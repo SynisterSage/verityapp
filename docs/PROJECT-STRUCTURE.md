@@ -83,7 +83,7 @@ Backend:     Node.js + Express on Railway (TypeScript)
 Database:    Supabase PostgreSQL
 Phone:       Twilio
 Speech-to-Text: Azure (free tier)
-Email:       SendGrid
+Email:       Resend
 Real-time:   Supabase Realtime (WebSocket)
 Auth:        Supabase Auth (JWT)
 Storage:     Supabase Storage (recordings)
@@ -367,7 +367,7 @@ POST   /webhook/twilio/recording-ready    # Voicemail ready
 ```
 Twilio:           ~$5-10   (100-1000 calls)
 Azure:            ~$0      (free tier: 5 hours/month)
-SendGrid:         ~$0      (free tier: 100 emails/day)
+Resend:           ~$0      (sandbox senders available)
 Supabase:         ~$0      (free tier starter)
 Railway:          ~$5-10   (small server)
 Total:            ~$10-20/month
@@ -547,7 +547,7 @@ Created documentation files:
    - Supabase project (PostgreSQL database)
    - Twilio account (virtual phone number)
    - Azure Speech-to-Text (API key)
-   - SendGrid account (email service)
+  - Resend account (email service)
 
 3. **Start Backend Development**
    - Express app setup

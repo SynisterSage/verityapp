@@ -87,7 +87,7 @@ safecall/
 │   │   │   ├── twilio.ts               # Twilio integration
 │   │   │   ├── azure.ts                # Speech-to-Text
 │   │   │   ├── supabase.ts             # Database
-│   │   │   ├── sendgrid.ts             # Email service
+│   │   │   ├── email.ts                # Email service (Resend wrapper)
 │   │   │   ├── fraud.ts                # Fraud detection
 │   │   │   └── recording.ts            # Audio handling
 │   │   ├── middleware/                 # Express middleware
@@ -195,7 +195,7 @@ cp .env.example .env
 # TWILIO_AUTH_TOKEN=...
 # AZURE_SPEECH_KEY=...
 # AZURE_SPEECH_REGION=...
-# SENDGRID_API_KEY=...
+# RESEND_API_KEY=...
 # SESSION_SECRET=...
 
 # Create database migrations (manual first time)
@@ -226,9 +226,9 @@ TWILIO_WEBHOOK_SECRET=xxxx
 AZURE_SPEECH_KEY=xxxx
 AZURE_SPEECH_REGION=eastus
 
-# SendGrid
-SENDGRID_API_KEY=SG.xxxx
-SENDGRID_FROM_EMAIL=noreply@safecall.app
+# Resend
+RESEND_API_KEY=re_xxxx
+RESEND_FROM_EMAIL=onboarding@resend.dev # or another verified sender from Resend (no domain required)
 
 # Application
 NODE_ENV=development

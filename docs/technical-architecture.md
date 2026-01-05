@@ -21,7 +21,7 @@
 │  - REST endpoints (/auth, /profiles, /calls, /alerts)           │
 │  - Twilio webhooks (/webhook/twilio/*)                          │
 │  - Background jobs (transcription, fraud detection)             │
-│  - Email service (SendGrid)                                     │
+│  - Email service (Resend)                                       │
 └──────┬───────────────────────────┬──────────────┬───────────────┘
        │                           │              │
        ▼                           ▼              ▼
@@ -80,7 +80,7 @@
 7. ALERT GENERATION
    If fraud detected (score > 70)
    ├─ Create alert record
-   ├─ Send email via SendGrid
+   ├─ Send email via Resend
    ├─ Broadcast via Supabase Realtime (WebSocket)
 
 8. FAMILY NOTIFICATION
@@ -172,7 +172,7 @@ src/
 │   ├── twilio.ts (Twilio integration)
 │   ├── azure.ts (Speech-to-Text)
 │   ├── supabase.ts (Database)
-│   ├── sendgrid.ts (Email)
+│   ├── email.ts (Email service with Resend)
 │   ├── fraud.ts (Fraud detection)
 │   └── recording.ts (Audio handling)
 ├── middleware/
@@ -236,7 +236,7 @@ src/
   "twilio": "for Twilio integration",
   "@azure/cognitiveservices-speech": "for transcription",
   "@supabase/supabase-js": "for database",
-  "sendgrid": "for email",
+  "resend": "for email",
   "jsonwebtoken": "for auth",
   "dotenv": "for environment variables",
   "cors": "for cross-origin requests"
@@ -288,13 +288,12 @@ src/
 - 5 audio hours per month
 - No SLA
 
-### Email: SendGrid
+### Email: Resend
 
 **Why:**
-- Free tier: 100 emails/day
-- Excellent deliverability
-- Easy integration
-- Good for transactional emails
+- API-first, modern transactional email service
+- Sandboxed `resend.dev` senders that work without a custom domain
+- Clear delivery guarantees and webhooks for alerts
 
 ## Hosting & Deployment
 

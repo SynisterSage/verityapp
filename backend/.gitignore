@@ -1,0 +1,9 @@
+**/node_modules
+dist/
+temp/
+**/**/*.log
+config.js
+tsconfig.tsbuildinfo
+.env
+.env.*
+!.env.example

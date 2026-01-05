@@ -207,7 +207,7 @@ CREATE TABLE alerts (
   max_retries INT DEFAULT 3,
   
   -- External IDs for tracking
-  email_message_id VARCHAR(255),  -- SendGrid message ID
+  email_message_id VARCHAR(255),  -- Resend message ID (if available)
   sms_sid VARCHAR(255),  -- Twilio SMS SID
   
   -- Metadata
