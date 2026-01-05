@@ -5,6 +5,7 @@ import twilio from 'twilio';
 import fetch from 'node-fetch';
 import supabaseAdmin from '@src/services/supabase';
 import { transcribeWavBuffer } from '@src/services/azure';
+import { analyzeTranscript, hashCallerNumber, matchPhrases, scoreToRiskLevel } from '@src/services/fraud';
 
 const DEFAULT_GREETING = 'Hello, you have reached SafeCall.';
 
@@ -130,6 +131,28 @@ async function resolveToNumber(callSid?: string, fallbackTo?: string) {
   }
 }
 
+async function resolveFromNumber(callSid?: string, fallbackFrom?: string) {
+  if (fallbackFrom) {
+    return fallbackFrom;
+  }
+  if (!callSid) {
+    return '';
+  }
+  const accountSid = process.env.TWILIO_ACCOUNT_SID ?? '';
+  const authToken = process.env.TWILIO_AUTH_TOKEN ?? '';
+  if (!accountSid || !authToken) {
+    return '';
+  }
+  const client = twilio(accountSid, authToken);
+  try {
+    const call = await client.calls(callSid).fetch();
+    return call.from ?? '';
+  } catch (err) {
+    logger.err(err as Error);
+    return '';
+  }
+}
+
 async function getProfileByToNumber(to?: string | null) {
   if (!to) {
     return null;
@@ -149,6 +172,7 @@ async function verifyPin(req: Request, res: Response) {
   const payload = getPayload(req);
   const pin = extractPin(payload.Digits, payload.SpeechResult);
   const toNumber = payload.To ?? '';
+  const fromNumber = payload.From ?? '';
   const callbackUrl = buildRecordingCallbackUrl(req);
   const dialStatusUrl = buildDialStatusUrl(req);
   const { VoiceResponse } = twilio.twiml;
@@ -170,6 +194,39 @@ async function verifyPin(req: Request, res: Response) {
     });
     twimlResponse.hangup();
     return res.type('text/xml').send(twimlResponse.toString());
+  }
+
+  const callBlockingEnabled = process.env.ENABLE_CALL_BLOCKING === 'true';
+  if (callBlockingEnabled) {
+    const callerHash = hashCallerNumber(fromNumber);
+    if (callerHash) {
+      const { data: blocked } = await supabaseAdmin
+        .from('blocked_callers')
+        .select('id, blocked_until')
+        .eq('profile_id', profile.id)
+        .eq('caller_hash', callerHash)
+        .maybeSingle();
+      if (blocked) {
+        const stillBlocked =
+          !blocked.blocked_until || new Date(blocked.blocked_until) > new Date();
+        if (stillBlocked) {
+          twimlResponse.say(
+            { voice: 'Polly.Joanna' },
+            'We cannot connect your call. Please leave a message.'
+          );
+          twimlResponse.record({
+            recordingStatusCallback: callbackUrl,
+            recordingStatusCallbackMethod: 'POST',
+            maxLength: 120,
+            playBeep: true,
+            trim: 'trim-silence',
+            finishOnKey: '#',
+          });
+          twimlResponse.hangup();
+          return res.type('text/xml').send(twimlResponse.toString());
+        }
+      }
+    }
   }
 
   const isValid = verifyPinHash(pin, profile.passcode_hash);
@@ -238,9 +295,12 @@ async function recordingReady(req: Request, res: Response) {
     RecordingStatus,
     RecordingDuration,
     To,
+    From,
   } = getPayload(req);
   const wavUrl = getRecordingUrl(RecordingUrl);
   const resolvedTo = await resolveToNumber(CallSid, To);
+  const resolvedFrom = await resolveFromNumber(CallSid, From);
+  const callerHash = hashCallerNumber(resolvedFrom);
   logger.info(
     `Twilio recording ready CallSid=${CallSid} RecordingSid=${RecordingSid} status=${RecordingStatus} url=${wavUrl} To=${resolvedTo}`
   );
@@ -270,6 +330,8 @@ async function recordingReady(req: Request, res: Response) {
       recording_url: wavUrl,
       recording_status: RecordingStatus ?? null,
       recording_duration_seconds: RecordingDuration ? Number(RecordingDuration) : null,
+      caller_number: resolvedFrom || null,
+      caller_hash: callerHash,
     })
     .select('id')
     .single();
@@ -314,6 +376,76 @@ async function recordingReady(req: Request, res: Response) {
       return res.status(204).end();
     }
     const { text, confidence } = await transcribeWavBuffer(recordingBuffer);
+    const fraudThreshold = Number(process.env.FRAUD_SCORE_THRESHOLD ?? 90);
+    const fraudResult = text ? analyzeTranscript(text) : null;
+    let fraudScore = fraudResult?.score ?? null;
+    let fraudRiskLevel = fraudResult?.riskLevel ?? null;
+    const fraudKeywords = fraudResult?.matchedKeywords ?? null;
+    const fraudNotes: {
+      matchCount: number;
+      weightSum: number;
+      comboBoost: number;
+      negatedMatches: string[];
+      urgencyHits: number;
+      secrecyHits: number;
+      impersonationHits: number;
+      paymentAppHits: number;
+      codeRequestHits: number;
+      safePhraseMatches: string[];
+      safePhraseDampening: number;
+      repeatCallerBoost: number;
+      callerHistory: { windowDays: number; previousCalls: number } | null;
+    } | null = fraudResult
+      ? {
+          ...fraudResult.notes,
+          callerHistory: null,
+        }
+      : null;
+
+    if (callerHash && fraudNotes) {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { count } = await supabaseAdmin
+        .from('calls')
+        .select('id', { count: 'exact', head: true })
+        .eq('profile_id', profile.id)
+        .eq('caller_hash', callerHash)
+        .gte('created_at', thirtyDaysAgo)
+        .neq('id', callRow.id);
+      const previousCalls = count ?? 0;
+      fraudNotes.callerHistory = {
+        windowDays: 30,
+        previousCalls,
+      };
+      if (typeof fraudScore === 'number') {
+        const repeatBoost = previousCalls >= 5 ? 10 : previousCalls >= 2 ? 5 : 0;
+        fraudNotes.repeatCallerBoost = repeatBoost;
+        fraudScore = Math.min(100, fraudScore + repeatBoost);
+      }
+    }
+
+    if (text && fraudNotes) {
+      const { data: safeRows } = await supabaseAdmin
+        .from('fraud_safe_phrases')
+        .select('phrase')
+        .eq('profile_id', profile.id);
+      const safeMatches = matchPhrases(
+        text,
+        safeRows?.map((row) => row.phrase) ?? []
+      );
+      const dampening =
+        typeof fraudScore === 'number'
+          ? Math.min(20, safeMatches.length * 8)
+          : 0;
+      fraudNotes.safePhraseMatches = safeMatches;
+      fraudNotes.safePhraseDampening = dampening;
+      if (typeof fraudScore === 'number' && dampening > 0) {
+        fraudScore = Math.max(0, fraudScore - dampening);
+      }
+    }
+
+    if (typeof fraudScore === 'number') {
+      fraudRiskLevel = scoreToRiskLevel(fraudScore);
+    }
     await supabaseAdmin
       .from('calls')
       .update({
@@ -321,8 +453,49 @@ async function recordingReady(req: Request, res: Response) {
         transcript: text || null,
         transcript_confidence: confidence ?? null,
         transcribed_at: text ? new Date().toISOString() : null,
+        caller_number: resolvedFrom || null,
+        caller_hash: callerHash,
+        fraud_score: fraudScore,
+        fraud_risk_level: fraudRiskLevel,
+        fraud_keywords: fraudKeywords,
+        fraud_notes: fraudNotes,
+        fraud_alert_required:
+          typeof fraudScore === 'number' ? fraudScore >= fraudThreshold : false,
       })
       .eq('id', callRow.id);
+
+    if (typeof fraudScore === 'number' && fraudScore >= fraudThreshold) {
+      await supabaseAdmin
+        .from('alerts')
+        .upsert(
+          {
+            profile_id: profile.id,
+            call_id: callRow.id,
+            alert_type: 'fraud',
+            status: 'pending',
+            payload: {
+              score: fraudScore,
+              riskLevel: fraudRiskLevel,
+              keywords: fraudKeywords,
+              callerHash,
+            },
+          },
+          { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
+        );
+
+      const callBlockingEnabled = process.env.ENABLE_CALL_BLOCKING === 'true';
+      if (callBlockingEnabled && callerHash) {
+        await supabaseAdmin.from('blocked_callers').upsert(
+          {
+            profile_id: profile.id,
+            caller_hash: callerHash,
+            caller_number: resolvedFrom || null,
+            reason: `fraud_score_${fraudScore}`,
+          },
+          { onConflict: 'profile_id,caller_hash' }
+        );
+      }
+    }
   } catch (err) {
     logger.err(err as Error);
   }
