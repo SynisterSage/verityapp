@@ -3,6 +3,7 @@ import { Router } from 'express';
 import PATHS from '@src/common/constants/PATHS';
 import UserRoutes from './UserRoutes';
 import TwilioRoutes from './TwilioRoutes';
+import CallsRoutes from './CallsRoutes';
 
 /******************************************************************************
                                 Setup
@@ -25,6 +26,7 @@ userRouter.delete(PATHS.Users.Delete, UserRoutes.delete);
 // Add UserRouter
 apiRouter.use(PATHS.Users._, userRouter);
 apiRouter.use('/webhook/twilio', TwilioRoutes);
+apiRouter.use(PATHS.Calls._, CallsRoutes);
 
 /******************************************************************************
                                 Export default

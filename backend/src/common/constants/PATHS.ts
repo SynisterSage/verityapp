@@ -9,6 +9,10 @@ const PATHS = {
     Update: '/update',
     Delete: '/delete/:id',
   },
+  Calls: {
+    _: '/calls',
+    RecordingUrl: '/:callId/recording-url',
+  },
 } as const;
 
 export const JET_PATHS = jetPaths(PATHS);
