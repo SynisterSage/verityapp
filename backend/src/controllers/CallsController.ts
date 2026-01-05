@@ -86,6 +86,78 @@ async function getRecordingUrl(req: Request, res: Response) {
   });
 }
 
+async function submitFeedback(req: Request, res: Response) {
+  const { callId } = req.params;
+  if (!callId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing callId' });
+  }
+
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { status, notes } = req.body as { status?: string; notes?: string };
+  const allowedStatuses = new Set(['marked_safe', 'marked_fraud', 'reviewed']);
+  if (!status || !allowedStatuses.has(status)) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid status' });
+  }
+
+  const { data: callRow, error: callError } = await supabaseAdmin
+    .from('calls')
+    .select('profile_id')
+    .eq('id', callId)
+    .single();
+
+  if (callError || !callRow?.profile_id) {
+    return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Call not found' });
+  }
+
+  const { data: profileRow } = await supabaseAdmin
+    .from('profiles')
+    .select('caretaker_id')
+    .eq('id', callRow.profile_id)
+    .maybeSingle();
+
+  if (!profileRow) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const isCaretaker = profileRow.caretaker_id === userId;
+  let isMember = false;
+  if (!isCaretaker) {
+    const { data: memberRow } = await supabaseAdmin
+      .from('profile_members')
+      .select('id')
+      .eq('profile_id', callRow.profile_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    isMember = !!memberRow;
+  }
+
+  if (!isCaretaker && !isMember) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('calls')
+    .update({
+      feedback_status: status,
+      feedback_notes: notes ?? null,
+      feedback_by_user_id: userId,
+      feedback_at: new Date().toISOString(),
+    })
+    .eq('id', callId);
+
+  if (updateError) {
+    logger.err(updateError);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to save feedback' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
+}
+
 export default {
   getRecordingUrl,
+  submitFeedback,
 };

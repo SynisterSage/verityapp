@@ -12,10 +12,16 @@ const PATHS = {
   Calls: {
     _: '/calls',
     RecordingUrl: '/:callId/recording-url',
+    Feedback: '/:callId/feedback',
   },
   Alerts: {
     _: '/alerts',
     Update: '/:alertId',
+  },
+  Fraud: {
+    _: '/fraud',
+    SafePhrases: '/safe-phrases',
+    BlockedCallers: '/blocked-callers',
   },
 } as const;
 

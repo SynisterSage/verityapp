@@ -2,6 +2,7 @@ import morgan from 'morgan';
 import path from 'path';
 import helmet from 'helmet';
 import express, { Request, Response, NextFunction } from 'express';
+import rateLimit from 'express-rate-limit';
 import logger from 'jet-logger';
 
 import BaseRouter from '@src/routes';
@@ -21,12 +22,23 @@ import { NODE_ENVS } from '@src/common/constants';
 
 const app = express();
 
+// Allow express-rate-limit to respect X-Forwarded-For behind proxies (ngrok, prod LB).
+app.set('trust proxy', 1);
+
 
 // **** Middleware **** //
 
 // Basic middleware
 app.use(express.json());
 app.use(express.urlencoded({extended: true}));
+
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path.startsWith('/webhook/twilio'),
+});
 
 // Show routes called in console during development
 if (ENV.NodeEnv === NODE_ENVS.Dev) {
@@ -42,7 +54,7 @@ if (ENV.NodeEnv === NODE_ENVS.Production) {
 }
 
 // Add APIs, must be after middleware
-app.use(Paths._, BaseRouter);
+app.use(Paths._, apiLimiter, BaseRouter);
 
 // Add error handler
 app.use((err: Error, _: Request, res: Response, next: NextFunction) => {

@@ -5,6 +5,7 @@ import UserRoutes from './UserRoutes';
 import TwilioRoutes from './TwilioRoutes';
 import CallsRoutes from './CallsRoutes';
 import AlertsRoutes from './AlertsRoutes';
+import FraudRoutes from './FraudRoutes';
 
 /******************************************************************************
                                 Setup
@@ -29,6 +30,7 @@ apiRouter.use(PATHS.Users._, userRouter);
 apiRouter.use('/webhook/twilio', TwilioRoutes);
 apiRouter.use(PATHS.Calls._, CallsRoutes);
 apiRouter.use(PATHS.Alerts._, AlertsRoutes);
+apiRouter.use(PATHS.Fraud._, FraudRoutes);
 
 /******************************************************************************
                                 Export default
