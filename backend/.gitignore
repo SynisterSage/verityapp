@@ -9,6 +9,3 @@ tsconfig.tsbuildinfo
 !.env.example
 config/.env.*
 !config/.env.example
-!.env.test
-!.env.production
-!.env.development
