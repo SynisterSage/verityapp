@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, ActivityIndicator } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { Audio, AVPlaybackStatusSuccess } from 'expo-av';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import { supabase } from '../../services/supabase';
 import { authorizedFetch } from '../../services/backend';
@@ -12,9 +23,12 @@ type CallRow = {
   fraud_score: number | null;
   fraud_risk_level: string | null;
   fraud_keywords: string[] | null;
+  caller_number: string | null;
 };
 
 export default function CallDetailScreen({ route }: { route: any }) {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
   const { callId } = route.params;
   const [callRow, setCallRow] = useState<CallRow | null>(null);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
@@ -27,7 +41,9 @@ export default function CallDetailScreen({ route }: { route: any }) {
     const load = async () => {
       const { data } = await supabase
         .from('calls')
-        .select('id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords')
+        .select(
+          'id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords, caller_number'
+        )
         .eq('id', callId)
         .single();
       setCallRow(data ?? null);
@@ -126,16 +142,26 @@ export default function CallDetailScreen({ route }: { route: any }) {
 
   if (!callRow) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <Text style={styles.loading}>Loading…</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.title}>Call Detail</Text>
-      <Text style={styles.meta}>{new Date(callRow.created_at).toLocaleString()}</Text>
+    <SafeAreaView
+      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
+      edges={[]}
+    >
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color="#e4ebf7" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Call Detail</Text>
+      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        <Text style={styles.caller}>{callRow.caller_number ?? 'Unknown caller'}</Text>
+        <Text style={styles.meta}>{new Date(callRow.created_at).toLocaleString()}</Text>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Transcript</Text>
@@ -185,15 +211,22 @@ export default function CallDetailScreen({ route }: { route: any }) {
         ) : null}
       </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => markFeedback('marked_safe')}>
-          <Text style={styles.secondaryText}>Mark Safe</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.dangerButton} onPress={() => markFeedback('marked_fraud')}>
-          <Text style={styles.secondaryText}>Mark Fraud</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => markFeedback('marked_safe')}
+          >
+            <Text style={styles.secondaryText}>Mark Safe</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.dangerButton}
+            onPress={() => markFeedback('marked_fraud')}
+          >
+            <Text style={styles.secondaryText}>Mark Fraud</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -202,13 +235,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0b111b',
   },
-  content: {
-    padding: 24,
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 0,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  title: {
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#121a26',
+    borderWidth: 1,
+    borderColor: '#1f2a3a',
+  },
+  headerTitle: {
     color: '#f5f7fb',
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '700',
+    marginLeft: 12,
+  },
+  content: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 120,
+  },
+  caller: {
+    color: '#cbd6ea',
+    marginTop: 4,
+    fontSize: 15,
   },
   meta: {
     color: '#8aa0c6',
@@ -274,7 +332,8 @@ const styles = StyleSheet.create({
   },
   loading: {
     color: '#8aa0c6',
-    padding: 24,
+    paddingHorizontal: 24,
+    paddingTop: 16,
   },
   playButton: {
     backgroundColor: '#2d6df6',

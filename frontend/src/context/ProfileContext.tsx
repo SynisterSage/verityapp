@@ -22,6 +22,7 @@ type ProfileContextValue = {
   activeProfile: Profile | null;
   onboardingComplete: boolean;
   isLoading: boolean;
+  authInvalid: boolean;
   refreshProfiles: () => Promise<void>;
   setActiveProfile: (profile: Profile | null) => void;
   setOnboardingComplete: (value: boolean) => void;
@@ -30,16 +31,18 @@ type ProfileContextValue = {
 const ProfileContext = createContext<ProfileContextValue | undefined>(undefined);
 
 export function ProfileProvider({ children }: { children: React.ReactNode }) {
-  const { session } = useAuth();
+  const { session, signOut } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [authInvalid, setAuthInvalid] = useState(false);
 
   const refreshProfiles = async () => {
     if (!session) {
       setProfiles([]);
       setActiveProfile(null);
+      setAuthInvalid(false);
       return;
     }
     setIsLoading(true);
@@ -49,7 +52,13 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setProfiles(list);
       setActiveProfile(list[0] ?? null);
       setOnboardingComplete(Boolean(list[0]?.has_passcode));
-    } catch {
+      setAuthInvalid(false);
+    } catch (err) {
+      const message = err instanceof Error ? err.message.toLowerCase() : '';
+      if (message.includes('401') || message.includes('unauthorized')) {
+        await signOut();
+        setAuthInvalid(true);
+      }
       setProfiles([]);
       setActiveProfile(null);
       setOnboardingComplete(false);
@@ -68,11 +77,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       activeProfile,
       onboardingComplete,
       isLoading,
+      authInvalid,
       refreshProfiles,
       setActiveProfile,
       setOnboardingComplete,
     }),
-    [profiles, activeProfile, onboardingComplete, isLoading]
+    [profiles, activeProfile, onboardingComplete, isLoading, authInvalid]
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
