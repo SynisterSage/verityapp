@@ -23,12 +23,19 @@ import SettingsScreen from './src/screens/settings/SettingsScreen';
 import SafePhrasesScreen from './src/screens/settings/SafePhrasesScreen';
 import BlocklistScreen from './src/screens/settings/BlocklistScreen';
 import DataPrivacyScreen from './src/screens/settings/DataPrivacyScreen';
+import TrustedContactsScreen from './src/screens/settings/TrustedContactsScreen';
+import AccountScreen from './src/screens/settings/AccountScreen';
+import SecurityScreen from './src/screens/settings/SecurityScreen';
+import ChangePasscodeScreen from './src/screens/settings/ChangePasscodeScreen';
+import NotificationsScreen from './src/screens/settings/NotificationsScreen';
 import CreateProfileScreen from './src/screens/onboarding/CreateProfileScreen';
 import PasscodeScreen from './src/screens/onboarding/PasscodeScreen';
 import OnboardingSafePhrasesScreen from './src/screens/onboarding/OnboardingSafePhrasesScreen';
 import InviteFamilyScreen from './src/screens/onboarding/InviteFamilyScreen';
 import AlertPrefsScreen from './src/screens/onboarding/AlertPrefsScreen';
 import TestCallScreen from './src/screens/onboarding/TestCallScreen';
+import OnboardingTrustedContactsScreen from './src/screens/onboarding/OnboardingTrustedContactsScreen';
+import OnboardingCallForwardingScreen from './src/screens/onboarding/OnboardingCallForwardingScreen';
 import BottomDock from './src/components/navigation/BottomDock';
 
 export type RootStackParamList = {
@@ -36,9 +43,11 @@ export type RootStackParamList = {
   SignUp: undefined;
   OnboardingProfile: undefined;
   OnboardingPasscode: undefined;
+  OnboardingTrustedContacts: undefined;
   OnboardingSafePhrases: undefined;
   OnboardingInviteFamily: undefined;
   OnboardingAlerts: undefined;
+  OnboardingCallForwarding: undefined;
   OnboardingTestCall: undefined;
   AppTabs: undefined;
   CallDetailModal: { callId: string };
@@ -58,7 +67,12 @@ type CallsStackParamList = {
 
 type SettingsStackParamList = {
   Settings: undefined;
+  Account: undefined;
+  Notifications: undefined;
+  Security: undefined;
+  ChangePasscode: undefined;
   SafePhrases: undefined;
+  TrustedContacts: undefined;
   Blocklist: undefined;
   DataPrivacy: undefined;
 };
@@ -105,9 +119,17 @@ function SettingsStackNavigator() {
       }}
     >
       <SettingsStack.Screen name="Settings" component={SettingsScreen} />
+      <SettingsStack.Screen name="Account" component={AccountScreen} />
+      <SettingsStack.Screen name="Notifications" component={NotificationsScreen} />
+      <SettingsStack.Screen name="Security" component={SecurityScreen} />
+      <SettingsStack.Screen name="ChangePasscode" component={ChangePasscodeScreen} />
       <SettingsStack.Screen
         name="SafePhrases"
         component={SafePhrasesScreen}
+      />
+      <SettingsStack.Screen
+        name="TrustedContacts"
+        component={TrustedContactsScreen}
       />
       <SettingsStack.Screen name="Blocklist" component={BlocklistScreen} />
       <SettingsStack.Screen name="DataPrivacy" component={DataPrivacyScreen} />
@@ -136,7 +158,11 @@ function AppTabs() {
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} options={{ title: 'Home' }} />
       <Tab.Screen name="CallsTab" component={CallsStackNavigator} options={{ title: 'Calls' }} />
-      <Tab.Screen name="AlertsTab" component={AlertsScreen} options={{ title: 'Alerts' }} />
+      <Tab.Screen
+        name="AlertsTab"
+        component={AlertsScreen}
+        options={{ title: 'Alerts' }}
+      />
       <Tab.Screen
         name="SettingsTab"
         component={SettingsStackNavigator}
@@ -170,6 +196,11 @@ function RootNavigator() {
               options={{ title: 'Set Passcode' }}
             />
             <RootStack.Screen
+              name="OnboardingTrustedContacts"
+              component={OnboardingTrustedContactsScreen}
+              options={{ title: 'Trusted Contacts' }}
+            />
+            <RootStack.Screen
               name="OnboardingSafePhrases"
               component={OnboardingSafePhrasesScreen}
               options={{ title: 'Safe Phrases' }}
@@ -183,6 +214,11 @@ function RootNavigator() {
               name="OnboardingAlerts"
               component={AlertPrefsScreen}
               options={{ title: 'Alert Preferences' }}
+            />
+            <RootStack.Screen
+              name="OnboardingCallForwarding"
+              component={OnboardingCallForwardingScreen}
+              options={{ title: 'Call Forwarding' }}
             />
             <RootStack.Screen
               name="OnboardingTestCall"

@@ -27,6 +27,8 @@ const PATHS = {
     _: '/profiles',
     Get: '/',
     Create: '/',
+    Update: '/:profileId',
+    Delete: '/:profileId',
     Passcode: '/:profileId/passcode',
     Alerts: '/:profileId/alerts',
     Invites: '/:profileId/invites',

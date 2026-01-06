@@ -45,15 +45,112 @@ function extractPin(digits?: string, speechResult?: string) {
   return numeric.length >= 6 ? numeric.slice(0, 6) : '';
 }
 
+async function isCallerTrusted(profileId: string, fromNumber?: string | null) {
+  const callerHash = hashCallerNumber(fromNumber);
+  if (!callerHash) {
+    return false;
+  }
+  const { data } = await supabaseAdmin
+    .from('trusted_contacts')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('caller_hash', callerHash)
+    .maybeSingle();
+  return !!data;
+}
+
+function appendVoicemail(
+  twimlResponse: twilio.twiml.VoiceResponse,
+  callbackUrl: string,
+  message: string
+) {
+  twimlResponse.say({ voice: 'Polly.Joanna' }, message);
+  twimlResponse.record({
+    recordingStatusCallback: callbackUrl,
+    recordingStatusCallbackMethod: 'POST',
+    maxLength: 120,
+    playBeep: true,
+    trim: 'trim-silence',
+    finishOnKey: '#',
+  });
+  twimlResponse.hangup();
+}
+
+function appendHangupMessage(
+  twimlResponse: twilio.twiml.VoiceResponse,
+  message: string
+) {
+  twimlResponse.say({ voice: 'Polly.Joanna' }, message);
+  twimlResponse.hangup();
+}
+
+function appendBridge(
+  twimlResponse: twilio.twiml.VoiceResponse,
+  dialStatusUrl: string,
+  callerId: string,
+  destination: string
+) {
+  twimlResponse.say({ voice: 'Polly.Joanna' }, 'Thank you. Connecting your call.');
+  const dial = twimlResponse.dial({
+    callerId,
+    timeout: 20,
+    answerOnBridge: true,
+  });
+  dial.number(
+    {
+      statusCallback: dialStatusUrl,
+      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+      statusCallbackMethod: 'POST',
+    },
+    destination
+  );
+}
+
 /**
  * Respond to Twilio when a call comes in. We play a greeting, record the voicemail,
  * and point recordingStatusCallback to our recording-ready webhook.
  */
-function callIncoming(req: Request, res: Response) {
+async function callIncoming(req: Request, res: Response) {
   const callbackUrl = buildRecordingCallbackUrl(req);
   const verifyUrl = buildVerifyPinUrl(req);
+  const dialStatusUrl = buildDialStatusUrl(req);
   const { VoiceResponse } = twilio.twiml;
   const twimlResponse = new VoiceResponse();
+
+  const payload = getPayload(req);
+  const toNumber = payload.To ?? '';
+  const fromNumber = payload.From ?? '';
+  const profile = await getProfileByToNumber(toNumber);
+  if (profile) {
+    const trusted = await isCallerTrusted(profile.id, fromNumber);
+    if (trusted) {
+      const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
+      if (bridgeEnabled && profile.phone_number) {
+        const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
+        appendBridge(twimlResponse, dialStatusUrl, outboundCallerId, profile.phone_number);
+        logger.info(`Trusted caller bridged to=${toNumber} from=${fromNumber}`);
+        return res.type('text/xml').send(twimlResponse.toString());
+      }
+      await supabaseAdmin.from('alerts').insert({
+        profile_id: profile.id,
+        call_id: null,
+        alert_type: 'trusted',
+        status: 'pending',
+        payload: {
+          callerNumber: fromNumber || null,
+          riskLevel: 'low',
+          label: 'trusted',
+        },
+      });
+      appendHangupMessage(
+        twimlResponse,
+        'Thank you. We will let them know you called.'
+      );
+      logger.info(`Trusted caller bypassed passcode to=${toNumber} from=${fromNumber}`);
+      return res.type('text/xml').send(twimlResponse.toString());
+    }
+  }
+
   twimlResponse.say({ voice: 'Polly.Joanna' }, DEFAULT_GREETING);
   const gather = twimlResponse.gather({
     input: ['dtmf', 'speech'],
@@ -67,16 +164,7 @@ function callIncoming(req: Request, res: Response) {
     'Please say or enter your six digit passcode.'
   );
   // If no input, go to voicemail.
-  twimlResponse.say({ voice: 'Polly.Joanna' }, 'No passcode received. Please leave a message.');
-  twimlResponse.record({
-    recordingStatusCallback: callbackUrl,
-    recordingStatusCallbackMethod: 'POST',
-    maxLength: 120,
-    playBeep: true,
-    trim: 'trim-silence',
-    finishOnKey: '#',
-  });
-  twimlResponse.hangup();
+  appendVoicemail(twimlResponse, callbackUrl, 'No passcode received. Please leave a message.');
   logger.info(`Twilio call incoming handled, callback ${callbackUrl}`);
   res.type('text/xml').send(twimlResponse.toString());
 }
@@ -169,19 +257,23 @@ async function verifyPin(req: Request, res: Response) {
 
   const profile = await getProfileByToNumber(toNumber);
   if (!profile) {
-    twimlResponse.say(
-      { voice: 'Polly.Joanna' },
+    appendVoicemail(
+      twimlResponse,
+      callbackUrl,
       'We could not verify this call. Please leave a message.'
     );
-    twimlResponse.record({
-      recordingStatusCallback: callbackUrl,
-      recordingStatusCallbackMethod: 'POST',
-      maxLength: 120,
-      playBeep: true,
-      trim: 'trim-silence',
-      finishOnKey: '#',
-    });
-    twimlResponse.hangup();
+    return res.type('text/xml').send(twimlResponse.toString());
+  }
+
+  const trusted = await isCallerTrusted(profile.id, fromNumber);
+  if (trusted) {
+    const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
+    if (bridgeEnabled && profile.phone_number) {
+      const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
+      appendBridge(twimlResponse, dialStatusUrl, outboundCallerId, profile.phone_number);
+      return res.type('text/xml').send(twimlResponse.toString());
+    }
+    appendHangupMessage(twimlResponse, 'Thank you. We will let them know you called.');
     return res.type('text/xml').send(twimlResponse.toString());
   }
 
@@ -199,19 +291,11 @@ async function verifyPin(req: Request, res: Response) {
         const stillBlocked =
           !blocked.blocked_until || new Date(blocked.blocked_until) > new Date();
         if (stillBlocked) {
-          twimlResponse.say(
-            { voice: 'Polly.Joanna' },
+          appendVoicemail(
+            twimlResponse,
+            callbackUrl,
             'We cannot connect your call. Please leave a message.'
           );
-          twimlResponse.record({
-            recordingStatusCallback: callbackUrl,
-            recordingStatusCallbackMethod: 'POST',
-            maxLength: 120,
-            playBeep: true,
-            trim: 'trim-silence',
-            finishOnKey: '#',
-          });
-          twimlResponse.hangup();
           return res.type('text/xml').send(twimlResponse.toString());
         }
       }
@@ -228,43 +312,15 @@ async function verifyPin(req: Request, res: Response) {
     logger.info(
       `Dialing profile_number=${profile.phone_number} callerId=${outboundCallerId}`
     );
-    twimlResponse.say({ voice: 'Polly.Joanna' }, 'Thank you. Connecting your call.');
-    const dial = twimlResponse.dial({
-      callerId: outboundCallerId,
-      timeout: 20,
-      answerOnBridge: true,
-    });
-    dial.number(
-      {
-        statusCallback: dialStatusUrl,
-        statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
-        statusCallbackMethod: 'POST',
-      },
-      profile.phone_number
-    );
+    appendBridge(twimlResponse, dialStatusUrl, outboundCallerId, profile.phone_number);
     return res.type('text/xml').send(twimlResponse.toString());
   }
 
   if (isValid && !bridgeEnabled) {
-    twimlResponse.say(
-      { voice: 'Polly.Joanna' },
-      'Thank you. Please leave a message.'
-    );
+    appendVoicemail(twimlResponse, callbackUrl, 'Thank you. Please leave a message.');
   } else {
-    twimlResponse.say(
-      { voice: 'Polly.Joanna' },
-      'Passcode not accepted. Please leave a message.'
-    );
+    appendVoicemail(twimlResponse, callbackUrl, 'Passcode not accepted. Please leave a message.');
   }
-  twimlResponse.record({
-    recordingStatusCallback: callbackUrl,
-    recordingStatusCallbackMethod: 'POST',
-    maxLength: 120,
-    playBeep: true,
-    trim: 'trim-silence',
-    finishOnKey: '#',
-  });
-  twimlResponse.hangup();
   return res.type('text/xml').send(twimlResponse.toString());
 }
 
@@ -307,6 +363,12 @@ async function recordingReady(req: Request, res: Response) {
     logger.warn(
       `No profile found for To=${resolvedTo} error=${profileError?.message ?? 'none'}`
     );
+    return res.status(204).end();
+  }
+
+  const trusted = await isCallerTrusted(profile.id, resolvedFrom);
+  if (trusted) {
+    logger.info(`Skipping recording for trusted caller profile=${profile.id}`);
     return res.status(204).end();
   }
 

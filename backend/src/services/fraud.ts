@@ -24,6 +24,8 @@ export type FraudNotes = {
   threatHits: number;
   accountAccessHits: number;
   moneyAmountHits: number;
+  taxScamHits: number;
+  bankFraudHits: number;
   criticalKeywordHits: number;
   safePhraseMatches: string[];
   safePhraseDampening: number;
@@ -64,12 +66,14 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'send money', weight: 20, category: 'banking' },
   { phrase: 'payment', weight: 30, category: 'banking' },
   { phrase: 'verify account', weight: 20, category: 'banking' },
+  { phrase: 'verify your account', weight: 28, category: 'banking' },
   { phrase: 'confirm credit card', weight: 22, category: 'banking' },
   { phrase: 'account number', weight: 28, category: 'banking' },
   { phrase: 'routing number', weight: 28, category: 'banking' },
-  { phrase: 'bank account', weight: 26, category: 'banking' },
-  { phrase: 'bank', weight: 20, category: 'banking' },
+  { phrase: 'bank account', weight: 28, category: 'banking' },
+  { phrase: 'bank', weight: 24, category: 'banking' },
   { phrase: 'refund', weight: 20, category: 'banking' },
+  { phrase: 'refund department', weight: 24, category: 'banking' },
   { phrase: 'overdraft', weight: 20, category: 'banking' },
   { phrase: 'password', weight: 20, category: 'banking' },
   { phrase: 'pin', weight: 20, category: 'banking' },
@@ -79,15 +83,65 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'balance', weight: 12, category: 'banking' },
   { phrase: 'transaction', weight: 12, category: 'banking' },
   { phrase: 'billing', weight: 12, category: 'banking' },
+  { phrase: 'fraud alert', weight: 40, category: 'banking' },
+  { phrase: 'fraud department', weight: 36, category: 'banking' },
+  { phrase: 'bank fraud', weight: 38, category: 'banking' },
+  { phrase: 'bank security', weight: 34, category: 'banking' },
+  { phrase: 'security department', weight: 32, category: 'banking' },
+  { phrase: 'fraud team', weight: 30, category: 'banking' },
+  { phrase: 'account compromised', weight: 34, category: 'banking' },
+  { phrase: 'account locked', weight: 30, category: 'banking' },
+  { phrase: 'account suspended', weight: 30, category: 'banking' },
+  { phrase: 'suspicious activity', weight: 32, category: 'banking' },
+  { phrase: 'suspicious transaction', weight: 32, category: 'banking' },
+  { phrase: 'unauthorized transaction', weight: 34, category: 'banking' },
+  { phrase: 'unauthorized charge', weight: 34, category: 'banking' },
 
   // Government & taxes
-  { phrase: 'irs', weight: 20, category: 'government' },
+  { phrase: 'irs', weight: 32, category: 'government' },
+  { phrase: 'internal revenue service', weight: 34, category: 'government' },
+  { phrase: 'revenue service', weight: 28, category: 'government' },
+  { phrase: 'tax authority', weight: 30, category: 'government' },
+  { phrase: 'tax agency', weight: 28, category: 'government' },
+  { phrase: 'tax office', weight: 28, category: 'government' },
+  { phrase: 'tax department', weight: 30, category: 'government' },
+  { phrase: 'tax bureau', weight: 30, category: 'government' },
+  { phrase: 'revenue department', weight: 30, category: 'government' },
+  { phrase: 'government debt', weight: 28, category: 'government' },
+  { phrase: 'federal tax', weight: 32, category: 'government' },
+  { phrase: 'state tax', weight: 28, category: 'government' },
+  { phrase: 'tax balance', weight: 30, category: 'government' },
+  { phrase: 'tax balance due', weight: 36, category: 'government' },
+  { phrase: 'balance due', weight: 28, category: 'government' },
+  { phrase: 'tax notice', weight: 28, category: 'government' },
+  { phrase: 'tax case', weight: 28, category: 'government' },
+  { phrase: 'tax investigation', weight: 34, category: 'government' },
+  { phrase: 'tax fraud', weight: 30, category: 'government' },
+  { phrase: 'tax audit', weight: 32, category: 'government' },
+  { phrase: 'audit notice', weight: 30, category: 'government' },
+  { phrase: 'audit department', weight: 28, category: 'government' },
+  { phrase: 'collections department', weight: 30, category: 'government' },
+  { phrase: 'collections agency', weight: 28, category: 'government' },
+  { phrase: 'tax collector', weight: 30, category: 'government' },
   { phrase: 'fbi', weight: 20, category: 'government' },
   { phrase: 'social security', weight: 20, category: 'government' },
   { phrase: 'legal action', weight: 20, category: 'government' },
   { phrase: 'arrest', weight: 20, category: 'government' },
-  { phrase: 'tax refund', weight: 20, category: 'government' },
-  { phrase: 'tax return', weight: 20, category: 'government' },
+  { phrase: 'tax refund', weight: 24, category: 'government' },
+  { phrase: 'tax return', weight: 24, category: 'government' },
+  { phrase: 'refund department', weight: 26, category: 'government' },
+  { phrase: 'tax refund owed', weight: 30, category: 'government' },
+  { phrase: 'back taxes', weight: 45, category: 'government' },
+  { phrase: 'back tax', weight: 42, category: 'government' },
+  { phrase: 'tax debt', weight: 42, category: 'government' },
+  { phrase: 'taxes owed', weight: 40, category: 'government' },
+  { phrase: 'owe taxes', weight: 38, category: 'government' },
+  { phrase: 'owed taxes', weight: 38, category: 'government' },
+  { phrase: 'tax lien', weight: 34, category: 'government' },
+  { phrase: 'tax warrant', weight: 36, category: 'government' },
+  { phrase: 'tax penalty', weight: 30, category: 'government' },
+  { phrase: 'tax collection', weight: 32, category: 'government' },
+  { phrase: 'taxes', weight: 22, category: 'government' },
   { phrase: 'federal', weight: 18, category: 'government' },
   { phrase: 'law enforcement', weight: 18, category: 'government' },
   { phrase: 'compliance', weight: 14, category: 'government' },
@@ -244,6 +298,8 @@ const ACCOUNT_ACCESS_TERMS = [
   'passcode',
   'login',
   'verify account',
+  'verify your account',
+  'account verification',
   'account number',
   'routing number',
   'bank account',
@@ -255,15 +311,55 @@ const IMPERSONATION_TERMS = [
   'this is the bank',
   'bank calling',
   'fraud department',
+  'fraud alert',
+  'bank fraud',
+  'bank security',
+  'security department',
+  'fraud team',
+  'account compromised',
+  'account locked',
+  'account suspended',
+  'suspicious activity',
+  'suspicious transaction',
+  'unauthorized transaction',
+  'unauthorized charge',
   'irs',
+  'internal revenue service',
+  'tax department',
+  'revenue service',
+  'tax authority',
+  'tax agency',
+  'tax office',
+  'tax bureau',
+  'revenue department',
+  'collections department',
+  'collections agency',
+  'tax collector',
+  'government debt',
+  'federal tax',
+  'state tax',
+  'tax audit',
+  'audit department',
+  'audit notice',
+  'tax investigation',
+  'tax fraud',
   'social security administration',
   'law enforcement',
   'sheriff',
   'police',
   'dea',
+  'homeland security',
+  'customs and border protection',
+  'border patrol',
+  'department of justice',
   'microsoft support',
   'apple support',
   'amazon support',
+  'google support',
+  'paypal support',
+  'bank of america',
+  'wells fargo',
+  'chase bank',
   'from the organization',
 ];
 
@@ -317,6 +413,25 @@ const HARD_BLOCK_TERMS = [
   'account number',
   'routing number',
   'bank account',
+  'back taxes',
+  'tax debt',
+  'taxes owed',
+  'owed taxes',
+  'owe taxes',
+  'tax lien',
+  'tax warrant',
+  'tax penalty',
+  'tax collection',
+  'tax balance due',
+  'tax audit',
+  'audit notice',
+  'tax investigation',
+  'tax fraud',
+  'fraud alert',
+  'bank fraud',
+  'account compromised',
+  'unauthorized transaction',
+  'unauthorized charge',
   'give me your money',
   'send me your money',
   'steal your money',
@@ -334,6 +449,17 @@ const HARD_BLOCK_PATTERNS = [
   /\b(give|send|wire|pay)\s+me\s+(your\s+)?(zelle|cash app|venmo|paypal|bank|account|card)\b/i,
   /\b(social security|ssn)\b/i,
   /\bverification code\b/i,
+  /\bback\s+tax(es)?\b/i,
+  /\btax(es)?\s+(owed|due)\b/i,
+  /\b(balance)\s+due\b/i,
+  /\btax\s+debt\b/i,
+  /\btax\s+lien\b/i,
+  /\btax\s+warrant\b/i,
+  /\btax\s+audit\b/i,
+  /\btax\s+investigation\b/i,
+  /\bunauthorized\s+(transaction|charge)\b/i,
+  /\bsuspicious\s+activity\b/i,
+  /\baccount\s+compromised\b/i,
 ];
 
 const MONEY_AMOUNT_PATTERNS = [
@@ -362,6 +488,49 @@ const CRITICAL_KEYWORDS = new Set([
   'account number',
   'routing number',
   'bank account',
+  'irs',
+  'internal revenue service',
+  'revenue service',
+  'tax authority',
+  'tax agency',
+  'tax office',
+  'tax bureau',
+  'revenue department',
+  'collections department',
+  'collections agency',
+  'tax collector',
+  'government debt',
+  'federal tax',
+  'state tax',
+  'tax audit',
+  'audit notice',
+  'tax investigation',
+  'tax fraud',
+  'back taxes',
+  'back tax',
+  'tax debt',
+  'taxes owed',
+  'owe taxes',
+  'owed taxes',
+  'tax lien',
+  'tax warrant',
+  'tax penalty',
+  'tax collection',
+  'tax balance due',
+  'balance due',
+  'fraud alert',
+  'fraud department',
+  'bank fraud',
+  'bank security',
+  'security department',
+  'fraud team',
+  'account compromised',
+  'account locked',
+  'account suspended',
+  'suspicious activity',
+  'suspicious transaction',
+  'unauthorized transaction',
+  'unauthorized charge',
   'wallet address',
   'bitcoin atm',
   'scam',
@@ -381,6 +550,59 @@ const CRITICAL_KEYWORDS = new Set([
   'send me your money',
   'payment',
 ]);
+
+const TAX_SCAM_TERMS = [
+  'irs',
+  'internal revenue service',
+  'revenue service',
+  'tax authority',
+  'tax agency',
+  'tax office',
+  'tax bureau',
+  'revenue department',
+  'collections department',
+  'collections agency',
+  'tax collector',
+  'government debt',
+  'federal tax',
+  'state tax',
+  'tax audit',
+  'audit notice',
+  'tax investigation',
+  'tax fraud',
+  'back taxes',
+  'back tax',
+  'tax debt',
+  'taxes owed',
+  'owe taxes',
+  'owed taxes',
+  'tax lien',
+  'tax warrant',
+  'tax penalty',
+  'tax collection',
+  'tax balance due',
+  'balance due',
+  'taxes',
+  'tax refund',
+  'tax return',
+];
+
+const BANK_FRAUD_TERMS = [
+  'fraud alert',
+  'fraud department',
+  'bank fraud',
+  'bank security',
+  'security department',
+  'fraud team',
+  'account compromised',
+  'account locked',
+  'account suspended',
+  'suspicious activity',
+  'suspicious transaction',
+  'unauthorized transaction',
+  'unauthorized charge',
+  'verify your account',
+];
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -488,6 +710,8 @@ function heuristicBoosts(text: string) {
     (count, pattern) => (pattern.test(text) ? count + 1 : count),
     0
   );
+  const taxScamHits = countPhraseHits(text, TAX_SCAM_TERMS);
+  const bankFraudHits = countPhraseHits(text, BANK_FRAUD_TERMS);
 
   let boost = 0;
   if (urgencyHits >= 2) boost += 10;
@@ -502,6 +726,10 @@ function heuristicBoosts(text: string) {
   if (threatHits >= 1) boost += 12;
   if (accountAccessHits >= 1) boost += 10;
   if (moneyAmountHits >= 1) boost += 10;
+  if (taxScamHits >= 1) boost += 30;
+  if (taxScamHits >= 2) boost += 10;
+  if (bankFraudHits >= 1) boost += 28;
+  if (bankFraudHits >= 2) boost += 10;
 
   if (secrecyHits >= 1 && paymentAppHits >= 1) boost += 12;
   if (urgencyHits >= 1 && paymentAppHits >= 1) boost += 8;
@@ -525,6 +753,8 @@ function heuristicBoosts(text: string) {
     threatHits,
     accountAccessHits,
     moneyAmountHits,
+    taxScamHits,
+    bankFraudHits,
   };
 }
 
@@ -571,6 +801,8 @@ export function analyzeTranscript(transcript: string) {
         threatHits: 0,
         accountAccessHits: 0,
         moneyAmountHits: 0,
+        taxScamHits: 0,
+        bankFraudHits: 0,
         criticalKeywordHits: 0,
         safePhraseMatches: [],
         safePhraseDampening: 0,
@@ -602,6 +834,8 @@ export function analyzeTranscript(transcript: string) {
         threatHits: heuristic.threatHits,
         accountAccessHits: heuristic.accountAccessHits,
         moneyAmountHits: heuristic.moneyAmountHits,
+        taxScamHits: heuristic.taxScamHits,
+        bankFraudHits: heuristic.bankFraudHits,
         criticalKeywordHits: 0,
         safePhraseMatches: [],
         safePhraseDampening: 0,
@@ -619,11 +853,32 @@ export function analyzeTranscript(transcript: string) {
   score += boost;
 
   const criticalKeywordHits = matches.filter((kw) => CRITICAL_KEYWORDS.has(kw.phrase)).length;
+  const taxKeywordHits = matches.filter((kw) => TAX_SCAM_TERMS.includes(kw.phrase)).length;
+  const taxHardTerms = new Set(['back taxes', 'back tax', 'tax debt', 'taxes owed', 'owe taxes', 'owed taxes', 'tax lien', 'tax warrant', 'tax penalty', 'tax collection']);
+  const taxHardHits = matches.filter((kw) => taxHardTerms.has(kw.phrase)).length;
+  const bankKeywordHits = matches.filter((kw) => BANK_FRAUD_TERMS.includes(kw.phrase)).length;
+  const bankHardTerms = new Set(['fraud alert', 'bank fraud', 'account compromised', 'unauthorized transaction', 'unauthorized charge', 'suspicious activity', 'suspicious transaction']);
+  const bankHardHits = matches.filter((kw) => bankHardTerms.has(kw.phrase)).length;
 
   if (heuristic.explicitScamHits >= 1) {
     score = Math.max(score, 90);
   }
   if (heuristic.hardBlockHits >= 1) {
+    score = Math.max(score, 95);
+  }
+  if (taxKeywordHits >= 1) {
+    score = Math.max(score, 90);
+  }
+  if (taxHardHits >= 1) {
+    score = Math.max(score, 100);
+  }
+  if (bankKeywordHits >= 1) {
+    score = Math.max(score, 85);
+  }
+  if (bankHardHits >= 1) {
+    score = Math.max(score, 95);
+  }
+  if (bankKeywordHits >= 1 && (heuristic.impersonationHits >= 1 || heuristic.accountAccessHits >= 1)) {
     score = Math.max(score, 95);
   }
   if (criticalKeywordHits >= 1) {
@@ -672,6 +927,8 @@ export function analyzeTranscript(transcript: string) {
       threatHits: heuristic.threatHits,
       accountAccessHits: heuristic.accountAccessHits,
       moneyAmountHits: heuristic.moneyAmountHits,
+      taxScamHits: heuristic.taxScamHits,
+      bankFraudHits: heuristic.bankFraudHits,
       criticalKeywordHits,
       safePhraseMatches: [],
       safePhraseDampening: 0,

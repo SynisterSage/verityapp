@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -33,6 +34,7 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const shimmer = useRef(new Animated.Value(0.6)).current;
+  const listRef = useRef<FlatList<CallRow>>(null);
 
   const loadCalls = async () => {
     setError(null);
@@ -72,6 +74,12 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
     return () => loop.stop();
   }, [shimmer]);
 
+  useFocusEffect(
+    useCallback(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, [])
+  );
+
   const skeletonRows = useMemo(() => Array.from({ length: 4 }, (_, i) => `skeleton-${i}`), []);
   const showSkeleton = loading && calls.length === 0 && !error;
   const contentOpacity = showSkeleton ? 0 : 1;
@@ -95,9 +103,18 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
           </Animated.View>
         ) : null}
         <FlatList
+          ref={listRef}
           data={calls}
           keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={loadCalls} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={loadCalls}
+              tintColor="#8ab4ff"
+              colors={['#8ab4ff']}
+            />
+          }
+          indicatorStyle="white"
           contentContainerStyle={[
             styles.listContent,
             !showSkeleton && calls.length === 0 && !error && styles.listEmptyContent,

@@ -51,3 +51,25 @@ Next suggested steps
 - Add push notification integration scaffolding.
 - Revisit fraud thresholds after collecting real-world samples.
 - Prepare production hosting (replace ngrok) and configure Twilio webhooks.
+
+2026-01-06
+Backend
+- Added trusted contacts table + endpoints and allowlist logic for Twilio inbound calls.
+- Skipped recording/transcription for trusted callers and created lightweight alerts for them.
+- Strengthened fraud detection with strict tax and bank/fraud impersonation phrases and scoring.
+- Added profile update/delete endpoints to support account management.
+
+Frontend
+- Built Trusted Contacts settings with native contact picker (iOS + Android), sync logic, and local contact name mapping.
+- Added Trusted Contacts to onboarding and implemented call forwarding tutorial step.
+- Added Account, Notifications, Security, and Change Passcode settings screens.
+- Added call forwarding screenshots and improved onboarding layout and scrolling.
+- Fixed navigation/dock behavior on nested settings, plus UX tweaks (keyboard dismiss, save flows).
+
+Native
+- Prebuilt native projects and added custom ContactPicker modules for iOS/Android.
+- Added contact permissions to app config and wired JS bridge.
+
+Operational notes
+- iOS build requires proper signing and a unique bundle identifier.
+- Expo Go cannot load custom native modules; use dev client builds for contact picker.

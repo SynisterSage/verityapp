@@ -45,6 +45,15 @@ async function userCanAccessProfile(userId: string, profileId: string) {
   return !!memberRow;
 }
 
+async function userIsCaretaker(userId: string, profileId: string) {
+  const { data: profileRow } = await supabaseAdmin
+    .from('profiles')
+    .select('caretaker_id')
+    .eq('id', profileId)
+    .maybeSingle();
+  return profileRow?.caretaker_id === userId;
+}
+
 async function listSafePhrases(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
@@ -260,6 +269,141 @@ async function deleteBlockedCaller(req: Request, res: Response) {
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
 }
 
+async function listTrustedContacts(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId } = req.query as Record<string, string | undefined>;
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const allowed = await userCanAccessProfile(userId, profileId);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('trusted_contacts')
+    .select('id, caller_number, source, created_at')
+    .eq('profile_id', profileId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    logger.err(error);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to load trusted contacts' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ trusted_contacts: data ?? [] });
+}
+
+async function addTrustedContacts(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId, callerNumber, callerNumbers, source } = req.body as {
+    profileId?: string;
+    callerNumber?: string;
+    callerNumbers?: string[];
+    source?: string;
+  };
+
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const allowed = await userIsCaretaker(userId, profileId);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const rawNumbers = Array.isArray(callerNumbers)
+    ? callerNumbers
+    : callerNumber
+      ? [callerNumber]
+      : [];
+
+  const normalizedSource = source === 'contacts' ? 'contacts' : 'manual';
+  const rows = rawNumbers
+    .map((number) => {
+      const trimmed = number?.trim();
+      const callerHash = hashCallerNumber(trimmed);
+      if (!trimmed || !callerHash) {
+        return null;
+      }
+      return {
+        profile_id: profileId,
+        caller_hash: callerHash,
+        caller_number: trimmed,
+        source: normalizedSource,
+      };
+    })
+    .filter(Boolean) as {
+      profile_id: string;
+      caller_hash: string;
+      caller_number: string;
+      source: 'manual' | 'contacts';
+    }[];
+
+  if (rows.length === 0) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing callerNumber(s)' });
+  }
+
+  const { error } = await supabaseAdmin
+    .from('trusted_contacts')
+    .upsert(rows, { onConflict: 'profile_id,caller_hash' });
+
+  if (error) {
+    logger.err(error);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to add trusted contacts' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true, added: rows.length });
+}
+
+async function deleteTrustedContact(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { trustedId } = req.params;
+  if (!trustedId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing trustedId' });
+  }
+
+  const { data: row } = await supabaseAdmin
+    .from('trusted_contacts')
+    .select('profile_id')
+    .eq('id', trustedId)
+    .maybeSingle();
+
+  if (!row) {
+    return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Trusted contact not found' });
+  }
+
+  const allowed = await userIsCaretaker(userId, row.profile_id);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { error } = await supabaseAdmin
+    .from('trusted_contacts')
+    .delete()
+    .eq('id', trustedId);
+
+  if (error) {
+    logger.err(error);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to remove trusted contact' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
+}
+
 export default {
   listSafePhrases,
   addSafePhrase,
@@ -267,4 +411,7 @@ export default {
   listBlockedCallers,
   addBlockedCaller,
   deleteBlockedCaller,
+  listTrustedContacts,
+  addTrustedContacts,
+  deleteTrustedContact,
 };

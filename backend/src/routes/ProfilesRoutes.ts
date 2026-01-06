@@ -7,6 +7,8 @@ const router = Router();
 
 router.get(PATHS.Profiles.Get, ProfilesController.listProfiles);
 router.post(PATHS.Profiles.Create, ProfilesController.createProfile);
+router.patch(PATHS.Profiles.Update, ProfilesController.updateProfile);
+router.delete(PATHS.Profiles.Delete, ProfilesController.deleteProfile);
 router.post(PATHS.Profiles.Passcode, ProfilesController.setPasscode);
 router.patch(PATHS.Profiles.Alerts, ProfilesController.updateAlertPrefs);
 router.post(PATHS.Profiles.Invites, ProfilesController.inviteMember);

@@ -123,18 +123,21 @@ async function listAlerts(req: Request, res: Response) {
   const enriched = alerts.map((alert) => {
     const call = alert.call_id ? callMap.get(alert.call_id) : undefined;
     const feedback = call?.feedback_status ?? null;
+    const payload = alert.payload as { riskLevel?: string; label?: string } | null;
+    const payloadLabel = payload?.label ?? null;
+    const payloadRisk = payload?.riskLevel ?? null;
     const riskLabel =
       feedback === 'marked_fraud'
         ? 'Fraud'
         : feedback === 'marked_safe'
         ? 'Safe'
-        : (alert.payload as { riskLevel?: string } | null)?.riskLevel ?? 'alert';
+        : payloadLabel ?? payloadRisk ?? 'alert';
     const riskLevel =
       feedback === 'marked_fraud'
         ? 'critical'
         : feedback === 'marked_safe'
         ? 'low'
-        : call?.fraud_risk_level ?? (alert.payload as { riskLevel?: string } | null)?.riskLevel ?? null;
+        : call?.fraud_risk_level ?? payloadRisk ?? null;
     return {
       ...alert,
       call_feedback_status: feedback,

@@ -1,17 +1,31 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 
-export default function PasscodeScreen({ navigation }: { navigation: any }) {
-  const { activeProfile, setActiveProfile } = useProfile();
+export default function ChangePasscodeScreen() {
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
+  const { activeProfile, refreshProfiles } = useProfile();
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleContinue = async () => {
+  const handleSave = async () => {
     setError('');
     if (!/^\d{6}$/.test(pin)) {
       setError('Passcode must be 6 digits.');
@@ -25,32 +39,39 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
       setError('Profile not found.');
       return;
     }
+    Keyboard.dismiss();
     setIsSubmitting(true);
     try {
       await authorizedFetch(`/profiles/${activeProfile.id}/passcode`, {
         method: 'POST',
         body: JSON.stringify({ pin }),
       });
-      setActiveProfile({ ...activeProfile, has_passcode: true });
-      navigation.navigate('OnboardingTrustedContacts');
+      await refreshProfiles();
+      navigation.goBack();
     } catch (err: any) {
-      setError(err?.message || 'Failed to save passcode.');
+      setError(err?.message || 'Failed to update passcode.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    <SafeAreaView
+      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
+      edges={[]}
     >
-      <View style={styles.card}>
-        <Text style={styles.title}>Set a 6‑Digit Passcode</Text>
-        <Text style={styles.subtitle}>
-          Callers must enter this to be connected.
-        </Text>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color="#e4ebf7" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Change passcode</Text>
+      </View>
 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.card}
+      >
+        <Text style={styles.subtitle}>Set a new 6-digit passcode.</Text>
         <TextInput
           placeholder="Enter passcode"
           placeholderTextColor="#9aa3b2"
@@ -70,14 +91,17 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
           maxLength={6}
         />
         {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <TouchableOpacity style={styles.primaryButton} onPress={handleContinue} disabled={isSubmitting}>
+        <TouchableOpacity
+          style={[styles.primaryButton, isSubmitting && styles.primaryDisabled]}
+          onPress={handleSave}
+          disabled={isSubmitting}
+        >
           <Text style={styles.primaryButtonText}>
-            {isSubmitting ? 'Saving…' : 'Continue'}
+            {isSubmitting ? 'Saving…' : 'Save passcode'}
           </Text>
         </TouchableOpacity>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
@@ -85,23 +109,41 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0b111b',
+    paddingHorizontal: 24,
+  },
+  header: {
+    paddingTop: 0,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
+    backgroundColor: '#121a26',
+    borderWidth: 1,
+    borderColor: '#1f2a3a',
+  },
+  headerTitle: {
+    color: '#f5f7fb',
+    fontSize: 24,
+    fontWeight: '700',
+    marginLeft: 12,
   },
   card: {
     backgroundColor: '#121a26',
-    borderRadius: 18,
-    padding: 24,
-    gap: 14,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#f5f7fb',
+    borderRadius: 16,
+    padding: 16,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#202c3c',
   },
   subtitle: {
-    fontSize: 14,
     color: '#b5c0d3',
+    marginBottom: 6,
   },
   input: {
     borderWidth: 1,
@@ -116,6 +158,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  primaryDisabled: {
+    opacity: 0.6,
   },
   primaryButtonText: {
     color: '#f5f7fb',

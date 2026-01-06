@@ -8,12 +8,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { authorizedFetch } from '../../services/backend';
 import AlertCard from '../../components/alerts/AlertCard';
 import EmptyState from '../../components/common/EmptyState';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
+import { useProfile } from '../../context/ProfileContext';
 
 type AlertRow = {
   id: string;
@@ -28,13 +30,53 @@ type AlertRow = {
 
 export default function AlertsScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
+  const { activeProfile } = useProfile();
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [contactNames, setContactNames] = useState<Record<string, string>>({});
   const shimmer = useRef(new Animated.Value(0.6)).current;
+  const listRef = useRef<FlatList<AlertRow>>(null);
+
+  const loadContactNames = async () => {
+    if (!activeProfile) {
+      setContactNames({});
+      return;
+    }
+    const raw = await AsyncStorage.getItem(`trusted_contacts_map:${activeProfile.id}`);
+    if (!raw) {
+      setContactNames({});
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw) as Record<string, { name?: string; numbers?: string[] } | string[]>;
+      const map: Record<string, string> = {};
+      Object.values(parsed).forEach((entry) => {
+        if (Array.isArray(entry)) {
+          entry.forEach((number) => {
+            if (number) {
+              map[number] = map[number] ?? 'Trusted contact';
+            }
+          });
+        } else if (entry && typeof entry === 'object') {
+          const name = entry.name ?? 'Trusted contact';
+          const numbers = Array.isArray(entry.numbers) ? entry.numbers : [];
+          numbers.forEach((number) => {
+            if (number) {
+              map[number] = name;
+            }
+          });
+        }
+      });
+      setContactNames(map);
+    } catch {
+      setContactNames({});
+    }
+  };
 
   const loadAlerts = async () => {
     setLoading(true);
     try {
+      await loadContactNames();
       const data = await authorizedFetch('/alerts?status=pending&limit=25');
       const alerts = (data?.alerts ?? []) as AlertRow[];
       const callIds = alerts
@@ -91,6 +133,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   useFocusEffect(
     useCallback(() => {
       loadAlerts();
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
     }, [])
   );
 
@@ -108,14 +151,6 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
   const showSkeleton = loading && alerts.length === 0;
   const contentOpacity = showSkeleton ? 0 : 1;
-
-  const updateStatus = async (alertId: string, status: string) => {
-    await authorizedFetch(`/alerts/${alertId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ status }),
-    });
-    loadAlerts();
-  };
 
   return (
     <SafeAreaView
@@ -136,31 +171,51 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
           </Animated.View>
         ) : null}
         <FlatList
+          ref={listRef}
           data={alerts}
           keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={loadAlerts} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={loadAlerts}
+              tintColor="#8ab4ff"
+              colors={['#8ab4ff']}
+            />
+          }
+          indicatorStyle="white"
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
           contentContainerStyle={[
             styles.listContent,
             !showSkeleton && alerts.length === 0 && styles.listEmptyContent,
           ]}
           style={{ opacity: contentOpacity }}
           renderItem={({ item }) => {
-            const riskLabel = item.risk_label ?? item.payload?.riskLevel ?? 'alert';
-            const riskLevel = item.risk_level ?? item.payload?.riskLevel ?? 'unknown';
-            const displayStatus =
-              riskLabel.toLowerCase() === 'fraud'
-                ? 'marked fraud'
+            const isTrusted = item.alert_type === 'trusted';
+            const riskLabel = isTrusted ? 'Trusted' : item.risk_label ?? item.payload?.riskLevel ?? 'alert';
+            const riskLevel = isTrusted ? 'low' : item.risk_level ?? item.payload?.riskLevel ?? 'unknown';
+            const callerNumber = item.payload?.callerNumber as string | undefined;
+            const callerName = callerNumber ? contactNames[callerNumber] : '';
+            const displayStatus = isTrusted
+              ? 'trusted contact'
+              : riskLabel.toLowerCase() === 'fraud'
+                ? 'blocked'
                 : riskLabel.toLowerCase() === 'safe'
                 ? 'marked safe'
                 : item.status;
+            const title = isTrusted ? 'Trusted call' : item.alert_type;
+            const subtitle = isTrusted
+              ? callerName || callerNumber || 'Trusted contact'
+              : undefined;
             return (
               <AlertCard
-                alertType={item.alert_type}
+                alertType={title}
                 status={displayStatus}
                 createdAt={item.created_at}
                 score={item.payload?.score}
                 riskLevel={riskLevel}
                 riskLabel={riskLabel}
+                subtitle={subtitle}
                 onPress={() =>
                   item.call_id
                     ? navigation.navigate('CallDetailModal', { callId: item.call_id })

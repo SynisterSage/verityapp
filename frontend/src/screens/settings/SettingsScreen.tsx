@@ -3,7 +3,6 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../../context/AuthContext';
-
 type SettingsItem = {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -15,9 +14,9 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   const { signOut } = useAuth();
 
   const accountItems: SettingsItem[] = [
-    { label: 'Account', icon: 'person-outline' },
-    { label: 'Notifications', icon: 'notifications-outline' },
-    { label: 'Security', icon: 'shield-checkmark-outline' },
+    { label: 'Account', icon: 'person-outline', onPress: () => navigation.navigate('Account') },
+    { label: 'Notifications', icon: 'notifications-outline', onPress: () => navigation.navigate('Notifications') },
+    { label: 'Security', icon: 'shield-checkmark-outline', onPress: () => navigation.navigate('Security') },
   ];
 
   const safetyItems: SettingsItem[] = [
@@ -25,6 +24,11 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       label: 'Safe Phrases',
       icon: 'chatbubble-ellipses-outline',
       onPress: () => navigation.navigate('SafePhrases'),
+    },
+    {
+      label: 'Trusted Contacts',
+      icon: 'people-outline',
+      onPress: () => navigation.navigate('TrustedContacts'),
     },
     {
       label: 'Blocked Numbers',
@@ -110,10 +114,10 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
         </View>
       </View>
 
-        <TouchableOpacity style={styles.signOut} onPress={signOut} activeOpacity={0.8}>
-          <Ionicons name="log-out-outline" size={18} color="#f2d6d6" />
-          <Text style={styles.signOutText}>Sign out</Text>
-        </TouchableOpacity>
+      <TouchableOpacity style={styles.signOut} onPress={signOut} activeOpacity={0.8}>
+        <Ionicons name="log-out-outline" size={18} color="#f2d6d6" />
+        <Text style={styles.signOutText}>Sign out</Text>
+      </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );

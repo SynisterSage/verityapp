@@ -8,8 +8,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const { activeProfile, setActiveProfile, setOnboardingComplete } = useProfile();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [twilioNumber, setTwilioNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('+1');
+  const [twilioNumber, setTwilioNumber] = useState('+1');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -92,7 +92,13 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           style={styles.input}
           keyboardType="phone-pad"
           value={phoneNumber}
-          onChangeText={setPhoneNumber}
+          onChangeText={(value) => {
+            if (!value.startsWith('+1')) {
+              setPhoneNumber(`+1${value.replace(/^\+?1?/, '')}`);
+              return;
+            }
+            setPhoneNumber(value);
+          }}
         />
         <TextInput
           placeholder="Twilio number (optional for now)"
@@ -100,7 +106,13 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           style={styles.input}
           keyboardType="phone-pad"
           value={twilioNumber}
-          onChangeText={setTwilioNumber}
+          onChangeText={(value) => {
+            if (!value.startsWith('+1')) {
+              setTwilioNumber(`+1${value.replace(/^\+?1?/, '')}`);
+              return;
+            }
+            setTwilioNumber(value);
+          }}
         />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}

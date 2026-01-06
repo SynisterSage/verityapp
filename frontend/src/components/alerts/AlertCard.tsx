@@ -10,6 +10,7 @@ type AlertCardProps = {
   score?: number | string | null;
   riskLevel?: string | null;
   riskLabel?: string | null;
+  subtitle?: string;
   onPress?: () => void;
 };
 
@@ -20,12 +21,14 @@ export default function AlertCard({
   score,
   riskLevel,
   riskLabel,
+  subtitle,
   onPress,
 }: AlertCardProps) {
   const badgeLabel = riskLabel ?? riskLevel ?? 'unknown';
   const riskStyles = getRiskStyles(riskLevel ?? badgeLabel);
   const scoreValue = score ?? '—';
   const scoreText = typeof scoreValue === 'number' ? scoreValue.toString() : scoreValue;
+  const subtitleText = subtitle ?? `Score ${scoreText}`;
 
   return (
     <TouchableOpacity
@@ -41,7 +44,7 @@ export default function AlertCard({
           </View>
           <View>
             <Text style={styles.title}>{alertType.toUpperCase()}</Text>
-            <Text style={styles.subtitle}>Score {scoreText}</Text>
+            <Text style={styles.subtitle}>{subtitleText}</Text>
           </View>
         </View>
         <Text

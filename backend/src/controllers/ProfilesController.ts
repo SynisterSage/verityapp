@@ -224,6 +224,95 @@ async function updateAlertPrefs(req: Request, res: Response) {
   });
 }
 
+async function updateProfile(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId } = req.params as { profileId: string };
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const allowed = await userIsCaretaker(userId, profileId);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { first_name, last_name, phone_number } = req.body as {
+    first_name?: string;
+    last_name?: string;
+    phone_number?: string | null;
+  };
+
+  const updates: Record<string, string | null> = {};
+  if (typeof first_name === 'string') {
+    updates.first_name = first_name.trim();
+  }
+  if (typeof last_name === 'string') {
+    updates.last_name = last_name.trim();
+  }
+  if (typeof phone_number !== 'undefined') {
+    updates.phone_number = phone_number ? phone_number.trim() : null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'No updates provided' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .update(updates)
+    .eq('id', profileId)
+    .select(
+      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
+    )
+    .single();
+
+  if (error || !data) {
+    logger.err(error ?? new Error('Failed to update profile'));
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update profile' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({
+    profile: {
+      ...data,
+      has_passcode: Boolean(data.passcode_hash),
+      passcode_hash: undefined,
+    },
+  });
+}
+
+async function deleteProfile(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId } = req.params as { profileId: string };
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const allowed = await userIsCaretaker(userId, profileId);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .delete()
+    .eq('id', profileId);
+
+  if (error) {
+    logger.err(error);
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to delete profile' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
+}
+
 async function inviteMember(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
@@ -325,6 +414,8 @@ export default {
   createProfile,
   setPasscode,
   updateAlertPrefs,
+  updateProfile,
+  deleteProfile,
   inviteMember,
   listInvites,
 };

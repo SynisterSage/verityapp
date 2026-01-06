@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
@@ -33,6 +33,7 @@ export default function BlocklistScreen() {
   const [input, setInput] = useState('');
   const inputRef = useRef<TextInput>(null);
   const shimmer = useRef(new Animated.Value(0.6)).current;
+  const listRef = useRef<FlatList<BlockedCaller>>(null);
 
   const loadBlocked = async () => {
     if (!activeProfile) return;
@@ -49,6 +50,12 @@ export default function BlocklistScreen() {
   useEffect(() => {
     loadBlocked();
   }, [activeProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, [])
+  );
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -120,9 +127,18 @@ export default function BlocklistScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={blocked}
           keyExtractor={(item) => item.id}
-          refreshControl={<RefreshControl refreshing={loading} onRefresh={loadBlocked} />}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={loadBlocked}
+              tintColor="#8ab4ff"
+              colors={['#8ab4ff']}
+            />
+          }
+          indicatorStyle="white"
           contentContainerStyle={[
             styles.listContent,
             !loading && blocked.length === 0 && styles.listEmptyContent,

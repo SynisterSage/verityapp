@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   RefreshControl,
@@ -10,6 +10,8 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
@@ -65,6 +67,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const shimmer = useRef(new Animated.Value(0.6)).current;
+  const scrollRef = useRef<ScrollView>(null);
   const email = session?.user.email ?? 'Account';
   const hasTwilioNumber = Boolean(activeProfile?.twilio_virtual_number);
   const loadStats = async (isRefresh = false) => {
@@ -141,6 +144,33 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         );
       }
 
+      const contactNameMap: Record<string, string> = {};
+      try {
+        const raw = await AsyncStorage.getItem(`trusted_contacts_map:${activeProfile.id}`);
+        if (raw) {
+          const parsed = JSON.parse(raw) as Record<string, { name?: string; numbers?: string[] } | string[]>;
+          Object.values(parsed).forEach((entry) => {
+            if (Array.isArray(entry)) {
+              entry.forEach((number) => {
+                if (number) {
+                  contactNameMap[number] = contactNameMap[number] ?? 'Trusted contact';
+                }
+              });
+            } else if (entry && typeof entry === 'object') {
+              const name = entry.name ?? 'Trusted contact';
+              const numbers = Array.isArray(entry.numbers) ? entry.numbers : [];
+              numbers.forEach((number) => {
+                if (number) {
+                  contactNameMap[number] = name;
+                }
+              });
+            }
+          });
+        }
+      } catch {
+        // Ignore local map failures.
+      }
+
       const activityItems: ActivityItem[] = [
         ...callRows.map((call) => {
           const feedback = call.feedback_status ?? '';
@@ -161,16 +191,23 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           };
         }),
         ...alertRows.map((alert) => {
+          const isTrusted = alert.alert_type === 'trusted';
+          const callerNumber = alert.payload?.callerNumber as string | undefined;
+          const callerName = callerNumber ? contactNameMap[callerNumber] : '';
           const feedback = alert.call_id ? alertFeedbackMap.get(alert.call_id)?.feedback_status ?? '' : '';
           const label =
-            feedback === 'marked_fraud'
+            isTrusted
+              ? callerName || callerNumber || 'Trusted contact'
+              : feedback === 'marked_fraud'
               ? 'Fraud'
               : feedback === 'marked_safe'
               ? 'Safe'
               : (alert.risk_label ?? alert.payload?.riskLevel ?? 'alert').toString();
-          const badge = label.toUpperCase();
+          const badge = isTrusted ? 'TRUSTED' : label.toUpperCase();
           const badgeLevel =
-            feedback === 'marked_fraud'
+            isTrusted
+              ? 'low'
+              : feedback === 'marked_fraud'
               ? 'critical'
               : feedback === 'marked_safe'
               ? 'low'
@@ -178,7 +215,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           return {
             type: 'alert' as const,
             created_at: alert.created_at,
-            label: 'Fraud alert',
+            label: isTrusted ? 'Trusted call' : 'Fraud alert',
             badge,
             badgeLevel,
           };
@@ -206,6 +243,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     loop.start();
     return () => loop.stop();
   }, [shimmer]);
+
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, [])
+  );
 
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
   const showSkeleton = loading && !recentCall && recentActivity.length === 0;
@@ -238,10 +281,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       <Text style={styles.subtitle}>{activeProfile?.first_name ?? email}</Text>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.grid}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={() => loadStats(true)} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadStats(true)}
+            tintColor="#8ab4ff"
+            colors={['#8ab4ff']}
+          />
         }
+        indicatorStyle="white"
       >
         {showSkeleton ? (
           <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>

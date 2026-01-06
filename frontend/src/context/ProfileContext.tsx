@@ -45,7 +45,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setAuthInvalid(false);
       return;
     }
-    setIsLoading(true);
+    const showLoader = profiles.length === 0 && !activeProfile;
+    if (showLoader) {
+      setIsLoading(true);
+    }
     try {
       const data = await authorizedFetch('/profiles');
       const list = (data?.profiles ?? []) as Profile[];

@@ -1,14 +1,13 @@
-import { useState } from 'react';
-import { StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Keyboard, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import Slider from '@react-native-community/slider';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 
 export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
   const { activeProfile, setActiveProfile } = useProfile();
-  const [threshold, setThreshold] = useState(
-    String(activeProfile?.alert_threshold_score ?? 90)
-  );
+  const [threshold, setThreshold] = useState(activeProfile?.alert_threshold_score ?? 90);
   const [emailAlerts, setEmailAlerts] = useState(
     activeProfile?.enable_email_alerts ?? true
   );
@@ -29,6 +28,7 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
       return;
     }
     try {
+      Keyboard.dismiss();
       await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
         method: 'PATCH',
         body: JSON.stringify({
@@ -45,7 +45,11 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
         enable_push_alerts: pushAlerts,
         enable_sms_alerts: smsAlerts,
       });
-      navigation.navigate('OnboardingTestCall');
+      if (activeProfile.twilio_virtual_number) {
+        navigation.navigate('OnboardingCallForwarding');
+      } else {
+        navigation.navigate('OnboardingTestCall');
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to update preferences.');
     }
@@ -53,33 +57,49 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Alert Preferences</Text>
-      <Text style={styles.subtitle}>Tune when and how you get notified.</Text>
+      <View style={styles.content}>
+        <Text style={styles.title}>Alert Preferences</Text>
+        <Text style={styles.subtitle}>Tune when and how you get notified.</Text>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>Fraud threshold (1–100)</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="number-pad"
-          value={threshold}
-          onChangeText={setThreshold}
-        />
-      </View>
+        <Text style={styles.sectionTitle}>Fraud threshold</Text>
+        <View style={styles.card}>
+          <View style={styles.thresholdRow}>
+            <Text style={styles.label}>Alert score</Text>
+            <Text style={styles.value}>{threshold}</Text>
+          </View>
+          <Slider
+            value={threshold}
+            minimumValue={1}
+            maximumValue={100}
+            step={1}
+            minimumTrackTintColor="#8ab4ff"
+            maximumTrackTintColor="#1b2534"
+            thumbTintColor="#2d6df6"
+            onValueChange={setThreshold}
+          />
+        </View>
 
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Email alerts</Text>
-        <Switch value={emailAlerts} onValueChange={setEmailAlerts} />
-      </View>
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>Push alerts</Text>
-        <Switch value={pushAlerts} onValueChange={setPushAlerts} />
-      </View>
-      <View style={styles.toggleRow}>
-        <Text style={styles.toggleLabel}>SMS alerts (later)</Text>
-        <Switch value={smsAlerts} onValueChange={setSmsAlerts} />
-      </View>
+        <Text style={styles.sectionTitle}>Alert channels</Text>
+        <View style={styles.card}>
+          <View style={styles.toggleRow}>
+            <Text style={styles.toggleLabel}>Email alerts</Text>
+            <Switch value={emailAlerts} onValueChange={setEmailAlerts} />
+          </View>
+          <View style={styles.toggleRow}>
+            <Text style={styles.toggleLabel}>Push alerts</Text>
+            <Switch value={pushAlerts} onValueChange={setPushAlerts} />
+          </View>
+          <View style={styles.toggleRow}>
+            <View>
+              <Text style={styles.toggleLabel}>SMS alerts</Text>
+              <Text style={styles.toggleHint}>Later</Text>
+            </View>
+            <Switch value={smsAlerts} onValueChange={setSmsAlerts} />
+          </View>
+        </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+      </View>
 
       <TouchableOpacity style={styles.primaryButton} onPress={handleContinue}>
         <Text style={styles.primaryButtonText}>Continue</Text>
@@ -94,6 +114,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#0b111b',
     padding: 24,
   },
+  content: {
+    flex: 1,
+  },
   title: {
     fontSize: 22,
     fontWeight: '700',
@@ -102,42 +125,58 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#b5c0d3',
     marginTop: 6,
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  section: {
-    marginBottom: 18,
-  },
-  label: {
-    color: '#c8d1e0',
+  sectionTitle: {
+    color: '#98a7c2',
+    fontWeight: '600',
+    marginTop: 10,
     marginBottom: 8,
   },
-  input: {
-    borderWidth: 1,
-    borderColor: '#243247',
-    borderRadius: 12,
-    padding: 12,
-    color: '#e6ebf5',
-  },
-  toggleRow: {
+  card: {
     backgroundColor: '#121a26',
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#202c3c',
+    padding: 16,
+    gap: 12,
+  },
+  thresholdRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+  },
+  label: {
+    color: '#8aa0c6',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
+  value: {
+    color: '#e6ebf5',
+    fontWeight: '600',
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
   },
   toggleLabel: {
     color: '#e6ebf5',
+    fontWeight: '500',
+  },
+  toggleHint: {
+    color: '#7b8aa5',
+    fontSize: 12,
+    marginTop: 2,
   },
   primaryButton: {
     backgroundColor: '#2d6df6',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 12,
+    marginTop: 18,
   },
   primaryButtonText: {
     color: '#f5f7fb',
@@ -146,6 +185,6 @@ const styles = StyleSheet.create({
   error: {
     color: '#ff8a8a',
     fontSize: 12,
-    marginBottom: 6,
+    marginTop: 10,
   },
 });
