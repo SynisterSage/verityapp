@@ -83,7 +83,7 @@ async function listAlerts(req: Request, res: Response) {
 
   let query = supabaseAdmin
     .from('alerts')
-    .select('id, profile_id, call_id, alert_type, status, payload, created_at')
+    .select('id, profile_id, call_id, alert_type, status, payload, created_at, calls:call_id (feedback_status, fraud_risk_level)')
     .in('profile_id', profileIds)
     .order('created_at', { ascending: false });
 
@@ -101,7 +101,50 @@ async function listAlerts(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to load alerts' });
   }
 
-  return res.status(HTTP_STATUS_CODES.Ok).json({ alerts: data ?? [] });
+  const alerts = data ?? [];
+  const callIds = alerts
+    .map((alert) => alert.call_id)
+    .filter((callId): callId is string => Boolean(callId));
+
+  let callMap = new Map<string, { feedback_status: string | null; fraud_risk_level: string | null }>();
+  if (callIds.length > 0) {
+    const { data: callRows } = await supabaseAdmin
+      .from('calls')
+      .select('id, feedback_status, fraud_risk_level')
+      .in('id', callIds);
+    callMap = new Map(
+      (callRows ?? []).map((row) => [
+        row.id,
+        { feedback_status: row.feedback_status ?? null, fraud_risk_level: row.fraud_risk_level ?? null },
+      ])
+    );
+  }
+
+  const enriched = alerts.map((alert) => {
+    const call = alert.call_id ? callMap.get(alert.call_id) : undefined;
+    const feedback = call?.feedback_status ?? null;
+    const riskLabel =
+      feedback === 'marked_fraud'
+        ? 'Fraud'
+        : feedback === 'marked_safe'
+        ? 'Safe'
+        : (alert.payload as { riskLevel?: string } | null)?.riskLevel ?? 'alert';
+    const riskLevel =
+      feedback === 'marked_fraud'
+        ? 'critical'
+        : feedback === 'marked_safe'
+        ? 'low'
+        : call?.fraud_risk_level ?? (alert.payload as { riskLevel?: string } | null)?.riskLevel ?? null;
+    return {
+      ...alert,
+      call_feedback_status: feedback,
+      call_fraud_risk_level: call?.fraud_risk_level ?? null,
+      risk_label: riskLabel,
+      risk_level: riskLevel,
+    };
+  });
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ alerts: enriched });
 }
 
 async function updateAlertStatus(req: Request, res: Response) {

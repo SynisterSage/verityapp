@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import EmptyState from '../../components/common/EmptyState';
 
 type SafePhrase = {
   id: string;
@@ -29,6 +30,7 @@ export default function SafePhrasesScreen() {
   const [phrases, setPhrases] = useState<SafePhrase[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
+  const inputRef = useRef<TextInput>(null);
   const shimmer = useRef(new Animated.Value(0.6)).current;
 
   const loadPhrases = async () => {
@@ -90,6 +92,7 @@ export default function SafePhrasesScreen() {
       </View>
       <View style={styles.inputRow}>
         <TextInput
+          ref={inputRef}
           style={styles.input}
           placeholder="Add phrase…"
           placeholderTextColor="#8aa0c6"
@@ -115,7 +118,10 @@ export default function SafePhrasesScreen() {
           data={phrases}
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadPhrases} />}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            !loading && phrases.length === 0 && styles.listEmptyContent,
+          ]}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Text style={styles.cardText}>{item.phrase}</Text>
@@ -124,7 +130,19 @@ export default function SafePhrasesScreen() {
               </TouchableOpacity>
             </View>
           )}
-          ListEmptyComponent={<Text style={styles.empty}>No safe phrases yet.</Text>}
+          ListEmptyComponent={
+            !activeProfile ? null : (
+              <View style={styles.emptyStateWrap}>
+                <EmptyState
+                  icon="chatbubble-ellipses-outline"
+                  title="No safe phrases yet"
+                  body="Add a phrase your loved one can use to confirm it's really them."
+                  ctaLabel="Add a phrase"
+                  onPress={() => inputRef.current?.focus()}
+                />
+              </View>
+            )
+          }
         />
       )}
       {!activeProfile ? (
@@ -202,10 +220,9 @@ const styles = StyleSheet.create({
   remove: {
     color: '#ff9c9c',
   },
-  empty: {
-    color: '#8aa0c6',
-    textAlign: 'center',
-    marginTop: 40,
+  emptyStateWrap: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
   },
   warning: {
     color: '#f7c16e',
@@ -213,6 +230,10 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 120,
+  },
+  listEmptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   skeletonCard: {
     backgroundColor: '#121a26',

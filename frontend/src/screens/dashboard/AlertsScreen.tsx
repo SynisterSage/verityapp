@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
   RefreshControl,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { authorizedFetch } from '../../services/backend';
+import AlertCard from '../../components/alerts/AlertCard';
+import EmptyState from '../../components/common/EmptyState';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '../../services/supabase';
 
 type AlertRow = {
   id: string;
@@ -18,9 +21,12 @@ type AlertRow = {
   status: string;
   created_at: string;
   payload: any;
+  call_id: string | null;
+  risk_label?: string | null;
+  risk_level?: string | null;
 };
 
-export default function AlertsScreen() {
+export default function AlertsScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,7 +36,48 @@ export default function AlertsScreen() {
     setLoading(true);
     try {
       const data = await authorizedFetch('/alerts?status=pending&limit=25');
-      setAlerts(data?.alerts ?? []);
+      const alerts = (data?.alerts ?? []) as AlertRow[];
+      const callIds = alerts
+        .map((alert) => alert.call_id)
+        .filter((callId): callId is string => Boolean(callId));
+
+      let feedbackMap = new Map<string, { feedback_status?: string | null; fraud_risk_level?: string | null }>();
+      if (callIds.length > 0) {
+        const { data: callRows } = await supabase
+          .from('calls')
+          .select('id, feedback_status, fraud_risk_level')
+          .in('id', callIds);
+        feedbackMap = new Map(
+          (callRows ?? []).map((row) => [
+            row.id,
+            { feedback_status: row.feedback_status ?? null, fraud_risk_level: row.fraud_risk_level ?? null },
+          ])
+        );
+      }
+
+      const enriched = alerts.map((alert) => {
+        const feedback = alert.call_id ? feedbackMap.get(alert.call_id) : undefined;
+        const feedbackStatus = feedback?.feedback_status ?? null;
+        const riskLabel =
+          feedbackStatus === 'marked_fraud'
+            ? 'Fraud'
+            : feedbackStatus === 'marked_safe'
+            ? 'Safe'
+            : alert.payload?.riskLevel ?? 'alert';
+        const riskLevel =
+          feedbackStatus === 'marked_fraud'
+            ? 'critical'
+            : feedbackStatus === 'marked_safe'
+            ? 'low'
+            : feedback?.fraud_risk_level ?? alert.payload?.riskLevel ?? null;
+        return {
+          ...alert,
+          risk_label: riskLabel,
+          risk_level: riskLevel,
+        };
+      });
+
+      setAlerts(enriched);
     } catch {
       setAlerts([]);
     }
@@ -40,6 +87,12 @@ export default function AlertsScreen() {
   useEffect(() => {
     loadAlerts();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadAlerts();
+    }, [])
+  );
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -86,28 +139,47 @@ export default function AlertsScreen() {
           data={alerts}
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadAlerts} />}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            !showSkeleton && alerts.length === 0 && styles.listEmptyContent,
+          ]}
           style={{ opacity: contentOpacity }}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>{item.alert_type.toUpperCase()}</Text>
-              <Text style={styles.meta}>
-                {new Date(item.created_at).toLocaleString()} • {item.status}
-              </Text>
-              <Text style={styles.body}>
-                Score: {item.payload?.score ?? '—'} ({item.payload?.riskLevel ?? 'unknown'})
-              </Text>
-              <View style={styles.actions}>
-                <TouchableOpacity onPress={() => updateStatus(item.id, 'acknowledged')}>
-                  <Text style={styles.link}>Acknowledge</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => updateStatus(item.id, 'resolved')}>
-                  <Text style={styles.link}>Resolve</Text>
-                </TouchableOpacity>
+          renderItem={({ item }) => {
+            const riskLabel = item.risk_label ?? item.payload?.riskLevel ?? 'alert';
+            const riskLevel = item.risk_level ?? item.payload?.riskLevel ?? 'unknown';
+            const displayStatus =
+              riskLabel.toLowerCase() === 'fraud'
+                ? 'marked fraud'
+                : riskLabel.toLowerCase() === 'safe'
+                ? 'marked safe'
+                : item.status;
+            return (
+              <AlertCard
+                alertType={item.alert_type}
+                status={displayStatus}
+                createdAt={item.created_at}
+                score={item.payload?.score}
+                riskLevel={riskLevel}
+                riskLabel={riskLabel}
+                onPress={() =>
+                  item.call_id
+                    ? navigation.navigate('CallDetailModal', { callId: item.call_id })
+                    : undefined
+                }
+              />
+            );
+          }}
+          ListEmptyComponent={
+            showSkeleton ? null : (
+              <View style={styles.emptyStateWrap}>
+                <EmptyState
+                  icon="alert-circle-outline"
+                  title="No alerts yet"
+                  body="We will surface anything suspicious here as soon as it happens."
+                />
               </View>
-            </View>
-          )}
-          ListEmptyComponent={showSkeleton ? null : <Text style={styles.empty}>No alerts.</Text>}
+            )
+          }
         />
       </View>
     </SafeAreaView>
@@ -126,45 +198,20 @@ const styles = StyleSheet.create({
     color: '#f5f7fb',
     marginBottom: 12,
   },
-  card: {
-    backgroundColor: '#121a26',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#202c3c',
-    marginBottom: 12,
-  },
-  cardTitle: {
-    color: '#f5f7fb',
-    fontWeight: '600',
-  },
-  meta: {
-    color: '#8aa0c6',
-    marginTop: 6,
-  },
-  body: {
-    color: '#d2daea',
-    marginTop: 8,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 16,
-    marginTop: 10,
-  },
-  link: {
-    color: '#8ab4ff',
-  },
-  empty: {
-    color: '#8aa0c6',
-    textAlign: 'center',
-    marginTop: 40,
-  },
   listContent: {
     paddingBottom: 120,
+  },
+  listEmptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   listWrapper: {
     flex: 1,
     position: 'relative',
+  },
+  emptyStateWrap: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
   },
   skeletonOverlay: {
     position: 'absolute',

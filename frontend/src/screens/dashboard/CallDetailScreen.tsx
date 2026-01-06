@@ -18,12 +18,14 @@ import { authorizedFetch } from '../../services/backend';
 
 type CallRow = {
   id: string;
+  profile_id: string | null;
   created_at: string;
   transcript: string | null;
   fraud_score: number | null;
   fraud_risk_level: string | null;
   fraud_keywords: string[] | null;
   caller_number: string | null;
+  feedback_status?: string | null;
 };
 
 export default function CallDetailScreen({ route }: { route: any }) {
@@ -42,7 +44,7 @@ export default function CallDetailScreen({ route }: { route: any }) {
       const { data } = await supabase
         .from('calls')
         .select(
-          'id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords, caller_number'
+          'id, profile_id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords, caller_number, feedback_status'
         )
         .eq('id', callId)
         .single();
@@ -134,6 +136,19 @@ export default function CallDetailScreen({ route }: { route: any }) {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
+      setCallRow((prev) => (prev ? { ...prev, feedback_status: status } : prev));
+      if (status === 'marked_fraud') {
+        if (callRow?.profile_id && callRow?.caller_number) {
+          await authorizedFetch('/fraud/blocked-callers', {
+            method: 'POST',
+            body: JSON.stringify({
+              profileId: callRow.profile_id,
+              callerNumber: callRow.caller_number,
+              reason: 'marked_fraud',
+            }),
+          });
+        }
+      }
       Alert.alert('Saved', `Marked as ${status.replace('_', ' ')}`);
     } catch (err) {
       Alert.alert('Error', 'Failed to save feedback');
@@ -148,9 +163,11 @@ export default function CallDetailScreen({ route }: { route: any }) {
     );
   }
 
+  const topPadding = Math.max(16, insets.top + 4);
+
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
+      style={[styles.container, { paddingTop: topPadding }]}
       edges={[]}
     >
       <View style={styles.header}>
@@ -213,16 +230,32 @@ export default function CallDetailScreen({ route }: { route: any }) {
 
         <View style={styles.actions}>
           <TouchableOpacity
-            style={styles.secondaryButton}
+            style={[
+              styles.secondaryButton,
+              callRow.feedback_status === 'marked_safe' && styles.buttonDisabled,
+            ]}
             onPress={() => markFeedback('marked_safe')}
+            activeOpacity={0.85}
+            disabled={callRow.feedback_status === 'marked_safe'}
           >
-            <Text style={styles.secondaryText}>Mark Safe</Text>
+            <Ionicons name="checkmark-circle-outline" size={18} color="#cfe0ff" />
+            <Text style={styles.secondaryText}>
+              {callRow.feedback_status === 'marked_safe' ? 'Marked Safe' : 'Mark Safe'}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.dangerButton}
+            style={[
+              styles.dangerButton,
+              callRow.feedback_status === 'marked_fraud' && styles.buttonDisabled,
+            ]}
             onPress={() => markFeedback('marked_fraud')}
+            activeOpacity={0.85}
+            disabled={callRow.feedback_status === 'marked_fraud'}
           >
-            <Text style={styles.secondaryText}>Mark Fraud</Text>
+            <Ionicons name="warning-outline" size={18} color="#ffe3e3" />
+            <Text style={styles.dangerText}>
+              {callRow.feedback_status === 'marked_fraud' ? 'Marked Fraud' : 'Mark Fraud'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -315,20 +348,36 @@ const styles = StyleSheet.create({
     flex: 1,
     borderWidth: 1,
     borderColor: '#2b3c57',
+    backgroundColor: '#111b2b',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
   },
   dangerButton: {
     flex: 1,
     borderWidth: 1,
     borderColor: '#553a3a',
+    backgroundColor: '#3a1e22',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
   },
   secondaryText: {
-    color: '#d2daea',
+    color: '#d7e3f7',
+    fontWeight: '600',
+  },
+  dangerText: {
+    color: '#ffe3e3',
+    fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   loading: {
     color: '#8aa0c6',

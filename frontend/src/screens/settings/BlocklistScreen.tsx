@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import EmptyState from '../../components/common/EmptyState';
 
 type BlockedCaller = {
   id: string;
@@ -30,6 +31,7 @@ export default function BlocklistScreen() {
   const [blocked, setBlocked] = useState<BlockedCaller[]>([]);
   const [loading, setLoading] = useState(false);
   const [input, setInput] = useState('');
+  const inputRef = useRef<TextInput>(null);
   const shimmer = useRef(new Animated.Value(0.6)).current;
 
   const loadBlocked = async () => {
@@ -95,6 +97,7 @@ export default function BlocklistScreen() {
       </View>
       <View style={styles.inputRow}>
         <TextInput
+          ref={inputRef}
           style={styles.input}
           placeholder="Add caller number…"
           placeholderTextColor="#8aa0c6"
@@ -120,19 +123,45 @@ export default function BlocklistScreen() {
           data={blocked}
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadBlocked} />}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View>
-                <Text style={styles.cardText}>{item.caller_number ?? 'Unknown number'}</Text>
-                <Text style={styles.meta}>{item.reason ?? 'auto'}</Text>
+          contentContainerStyle={[
+            styles.listContent,
+            !loading && blocked.length === 0 && styles.listEmptyContent,
+          ]}
+          renderItem={({ item }) => {
+            const rawReason = item.reason ?? 'auto';
+            const formattedReason =
+              rawReason === 'marked_fraud'
+                ? 'Marked fraud'
+                : rawReason.replace(/_/g, ' ');
+            const reasonText =
+              formattedReason.length > 0
+                ? formattedReason.charAt(0).toUpperCase() + formattedReason.slice(1)
+                : 'Auto';
+            return (
+              <View style={styles.card}>
+                <View>
+                  <Text style={styles.cardText}>{item.caller_number ?? 'Unknown number'}</Text>
+                  <Text style={styles.meta}>{reasonText}</Text>
+                </View>
+                <TouchableOpacity onPress={() => removeBlocked(item.id)}>
+                  <Text style={styles.remove}>Unblock</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => removeBlocked(item.id)}>
-                <Text style={styles.remove}>Unblock</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-          ListEmptyComponent={<Text style={styles.empty}>No blocked callers.</Text>}
+            );
+          }}
+          ListEmptyComponent={
+            !activeProfile ? null : (
+              <View style={styles.emptyStateWrap}>
+                <EmptyState
+                  icon="ban-outline"
+                  title="No blocked numbers"
+                  body="Block suspicious callers to stop them from reaching your loved one."
+                  ctaLabel="Block a number"
+                  onPress={() => inputRef.current?.focus()}
+                />
+              </View>
+            )
+          }
         />
       )}
       {!activeProfile ? (
@@ -203,6 +232,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   cardText: {
     color: '#f1f4fa',
@@ -214,10 +244,9 @@ const styles = StyleSheet.create({
   remove: {
     color: '#ff9c9c',
   },
-  empty: {
-    color: '#8aa0c6',
-    textAlign: 'center',
-    marginTop: 40,
+  emptyStateWrap: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
   },
   warning: {
     color: '#f7c16e',
@@ -225,6 +254,10 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 120,
+  },
+  listEmptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   skeletonCard: {
     backgroundColor: '#121a26',

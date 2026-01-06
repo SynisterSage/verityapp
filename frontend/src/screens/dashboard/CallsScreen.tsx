@@ -5,7 +5,6 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,6 +12,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
+import RecentCallCard from '../../components/home/RecentCallCard';
+import EmptyState from '../../components/common/EmptyState';
 
 type CallRow = {
   id: string;
@@ -21,6 +22,7 @@ type CallRow = {
   fraud_risk_level: string | null;
   fraud_score: number | null;
   caller_number: string | null;
+  feedback_status?: string | null;
 };
 
 export default function CallsScreen({ navigation }: { navigation: any }) {
@@ -42,7 +44,7 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
     setLoading(true);
     const { data, error: fetchError } = await supabase
       .from('calls')
-      .select('id, created_at, transcript, fraud_risk_level, fraud_score, caller_number')
+      .select('id, created_at, transcript, fraud_risk_level, fraud_score, caller_number, feedback_status')
       .eq('profile_id', activeProfile.id)
       .order('created_at', { ascending: false })
       .limit(25);
@@ -96,34 +98,52 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
           data={calls}
           keyExtractor={(item) => item.id}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={loadCalls} />}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            !showSkeleton && calls.length === 0 && !error && styles.listEmptyContent,
+          ]}
           style={{ opacity: contentOpacity }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              onPress={() => navigation.navigate('CallDetail', { callId: item.id })}
-            >
-              <Text style={styles.cardTitle}>{item.caller_number ?? 'Unknown caller'}</Text>
-              <Text style={styles.cardSubtitle}>
-                {item.transcript ? item.transcript.slice(0, 80) : 'No transcript'}
-              </Text>
-              <View style={styles.metaRow}>
-                <Text style={styles.meta}>{new Date(item.created_at).toLocaleString()}</Text>
-                <Text style={styles.badge}>
-                  {(item.fraud_risk_level ?? 'unknown').toUpperCase()}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
+          ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
+          renderItem={({ item }) => {
+            const feedback = item.feedback_status ?? '';
+            const badgeLabel =
+              feedback === 'marked_fraud'
+                ? 'Fraud'
+                : feedback === 'marked_safe'
+                ? 'Safe'
+                : undefined;
+            const badgeLevel =
+              feedback === 'marked_fraud'
+                ? 'critical'
+                : feedback === 'marked_safe'
+                ? 'low'
+                : item.fraud_risk_level;
+            return (
+              <RecentCallCard
+                title={item.caller_number ?? 'Unknown caller'}
+                transcript={item.transcript}
+                createdAt={item.created_at}
+                fraudLevel={badgeLevel}
+                badgeLabel={badgeLabel}
+                emptyText="No transcript"
+                maxLength={80}
+                onPress={() => navigation.navigate('CallDetail', { callId: item.id })}
+              />
+            );
+          }}
           ListEmptyComponent={
-            showSkeleton ? null : (
-              <Text style={styles.empty}>
-                {error
-                  ? `Error: ${error}`
-                  : activeProfile
-                  ? 'No calls yet.'
-                  : 'Finish onboarding to view calls.'}
-              </Text>
+            showSkeleton ? null : error ? (
+              <Text style={styles.empty}>Error: {error}</Text>
+            ) : activeProfile ? (
+              <View style={styles.emptyStateWrap}>
+                <EmptyState
+                  icon="call-outline"
+                  title="No calls yet"
+                  body="Incoming calls will appear here once they are recorded."
+                />
+              </View>
+            ) : (
+              <Text style={styles.empty}>Finish onboarding to view calls.</Text>
             )
           }
         />
@@ -144,38 +164,6 @@ const styles = StyleSheet.create({
     color: '#f5f7fb',
     marginBottom: 12,
   },
-  card: {
-    backgroundColor: '#121a26',
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#202c3c',
-  },
-  cardTitle: {
-    color: '#f1f4fa',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  cardSubtitle: {
-    color: '#8aa0c6',
-    marginTop: 6,
-    fontSize: 13,
-  },
-  metaRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  meta: {
-    color: '#8392ad',
-    fontSize: 12,
-  },
-  badge: {
-    color: '#8ab4ff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   empty: {
     color: '#8aa0c6',
     textAlign: 'center',
@@ -184,9 +172,20 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 120,
   },
+  listEmptyContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
   listWrapper: {
     flex: 1,
     position: 'relative',
+  },
+  listSeparator: {
+    height: 12,
+  },
+  emptyStateWrap: {
+    alignItems: 'center',
+    paddingHorizontal: 16,
   },
   skeletonOverlay: {
     position: 'absolute',

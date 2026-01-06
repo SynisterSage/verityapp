@@ -34,7 +34,11 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
   ];
 
   const privacyItems: SettingsItem[] = [
-    { label: 'Data & Privacy', icon: 'lock-closed-outline' },
+    {
+      label: 'Data & Privacy',
+      icon: 'lock-closed-outline',
+      onPress: () => navigation.navigate('DataPrivacy'),
+    },
   ];
 
   return (
