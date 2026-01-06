@@ -11,20 +11,6 @@ SafeCall detects fraud through a multi-layered approach:
 
 This document focuses on **Phase 1: Keyword Matching** for MVP.
 
-MVP scope:
-- **Language:** English only
-- **Mode:** Post-call transcript analysis (voicemail flow)
-- **Decision:** High-confidence flags only (target threshold 85–90)
-- **Caller patterning:** store caller hash to detect repeat attempts (no alerts yet)
-
-Phase 1.5 (optional, still MVP-safe):
-- Add **confidence boosts** for risky keyword combinations and proximity
-- Add **negation checks** (e.g., "did NOT give my SSN")
-- Add **behavioral heuristics** (urgency density, secrecy phrasing, OTP requests)
-- Add **safe phrase dampening** (caretaker-approved phrases reduce score)
-- Add **alert queue** for push notifications later
-- Add **auto-block list** (optional, feature-flagged)
-
 ---
 
 ## Fraud Score Calculation
@@ -82,7 +68,7 @@ Example:
 Hmm, still need refinement...
 ```
 
-### Final Algorithm (Linear + Combo Boosts)
+### Final Algorithm (Linear Scale)
 
 ```javascript
 /**
@@ -111,44 +97,16 @@ const calculateFraudScore = (
   
   // Base score from keyword matches
   let score = (detectedKeywords.length / 4) * 40; // 4+ keywords = high risk
-
+  
   // Add weight-based score
   score += (detectedSum / 100) * 60;
-
+  
   // Multiply by number of matches (diminishing returns)
   const matchMultiplier = Math.log(detectedKeywords.length + 1);
   score *= matchMultiplier;
-
-  // Combo boosts (co-occurring high-risk patterns)
-  // Example: "gift card" + "urgent" + "keep secret" => strong fraud signal
-  score += comboBoost(normalizedTranscript, detectedKeywords);
   
   // Cap at 100
   return Math.min(100, Math.round(score));
-};
-
-/**
- * Apply additive boosts for risky combos and proximity.
- * Keep this small (0-20) so score still reflects overall evidence.
- */
-const comboBoost = (text: string, matches: Keyword[]) => {
-  const boostRules = [
-    { all: ['gift card', 'urgent'], add: 12 },
-    { all: ['wire money', 'bank'], add: 10 },
-    { all: ['social security', 'verify'], add: 12 },
-    { all: ['donation', 'gift card'], add: 12 },
-    { all: ['charity', 'immediately'], add: 10 },
-    { all: ['remote access', 'computer'], add: 10 },
-  ];
-
-  let boost = 0;
-  for (const rule of boostRules) {
-    if (rule.all.every((kw) => text.includes(kw))) {
-      boost += rule.add;
-    }
-  }
-
-  return Math.min(20, boost);
 };
 ```
 
@@ -160,11 +118,15 @@ const comboBoost = (text: string, matches: Keyword[]) => {
 | 1 | "bank" | 8 | 15 (low) |
 | 2 | "verify", "account" | 28 | 35 (medium) |
 | 3 | "bank", "verify", "password" | 42 | 55 (high) |
-| 4+ | "bank", "verify", "SSN", "confirm" | 54 | 85+ (critical) |
+| 4+ | "bank", "verify", "SSN", "confirm" | 54 | 80+ (critical) |
 
 ---
 
 ## Default Fraud Keywords
+
+### DONATIONS (High Risk)
+
+### CHARITIES (High Risk)
 
 ### Banking & Finance (High Risk)
 
@@ -255,49 +217,6 @@ Weight 10:
 - "gift"
 ```
 
-### Donations & Charities (High Risk)
-
-```
-Weight 20 (highest):
-- "charity donation"
-- "donate now"
-- "emergency relief"
-- "disaster fund"
-- "orphanage"
-- "children's hospital"
-
-Weight 16-18:
-- "donation"
-- "charity"
-- "fundraiser"
-- "nonprofit"
-- "give now"
-
-Weight 12-15:
-- "pledge"
-- "sponsor"
-- "support our cause"
-- "tax deductible"
-```
-
-### Gift Cards & Crypto (Very High Risk)
-
-```
-Weight 20 (highest):
-- "gift card"
-- "google play card"
-- "apple gift card"
-- "steam card"
-- "crypto"
-- "bitcoin"
-- "wallet address"
-
-Weight 16-18:
-- "wire transfer"
-- "western union"
-- "moneygram"
-```
-
 ### Urgency/Pressure Tactics
 
 ```
@@ -362,7 +281,7 @@ class FraudDetectionService {
   async analyzeTranscript(
     transcript: string,
     keywords: Keyword[],
-    threshold: number = 88
+    threshold: number = 70
   ): Promise<FraudAnalysisResult> {
     // Normalize transcript
     const normalized = this.normalizeText(transcript);
@@ -541,7 +460,7 @@ Add caretaker-approved safe phrases
 
 **For less sensitive profiles:**
 ```
-Higher threshold: 90
+Higher threshold: 80
 Add more keywords
 Stricter matching (exact phrases only)
 ```
@@ -771,16 +690,3 @@ Future: Contextual analysis
 - Sentiment analysis
 - Negation detection ("I did NOT give them money")
 ```
-
----
-
-## Risk Levels (Recommended)
-
-```
-0–39: Low
-40–69: Medium
-70–84: High
-85–100: Critical (alert)
-```
-
-With your requirement (threshold 85–90), only **Critical** triggers alerts.

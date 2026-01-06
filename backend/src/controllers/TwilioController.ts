@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
-import crypto from 'crypto';
 import logger from 'jet-logger';
 import twilio from 'twilio';
 import fetch from 'node-fetch';
 import supabaseAdmin from '@src/services/supabase';
 import { transcribeWavBuffer } from '@src/services/azure';
 import { analyzeTranscript, hashCallerNumber, matchPhrases, scoreToRiskLevel } from '@src/services/fraud';
+import { verifyPasscodeHash } from '@src/services/passcode';
 
 const DEFAULT_GREETING = 'Hello, you have reached SafeCall.';
 
@@ -45,17 +45,6 @@ function extractPin(digits?: string, speechResult?: string) {
   return numeric.length >= 6 ? numeric.slice(0, 6) : '';
 }
 
-function verifyPinHash(pin: string, stored?: string | null) {
-  if (!pin || !stored) {
-    return false;
-  }
-  const [salt, hash] = stored.split(':');
-  if (!salt || !hash) {
-    return false;
-  }
-  const derived = crypto.scryptSync(pin, salt, 32).toString('hex');
-  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(derived, 'hex'));
-}
 /**
  * Respond to Twilio when a call comes in. We play a greeting, record the voicemail,
  * and point recordingStatusCallback to our recording-ready webhook.
@@ -229,7 +218,7 @@ async function verifyPin(req: Request, res: Response) {
     }
   }
 
-  const isValid = verifyPinHash(pin, profile.passcode_hash);
+  const isValid = verifyPasscodeHash(pin, profile.passcode_hash);
   logger.info(
     `Verify pin result to=${toNumber} pin_len=${pin.length} valid=${isValid} phone=${profile.phone_number ?? 'none'}`
   );
@@ -310,7 +299,7 @@ async function recordingReady(req: Request, res: Response) {
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('id')
+    .select('id, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts')
     .eq('twilio_virtual_number', resolvedTo)
     .single();
 
@@ -376,7 +365,10 @@ async function recordingReady(req: Request, res: Response) {
       return res.status(204).end();
     }
     const { text, confidence } = await transcribeWavBuffer(recordingBuffer);
-    const fraudThreshold = Number(process.env.FRAUD_SCORE_THRESHOLD ?? 90);
+    const fraudThreshold =
+      typeof profile.alert_threshold_score === 'number'
+        ? profile.alert_threshold_score
+        : Number(process.env.FRAUD_SCORE_THRESHOLD ?? 90);
     const fraudResult = text ? analyzeTranscript(text) : null;
     let fraudScore = fraudResult?.score ?? null;
     let fraudRiskLevel = fraudResult?.riskLevel ?? null;
@@ -391,6 +383,13 @@ async function recordingReady(req: Request, res: Response) {
       impersonationHits: number;
       paymentAppHits: number;
       codeRequestHits: number;
+      explicitScamHits: number;
+      paymentRequestHits: number;
+      hardBlockHits: number;
+      threatHits: number;
+      accountAccessHits: number;
+      moneyAmountHits: number;
+      criticalKeywordHits: number;
       safePhraseMatches: string[];
       safePhraseDampening: number;
       repeatCallerBoost: number;
@@ -465,23 +464,27 @@ async function recordingReady(req: Request, res: Response) {
       .eq('id', callRow.id);
 
     if (typeof fraudScore === 'number' && fraudScore >= fraudThreshold) {
-      await supabaseAdmin
-        .from('alerts')
-        .upsert(
-          {
-            profile_id: profile.id,
-            call_id: callRow.id,
-            alert_type: 'fraud',
-            status: 'pending',
-            payload: {
-              score: fraudScore,
-              riskLevel: fraudRiskLevel,
-              keywords: fraudKeywords,
-              callerHash,
+      const alertsEnabled =
+        profile.enable_email_alerts || profile.enable_sms_alerts || profile.enable_push_alerts;
+      if (alertsEnabled) {
+        await supabaseAdmin
+          .from('alerts')
+          .upsert(
+            {
+              profile_id: profile.id,
+              call_id: callRow.id,
+              alert_type: 'fraud',
+              status: 'pending',
+              payload: {
+                score: fraudScore,
+                riskLevel: fraudRiskLevel,
+                keywords: fraudKeywords,
+                callerHash,
+              },
             },
-          },
-          { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
-        );
+            { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
+          );
+      }
 
       const callBlockingEnabled = process.env.ENABLE_CALL_BLOCKING === 'true';
       if (callBlockingEnabled && callerHash) {

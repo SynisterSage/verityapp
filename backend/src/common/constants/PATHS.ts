@@ -23,6 +23,14 @@ const PATHS = {
     SafePhrases: '/safe-phrases',
     BlockedCallers: '/blocked-callers',
   },
+  Profiles: {
+    _: '/profiles',
+    Get: '/',
+    Create: '/',
+    Passcode: '/:profileId/passcode',
+    Alerts: '/:profileId/alerts',
+    Invites: '/:profileId/invites',
+  },
 } as const;
 
 export const JET_PATHS = jetPaths(PATHS);
