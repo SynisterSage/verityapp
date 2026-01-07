@@ -1,3 +1,3 @@
-## SafeCall
+## Verity App
 
     - Lex F
