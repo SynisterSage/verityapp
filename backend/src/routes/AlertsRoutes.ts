@@ -6,5 +6,6 @@ const alertsRouter = Router();
 
 alertsRouter.get('/', AlertsController.listAlerts);
 alertsRouter.patch('/:alertId', AlertsController.updateAlertStatus);
+alertsRouter.delete('/:alertId', AlertsController.deleteAlert);
 
 export default alertsRouter;

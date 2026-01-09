@@ -141,8 +141,7 @@ export default function CallDetailScreen({ route }: { route: any }) {
       setCallRow((prev) => (prev ? { ...prev, feedback_status: status } : prev));
       if (status === 'marked_fraud') {
         const automationBlockEnabled =
-          Boolean(activeProfile?.auto_mark_enabled) &&
-          (activeProfile.auto_block_on_fraud ?? true);
+          activeProfile?.auto_mark_enabled === true && (activeProfile.auto_block_on_fraud ?? true);
         if (!automationBlockEnabled) {
           return Alert.alert('Saved', `Marked as ${status.replace('_', ' ')}`);
         }
