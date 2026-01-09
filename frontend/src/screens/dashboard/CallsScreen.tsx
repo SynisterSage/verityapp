@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  AppState,
+  AppStateStatus,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -33,17 +35,20 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
   const [calls, setCalls] = useState<CallRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const shimmer = useRef(new Animated.Value(0.6)).current;
   const listRef = useRef<FlatList<CallRow>>(null);
 
-  const loadCalls = async () => {
+  const loadCalls = async (silent = false) => {
     setError(null);
     if (!session || !activeProfile) {
       setCalls([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) {
+      setLoading(true);
+    }
     const { data, error: fetchError } = await supabase
       .from('calls')
       .select('id, created_at, transcript, fraud_risk_level, fraud_score, caller_number, feedback_status')
@@ -62,6 +67,29 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
   useEffect(() => {
     loadCalls();
   }, [session, activeProfile]);
+
+  useEffect(() => {
+    const interval = isAppActive
+      ? setInterval(() => {
+          loadCalls(true);
+        }, 60000)
+      : null;
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [session, activeProfile, isAppActive]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      const active = nextState === 'active';
+      setIsAppActive(active);
+      if (active) {
+        loadCalls();
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     const loop = Animated.loop(

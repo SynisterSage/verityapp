@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  AppState,
+  AppStateStatus,
   FlatList,
   RefreshControl,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
 
 import { authorizedFetch } from '../../services/backend';
 import AlertCard from '../../components/alerts/AlertCard';
@@ -34,7 +38,12 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
+  const [filter, setFilter] = useState<'all' | 'new' | 'critical'>('all');
+  const [callNumberMap, setCallNumberMap] = useState<Record<string, string>>({});
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const shimmer = useRef(new Animated.Value(0.6)).current;
+  const menuAnim = useRef(new Animated.Value(0)).current;
   const listRef = useRef<FlatList<AlertRow>>(null);
 
   const loadContactNames = async () => {
@@ -73,8 +82,10 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
     }
   };
 
-  const loadAlerts = async () => {
-    setLoading(true);
+  const loadAlerts = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
     try {
       await loadContactNames();
       const data = await authorizedFetch('/alerts?status=pending&limit=25');
@@ -84,16 +95,22 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
         .filter((callId): callId is string => Boolean(callId));
 
       let feedbackMap = new Map<string, { feedback_status?: string | null; fraud_risk_level?: string | null }>();
+      let numberMap: Record<string, string> = {};
       if (callIds.length > 0) {
         const { data: callRows } = await supabase
           .from('calls')
-          .select('id, feedback_status, fraud_risk_level')
+          .select('id, feedback_status, fraud_risk_level, caller_number')
           .in('id', callIds);
         feedbackMap = new Map(
           (callRows ?? []).map((row) => [
             row.id,
             { feedback_status: row.feedback_status ?? null, fraud_risk_level: row.fraud_risk_level ?? null },
           ])
+        );
+        numberMap = Object.fromEntries(
+          (callRows ?? [])
+            .filter((row) => row.caller_number)
+            .map((row) => [row.id, row.caller_number as string])
         );
       }
 
@@ -120,6 +137,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
       });
 
       setAlerts(enriched);
+      setCallNumberMap(numberMap);
     } catch {
       setAlerts([]);
     }
@@ -130,10 +148,35 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
     loadAlerts();
   }, []);
 
+  useEffect(() => {
+    // Close menu when the screen is refocused or left.
+    return () => setShowFilterMenu(false);
+  }, []);
+
+  useEffect(() => {
+    Animated.timing(menuAnim, {
+      toValue: showFilterMenu ? 1 : 0,
+      duration: 150,
+      useNativeDriver: true,
+    }).start();
+  }, [showFilterMenu, menuAnim]);
+
+  useEffect(() => {
+    const interval = isAppActive
+      ? setInterval(() => {
+          loadAlerts(true);
+        }, 60000)
+      : null;
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isAppActive]);
+
   useFocusEffect(
     useCallback(() => {
-      loadAlerts();
+      loadAlerts(true);
       listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      setShowFilterMenu(false);
     }, [])
   );
 
@@ -151,13 +194,106 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
   const showSkeleton = loading && alerts.length === 0;
   const contentOpacity = showSkeleton ? 0 : 1;
+  const sortedAlerts = useMemo(() => {
+    const weight = (status?: string | null) => (status === 'resolved' ? 1 : 0);
+    return [...alerts].sort((a, b) => {
+      const wDiff = weight(a.status) - weight(b.status);
+      if (wDiff !== 0) return wDiff;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [alerts]);
+  const filteredAlerts = useMemo(() => {
+    if (filter === 'critical') {
+      return sortedAlerts.filter((a) => (a.risk_level ?? '').toLowerCase() === 'critical');
+    }
+    if (filter === 'new') {
+      return sortedAlerts.filter((a) => a.status !== 'resolved');
+    }
+    return sortedAlerts;
+  }, [sortedAlerts, filter]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      const active = nextState === 'active';
+      setIsAppActive(active);
+      if (active) {
+        loadAlerts();
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => sub.remove();
+  }, []);
 
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
       edges={[]}
     >
-      <Text style={styles.title}>Alerts</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.title}>Alerts</Text>
+        <View style={styles.filterWrapper}>
+          <TouchableOpacity
+            style={styles.filterButton}
+            onPress={() => setShowFilterMenu((prev) => !prev)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.filterButtonText}>
+              {filter === 'all' ? 'All' : filter === 'new' ? 'New' : 'Critical'}
+            </Text>
+            <Ionicons
+              name={showFilterMenu ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color="#cfe0ff"
+            />
+          </TouchableOpacity>
+          {showFilterMenu ? (
+            <>
+              <TouchableOpacity
+                style={styles.menuOverlay}
+                activeOpacity={1}
+                onPress={() => setShowFilterMenu(false)}
+              />
+              <Animated.View
+                style={[
+                  styles.filterMenu,
+                  {
+                    opacity: menuAnim,
+                    transform: [
+                      {
+                        translateY: menuAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-4, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                {(['all', 'new', 'critical'] as const).map((key, idx, arr) => (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.filterMenuItem, idx === arr.length - 1 && styles.filterMenuItemLast]}
+                    onPress={() => {
+                      setFilter(key);
+                      setShowFilterMenu(false);
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.filterMenuText,
+                        filter === key && styles.filterMenuTextActive,
+                      ]}
+                    >
+                      {key === 'all' ? 'All' : key === 'new' ? 'New' : 'Critical'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </Animated.View>
+            </>
+          ) : null}
+        </View>
+      </View>
       <View style={styles.listWrapper}>
         {showSkeleton ? (
           <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>
@@ -172,7 +308,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
         ) : null}
         <FlatList
           ref={listRef}
-          data={alerts}
+          data={filteredAlerts}
           keyExtractor={(item) => item.id}
           refreshControl={
             <RefreshControl
@@ -187,35 +323,31 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
           automaticallyAdjustContentInsets={false}
           contentContainerStyle={[
             styles.listContent,
-            !showSkeleton && alerts.length === 0 && styles.listEmptyContent,
+            !showSkeleton && filteredAlerts.length === 0 && styles.listEmptyContent,
           ]}
           style={{ opacity: contentOpacity }}
           renderItem={({ item }) => {
             const isTrusted = item.alert_type === 'trusted';
             const riskLabel = isTrusted ? 'Trusted' : item.risk_label ?? item.payload?.riskLevel ?? 'alert';
             const riskLevel = isTrusted ? 'low' : item.risk_level ?? item.payload?.riskLevel ?? 'unknown';
-            const callerNumber = item.payload?.callerNumber as string | undefined;
+            const callerNumber =
+              (item.payload?.callerNumber as string | undefined) ||
+              (item.payload?.caller_number as string | undefined) ||
+              (item.call_id ? callNumberMap[item.call_id] : undefined);
             const callerName = callerNumber ? contactNames[callerNumber] : '';
-            const displayStatus = isTrusted
-              ? 'trusted contact'
-              : riskLabel.toLowerCase() === 'fraud'
-                ? 'blocked'
-                : riskLabel.toLowerCase() === 'safe'
-                ? 'marked safe'
-                : item.status;
             const title = isTrusted ? 'Trusted call' : item.alert_type;
-            const subtitle = isTrusted
-              ? callerName || callerNumber || 'Trusted contact'
-              : undefined;
+            const nameOrNumber = callerName || callerNumber || 'Unknown caller';
+            const subtitle = `${nameOrNumber} • Score ${item.payload?.score ?? '—'}`;
             return (
               <AlertCard
                 alertType={title}
-                status={displayStatus}
+                status={item.status}
                 createdAt={item.created_at}
                 score={item.payload?.score}
                 riskLevel={riskLevel}
                 riskLabel={riskLabel}
                 subtitle={subtitle}
+                muted={item.status !== 'pending'}
                 onPress={() =>
                   item.call_id
                     ? navigation.navigate('CallDetailModal', { callId: item.call_id })
@@ -229,8 +361,14 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
               <View style={styles.emptyStateWrap}>
                 <EmptyState
                   icon="alert-circle-outline"
-                  title="No alerts yet"
-                  body="We will surface anything suspicious here as soon as it happens."
+                  title="No alerts"
+                  body={
+                    filter === 'critical'
+                      ? 'No critical alerts right now.'
+                      : filter === 'new'
+                      ? 'No new alerts right now.'
+                      : 'We will surface anything suspicious here as soon as it happens.'
+                  }
                 />
               </View>
             )
@@ -263,6 +401,69 @@ const styles = StyleSheet.create({
   listWrapper: {
     flex: 1,
     position: 'relative',
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  filterWrapper: {
+    position: 'relative',
+  },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#121a26',
+    borderWidth: 1,
+    borderColor: '#1f2a3a',
+  },
+  filterButtonText: {
+    color: '#cfe0ff',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  filterMenu: {
+    position: 'absolute',
+    top: 34,
+    right: 0,
+    width: 120,
+    backgroundColor: '#121a26',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1f2a3a',
+    paddingVertical: 6,
+    zIndex: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
+  filterMenuItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#1f2a3a',
+  },
+  filterMenuItemLast: {
+    borderBottomWidth: 0,
+  },
+  filterMenuText: {
+    color: '#9fb0cc',
+    fontWeight: '600',
+  },
+  filterMenuTextActive: {
+    color: '#f5f7fb',
+  },
+  menuOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 5,
   },
   emptyStateWrap: {
     alignItems: 'center',

@@ -11,6 +11,7 @@ type AlertCardProps = {
   riskLevel?: string | null;
   riskLabel?: string | null;
   subtitle?: string;
+  muted?: boolean;
   onPress?: () => void;
 };
 
@@ -22,6 +23,7 @@ export default function AlertCard({
   riskLevel,
   riskLabel,
   subtitle,
+  muted,
   onPress,
 }: AlertCardProps) {
   const badgeLabel = riskLabel ?? riskLevel ?? 'unknown';
@@ -29,6 +31,7 @@ export default function AlertCard({
   const scoreValue = score ?? '—';
   const scoreText = typeof scoreValue === 'number' ? scoreValue.toString() : scoreValue;
   const subtitleText = subtitle ?? `Score ${scoreText}`;
+  const mutedStyle = muted ? { opacity: 0.55 } : null;
 
   return (
     <TouchableOpacity
@@ -37,7 +40,7 @@ export default function AlertCard({
       activeOpacity={0.85}
       disabled={!onPress}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, mutedStyle]}>
         <View style={styles.headerLeft}>
           <View style={styles.iconCircle}>
             <Ionicons name="alert-circle" size={18} color="#8ab4ff" />
@@ -55,12 +58,13 @@ export default function AlertCard({
               color: riskStyles.text,
               borderColor: riskStyles.accent,
             },
+            mutedStyle,
           ]}
         >
           {badgeLabel.toUpperCase()}
         </Text>
       </View>
-      <Text style={styles.meta}>
+      <Text style={[styles.meta, mutedStyle]}>
         {new Date(createdAt).toLocaleString()} • {status}
       </Text>
     </TouchableOpacity>

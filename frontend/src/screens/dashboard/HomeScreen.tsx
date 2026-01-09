@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
+  AppState,
+  AppStateStatus,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -66,11 +68,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [blockedCount, setBlockedCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const shimmer = useRef(new Animated.Value(0.6)).current;
   const scrollRef = useRef<ScrollView>(null);
   const email = session?.user.email ?? 'Account';
   const hasTwilioNumber = Boolean(activeProfile?.twilio_virtual_number);
-  const loadStats = async (isRefresh = false) => {
+  const loadStats = async (isRefresh = false, silent = false) => {
     if (!activeProfile) {
       setRecentCall(null);
       setRecentActivity([]);
@@ -80,9 +83,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       setRefreshing(false);
       return;
     }
-    if (isRefresh) {
+    if (isRefresh && !silent) {
       setRefreshing(true);
-    } else {
+    } else if (!silent) {
       setLoading(true);
     }
     const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -225,13 +228,38 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         .slice(0, 3);
 
     setRecentActivity(activityItems);
-    setLoading(false);
-    setRefreshing(false);
+    if (!silent) {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
     loadStats();
   }, [activeProfile]);
+
+  useEffect(() => {
+    const interval = isAppActive
+      ? setInterval(() => {
+          loadStats(true, true);
+        }, 60000)
+      : null;
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [activeProfile, isAppActive]);
+
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      const active = nextState === 'active';
+      setIsAppActive(active);
+      if (active) {
+        loadStats(true);
+      }
+    };
+    const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     const loop = Animated.loop(
