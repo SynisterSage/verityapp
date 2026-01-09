@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
+import { subscribeToCallUpdates } from '../../utils/callEvents';
 import RecentCallCard from '../../components/home/RecentCallCard';
 import EmptyState from '../../components/common/EmptyState';
 
@@ -39,7 +40,7 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
   const shimmer = useRef(new Animated.Value(0.6)).current;
   const listRef = useRef<FlatList<CallRow>>(null);
 
-  const loadCalls = async (silent = false) => {
+  const loadCalls = useCallback(async (silent = false) => {
     setError(null);
     if (!session || !activeProfile) {
       setCalls([]);
@@ -62,11 +63,11 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
       setCalls(data ?? []);
     }
     setLoading(false);
-  };
+  }, [session, activeProfile]);
 
   useEffect(() => {
     loadCalls();
-  }, [session, activeProfile]);
+  }, [loadCalls]);
 
   useEffect(() => {
     const interval = isAppActive
@@ -77,7 +78,7 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [session, activeProfile, isAppActive]);
+  }, [isAppActive, loadCalls]);
 
   useEffect(() => {
     const handleAppStateChange = (nextState: AppStateStatus) => {
@@ -89,7 +90,7 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
     };
     const sub = AppState.addEventListener('change', handleAppStateChange);
     return () => sub.remove();
-  }, []);
+  }, [loadCalls]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -107,6 +108,13 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
       listRef.current?.scrollToOffset({ offset: 0, animated: false });
     }, [])
   );
+
+  useEffect(() => {
+    const unsubscribe = subscribeToCallUpdates(() => {
+      loadCalls(true);
+    });
+    return unsubscribe;
+  }, [loadCalls]);
 
   const skeletonRows = useMemo(() => Array.from({ length: 4 }, (_, i) => `skeleton-${i}`), []);
   const showSkeleton = loading && calls.length === 0 && !error;
@@ -172,7 +180,14 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
                 badgeLabel={badgeLabel}
                 emptyText="No transcript"
                 maxLength={80}
-                onPress={() => navigation.navigate('CallDetail', { callId: item.id })}
+                onPress={() => {
+                  const rootNavigator = navigation.getParent()?.getParent();
+                  if (rootNavigator?.navigate) {
+                    rootNavigator.navigate('CallDetailModal', { callId: item.id, compact: false });
+                  } else {
+                    navigation.navigate('CallDetail', { callId: item.id });
+                  }
+                }}
               />
             );
           }}

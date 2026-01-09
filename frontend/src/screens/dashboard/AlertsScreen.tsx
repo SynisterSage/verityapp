@@ -22,6 +22,7 @@ import EmptyState from '../../components/common/EmptyState';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { useProfile } from '../../context/ProfileContext';
+import { subscribeToCallUpdates } from '../../utils/callEvents';
 
 type AlertRow = {
   id: string;
@@ -58,6 +59,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
   const [filter, setFilter] = useState<'all' | 'new' | 'critical' | 'muted'>('all');
   const [callNumberMap, setCallNumberMap] = useState<Record<string, string>>({});
+  const loadAlertsRef = useRef<((silent?: boolean) => Promise<void>) | null>(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const shimmer = useRef(new Animated.Value(0.6)).current;
@@ -166,6 +168,17 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
 
   useEffect(() => {
     loadAlerts();
+  }, []);
+
+  useEffect(() => {
+    loadAlertsRef.current = loadAlerts;
+  }, [loadAlerts]);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToCallUpdates(() => {
+      loadAlertsRef.current?.(true);
+    });
+    return unsubscribe;
   }, []);
 
   useEffect(() => {

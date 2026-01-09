@@ -1,14 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Audio, AVPlaybackStatusSuccess } from 'expo-av';
+import { Audio } from 'expo-av';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -16,6 +17,8 @@ import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import { emitCallUpdated } from '../../utils/callEvents';
+import { getRiskStyles } from '../../utils/risk';
 
 type CallRow = {
   id: string;
@@ -27,7 +30,57 @@ type CallRow = {
   fraud_keywords: string[] | null;
   caller_number: string | null;
   feedback_status?: string | null;
+  caller_hash?: string | null;
 };
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
+}
+
+function highlightTranscript(text: string, keywords: string[]) {
+  if (!text) {
+    return [{ text, highlight: false }];
+  }
+  const normalized = Array.from(
+    new Set(
+      keywords
+        .map((keyword) => keyword.trim())
+        .filter(Boolean)
+        .map((keyword) => keyword)
+    )
+  );
+  if (normalized.length === 0) {
+    return [{ text, highlight: false }];
+  }
+  const sorted = normalized
+    .slice()
+    .sort((a, b) => b.length - a.length)
+    .map((keyword) => escapeRegExp(keyword));
+  const pattern = new RegExp(`(${sorted.join('|')})`, 'gi');
+  const segments: { text: string; highlight: boolean }[] = [];
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text))) {
+    if (match.index > lastIndex) {
+      segments.push({
+        text: text.slice(lastIndex, match.index),
+        highlight: false,
+      });
+    }
+    segments.push({
+      text: match[0],
+      highlight: true,
+    });
+    lastIndex = pattern.lastIndex;
+  }
+  if (lastIndex < text.length) {
+    segments.push({
+      text: text.slice(lastIndex),
+      highlight: false,
+    });
+  }
+  return segments;
+}
 
 export default function CallDetailScreen({
   route,
@@ -45,23 +98,24 @@ export default function CallDetailScreen({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const highlightAnim = useRef(new Animated.Value(0)).current;
+  const riskBarAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase
         .from('calls')
         .select(
-          'id, profile_id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords, caller_number, feedback_status'
+          'id, profile_id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords, caller_number, feedback_status, caller_hash'
         )
         .eq('id', callId)
         .single();
       setCallRow(data ?? null);
       try {
-        const urlData = await authorizedFetch(`/calls/${callId}/recording-url`);
+        const urlData = await authorizedFetch(`/calls/${callId}/recording-url`); 
         setRecordingUrl(urlData?.url ?? null);
         setRecordingStatus(urlData?.url ? 'ready' : 'error');
       } catch (err) {
-        // If we can't load the URL, keep UI minimal and let user retry via alert
         console.warn('Failed to prefetch recording URL', err);
         setRecordingStatus('error');
       }
@@ -213,11 +267,44 @@ export default function CallDetailScreen({
           }
         }
       }
+      emitCallUpdated({ callId });
       Alert.alert('Saved', `Marked as ${status.replace('_', ' ')}`);
     } catch (err) {
       Alert.alert('Error', 'Failed to save feedback');
     }
   };
+
+  const highlightedTranscript = useMemo(
+    () =>
+      callRow ? highlightTranscript(callRow.transcript ?? '', callRow.fraud_keywords ?? []) : [],
+    [callRow?.transcript, callRow?.fraud_keywords]
+  );
+  const fraudRiskStyle = useMemo(
+    () => getRiskStyles(callRow?.fraud_risk_level ?? 'unknown'),
+    [callRow?.fraud_risk_level]
+  );
+  useEffect(() => {
+    if (!callRow) {
+      return;
+    }
+    highlightAnim.setValue(0);
+    riskBarAnim.setValue(0);
+    Animated.timing(highlightAnim, {
+      toValue: 1,
+      duration: 450,
+      useNativeDriver: true,
+    }).start();
+    Animated.timing(riskBarAnim, {
+      toValue: Math.min(100, Math.max(0, callRow.fraud_score ?? 0)),
+      duration: 700,
+      useNativeDriver: false,
+    }).start();
+  }, [callRow, highlightAnim, riskBarAnim]);
+  const riskBarWidth = riskBarAnim.interpolate({
+    inputRange: [0, 100],
+    outputRange: ['0%', '100%'],
+    extrapolate: 'clamp',
+  });
 
   if (!callRow) {
     return (
@@ -270,53 +357,97 @@ export default function CallDetailScreen({
         <Text style={styles.caller}>{callRow.caller_number ?? 'Unknown caller'}</Text>
         <Text style={styles.meta}>{new Date(callRow.created_at).toLocaleString()}</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Transcript</Text>
-        <Text style={styles.body}>{callRow.transcript ?? 'No transcript'}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Fraud</Text>
-        <Text style={styles.body}>
-          Score: {callRow.fraud_score ?? '—'} ({callRow.fraud_risk_level ?? 'unknown'})
-        </Text>
-        <Text style={styles.body}>
-          Keywords: {callRow.fraud_keywords?.join(', ') ?? '—'}
-        </Text>
-      </View>
-
-      <View style={styles.card}>
-        <View style={styles.recordingHeader}>
-          <Text style={styles.sectionTitle}>Recording</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>
-              {recordingStatus === 'loading'
-                ? 'Loading'
-                : recordingStatus === 'error'
-                ? 'Unavailable'
-                : isPlaying
-                ? 'Playing'
-                : 'Ready'}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Transcript</Text>
+          {callRow.transcript ? (
+            <Text style={styles.body}>
+              {highlightedTranscript.map((segment, index) =>
+                segment.highlight ? (
+                  <Animated.Text
+                    key={`segment-${index}`}
+                    style={[styles.transcriptHighlight, { opacity: highlightAnim }]}
+                  >
+                    {segment.text}
+                  </Animated.Text>
+                ) : (
+                  <Text key={`segment-${index}`}>{segment.text}</Text>
+                )
+              )}
             </Text>
+          ) : (
+            <Text style={styles.body}>No transcript</Text>
+          )}
+        </View>
+
+        <View style={[styles.card, styles.fraudCard]}>
+          <Text style={styles.sectionTitle}>Fraud</Text>
+          <View style={styles.riskRow}>
+            <Text style={[styles.scoreText, { color: fraudRiskStyle.text }]}>Score: {callRow.fraud_score ?? '—'}</Text>
+            <View
+              style={[
+                styles.badge,
+                {
+                  borderColor: fraudRiskStyle.accent,
+                  backgroundColor: fraudRiskStyle.background,
+                },
+              ]}
+            >
+              <Text style={[styles.badgeText, { color: fraudRiskStyle.text }]}> 
+                {callRow.fraud_risk_level?.toUpperCase() ?? 'UNKNOWN'}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.body}>
+            Keywords:{' '}
+            {callRow.fraud_keywords && callRow.fraud_keywords.length > 0
+              ? callRow.fraud_keywords.join(', ')
+              : '—'}
+          </Text>
+          <View style={styles.riskBar}>
+            <Animated.View
+              style={[
+                styles.riskFill,
+                {
+                  width: riskBarWidth,
+                  backgroundColor: fraudRiskStyle.accent,
+                },
+              ]}
+            />
           </View>
         </View>
-        <TouchableOpacity
-          style={[styles.playButton, recordingStatus === 'error' && styles.playButtonError]}
-          onPress={recordingStatus === 'error' ? retryUrl : playOrPause}
-          disabled={isLoadingAudio || recordingStatus === 'loading'}
-        >
-          {isLoadingAudio || recordingStatus === 'loading' ? (
-            <ActivityIndicator color="#f5f7fb" />
-          ) : (
-            <Text style={styles.playText}>
-              {recordingStatus === 'error' ? 'Retry' : isPlaying ? 'Pause' : 'Play'}
-            </Text>
-          )}
-        </TouchableOpacity>
-        {recordingStatus === 'error' ? (
-          <Text style={styles.hint}>Recording link not ready yet. Tap retry.</Text>
-        ) : null}
-      </View>
+
+        <View style={styles.card}>
+          <View style={styles.recordingHeader}>
+            <Text style={styles.sectionTitle}>Recording</Text>
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {recordingStatus === 'loading'
+                  ? 'Loading'
+                  : recordingStatus === 'error'
+                  ? 'Unavailable'
+                  : isPlaying
+                  ? 'Playing'
+                  : 'Ready'}
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity
+            style={[styles.playButton, recordingStatus === 'error' && styles.playButtonError]}
+            onPress={recordingStatus === 'error' ? retryUrl : playOrPause}
+            disabled={isLoadingAudio || recordingStatus === 'loading'}
+          >
+            {isLoadingAudio || recordingStatus === 'loading' ? (
+              <ActivityIndicator color="#f5f7fb" />
+            ) : (
+              <Text style={styles.playText}>
+                {recordingStatus === 'error' ? 'Retry' : isPlaying ? 'Pause' : 'Play'}
+              </Text>
+            )}
+          </TouchableOpacity>
+          {recordingStatus === 'error' ? (
+            <Text style={styles.hint}>Recording link not ready yet. Tap retry.</Text>
+          ) : null}
+        </View>
 
         <View style={styles.actions}>
           <TouchableOpacity
@@ -384,6 +515,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 24,
+    paddingTop: 0,
     paddingBottom: 120,
   },
   caller: {
@@ -403,11 +535,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#202c3c',
   },
-  recordingHeader: {
+  fraudCard: {
+    borderColor: '#1f293a',
+  },
+  riskRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  scoreText: {
+    fontWeight: '600',
   },
   sectionTitle: {
     color: '#f5f7fb',
@@ -418,16 +556,38 @@ const styles = StyleSheet.create({
     color: '#d2daea',
     lineHeight: 20,
   },
-  primaryButton: {
-    marginTop: 16,
+  recordingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  playButton: {
     backgroundColor: '#2d6df6',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
   },
-  primaryButtonText: {
+  playButtonError: {
+    backgroundColor: '#8c3b3b',
+  },
+  playText: {
     color: '#f5f7fb',
     fontWeight: '600',
+  },
+  hint: {
+    color: '#8aa0c6',
+    marginTop: 10,
+  },
+  badge: {
+    backgroundColor: '#20304a',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  badgeText: {
+    color: '#8ab4ff',
+    fontSize: 12,
   },
   actions: {
     marginTop: 20,
@@ -458,6 +618,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
+  transcriptHighlight: {
+    backgroundColor: '#2d1726',
+    borderRadius: 6,
+    color: '#ffb6c1',
+    paddingHorizontal: 4,
+  },
+  riskBar: {
+    marginTop: 12,
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#1d2737',
+    overflow: 'hidden',
+  },
+  riskFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
   secondaryText: {
     color: '#d7e3f7',
     fontWeight: '600',
@@ -468,38 +645,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6,
-  },
-  loading: {
-    color: '#8aa0c6',
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  playButton: {
-    backgroundColor: '#2d6df6',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  playButtonError: {
-    backgroundColor: '#8c3b3b',
-  },
-  playText: {
-    color: '#f5f7fb',
-    fontWeight: '600',
-  },
-  hint: {
-    color: '#8aa0c6',
-    marginTop: 10,
-  },
-  badge: {
-    backgroundColor: '#20304a',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeText: {
-    color: '#8ab4ff',
-    fontSize: 12,
   },
   skeletonWrapper: {
     paddingHorizontal: 24,
