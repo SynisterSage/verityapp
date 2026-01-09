@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { supabase } from '../../services/supabase';
 import { authorizedFetch } from '../../services/backend';
+import { useProfile } from '../../context/ProfileContext';
 
 type CallRow = {
   id: string;
@@ -32,6 +33,7 @@ export default function CallDetailScreen({ route }: { route: any }) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const { callId } = route.params;
+  const { activeProfile } = useProfile();
   const [callRow, setCallRow] = useState<CallRow | null>(null);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -138,6 +140,12 @@ export default function CallDetailScreen({ route }: { route: any }) {
       });
       setCallRow((prev) => (prev ? { ...prev, feedback_status: status } : prev));
       if (status === 'marked_fraud') {
+        const automationBlockEnabled =
+          Boolean(activeProfile?.auto_mark_enabled) &&
+          (activeProfile.auto_block_on_fraud ?? true);
+        if (!automationBlockEnabled) {
+          return Alert.alert('Saved', `Marked as ${status.replace('_', ' ')}`);
+        }
         if (callRow?.profile_id && callRow?.caller_number) {
           await authorizedFetch('/fraud/blocked-callers', {
             method: 'POST',
@@ -158,7 +166,28 @@ export default function CallDetailScreen({ route }: { route: any }) {
   if (!callRow) {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
-        <Text style={styles.loading}>Loading…</Text>
+        <View style={styles.skeletonWrapper}>
+          <View style={styles.skeletonHeader}>
+            <View style={styles.skeletonLineWide} />
+            <View style={styles.skeletonLineShort} />
+          </View>
+          <View style={styles.skeletonCard}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonLineFull} />
+            <View style={styles.skeletonLineShort} />
+          </View>
+          <View style={styles.skeletonCard}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonLineFull} />
+            <View style={styles.skeletonLineMedium} />
+          </View>
+          <View style={styles.skeletonCard}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonLineFull} />
+            <View style={styles.skeletonLineFull} />
+            <View style={styles.skeletonLineShort} />
+          </View>
+        </View>
       </SafeAreaView>
     );
   }
@@ -410,5 +439,51 @@ const styles = StyleSheet.create({
   badgeText: {
     color: '#8ab4ff',
     fontSize: 12,
+  },
+  skeletonWrapper: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    gap: 16,
+  },
+  skeletonHeader: {
+    gap: 8,
+  },
+  skeletonCard: {
+    backgroundColor: '#121a26',
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#202c3c',
+    gap: 8,
+  },
+  skeletonTitle: {
+    height: 16,
+    width: '50%',
+    borderRadius: 6,
+    backgroundColor: '#20293a',
+  },
+  skeletonLineWide: {
+    height: 14,
+    width: '70%',
+    borderRadius: 6,
+    backgroundColor: '#20293a',
+  },
+  skeletonLineFull: {
+    height: 12,
+    width: '100%',
+    borderRadius: 6,
+    backgroundColor: '#152034',
+  },
+  skeletonLineMedium: {
+    height: 12,
+    width: '60%',
+    borderRadius: 6,
+    backgroundColor: '#152034',
+  },
+  skeletonLineShort: {
+    height: 12,
+    width: '35%',
+    borderRadius: 6,
+    backgroundColor: '#152034',
   },
 });

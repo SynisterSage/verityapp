@@ -544,14 +544,16 @@ async function recordingReady(req: Request, res: Response) {
     let autoAlertRequired = false;
     let shouldBlockCaller = false;
     let shouldTrustCaller = false;
+    const automationBlockEnabled = autoMarkEnabled && autoBlockOnFraud;
+    const automationTrustEnabled = autoMarkEnabled && autoTrustOnSafe;
     if (autoMarkEnabled && typeof fraudScore === 'number') {
       if (fraudScore >= autoFraudThreshold) {
         autoFeedback = 'marked_fraud';
         autoAlertRequired = true;
-        shouldBlockCaller = autoBlockOnFraud;
+        shouldBlockCaller = automationBlockEnabled;
       } else if (fraudScore <= autoSafeThreshold) {
         autoFeedback = 'marked_safe';
-        shouldTrustCaller = autoTrustOnSafe;
+        shouldTrustCaller = automationTrustEnabled;
       }
     }
     await supabaseAdmin
@@ -603,7 +605,7 @@ async function recordingReady(req: Request, res: Response) {
       }
 
       const callBlockingEnabled = process.env.ENABLE_CALL_BLOCKING === 'true';
-      if (callBlockingEnabled && callerHash) {
+      if (callBlockingEnabled && callerHash && automationBlockEnabled) {
         await supabaseAdmin.from('blocked_callers').upsert(
           {
             profile_id: profile.id,

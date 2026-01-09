@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   AppState,
   AppStateStatus,
@@ -13,6 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 
 import { authorizedFetch } from '../../services/backend';
 import AlertCard from '../../components/alerts/AlertCard';
@@ -30,7 +32,23 @@ type AlertRow = {
   call_id: string | null;
   risk_label?: string | null;
   risk_level?: string | null;
+  processed?: boolean;
+  feedback_status?: string | null;
 };
+
+function formatPhoneNumber(value?: string | undefined | null) {
+  if (!value) return null;
+  const normalized = value.replace(/[^0-9+]/g, '');
+  if (!normalized.startsWith('+')) {
+    return normalized;
+  }
+  const digits = normalized.slice(1);
+  if (!digits) return normalized;
+  const countryDigits = digits.length > 10 ? digits.length - 10 : 1;
+  const country = digits.slice(0, countryDigits);
+  const local = digits.slice(countryDigits);
+  return local ? `+${country} ${local}` : `+${country}`;
+}
 
 export default function AlertsScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
@@ -38,7 +56,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
-  const [filter, setFilter] = useState<'all' | 'new' | 'critical'>('all');
+  const [filter, setFilter] = useState<'all' | 'new' | 'critical' | 'muted'>('all');
   const [callNumberMap, setCallNumberMap] = useState<Record<string, string>>({});
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
@@ -88,7 +106,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
     }
     try {
       await loadContactNames();
-      const data = await authorizedFetch('/alerts?status=pending&limit=25');
+      const data = await authorizedFetch('/alerts?limit=25');
       const alerts = (data?.alerts ?? []) as AlertRow[];
       const callIds = alerts
         .map((alert) => alert.call_id)
@@ -133,6 +151,8 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
           ...alert,
           risk_label: riskLabel,
           risk_level: riskLevel,
+          processed: Boolean(feedbackStatus),
+          feedback_status: feedbackStatus,
         };
       });
 
@@ -195,9 +215,9 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const showSkeleton = loading && alerts.length === 0;
   const contentOpacity = showSkeleton ? 0 : 1;
   const sortedAlerts = useMemo(() => {
-    const weight = (status?: string | null) => (status === 'resolved' ? 1 : 0);
+    const weight = (row: AlertRow) => (row.processed ? 1 : 0);
     return [...alerts].sort((a, b) => {
-      const wDiff = weight(a.status) - weight(b.status);
+      const wDiff = weight(a) - weight(b);
       if (wDiff !== 0) return wDiff;
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
@@ -207,10 +227,52 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
       return sortedAlerts.filter((a) => (a.risk_level ?? '').toLowerCase() === 'critical');
     }
     if (filter === 'new') {
-      return sortedAlerts.filter((a) => a.status !== 'resolved');
+      return sortedAlerts.filter((a) => !a.processed);
+    }
+    if (filter === 'muted') {
+      return sortedAlerts.filter((a) => Boolean(a.processed));
     }
     return sortedAlerts;
   }, [sortedAlerts, filter]);
+
+  const handleDelete = useCallback(async (alertId: string) => {
+    try {
+      await authorizedFetch(`/alerts/${alertId}`, { method: 'DELETE' });
+      setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
+    } catch (err) {
+      Alert.alert('Delete failed', 'Could not delete the alert right now.');
+    }
+  }, []);
+
+  const confirmDelete = useCallback(
+    (alertId: string) => {
+      Alert.alert(
+        'Delete alert',
+        'This permanently removes the alert. This cannot be undone. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => handleDelete(alertId),
+          },
+        ],
+        { cancelable: true }
+      );
+    },
+    [handleDelete]
+  );
+
+  const renderDeleteAction = (alertId: string) => (
+    <TouchableOpacity
+      style={styles.deleteAction}
+      onPress={() => confirmDelete(alertId)}
+      activeOpacity={1}
+    >
+      <Ionicons name="trash-outline" size={22} color="#ffe3e3" />
+      <Text style={styles.deleteActionText}>Delete</Text>
+    </TouchableOpacity>
+  );
 
   useEffect(() => {
     const handleAppStateChange = (nextState: AppStateStatus) => {
@@ -238,7 +300,13 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
             activeOpacity={0.8}
           >
             <Text style={styles.filterButtonText}>
-              {filter === 'all' ? 'All' : filter === 'new' ? 'New' : 'Critical'}
+              {filter === 'all'
+                ? 'All'
+                : filter === 'new'
+                ? 'New'
+                : filter === 'critical'
+                ? 'Critical'
+                : 'Muted'}
             </Text>
             <Ionicons
               name={showFilterMenu ? 'chevron-up' : 'chevron-down'}
@@ -269,7 +337,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
                   },
                 ]}
               >
-                {(['all', 'new', 'critical'] as const).map((key, idx, arr) => (
+            {(['all', 'new', 'critical', 'muted'] as const).map((key, idx, arr) => (
                   <TouchableOpacity
                     key={key}
                     style={[styles.filterMenuItem, idx === arr.length - 1 && styles.filterMenuItemLast]}
@@ -285,7 +353,13 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
                         filter === key && styles.filterMenuTextActive,
                       ]}
                     >
-                      {key === 'all' ? 'All' : key === 'new' ? 'New' : 'Critical'}
+                      {key === 'all'
+                        ? 'All'
+                        : key === 'new'
+                        ? 'New'
+                        : key === 'critical'
+                        ? 'Critical'
+                        : 'Muted'}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -294,6 +368,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
           ) : null}
         </View>
       </View>
+      <Text style={styles.hint}>Swipe left on an alert to delete it forever.</Text>
       <View style={styles.listWrapper}>
         {showSkeleton ? (
           <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>
@@ -335,27 +410,46 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
               (item.payload?.caller_number as string | undefined) ||
               (item.call_id ? callNumberMap[item.call_id] : undefined);
             const callerName = callerNumber ? contactNames[callerNumber] : '';
-            const title = isTrusted ? 'Trusted call' : item.alert_type;
-            const nameOrNumber = callerName || callerNumber || 'Unknown caller';
+            const title = (() => {
+              if (isTrusted) return 'Trusted call';
+              const normalizedLabel = (riskLabel ?? '').toLowerCase();
+              if (normalizedLabel === 'fraud') return 'Fraud alert';
+              if (normalizedLabel === 'safe') return 'Safe call';
+              if (normalizedLabel === 'trusted') return 'Trusted call';
+              if (normalizedLabel === 'alert') return 'Alert';
+              return riskLabel ?? 'Alert';
+            })();
+            const statusLabel = item.processed && item.status === 'pending' ? 'resolved' : item.status;
+            const formattedNumber = formatPhoneNumber(callerNumber);
+            const nameOrNumber = callerName || formattedNumber || 'Unknown caller';
             const subtitle = `${nameOrNumber} • Score ${item.payload?.score ?? '—'}`;
             return (
-              <AlertCard
-                alertType={title}
-                status={item.status}
-                createdAt={item.created_at}
-                score={item.payload?.score}
-                riskLevel={riskLevel}
-                riskLabel={riskLabel}
-                subtitle={subtitle}
-                muted={item.status !== 'pending'}
-                onPress={() =>
-                  item.call_id
-                    ? navigation.navigate('CallDetailModal', { callId: item.call_id })
-                    : undefined
-                }
-              />
-            );
-          }}
+              <Swipeable
+                renderRightActions={() => renderDeleteAction(item.id)}
+                overshootRight={false}
+                friction={2}
+                rightThreshold={70}
+                enableTrackpadTwoFingerGesture
+                containerStyle={styles.swipeContainer}
+              >
+            <AlertCard
+              alertType={title}
+              status={statusLabel}
+              createdAt={item.created_at}
+              score={item.payload?.score}
+              riskLevel={riskLevel}
+              riskLabel={riskLabel}
+              subtitle={subtitle}
+              muted={Boolean(item.processed) || item.status !== 'pending'}
+              onPress={() =>
+                item.call_id
+                  ? navigation.navigate('CallDetailModal', { callId: item.call_id })
+                  : undefined
+              }
+            />
+          </Swipeable>
+        );
+      }}
           ListEmptyComponent={
             showSkeleton ? null : (
               <View style={styles.emptyStateWrap}>
@@ -389,7 +483,7 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#f5f7fb',
-    marginBottom: 12,
+    marginBottom: 6,
   },
   listContent: {
     paddingBottom: 120,
@@ -464,6 +558,29 @@ const styles = StyleSheet.create({
   menuOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 5,
+  },
+  hint: {
+    color: '#9fb0cc',
+    fontSize: 12,
+    marginTop: 1,
+    marginBottom: 8,
+  },
+  deleteAction: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 92,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    marginVertical: 0,
+  },
+  deleteActionText: {
+    color: '#ffe3e3',
+    marginTop: 6,
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  swipeContainer: {
+    backgroundColor: '#0b111b',
   },
   emptyStateWrap: {
     alignItems: 'center',

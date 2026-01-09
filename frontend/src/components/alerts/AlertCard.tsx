@@ -42,8 +42,8 @@ export default function AlertCard({
     >
       <View style={[styles.header, mutedStyle]}>
         <View style={styles.headerLeft}>
-          <View style={styles.iconCircle}>
-            <Ionicons name="alert-circle" size={18} color="#8ab4ff" />
+          <View style={[styles.iconCircle, { borderColor: riskStyles.accent }]}>
+            <Ionicons name="alert-circle" size={18} color={riskStyles.accent} />
           </View>
           <View>
             <Text style={styles.title}>{alertType.toUpperCase()}</Text>
@@ -98,6 +98,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+    borderWidth: 1,
   },
   title: {
     color: '#f5f7fb',

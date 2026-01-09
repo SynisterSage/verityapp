@@ -173,11 +173,13 @@ async function updateAlertStatus(req: Request, res: Response) {
     .eq('id', alertId)
     .single();
 
+  console.log('deleteAlert: id=', alertId, 'alertRow=', alertRow, 'error=', alertError);
   if (alertError || !alertRow) {
     return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Alert not found' });
   }
 
   const allowed = await userCanAccessProfile(userId, alertRow.profile_id);
+  console.log('deleteAlert access', { userId, profileId: alertRow.profile_id, allowed });
   if (!allowed) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
@@ -195,7 +197,43 @@ async function updateAlertStatus(req: Request, res: Response) {
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
 }
 
+async function deleteAlert(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { alertId } = req.params;
+  if (!alertId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing alertId' });
+  }
+
+  const { data: alertRow, error: alertError } = await supabaseAdmin
+    .from('alerts')
+    .select('id, profile_id')
+    .eq('id', alertId)
+    .single();
+
+  if (alertError || !alertRow) {
+    return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Alert not found' });
+  }
+
+  const allowed = await userCanAccessProfile(userId, alertRow.profile_id);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { error: deleteError } = await supabaseAdmin.from('alerts').delete().eq('id', alertId);
+  if (deleteError) {
+    logger.err(deleteError);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to delete alert' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
+}
+
 export default {
   listAlerts,
   updateAlertStatus,
+  deleteAlert,
 };

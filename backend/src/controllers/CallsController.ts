@@ -105,7 +105,7 @@ async function submitFeedback(req: Request, res: Response) {
 
   const { data: callRow, error: callError } = await supabaseAdmin
     .from('calls')
-    .select('profile_id')
+    .select('profile_id, caller_number, caller_hash')
     .eq('id', callId)
     .single();
 
@@ -115,7 +115,9 @@ async function submitFeedback(req: Request, res: Response) {
 
   const { data: profileRow } = await supabaseAdmin
     .from('profiles')
-    .select('caretaker_id')
+    .select(
+      'caretaker_id, auto_mark_enabled, auto_block_on_fraud, auto_trust_on_safe'
+    )
     .eq('id', callRow.profile_id)
     .maybeSingle();
 
@@ -152,6 +154,57 @@ async function submitFeedback(req: Request, res: Response) {
   if (updateError) {
     logger.err(updateError);
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to save feedback' });
+  }
+
+  const autoMarkEnabled = profileRow?.auto_mark_enabled ?? false;
+  const autoBlockOnFraud = profileRow?.auto_block_on_fraud ?? true;
+  const autoTrustOnSafe = profileRow?.auto_trust_on_safe ?? false;
+  const shouldAutoBlock = autoMarkEnabled && autoBlockOnFraud;
+  const shouldAutoTrust = autoMarkEnabled && autoTrustOnSafe;
+
+  if (status === 'marked_fraud' && shouldAutoBlock && callRow?.caller_hash) {
+    const { error: blockError } = await supabaseAdmin.from('blocked_callers').upsert(
+      {
+        profile_id: callRow.profile_id,
+        caller_hash: callRow.caller_hash,
+        caller_number: callRow.caller_number || null,
+        reason: 'auto_mark_fraud_manual',
+      },
+      { onConflict: 'profile_id,caller_hash' }
+    );
+    if (blockError) {
+      logger.err(blockError);
+    }
+  }
+
+  if (status === 'marked_safe' && shouldAutoTrust && callRow?.caller_hash && callRow.caller_number) {
+    const { error: trustError } = await supabaseAdmin.from('trusted_contacts').upsert(
+      {
+        profile_id: callRow.profile_id,
+        caller_hash: callRow.caller_hash,
+        caller_number: callRow.caller_number,
+        source: 'auto',
+      },
+      { onConflict: 'profile_id,caller_hash' }
+    );
+    if (trustError) {
+      logger.err(trustError);
+    }
+  }
+
+  const alertTypeUpdate =
+    status === 'marked_safe' ? 'safe' : status === 'marked_fraud' ? 'fraud' : undefined;
+  const { error: alertUpdateError } = await supabaseAdmin
+    .from('alerts')
+    .update({
+      status: 'resolved',
+      ...(alertTypeUpdate ? { alert_type: alertTypeUpdate } : {}),
+    })
+    .eq('call_id', callId)
+    .eq('profile_id', callRow.profile_id);
+
+  if (alertUpdateError) {
+    logger.err(alertUpdateError);
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
