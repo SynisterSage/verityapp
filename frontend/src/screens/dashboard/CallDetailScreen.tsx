@@ -37,6 +37,8 @@ function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&');
 }
 
+const AnimatedText = Animated.createAnimatedComponent(Text);
+
 function highlightTranscript(text: string, keywords: string[]) {
   if (!text) {
     return [{ text, highlight: false }];
@@ -274,6 +276,7 @@ export default function CallDetailScreen({
     }
   };
 
+  const isSafeCall = callRow?.fraud_score === 0;
   const highlightedTranscript = useMemo(
     () =>
       callRow ? highlightTranscript(callRow.transcript ?? '', callRow.fraud_keywords ?? []) : [],
@@ -304,6 +307,10 @@ export default function CallDetailScreen({
     inputRange: [0, 100],
     outputRange: ['0%', '100%'],
     extrapolate: 'clamp',
+  });
+  const highlightBackground = highlightAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(255, 182, 193, 0)', 'rgba(255, 182, 193, 0.28)'],
   });
 
   if (!callRow) {
@@ -360,20 +367,23 @@ export default function CallDetailScreen({
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Transcript</Text>
           {callRow.transcript ? (
-            <Text style={styles.body}>
-              {highlightedTranscript.map((segment, index) =>
-                segment.highlight ? (
-                  <Animated.Text
-                    key={`segment-${index}`}
-                    style={[styles.transcriptHighlight, { opacity: highlightAnim }]}
-                  >
-                    {segment.text}
-                  </Animated.Text>
-                ) : (
-                  <Text key={`segment-${index}`}>{segment.text}</Text>
-                )
-              )}
-            </Text>
+          <Text style={styles.body}>
+            {highlightedTranscript.map((segment, index) =>
+              segment.highlight ? (
+                <AnimatedText
+                  key={`segment-${index}`}
+                  style={[
+                    styles.transcriptHighlightText,
+                    { backgroundColor: highlightBackground },
+                  ]}
+                >
+                  {segment.text}
+                </AnimatedText>
+              ) : (
+                <Text key={`segment-${index}`}>{segment.text}</Text>
+              )
+            )}
+          </Text>
           ) : (
             <Text style={styles.body}>No transcript</Text>
           )}
@@ -397,23 +407,33 @@ export default function CallDetailScreen({
               </Text>
             </View>
           </View>
-          <Text style={styles.body}>
-            Keywords:{' '}
-            {callRow.fraud_keywords && callRow.fraud_keywords.length > 0
-              ? callRow.fraud_keywords.join(', ')
-              : '—'}
-          </Text>
-          <View style={styles.riskBar}>
-            <Animated.View
-              style={[
-                styles.riskFill,
-                {
-                  width: riskBarWidth,
-                  backgroundColor: fraudRiskStyle.accent,
-                },
-              ]}
-            />
-          </View>
+          {isSafeCall ? (
+            <>
+              <Text style={styles.safeCaption}>Safe call</Text>
+              <Text style={styles.safeNote}>No suspicious behavior detected.</Text>
+              <View style={styles.safeBar} />
+            </>
+          ) : (
+            <>
+              <Text style={styles.body}>
+                Keywords:{' '}
+                {callRow.fraud_keywords && callRow.fraud_keywords.length > 0
+                  ? callRow.fraud_keywords.join(', ')
+                  : '—'}
+              </Text>
+              <View style={styles.riskBar}>
+                <Animated.View
+                  style={[
+                    styles.riskFill,
+                    {
+                      width: riskBarWidth,
+                      backgroundColor: fraudRiskStyle.accent,
+                    },
+                  ]}
+                />
+              </View>
+            </>
+          )}
         </View>
 
         <View style={styles.card}>
@@ -556,6 +576,25 @@ const styles = StyleSheet.create({
     color: '#d2daea',
     lineHeight: 20,
   },
+  transcriptHighlightText: {
+    color: '#ffaeb2',
+    borderRadius: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 0,
+    lineHeight: 20,
+    marginHorizontal: 0,
+  },
+  safeCaption: {
+    color: '#8ab4ff',
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 6,
+  },
+  safeNote: {
+    color: '#9fb0c9',
+    fontSize: 12,
+    marginBottom: 10,
+  },
   recordingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -618,12 +657,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  transcriptHighlight: {
-    backgroundColor: '#2d1726',
-    borderRadius: 6,
-    color: '#ffb6c1',
-    paddingHorizontal: 4,
-  },
   riskBar: {
     marginTop: 12,
     height: 6,
@@ -634,6 +667,12 @@ const styles = StyleSheet.create({
   riskFill: {
     height: '100%',
     borderRadius: 999,
+  },
+  safeBar: {
+    height: 2,
+    marginTop: 6,
+    borderRadius: 999,
+    backgroundColor: '#1d2737',
   },
   secondaryText: {
     color: '#d7e3f7',
