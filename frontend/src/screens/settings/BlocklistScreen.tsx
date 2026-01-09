@@ -144,20 +144,16 @@ export default function BlocklistScreen() {
             !loading && blocked.length === 0 && styles.listEmptyContent,
           ]}
           renderItem={({ item }) => {
-            const rawReason = item.reason ?? 'auto';
-            const formattedReason =
-              rawReason === 'marked_fraud'
-                ? 'Marked fraud'
-                : rawReason.replace(/_/g, ' ');
-            const reasonText =
-              formattedReason.length > 0
-                ? formattedReason.charAt(0).toUpperCase() + formattedReason.slice(1)
-                : 'Auto';
+            const rawReason = (item.reason ?? '').toLowerCase();
+            let badgeText = 'Manual';
+            if (rawReason.startsWith('auto_mark_fraud') || rawReason === 'auto') {
+              badgeText = 'Auto (fraud)';
+            }
             return (
               <View style={styles.card}>
                 <View>
                   <Text style={styles.cardText}>{item.caller_number ?? 'Unknown number'}</Text>
-                  <Text style={styles.meta}>{reasonText}</Text>
+                  <Text style={styles.meta}>{badgeText}</Text>
                 </View>
                 <TouchableOpacity onPress={() => removeBlocked(item.id)}>
                   <Text style={styles.remove}>Unblock</Text>

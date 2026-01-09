@@ -24,7 +24,7 @@ import { getAllContacts, selectContacts } from '../../native/ContactPicker';
 type TrustedContact = {
   id: string;
   caller_number: string | null;
-  source: 'manual' | 'contacts';
+  source: string | null;
   created_at: string;
 };
 
@@ -446,26 +446,35 @@ export default function TrustedContactsScreen() {
             styles.listContent,
             !loading && trusted.length === 0 && styles.listEmptyContent,
           ]}
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View>
-                <Text style={styles.cardText}>
-                  {item.caller_number && contactNames[item.caller_number]
-                    ? contactNames[item.caller_number]
-                    : item.caller_number ?? 'Unknown number'}
-                </Text>
-                <Text style={styles.meta}>
-                  {item.source === 'contacts' ? 'Synced contact' : 'Manual add'}
-                  {item.caller_number && contactNames[item.caller_number]
-                    ? ` • ${item.caller_number}`
-                    : ''}
-                </Text>
+          renderItem={({ item }) => {
+            const source = (item.source ?? '').toLowerCase();
+            let badgeText = 'Manual';
+            if (source === 'contacts') {
+              badgeText = 'Imported';
+            } else if (source === 'auto') {
+              badgeText = 'Auto (safe)';
+            }
+            return (
+              <View style={styles.card}>
+                <View>
+                  <Text style={styles.cardText}>
+                    {item.caller_number && contactNames[item.caller_number]
+                      ? contactNames[item.caller_number]
+                      : item.caller_number ?? 'Unknown number'}
+                  </Text>
+                  <Text style={styles.meta}>
+                    {badgeText}
+                    {item.caller_number && contactNames[item.caller_number]
+                      ? ` • ${item.caller_number}`
+                      : ''}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => removeTrusted(item.id)}>
+                  <Text style={styles.remove}>Remove</Text>
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity onPress={() => removeTrusted(item.id)}>
-                <Text style={styles.remove}>Remove</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+            );
+          }}
           ListEmptyComponent={
             !activeProfile ? null : (
               <View style={styles.emptyStateWrap}>

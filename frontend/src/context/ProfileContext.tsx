@@ -14,6 +14,11 @@ export type Profile = {
   enable_email_alerts?: boolean | null;
   enable_sms_alerts?: boolean | null;
   enable_push_alerts?: boolean | null;
+  auto_mark_enabled?: boolean | null;
+  auto_mark_fraud_threshold?: number | null;
+  auto_mark_safe_threshold?: number | null;
+  auto_trust_on_safe?: boolean | null;
+  auto_block_on_fraud?: boolean | null;
   created_at: string;
 };
 

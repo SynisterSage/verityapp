@@ -5,6 +5,7 @@ import fetch from 'node-fetch';
 import supabaseAdmin from '@src/services/supabase';
 import { transcribeWavBuffer } from '@src/services/azure';
 import { analyzeTranscript, hashCallerNumber, matchPhrases, scoreToRiskLevel } from '@src/services/fraud';
+import { getCallerMetadata } from '@src/services/phone';
 import { verifyPasscodeHash } from '@src/services/passcode';
 
 const DEFAULT_GREETING = 'Hello, you have reached SafeCall.';
@@ -346,6 +347,9 @@ async function recordingReady(req: Request, res: Response) {
   const resolvedTo = await resolveToNumber(CallSid, To);
   const resolvedFrom = await resolveFromNumber(CallSid, From);
   const callerHash = hashCallerNumber(resolvedFrom);
+  const callerMeta = getCallerMetadata(resolvedFrom);
+  const callTimestamp = new Date().toISOString();
+  const recordingDurationSeconds = RecordingDuration ? Number(RecordingDuration) : null;
   logger.info(
     `Twilio recording ready CallSid=${CallSid} RecordingSid=${RecordingSid} status=${RecordingStatus} url=${wavUrl} To=${resolvedTo}`
   );
@@ -355,7 +359,9 @@ async function recordingReady(req: Request, res: Response) {
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('id, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts')
+    .select(
+      'id, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud'
+    )
     .eq('twilio_virtual_number', resolvedTo)
     .single();
 
@@ -382,6 +388,8 @@ async function recordingReady(req: Request, res: Response) {
       recording_status: RecordingStatus ?? null,
       recording_duration_seconds: RecordingDuration ? Number(RecordingDuration) : null,
       caller_number: resolvedFrom || null,
+      caller_country: callerMeta.country ?? null,
+      caller_region: callerMeta.region ?? null,
       caller_hash: callerHash,
     })
     .select('id')
@@ -405,6 +413,18 @@ async function recordingReady(req: Request, res: Response) {
   const storagePath = `profiles/${profile.id}/calls/${callRow.id}.wav`;
 
   try {
+    let previousCalls = 0;
+    if (callerHash) {
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const { count } = await supabaseAdmin
+        .from('calls')
+        .select('id', { count: 'exact', head: true })
+        .eq('profile_id', profile.id)
+        .eq('caller_hash', callerHash)
+        .gte('created_at', thirtyDaysAgo)
+        .neq('id', callRow.id);
+      previousCalls = count ?? 0;
+    }
     const auth = Buffer.from(
       `${process.env.TWILIO_ACCOUNT_SID}:${process.env.TWILIO_AUTH_TOKEN}`
     ).toString('base64');
@@ -431,7 +451,16 @@ async function recordingReady(req: Request, res: Response) {
       typeof profile.alert_threshold_score === 'number'
         ? profile.alert_threshold_score
         : Number(process.env.FRAUD_SCORE_THRESHOLD ?? 90);
-    const fraudResult = text ? analyzeTranscript(text) : null;
+    const fraudResult = text
+      ? analyzeTranscript(text, {
+          callerCountry: callerMeta.country ?? null,
+          callerRegion: callerMeta.region ?? null,
+          isHighRiskCountry: callerMeta.isHighRiskCountry,
+          callDurationSeconds: recordingDurationSeconds,
+          callTimestamp,
+          repeatCallCount: previousCalls,
+        })
+      : null;
     let fraudScore = fraudResult?.score ?? null;
     let fraudRiskLevel = fraudResult?.riskLevel ?? null;
     const fraudKeywords = fraudResult?.matchedKeywords ?? null;
@@ -464,15 +493,6 @@ async function recordingReady(req: Request, res: Response) {
       : null;
 
     if (callerHash && fraudNotes) {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const { count } = await supabaseAdmin
-        .from('calls')
-        .select('id', { count: 'exact', head: true })
-        .eq('profile_id', profile.id)
-        .eq('caller_hash', callerHash)
-        .gte('created_at', thirtyDaysAgo)
-        .neq('id', callRow.id);
-      const previousCalls = count ?? 0;
       fraudNotes.callerHistory = {
         windowDays: 30,
         previousCalls,
@@ -507,6 +527,33 @@ async function recordingReady(req: Request, res: Response) {
     if (typeof fraudScore === 'number') {
       fraudRiskLevel = scoreToRiskLevel(fraudScore);
     }
+
+    const autoMarkEnabled = profile.auto_mark_enabled ?? false;
+    const autoFraudThreshold =
+      typeof profile.auto_mark_fraud_threshold === 'number'
+        ? profile.auto_mark_fraud_threshold
+        : fraudThreshold;
+    const autoSafeThreshold =
+      typeof profile.auto_mark_safe_threshold === 'number'
+        ? profile.auto_mark_safe_threshold
+        : 30;
+    const autoTrustOnSafe = profile.auto_trust_on_safe ?? false;
+    const autoBlockOnFraud = profile.auto_block_on_fraud ?? true;
+
+    let autoFeedback: 'marked_fraud' | 'marked_safe' | null = null;
+    let autoAlertRequired = false;
+    let shouldBlockCaller = false;
+    let shouldTrustCaller = false;
+    if (autoMarkEnabled && typeof fraudScore === 'number') {
+      if (fraudScore >= autoFraudThreshold) {
+        autoFeedback = 'marked_fraud';
+        autoAlertRequired = true;
+        shouldBlockCaller = autoBlockOnFraud;
+      } else if (fraudScore <= autoSafeThreshold) {
+        autoFeedback = 'marked_safe';
+        shouldTrustCaller = autoTrustOnSafe;
+      }
+    }
     await supabaseAdmin
       .from('calls')
       .update({
@@ -515,13 +562,20 @@ async function recordingReady(req: Request, res: Response) {
         transcript_confidence: confidence ?? null,
         transcribed_at: text ? new Date().toISOString() : null,
         caller_number: resolvedFrom || null,
+        caller_country: callerMeta.country ?? null,
+        caller_region: callerMeta.region ?? null,
         caller_hash: callerHash,
         fraud_score: fraudScore,
         fraud_risk_level: fraudRiskLevel,
         fraud_keywords: fraudKeywords,
         fraud_notes: fraudNotes,
         fraud_alert_required:
-          typeof fraudScore === 'number' ? fraudScore >= fraudThreshold : false,
+          typeof fraudScore === 'number'
+            ? fraudScore >= fraudThreshold ||
+              autoAlertRequired ||
+              Boolean((fraudResult as { override?: boolean })?.override)
+            : false,
+        feedback_status: autoFeedback ?? undefined,
       })
       .eq('id', callRow.id);
 
@@ -556,6 +610,35 @@ async function recordingReady(req: Request, res: Response) {
             caller_hash: callerHash,
             caller_number: resolvedFrom || null,
             reason: `fraud_score_${fraudScore}`,
+          },
+          { onConflict: 'profile_id,caller_hash' }
+        );
+      }
+    }
+
+    // Auto-trust low-risk callers if enabled
+    if (shouldTrustCaller && callerHash && resolvedFrom) {
+      await supabaseAdmin.from('trusted_contacts').upsert(
+        {
+          profile_id: profile.id,
+          caller_hash: callerHash,
+          caller_number: resolvedFrom,
+          source: 'auto',
+        },
+        { onConflict: 'profile_id,caller_hash' }
+      );
+    }
+
+    // Auto-block when auto-mark triggered high risk (even if below alert threshold)
+    if (shouldBlockCaller && callerHash && typeof fraudScore === 'number') {
+      const callBlockingEnabled = process.env.ENABLE_CALL_BLOCKING === 'true';
+      if (callBlockingEnabled) {
+        await supabaseAdmin.from('blocked_callers').upsert(
+          {
+            profile_id: profile.id,
+            caller_hash: callerHash,
+            caller_number: resolvedFrom || null,
+            reason: `auto_mark_fraud_${fraudScore}`,
           },
           { onConflict: 'profile_id,caller_hash' }
         );

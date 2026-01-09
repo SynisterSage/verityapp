@@ -31,7 +31,7 @@ export async function sendEmail(payload: SendEmailPayload) {
     subject: payload.subject,
     html: payload.html,
     text: payload.text,
-  });
+  } as any);
 }
 
 export default { sendEmail };

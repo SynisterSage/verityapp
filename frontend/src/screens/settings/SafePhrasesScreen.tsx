@@ -133,7 +133,7 @@ export default function SafePhrasesScreen() {
               colors={['#8ab4ff']}
             />
           }
-          indicatorStyle="white"
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.listContent,
             !loading && phrases.length === 0 && styles.listEmptyContent,

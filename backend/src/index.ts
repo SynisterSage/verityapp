@@ -18,8 +18,8 @@ const SERVER_START_MSG = (
 ******************************************************************************/
 
 // Start the server
-server.listen(ENV.Port, err => {
-  if (!!err) {
+server.listen(ENV.Port, (err?: Error) => {
+  if (err) {
     logger.err(err.message);
   } else {
     logger.info(SERVER_START_MSG);

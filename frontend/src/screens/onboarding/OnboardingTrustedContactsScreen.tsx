@@ -127,7 +127,7 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Trusted Contacts</Text>
         <Text style={styles.subtitle}>{helperText}</Text>
 

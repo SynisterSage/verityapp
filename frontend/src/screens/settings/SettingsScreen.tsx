@@ -35,6 +35,11 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       icon: 'ban-outline',
       onPress: () => navigation.navigate('Blocklist'),
     },
+    {
+      label: 'Automation',
+      icon: 'flash-outline',
+      onPress: () => navigation.navigate('Automation'),
+    },
   ];
 
   const privacyItems: SettingsItem[] = [
@@ -50,7 +55,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
       edges={[]}
     >
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.title}>Settings</Text>
         <Text style={styles.subtitle}>Manage safety controls and account access.</Text>
 

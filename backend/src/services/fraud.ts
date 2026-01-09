@@ -8,6 +8,16 @@ export type FraudKeyword = {
   category: string;
 };
 
+export type FraudMetadata = {
+  callerCountry?: string | null;
+  callerRegion?: string | null;
+  isHighRiskCountry?: boolean;
+  callDurationSeconds?: number | null;
+  callTimestamp?: string | null;
+  repeatCallCount?: number;
+  detectedLocale?: string | null;
+};
+
 export type FraudNotes = {
   matchCount: number;
   weightSum: number;
@@ -26,10 +36,27 @@ export type FraudNotes = {
   moneyAmountHits: number;
   taxScamHits: number;
   bankFraudHits: number;
+  piiHarvestHits: number;
   criticalKeywordHits: number;
   safePhraseMatches: string[];
   safePhraseDampening: number;
   repeatCallerBoost: number;
+  callerHistory?: {
+    windowDays: number;
+    previousCalls: number;
+  } | null;
+  callerCountry?: string | null;
+  callerRegion?: string | null;
+  highRiskCountryBoost: number;
+  timeOfDayBoost: number;
+  durationBoost: number;
+  repeatCallCount: number;
+  detectedLocale?: string | null;
+  localeBoost: number;
+  regionMismatchBoost: number;
+  commandSensitiveHits: number;
+  actionBoost: number;
+  techSupportHits: number;
 };
 
 export type FraudAnalysis = {
@@ -96,6 +123,18 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'suspicious transaction', weight: 32, category: 'banking' },
   { phrase: 'unauthorized transaction', weight: 34, category: 'banking' },
   { phrase: 'unauthorized charge', weight: 34, category: 'banking' },
+  { phrase: 'fraud department', weight: 36, category: 'banking' },
+  { phrase: 'fraud investigations', weight: 32, category: 'banking' },
+  { phrase: 'bank investigator', weight: 32, category: 'banking' },
+  { phrase: 'bank of america', weight: 30, category: 'banking' },
+  { phrase: 'chase bank', weight: 30, category: 'banking' },
+  { phrase: 'wells fargo', weight: 30, category: 'banking' },
+  { phrase: 'citibank', weight: 28, category: 'banking' },
+  { phrase: 'capital one', weight: 28, category: 'banking' },
+  { phrase: 'paypal', weight: 28, category: 'banking' },
+  { phrase: 'cash app', weight: 30, category: 'banking' },
+  { phrase: 'venmo', weight: 30, category: 'banking' },
+  { phrase: 'zelle support', weight: 34, category: 'banking' },
 
   // Government & taxes
   { phrase: 'irs', weight: 32, category: 'government' },
@@ -127,6 +166,12 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'social security', weight: 20, category: 'government' },
   { phrase: 'legal action', weight: 20, category: 'government' },
   { phrase: 'arrest', weight: 20, category: 'government' },
+  { phrase: 'warrant', weight: 26, category: 'government' },
+  { phrase: 'levy', weight: 26, category: 'government' },
+  { phrase: 'garnishment', weight: 26, category: 'government' },
+  { phrase: 'customs', weight: 22, category: 'government' },
+  { phrase: 'border patrol', weight: 22, category: 'government' },
+  { phrase: 'homeland security', weight: 24, category: 'government' },
   { phrase: 'tax refund', weight: 24, category: 'government' },
   { phrase: 'tax return', weight: 24, category: 'government' },
   { phrase: 'refund department', weight: 26, category: 'government' },
@@ -153,6 +198,10 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'microsoft', weight: 20, category: 'tech' },
   { phrase: 'apple', weight: 20, category: 'tech' },
   { phrase: 'microsoft support', weight: 20, category: 'tech' },
+  { phrase: 'apple support', weight: 22, category: 'tech' },
+  { phrase: 'amazon support', weight: 22, category: 'tech' },
+  { phrase: 'paypal support', weight: 22, category: 'tech' },
+  { phrase: 'cash app support', weight: 24, category: 'tech' },
   { phrase: 'virus', weight: 18, category: 'tech' },
   { phrase: 'malware', weight: 18, category: 'tech' },
   { phrase: 'update', weight: 14, category: 'tech' },
@@ -162,6 +211,12 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'repair', weight: 14, category: 'tech' },
   { phrase: 'access', weight: 14, category: 'tech' },
   { phrase: 'remote access', weight: 20, category: 'tech' },
+  { phrase: 'teamviewer', weight: 28, category: 'tech' },
+  { phrase: 'anydesk', weight: 28, category: 'tech' },
+  { phrase: 'logmein', weight: 26, category: 'tech' },
+  { phrase: 'remote session', weight: 26, category: 'tech' },
+  { phrase: 'remote access code', weight: 30, category: 'tech' },
+  { phrase: 'connect to your computer', weight: 30, category: 'tech' },
 
   // Prize/lottery
   { phrase: 'congratulations', weight: 20, category: 'prize' },
@@ -182,6 +237,14 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: "children's hospital", weight: 26, category: 'donation' },
   { phrase: 'donation', weight: 26, category: 'donation' },
   { phrase: 'charity', weight: 26, category: 'donation' },
+  { phrase: 'charity drive', weight: 26, category: 'donation' },
+  { phrase: 'relief fund', weight: 28, category: 'donation' },
+  { phrase: 'hurricane relief', weight: 28, category: 'donation' },
+  { phrase: 'earthquake relief', weight: 28, category: 'donation' },
+  { phrase: 'widows and orphans', weight: 24, category: 'donation' },
+  { phrase: 'church donation', weight: 24, category: 'donation' },
+  { phrase: 'missionary', weight: 22, category: 'donation' },
+  { phrase: 'charitable contribution', weight: 22, category: 'donation' },
   { phrase: 'fundraiser', weight: 22, category: 'donation' },
   { phrase: 'nonprofit', weight: 22, category: 'donation' },
   { phrase: 'give now', weight: 22, category: 'donation' },
@@ -202,12 +265,21 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'wallet address', weight: 18, category: 'payment' },
   { phrase: 'western union', weight: 18, category: 'payment' },
   { phrase: 'moneygram', weight: 18, category: 'payment' },
+  { phrase: 'money order', weight: 18, category: 'payment' },
   { phrase: 'zelle', weight: 35, category: 'payment' },
   { phrase: 'cash app', weight: 30, category: 'payment' },
   { phrase: 'venmo', weight: 30, category: 'payment' },
   { phrase: 'paypal', weight: 26, category: 'payment' },
   { phrase: 'give me your zelle', weight: 45, category: 'payment' },
   { phrase: 'gift card number', weight: 24, category: 'payment' },
+  { phrase: 'itunes gift card', weight: 28, category: 'payment' },
+  { phrase: 'amazon gift card', weight: 28, category: 'payment' },
+  { phrase: 'walmart gift card', weight: 28, category: 'payment' },
+  { phrase: 'target gift card', weight: 28, category: 'payment' },
+  { phrase: 'best buy gift card', weight: 28, category: 'payment' },
+  { phrase: 'green dot', weight: 26, category: 'payment' },
+  { phrase: 'onevanilla', weight: 26, category: 'payment' },
+  { phrase: 'prepaid card', weight: 24, category: 'payment' },
   { phrase: 'scratch off', weight: 22, category: 'payment' },
   { phrase: 'load the card', weight: 22, category: 'payment' },
   { phrase: 'bitcoin atm', weight: 22, category: 'payment' },
@@ -290,6 +362,13 @@ const THREAT_TERMS = [
   'sheriff',
   'federal agent',
   'deportation',
+  'final notice',
+  'last attempt',
+  'collections',
+  'garnishment',
+  'levy',
+  'disconnection',
+  'service interruption',
 ];
 
 const ACCOUNT_ACCESS_TERMS = [
@@ -394,6 +473,118 @@ const EXPLICIT_SCAM_TERMS = [
   'pay me',
 ];
 
+const ACTION_VERBS = [
+  'press',
+  'provide',
+  'confirm',
+  'call back',
+  'wire',
+  'send',
+  'transfer',
+  'submit',
+  'enter',
+  'speak to',
+  'talk to',
+];
+
+const SENSITIVE_NOUNS = [
+  'payment',
+  'money',
+  'account',
+  'account holder',
+  'bank',
+  'credit card',
+  'debit card',
+  'routing',
+  'ssn',
+  'social security',
+  'password',
+  'pin',
+  'code',
+  'verification',
+  'taxes',
+  'warrant',
+  'computer',
+  'device',
+  'service',
+  'support',
+  'plan',
+  'discount',
+];
+
+const TECH_SUPPORT_PHRASES = [
+  'tech',
+  'support',
+  'help desk',
+  'help center',
+  'service desk',
+  'customer support',
+  'customer service',
+  'technical department',
+  'technical team',
+  'tech support',
+  'technical support',
+  'it support',
+  'it department',
+  'security team',
+  'security center',
+  'computer problem',
+  'computer issue',
+  'computer security',
+  'windows license',
+  'microsoft support',
+  'apple support',
+  'amazon support',
+  'paypal support',
+  'cash app support',
+  'remote support',
+  'connect to your computer',
+  'fix your computer',
+  'service your computer',
+  'security alert on your computer',
+];
+
+// Common obfuscations and near-miss variants
+const FUZZY_KEYWORD_MAP: Record<string, string[]> = {
+  account: ['acct', 'acnt', 'accnt'],
+  verify: ['verif', 'vrfy', 'verifyy', 'verfy'],
+  payment: ['pymt', 'paymnt', 'paymnts'],
+  password: ['passwrd', 'passcode'],
+  transaction: ['txn', 'transactn'],
+  security: ['sec', 'securty'],
+  refund: ['refnd', 'refd'],
+  bank: ['bnk'],
+  taxes: ['taxs', 'taxe', 'taxed'],
+};
+
+const PII_TERMS = [
+  'birthday',
+  'date of birth',
+  'dob',
+  'birth date',
+  'mother maiden',
+  'maiden name',
+  'social security',
+  'ssn',
+  'last 4',
+  'last four',
+  'last four digits',
+  'security question',
+  'security answers',
+  'name on the account',
+  'account holder',
+  'home address',
+  'billing address',
+  'residential address',
+  'your address',
+  'pin code',
+  'pin number',
+  '4 digit pin',
+  'four digit pin',
+  'password reset',
+  'one time passcode',
+];
+
 const HARD_BLOCK_TERMS = [
   'gift card',
   'gift card number',
@@ -437,6 +628,18 @@ const HARD_BLOCK_TERMS = [
   'steal your money',
   'take your money',
   'take all your money',
+  'itunes gift card',
+  'amazon gift card',
+  'walmart gift card',
+  'target gift card',
+  'best buy gift card',
+  'green dot',
+  'onevanilla',
+  'prepaid card',
+  'teamviewer',
+  'anydesk',
+  'remote access code',
+  'remote session',
 ];
 
 const PAYMENT_REQUEST_PATTERNS = [
@@ -460,6 +663,7 @@ const HARD_BLOCK_PATTERNS = [
   /\bunauthorized\s+(transaction|charge)\b/i,
   /\bsuspicious\s+activity\b/i,
   /\baccount\s+compromised\b/i,
+  /\b(remote\s+access|remote\s+session|teamviewer|anydesk|logmein)\b/i,
 ];
 
 const MONEY_AMOUNT_PATTERNS = [
@@ -644,6 +848,33 @@ function countPhraseHits(text: string, phrases: string[]) {
   }, 0);
 }
 
+function countCommandSensitiveCombos(text: string) {
+  let hits = 0;
+  for (const verb of ACTION_VERBS) {
+    const verbRegex = new RegExp(`\\b${escapeRegExp(verb)}\\b`, 'i');
+    if (!verbRegex.test(text)) continue;
+    for (const noun of SENSITIVE_NOUNS) {
+      const nounRegex = new RegExp(`\\b${escapeRegExp(noun)}\\b`, 'i');
+      if (nounRegex.test(text)) {
+        hits += 1;
+        break;
+      }
+    }
+  }
+  return hits;
+}
+
+function countTechSupportHits(text: string) {
+  let hits = 0;
+  for (const phrase of TECH_SUPPORT_PHRASES) {
+    const regex = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, 'i');
+    if (regex.test(text)) {
+      hits += 1;
+    }
+  }
+  return hits;
+}
+
 function isNegated(text: string, index: number) {
   const windowStart = Math.max(0, index - 40);
   const window = text.slice(windowStart, index);
@@ -653,6 +884,15 @@ function isNegated(text: string, index: number) {
 function findMatches(text: string, keywords: FraudKeyword[]) {
   const matches: FraudKeyword[] = [];
   const negated: string[] = [];
+
+  // Fuzzy hits
+  for (const [canonical, variants] of Object.entries(FUZZY_KEYWORD_MAP)) {
+    const pattern = `\\b(${[canonical, ...variants.map(escapeRegExp)].join('|')})\\b`;
+    const regex = new RegExp(pattern, 'gi');
+    if (regex.test(text)) {
+      matches.push({ phrase: canonical, weight: 8, category: 'fuzzy' });
+    }
+  }
 
   for (const keyword of keywords) {
     const pattern = `\\b${escapeRegExp(keyword.phrase).replace(/\\s+/g, '\\\\s+')}\\b`;
@@ -697,6 +937,8 @@ function heuristicBoosts(text: string) {
   const paymentAppHits = countPhraseHits(text, PAYMENT_APPS);
   const codeRequestHits = countPhraseHits(text, CODE_TERMS);
   const explicitScamHits = countPhraseHits(text, EXPLICIT_SCAM_TERMS);
+  const techSupportHits = countTechSupportHits(text);
+  const piiHarvestHits = countPhraseHits(text, PII_TERMS);
   const paymentRequestHits = PAYMENT_REQUEST_PATTERNS.reduce(
     (count, pattern) => (pattern.test(text) ? count + 1 : count),
     0
@@ -730,6 +972,12 @@ function heuristicBoosts(text: string) {
   if (taxScamHits >= 2) boost += 10;
   if (bankFraudHits >= 1) boost += 28;
   if (bankFraudHits >= 2) boost += 10;
+  if (piiHarvestHits >= 1) boost += 10;
+  if (piiHarvestHits >= 2) boost += 8;
+  const commandSensitiveHits = countCommandSensitiveCombos(text);
+  const actionBoost = Math.min(12, commandSensitiveHits * 6);
+  boost += actionBoost;
+  if (techSupportHits >= 1) boost += Math.min(40, techSupportHits * 20);
 
   if (secrecyHits >= 1 && paymentAppHits >= 1) boost += 12;
   if (urgencyHits >= 1 && paymentAppHits >= 1) boost += 8;
@@ -739,6 +987,7 @@ function heuristicBoosts(text: string) {
   if (threatHits >= 1 && paymentAppHits >= 1) boost += 12;
   if (accountAccessHits >= 1 && paymentRequestHits >= 1) boost += 12;
   if (moneyAmountHits >= 1 && paymentRequestHits >= 1) boost += 10;
+  if (piiHarvestHits >= 1 && actionBoost > 0) boost += 12;
 
   return {
     boost: Math.min(70, boost),
@@ -748,6 +997,9 @@ function heuristicBoosts(text: string) {
     paymentAppHits,
     codeRequestHits,
     explicitScamHits,
+    piiHarvestHits,
+    commandSensitiveHits,
+    techSupportHits,
     paymentRequestHits,
     hardBlockHits,
     threatHits,
@@ -755,6 +1007,7 @@ function heuristicBoosts(text: string) {
     moneyAmountHits,
     taxScamHits,
     bankFraudHits,
+    actionBoost,
   };
 }
 
@@ -778,8 +1031,25 @@ export function hashCallerNumber(number?: string | null) {
   return createHash('sha256').update(number).digest('hex');
 }
 
-export function analyzeTranscript(transcript: string) {
+export function analyzeTranscript(transcript: string, metadata: FraudMetadata = {}) {
   const normalized = normalizeText(transcript);
+  const callerCountry = metadata.callerCountry ?? null;
+  const callerRegion = metadata.callerRegion ?? null;
+  const isHighRiskCountry = metadata.isHighRiskCountry ?? false;
+  const callDurationSeconds =
+    typeof metadata.callDurationSeconds === 'number' ? metadata.callDurationSeconds : null;
+  const callTimestamp = metadata.callTimestamp ?? null;
+  const repeatCallCount = metadata.repeatCallCount ?? 0;
+  const detectedLocale = metadata.detectedLocale ?? null;
+  const highRiskCountryBoost = isHighRiskCountry ? 10 : 0;
+  const timeOfDayBoost = calculateTimeOfDayBoost(callTimestamp);
+  const durationBoost = calculateDurationBoost(callDurationSeconds);
+  const localeBoost = calculateLocaleBoost(detectedLocale, callerCountry);
+  const regionMismatchBoost =
+    callerRegion && callerRegion !== '+1' ? 12 : callerCountry && callerCountry !== 'US' ? 12 : 0;
+  const heuristic = heuristicBoosts(normalized);
+  const actionBoost = heuristic.actionBoost;
+
   if (!normalized) {
     return {
       score: 0,
@@ -803,16 +1073,28 @@ export function analyzeTranscript(transcript: string) {
         moneyAmountHits: 0,
         taxScamHits: 0,
         bankFraudHits: 0,
+        piiHarvestHits: 0,
         criticalKeywordHits: 0,
         safePhraseMatches: [],
         safePhraseDampening: 0,
         repeatCallerBoost: 0,
+        callerCountry,
+        callerRegion,
+        highRiskCountryBoost,
+        timeOfDayBoost,
+        durationBoost,
+        repeatCallCount,
+        detectedLocale,
+        localeBoost,
+        regionMismatchBoost,
+        commandSensitiveHits: 0,
+        actionBoost: 0,
+        techSupportHits: 0,
       },
     } satisfies FraudAnalysis;
   }
 
   const { matches, negated } = findMatches(normalized, DEFAULT_KEYWORDS);
-  const heuristic = heuristicBoosts(normalized);
   if (matches.length === 0) {
     return {
       score: 0,
@@ -836,10 +1118,23 @@ export function analyzeTranscript(transcript: string) {
         moneyAmountHits: heuristic.moneyAmountHits,
         taxScamHits: heuristic.taxScamHits,
         bankFraudHits: heuristic.bankFraudHits,
+        piiHarvestHits: heuristic.piiHarvestHits,
         criticalKeywordHits: 0,
         safePhraseMatches: [],
         safePhraseDampening: 0,
         repeatCallerBoost: 0,
+        callerCountry,
+        callerRegion,
+        highRiskCountryBoost,
+        timeOfDayBoost,
+        durationBoost,
+        repeatCallCount,
+        detectedLocale,
+        localeBoost,
+        regionMismatchBoost,
+        commandSensitiveHits: heuristic.commandSensitiveHits,
+        actionBoost: heuristic.actionBoost,
+        techSupportHits: heuristic.techSupportHits,
       },
     } satisfies FraudAnalysis;
   }
@@ -850,7 +1145,14 @@ export function analyzeTranscript(transcript: string) {
   const multiplier = Math.max(1, Math.log(matches.length + 1));
   score *= multiplier;
   const boost = comboBoost(normalized) + heuristic.boost;
-  score += boost;
+  score +=
+    boost +
+    highRiskCountryBoost +
+    timeOfDayBoost +
+    durationBoost +
+    localeBoost +
+    regionMismatchBoost +
+    heuristic.actionBoost;
 
   const criticalKeywordHits = matches.filter((kw) => CRITICAL_KEYWORDS.has(kw.phrase)).length;
   const taxKeywordHits = matches.filter((kw) => TAX_SCAM_TERMS.includes(kw.phrase)).length;
@@ -859,12 +1161,18 @@ export function analyzeTranscript(transcript: string) {
   const bankKeywordHits = matches.filter((kw) => BANK_FRAUD_TERMS.includes(kw.phrase)).length;
   const bankHardTerms = new Set(['fraud alert', 'bank fraud', 'account compromised', 'unauthorized transaction', 'unauthorized charge', 'suspicious activity', 'suspicious transaction']);
   const bankHardHits = matches.filter((kw) => bankHardTerms.has(kw.phrase)).length;
+  const techSupportHits = heuristic.techSupportHits;
+  const piiHarvestHits = heuristic.piiHarvestHits;
 
   if (heuristic.explicitScamHits >= 1) {
     score = Math.max(score, 90);
   }
   if (heuristic.hardBlockHits >= 1) {
     score = Math.max(score, 95);
+  }
+  // Override patterns: tax + payment
+  if (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment'))) {
+    score = Math.max(score, 96);
   }
   if (taxKeywordHits >= 1) {
     score = Math.max(score, 90);
@@ -905,6 +1213,21 @@ export function analyzeTranscript(transcript: string) {
   if (normalized.includes('donation') || normalized.includes('charity')) {
     score = Math.max(score, 60);
   }
+  if (techSupportHits >= 1) {
+    score = Math.max(score, 95);
+  }
+  if (piiHarvestHits >= 1 && actionBoost > 0) {
+    score = Math.max(score, 80);
+  }
+  if (piiHarvestHits >= 2 && actionBoost > 0) {
+    score = Math.max(score, 85);
+  }
+
+  // If hard-block terms or tax+payment patterns hit, force alert-required signal.
+  const hardBlockOverride =
+    heuristic.hardBlockHits >= 1 ||
+    (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment')));
+  const techSupportOverride = techSupportHits >= 1;
 
   const finalScore = Math.min(100, Math.round(score));
   return {
@@ -929,10 +1252,65 @@ export function analyzeTranscript(transcript: string) {
       moneyAmountHits: heuristic.moneyAmountHits,
       taxScamHits: heuristic.taxScamHits,
       bankFraudHits: heuristic.bankFraudHits,
+      piiHarvestHits: heuristic.piiHarvestHits,
       criticalKeywordHits,
       safePhraseMatches: [],
       safePhraseDampening: 0,
       repeatCallerBoost: 0,
+      callerCountry,
+      callerRegion,
+      highRiskCountryBoost,
+      timeOfDayBoost,
+      durationBoost,
+      repeatCallCount,
+      detectedLocale,
+      localeBoost,
+      regionMismatchBoost,
+      commandSensitiveHits: heuristic.commandSensitiveHits,
+      actionBoost: heuristic.actionBoost,
+      techSupportHits,
     },
+    override: hardBlockOverride || techSupportOverride,
   };
+}
+
+function calculateTimeOfDayBoost(timestamp?: string | null): number {
+  if (!timestamp) {
+    return 0;
+  }
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return 0;
+  }
+  const hour = date.getHours();
+  return hour < 6 || hour >= 22 ? 6 : 0;
+}
+
+function calculateDurationBoost(duration?: number | null): number {
+  if (typeof duration !== 'number' || Number.isNaN(duration)) {
+    return 0;
+  }
+  if (duration < 10) {
+    return 6;
+  }
+  if (duration > 120) {
+    return 4;
+  }
+  return 0;
+}
+
+function calculateLocaleBoost(detectedLocale?: string | null, callerCountry?: string | null): number {
+  if (!detectedLocale) {
+    return 0;
+  }
+  const normalized = detectedLocale.toLowerCase();
+  const highRiskLocales = ['en-in', 'hi-in'];
+  if (highRiskLocales.includes(normalized)) {
+    return 8;
+  }
+  // If locale and country disagree (e.g., callerCountry is US but locale is another region), add a small flag.
+  if (callerCountry && normalized.startsWith('en-') && !normalized.endsWith(callerCountry.toLowerCase())) {
+    return 4;
+  }
+  return 0;
 }

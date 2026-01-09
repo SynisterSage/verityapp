@@ -176,7 +176,7 @@ export default function CallDetailScreen({ route }: { route: any }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Call Detail</Text>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.caller}>{callRow.caller_number ?? 'Unknown caller'}</Text>
         <Text style={styles.meta}>{new Date(callRow.created_at).toLocaleString()}</Text>
 

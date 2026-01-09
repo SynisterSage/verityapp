@@ -51,7 +51,7 @@ async function listProfiles(req: Request, res: Response) {
   const { data: caretakerProfiles } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
+      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .eq('caretaker_id', userId);
 
@@ -66,7 +66,7 @@ async function listProfiles(req: Request, res: Response) {
     const { data } = await supabaseAdmin
       .from('profiles')
       .select(
-        'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
+        'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
       )
       .in('id', memberIds);
     memberRows = data ?? [];
@@ -97,6 +97,11 @@ async function createProfile(req: Request, res: Response) {
     enable_email_alerts,
     enable_sms_alerts,
     enable_push_alerts,
+    auto_mark_enabled,
+    auto_mark_fraud_threshold,
+    auto_mark_safe_threshold,
+    auto_trust_on_safe,
+    auto_block_on_fraud,
   } = req.body as Record<string, string | number | boolean | undefined>;
 
   if (!first_name || !last_name) {
@@ -117,9 +122,17 @@ async function createProfile(req: Request, res: Response) {
       enable_sms_alerts: typeof enable_sms_alerts === 'boolean' ? enable_sms_alerts : undefined,
       enable_push_alerts:
         typeof enable_push_alerts === 'boolean' ? enable_push_alerts : undefined,
+      auto_mark_enabled: typeof auto_mark_enabled === 'boolean' ? auto_mark_enabled : undefined,
+      auto_mark_fraud_threshold:
+        typeof auto_mark_fraud_threshold === 'number' ? auto_mark_fraud_threshold : undefined,
+      auto_mark_safe_threshold:
+        typeof auto_mark_safe_threshold === 'number' ? auto_mark_safe_threshold : undefined,
+      auto_trust_on_safe: typeof auto_trust_on_safe === 'boolean' ? auto_trust_on_safe : undefined,
+      auto_block_on_fraud:
+        typeof auto_block_on_fraud === 'boolean' ? auto_block_on_fraud : undefined,
     })
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
+      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .single();
 
@@ -185,6 +198,11 @@ async function updateAlertPrefs(req: Request, res: Response) {
     enable_email_alerts,
     enable_sms_alerts,
     enable_push_alerts,
+    auto_mark_enabled,
+    auto_mark_fraud_threshold,
+    auto_mark_safe_threshold,
+    auto_trust_on_safe,
+    auto_block_on_fraud,
   } = req.body as Record<string, number | boolean | undefined>;
 
   const updates: Record<string, number | boolean> = {};
@@ -200,13 +218,28 @@ async function updateAlertPrefs(req: Request, res: Response) {
   if (typeof enable_push_alerts === 'boolean') {
     updates.enable_push_alerts = enable_push_alerts;
   }
+  if (typeof auto_mark_enabled === 'boolean') {
+    updates.auto_mark_enabled = auto_mark_enabled;
+  }
+  if (typeof auto_mark_fraud_threshold === 'number') {
+    updates.auto_mark_fraud_threshold = auto_mark_fraud_threshold;
+  }
+  if (typeof auto_mark_safe_threshold === 'number') {
+    updates.auto_mark_safe_threshold = auto_mark_safe_threshold;
+  }
+  if (typeof auto_trust_on_safe === 'boolean') {
+    updates.auto_trust_on_safe = auto_trust_on_safe;
+  }
+  if (typeof auto_block_on_fraud === 'boolean') {
+    updates.auto_block_on_fraud = auto_block_on_fraud;
+  }
 
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .update(updates)
     .eq('id', profileId)
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
+      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .single();
 

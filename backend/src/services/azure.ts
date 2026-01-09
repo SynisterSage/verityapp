@@ -1,5 +1,8 @@
 import {
   AudioConfig,
+  AutoDetectSourceLanguageConfig,
+  OutputFormat,
+  PropertyId,
   ResultReason,
   SpeechConfig,
   SpeechRecognizer,
@@ -15,6 +18,7 @@ if (!SPEECH_KEY || !SPEECH_REGION) {
 export interface TranscriptionResult {
   text: string;
   confidence?: number;
+  detectedLocale?: string | null;
 }
 
 export function transcribeWavBuffer(
@@ -22,6 +26,7 @@ export function transcribeWavBuffer(
   locale = 'en-US'
 ): Promise<TranscriptionResult> {
   const speechConfig = SpeechConfig.fromSubscription(SPEECH_KEY, SPEECH_REGION);
+  speechConfig.outputFormat = OutputFormat.Detailed;
   speechConfig.speechRecognitionLanguage = locale;
   const audioConfig = AudioConfig.fromWavFileInput(wavBuffer);
   const recognizer = new SpeechRecognizer(speechConfig, audioConfig);
@@ -31,12 +36,26 @@ export function transcribeWavBuffer(
       result => {
         recognizer.close();
         if (result.reason === ResultReason.RecognizedSpeech) {
+          let confidence: number | undefined;
+          try {
+            const json = result.properties.getProperty(PropertyId.SpeechServiceResponse_JsonResult);
+            if (json) {
+              const parsed = JSON.parse(json);
+              const first = parsed?.NBest?.[0];
+              if (first && typeof first.Confidence === 'number') {
+                confidence = first.Confidence;
+              }
+            }
+          } catch (err) {
+            // Ignore parse errors; return transcript without confidence.
+          }
           resolve({
             text: result.text,
-            confidence: result.confidence,
+            confidence,
+            detectedLocale: null,
           });
         } else {
-          resolve({ text: '' });
+          resolve({ text: '', detectedLocale: null });
         }
       },
       err => {

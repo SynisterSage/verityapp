@@ -283,6 +283,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.grid}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -291,7 +292,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             colors={['#8ab4ff']}
           />
         }
-        indicatorStyle="white"
       >
         {showSkeleton ? (
           <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>

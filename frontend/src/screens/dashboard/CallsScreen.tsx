@@ -114,7 +114,7 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
               colors={['#8ab4ff']}
             />
           }
-          indicatorStyle="white"
+          showsVerticalScrollIndicator={false}
           contentContainerStyle={[
             styles.listContent,
             !showSkeleton && calls.length === 0 && !error && styles.listEmptyContent,
