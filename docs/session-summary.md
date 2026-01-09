@@ -73,3 +73,20 @@ Native
 Operational notes
 - iOS build requires proper signing and a unique bundle identifier.
 - Expo Go cannot load custom native modules; use dev client builds for contact picker.
+
+Session Summary (2026-01-09)
+
+Scope
+- Alerts list UX and filters
+- Background polling behavior
+- Alert card visual treatment
+
+Frontend work
+- Added alert filtering (All/New/Critical) with dropdown UI and animated menu.
+- Show caller name/number in alerts using trusted contacts map + call lookup fallback.
+- Sorted resolved alerts to the bottom and muted non-pending items.
+- Added silent background polling (60s) gated by AppState; manual pull-to-refresh unchanged.
+- Closed alert filter menu on screen focus to avoid stale open state.
+
+Testing
+- Frontend type check: `npx tsc --noEmit`.
