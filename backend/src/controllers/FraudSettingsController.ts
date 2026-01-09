@@ -4,6 +4,7 @@ import logger from 'jet-logger';
 import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { hashCallerNumber } from '@src/services/fraud';
+import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 
 async function getAuthenticatedUserId(req: Request) {
   const authHeader = req.header('authorization') ?? '';
@@ -222,6 +223,8 @@ async function addBlockedCaller(req: Request, res: Response) {
       blocked_until: blockedUntil ?? null,
     }, { onConflict: 'profile_id,caller_hash' });
 
+  await removeTrustedContact(profileId, callerHash);
+
   if (error) {
     logger.err(error);
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to block caller' });
@@ -353,6 +356,8 @@ async function addTrustedContacts(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing callerNumber(s)' });
   }
 
+  await Promise.all(rows.map((row) => removeBlockedEntry(row.profile_id, row.caller_hash)));
+
   const { error } = await supabaseAdmin
     .from('trusted_contacts')
     .upsert(rows, { onConflict: 'profile_id,caller_hash' });
@@ -363,6 +368,47 @@ async function addTrustedContacts(req: Request, res: Response) {
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true, added: rows.length });
+}
+
+async function getCallerStatus(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId, callerNumber } = req.query as Record<string, string | undefined>;
+  if (!profileId || !callerNumber) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId or callerNumber' });
+  }
+
+  const allowed = await userCanAccessProfile(userId, profileId);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const callerHash = hashCallerNumber(callerNumber);
+  if (!callerHash) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid callerNumber' });
+  }
+
+  const [blockedRes, trustedRes] = await Promise.all([
+    supabaseAdmin
+      .from('blocked_callers')
+      .select('id')
+      .eq('profile_id', profileId)
+      .eq('caller_hash', callerHash)
+      .limit(1),
+    supabaseAdmin
+      .from('trusted_contacts')
+      .select('id')
+      .eq('profile_id', profileId)
+      .eq('caller_hash', callerHash)
+      .limit(1),
+  ]);
+
+  const blocked = (blockedRes.data ?? []).length > 0;
+  const trusted = (trustedRes.data ?? []).length > 0;
+  return res.status(HTTP_STATUS_CODES.Ok).json({ blocked, trusted });
 }
 
 async function deleteTrustedContact(req: Request, res: Response) {
@@ -414,4 +460,5 @@ export default {
   listTrustedContacts,
   addTrustedContacts,
   deleteTrustedContact,
+  getCallerStatus,
 };

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   FlatList,
   Modal,
@@ -177,13 +178,53 @@ export default function TrustedContactsScreen() {
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
   const showSkeleton = loading && trusted.length === 0;
 
+  const fetchBlockedNumbers = async () => {
+    if (!activeProfile) return new Set<string>();
+    try {
+      const data = await authorizedFetch(`/fraud/blocked-callers?profileId=${activeProfile.id}`);
+      const list = data?.blocked_callers ?? [];
+      return new Set(list.map((entry: any) => entry.caller_number).filter(Boolean));
+    } catch {
+      return new Set<string>();
+    }
+  };
+
+  const confirmTrust = (callerNumber: string) =>
+    new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Override block',
+        'This number is currently blocked. Trusting it will remove the block. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Trust number', onPress: () => resolve(true) },
+        ],
+        { cancelable: true }
+      );
+    });
+
   const addTrustedNumbers = async (numbers: string[], source: 'manual' | 'contacts') => {
     if (!activeProfile || numbers.length === 0) return;
+    const blockedNumbers = await fetchBlockedNumbers();
+    const resolvedNumbers: string[] = [];
+    for (const number of numbers) {
+      const normalized = number.trim();
+      if (!normalized) continue;
+      if (blockedNumbers.has(normalized)) {
+        const allowed = await confirmTrust(normalized);
+        if (!allowed) {
+          continue;
+        }
+      }
+      resolvedNumbers.push(normalized);
+    }
+    if (resolvedNumbers.length === 0) {
+      return;
+    }
     await authorizedFetch('/fraud/trusted-contacts', {
       method: 'POST',
       body: JSON.stringify({
         profileId: activeProfile.id,
-        callerNumbers: numbers,
+        callerNumbers: resolvedNumbers,
         source,
       }),
     });
@@ -452,7 +493,7 @@ export default function TrustedContactsScreen() {
             if (source === 'contacts') {
               badgeText = 'Imported';
             } else if (source === 'auto') {
-              badgeText = 'Auto (safe)';
+              badgeText = 'Auto trusted';
             }
             return (
               <View style={styles.card}>

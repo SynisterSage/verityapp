@@ -15,5 +15,6 @@ fraudRouter.delete('/blocked-callers/:blockId', FraudSettingsController.deleteBl
 fraudRouter.get('/trusted-contacts', FraudSettingsController.listTrustedContacts);
 fraudRouter.post('/trusted-contacts', FraudSettingsController.addTrustedContacts);
 fraudRouter.delete('/trusted-contacts/:trustedId', FraudSettingsController.deleteTrustedContact);
+fraudRouter.get('/caller-status', FraudSettingsController.getCallerStatus);
 
 export default fraudRouter;

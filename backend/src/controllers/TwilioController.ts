@@ -7,6 +7,7 @@ import { transcribeWavBuffer } from '@src/services/azure';
 import { analyzeTranscript, hashCallerNumber, matchPhrases, scoreToRiskLevel } from '@src/services/fraud';
 import { getCallerMetadata } from '@src/services/phone';
 import { verifyPasscodeHash } from '@src/services/passcode';
+import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 
 const DEFAULT_GREETING = 'Hello, you have reached SafeCall.';
 
@@ -606,12 +607,13 @@ async function recordingReady(req: Request, res: Response) {
 
       const callBlockingEnabled = process.env.ENABLE_CALL_BLOCKING === 'true';
       if (callBlockingEnabled && callerHash && automationBlockEnabled) {
+        await removeTrustedContact(profile.id, callerHash);
         await supabaseAdmin.from('blocked_callers').upsert(
           {
             profile_id: profile.id,
             caller_hash: callerHash,
             caller_number: resolvedFrom || null,
-            reason: `fraud_score_${fraudScore}`,
+            reason: `auto_block_fraud_score_${fraudScore}`,
           },
           { onConflict: 'profile_id,caller_hash' }
         );
@@ -620,6 +622,7 @@ async function recordingReady(req: Request, res: Response) {
 
     // Auto-trust low-risk callers if enabled
     if (shouldTrustCaller && callerHash && resolvedFrom) {
+      await removeBlockedEntry(profile.id, callerHash);
       await supabaseAdmin.from('trusted_contacts').upsert(
         {
           profile_id: profile.id,

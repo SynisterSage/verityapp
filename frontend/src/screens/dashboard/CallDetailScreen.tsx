@@ -29,10 +29,15 @@ type CallRow = {
   feedback_status?: string | null;
 };
 
-export default function CallDetailScreen({ route }: { route: any }) {
+export default function CallDetailScreen({
+  route,
+}: {
+  route: { params: { callId: string; compact?: boolean } };
+}) {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
-  const { callId } = route.params;
+  const { callId, compact } = route.params;
+  const isCompactModal = compact ?? false;
   const { activeProfile } = useProfile();
   const [callRow, setCallRow] = useState<CallRow | null>(null);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
@@ -132,7 +137,60 @@ export default function CallDetailScreen({ route }: { route: any }) {
     }
   };
 
+  const checkCallerStatus = async () => {
+    if (!callRow?.profile_id || !callRow.caller_number) {
+      return null;
+    }
+    try {
+      const data = await authorizedFetch(
+        `/fraud/caller-status?profileId=${callRow.profile_id}&callerNumber=${encodeURIComponent(
+          callRow.caller_number
+        )}`
+      );
+      return data as { blocked?: boolean; trusted?: boolean };
+    } catch {
+      return null;
+    }
+  };
+
+  const confirmOverride = (title: string, message: string) =>
+    new Promise<boolean>((resolve) => {
+      Alert.alert(
+        title,
+        message,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Continue', onPress: () => resolve(true) },
+        ],
+        { cancelable: true }
+      );
+    });
+
+  const shouldProceedWithMark = async (status: 'marked_safe' | 'marked_fraud') => {
+    const statusMap = await checkCallerStatus();
+    if (!statusMap) {
+      return true;
+    }
+    if (status === 'marked_fraud' && statusMap.trusted) {
+      return confirmOverride(
+        'Block trusted number?',
+        'This number is currently trusted. Blocking it will remove the trusted status. Continue?'
+      );
+    }
+    if (status === 'marked_safe' && statusMap.blocked) {
+      return confirmOverride(
+        'Trust blocked number?',
+        'This number is currently blocked. Trusting it will remove the block. Continue?'
+      );
+    }
+    return true;
+  };
+
   const markFeedback = async (status: 'marked_safe' | 'marked_fraud') => {
+    const canProceed = await shouldProceedWithMark(status);
+    if (!canProceed) {
+      return;
+    }
     try {
       await authorizedFetch(`/calls/${callId}/feedback`, {
         method: 'PATCH',
@@ -143,17 +201,16 @@ export default function CallDetailScreen({ route }: { route: any }) {
         const automationBlockEnabled =
           activeProfile?.auto_mark_enabled === true && (activeProfile.auto_block_on_fraud ?? true);
         if (!automationBlockEnabled) {
-          return Alert.alert('Saved', `Marked as ${status.replace('_', ' ')}`);
-        }
-        if (callRow?.profile_id && callRow?.caller_number) {
-          await authorizedFetch('/fraud/blocked-callers', {
-            method: 'POST',
-            body: JSON.stringify({
-              profileId: callRow.profile_id,
-              callerNumber: callRow.caller_number,
-              reason: 'marked_fraud',
-            }),
-          });
+          if (callRow?.profile_id && callRow?.caller_number) {
+            await authorizedFetch('/fraud/blocked-callers', {
+              method: 'POST',
+              body: JSON.stringify({
+                profileId: callRow.profile_id,
+                callerNumber: callRow.caller_number,
+                reason: 'marked_fraud',
+              }),
+            });
+          }
         }
       }
       Alert.alert('Saved', `Marked as ${status.replace('_', ' ')}`);
@@ -191,11 +248,13 @@ export default function CallDetailScreen({ route }: { route: any }) {
     );
   }
 
-  const topPadding = Math.max(16, insets.top + 4);
+  const baseTopPadding = Math.max(16, insets.top + 4);
+  const containerPaddingTop = isCompactModal ? Math.max(12, insets.top + 2) : baseTopPadding;
+  const contentPaddingTop = isCompactModal ? 4 : 16;
 
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: topPadding }]}
+      style={[styles.container, { paddingTop: containerPaddingTop }]}
       edges={[]}
     >
       <View style={styles.header}>
@@ -204,7 +263,10 @@ export default function CallDetailScreen({ route }: { route: any }) {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Call Detail</Text>
       </View>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}
+        showsVerticalScrollIndicator={false}
+      >
         <Text style={styles.caller}>{callRow.caller_number ?? 'Unknown caller'}</Text>
         <Text style={styles.meta}>{new Date(callRow.created_at).toLocaleString()}</Text>
 
@@ -295,6 +357,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0b111b',
+    marginBottom: 30,
   },
   header: {
     paddingHorizontal: 16,
@@ -321,7 +384,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingHorizontal: 24,
-    paddingTop: 16,
     paddingBottom: 120,
   },
   caller: {

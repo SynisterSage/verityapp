@@ -54,7 +54,7 @@ export type RootStackParamList = {
   OnboardingCallForwarding: undefined;
   OnboardingTestCall: undefined;
   AppTabs: undefined;
-  CallDetailModal: { callId: string };
+  CallDetailModal: { callId: string; compact?: boolean };
 };
 
 type TabParamList = {

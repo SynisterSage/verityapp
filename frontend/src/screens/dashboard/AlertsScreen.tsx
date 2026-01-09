@@ -443,7 +443,10 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
               muted={Boolean(item.processed) || item.status !== 'pending'}
               onPress={() =>
                 item.call_id
-                  ? navigation.navigate('CallDetailModal', { callId: item.call_id })
+                  ? navigation.navigate('CallDetailModal', {
+                      callId: item.call_id,
+                      compact: true,
+                    })
                   : undefined
               }
             />
@@ -487,6 +490,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 120,
+    paddingTop: 4,
   },
   listEmptyContent: {
     flexGrow: 1,
@@ -495,6 +499,7 @@ const styles = StyleSheet.create({
   listWrapper: {
     flex: 1,
     position: 'relative',
+    paddingTop: 8,
   },
   headerRow: {
     flexDirection: 'row',

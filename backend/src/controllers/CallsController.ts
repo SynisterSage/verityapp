@@ -3,6 +3,7 @@ import logger from 'jet-logger';
 
 import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
+import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 
 async function getAuthenticatedUserId(req: Request) {
   const authHeader = req.header('authorization') ?? '';
@@ -162,7 +163,13 @@ async function submitFeedback(req: Request, res: Response) {
   const shouldAutoBlock = autoMarkEnabled && autoBlockOnFraud;
   const shouldAutoTrust = autoMarkEnabled && autoTrustOnSafe;
 
-  if (status === 'marked_fraud' && shouldAutoBlock && callRow?.caller_hash) {
+  if (
+    status === 'marked_fraud' &&
+    shouldAutoBlock &&
+    callRow?.caller_hash &&
+    callRow.profile_id
+  ) {
+    await removeTrustedContact(callRow.profile_id, callRow.caller_hash);
     const { error: blockError } = await supabaseAdmin.from('blocked_callers').upsert(
       {
         profile_id: callRow.profile_id,
@@ -177,7 +184,14 @@ async function submitFeedback(req: Request, res: Response) {
     }
   }
 
-  if (status === 'marked_safe' && shouldAutoTrust && callRow?.caller_hash && callRow.caller_number) {
+  if (
+    status === 'marked_safe' &&
+    shouldAutoTrust &&
+    callRow?.caller_hash &&
+    callRow.caller_number &&
+    callRow.profile_id
+  ) {
+    await removeBlockedEntry(callRow.profile_id, callRow.caller_hash);
     const { error: trustError } = await supabaseAdmin.from('trusted_contacts').upsert(
       {
         profile_id: callRow.profile_id,

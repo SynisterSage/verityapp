@@ -145,10 +145,8 @@ export default function BlocklistScreen() {
           ]}
           renderItem={({ item }) => {
             const rawReason = (item.reason ?? '').toLowerCase();
-            let badgeText = 'Manual';
-            if (rawReason.startsWith('auto_mark_fraud') || rawReason === 'auto') {
-              badgeText = 'Auto (fraud)';
-            }
+            const autoReason = rawReason.includes('auto');
+            let badgeText = autoReason ? 'Auto blocked' : 'Manual';
             return (
               <View style={styles.card}>
                 <View>
