@@ -253,20 +253,35 @@ export default function CallDetailScreen({
         body: JSON.stringify({ status }),
       });
       setCallRow((prev) => (prev ? { ...prev, feedback_status: status } : prev));
-      if (status === 'marked_fraud') {
-        const automationBlockEnabled =
-          activeProfile?.auto_mark_enabled === true && (activeProfile.auto_block_on_fraud ?? true);
-        if (!automationBlockEnabled) {
-          if (callRow?.profile_id && callRow?.caller_number) {
-            await authorizedFetch('/fraud/blocked-callers', {
-              method: 'POST',
-              body: JSON.stringify({
-                profileId: callRow.profile_id,
-                callerNumber: callRow.caller_number,
-                reason: 'marked_fraud',
-              }),
-            });
-          }
+      const automationEnabled = activeProfile?.auto_mark_enabled === true;
+      const automationBlockEnabled =
+        automationEnabled && (activeProfile.auto_block_on_fraud ?? true);
+      const automationTrustEnabled =
+        automationEnabled && (activeProfile.auto_trust_on_safe ?? false);
+
+      const profileId = callRow?.profile_id;
+      const callerNumber = callRow?.caller_number;
+
+      if (profileId && callerNumber) {
+        if (status === 'marked_fraud' && automationBlockEnabled) {
+          await authorizedFetch('/fraud/blocked-callers', {
+            method: 'POST',
+            body: JSON.stringify({
+              profileId,
+              callerNumber,
+              reason: 'auto_mark_fraud',
+            }),
+          });
+        }
+        if (status === 'marked_safe' && automationTrustEnabled) {
+          await authorizedFetch('/fraud/trusted-contacts', {
+            method: 'POST',
+            body: JSON.stringify({
+              profileId,
+              callerNumbers: [callerNumber],
+              source: 'auto',
+            }),
+          });
         }
       }
       emitCallUpdated({ callId });
