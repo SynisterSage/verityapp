@@ -305,7 +305,7 @@ CREATE TABLE family_members (
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   
   -- Role-based access
-  role VARCHAR(50) NOT NULL,  -- 'admin' | 'viewer' | 'editor'
+  role VARCHAR(50) NOT NULL,  -- 'admin' | 'editor'
   
   -- Permissions
   can_view_calls BOOLEAN DEFAULT true,
@@ -327,7 +327,7 @@ CREATE TABLE family_members (
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW(),
   
-  CONSTRAINT valid_role CHECK (role IN ('admin', 'viewer', 'editor')),
+  CONSTRAINT valid_role CHECK (role IN ('admin', 'editor')),
   CONSTRAINT valid_relationship CHECK (relationship IN ('child', 'spouse', 'sibling', 'nurse', 'caregiver', 'attorney', 'other', null))
 );
 

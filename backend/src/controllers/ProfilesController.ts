@@ -364,8 +364,7 @@ async function inviteMember(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
-  const memberRole =
-    role && ['admin', 'editor', 'viewer'].includes(role) ? role : 'viewer';
+  const memberRole = role && ['admin', 'editor'].includes(role) ? role : 'editor';
 
   const { data: existingUserRow, error: existingUserError } = normalizedEmail
     ? await supabaseAdmin

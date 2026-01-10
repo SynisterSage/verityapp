@@ -1,12 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
+  Dimensions,
   Linking,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,16 +22,18 @@ import type { RouteProp } from '@react-navigation/native';
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import { SettingsStackParamList } from '../../navigation/types';
+import { useAuth } from '../../context/AuthContext';
 
 import * as Clipboard from 'expo-clipboard';
 
-type MemberRole = 'admin' | 'editor' | 'viewer';
+type MemberRole = 'admin' | 'editor';
 
 type Member = {
   id: string;
   user_id: string;
   role: MemberRole;
   is_caretaker?: boolean;
+  display_name?: string | null;
   user?: { email?: string; user_metadata?: { full_name?: string } } | null;
 };
 
@@ -38,6 +44,18 @@ type Invite = {
   status: string;
 };
 
+const avatarColors = ['#4c7dff', '#6e60f8', '#00c2ff', '#47d6a5'];
+const MENU_WIDTH = 140;
+const MENU_HEIGHT = 90;
+
+function resolveDisplayName(member: Member) {
+  const base =
+    member.display_name ??
+    member.user?.user_metadata?.full_name ??
+    member.user?.email ??
+    member.role.charAt(0).toUpperCase() + member.role.slice(1);
+  return base;
+}
 export default function MembersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<SettingsStackParamList, 'Members'>>();
   const route = useRoute<RouteProp<SettingsStackParamList, 'Members'>>();
@@ -47,11 +65,57 @@ export default function MembersScreen() {
   const [invites, setInvites] = useState<Invite[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [loadingInvites, setLoadingInvites] = useState(false);
-  const [inviteRole, setInviteRole] = useState<MemberRole>('viewer');
+  const [inviteRole, setInviteRole] = useState<MemberRole>('editor');
   const [inviteError, setInviteError] = useState('');
   const [inviteMessage, setInviteMessage] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const highlightInviteEntry = route.params?.highlightInviteEntry ?? false;
+  const { session } = useAuth();
+  const [activeMemberMenuId, setActiveMemberMenuId] = useState<string | null>(null);
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const sessionUserId = session?.user?.id ?? null;
+  const currentMembership = members.find((member) => member.user_id === sessionUserId);
+  const currentUserIsAdmin = Boolean(
+    currentMembership && (currentMembership.is_caretaker || currentMembership.role === 'admin')
+  );
+  const rowRefs = useRef<Map<string, View>>(new Map());
+  const [menuAnchor, setMenuAnchor] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  const [menuMember, setMenuMember] = useState<Member | null>(null);
+  const closeMemberMenu = useCallback(() => {
+    setActiveMemberMenuId(null);
+    setMenuAnchor(null);
+    setMenuMember(null);
+  }, []);
+  const canManageMember = (member: Member) =>
+    currentUserIsAdmin &&
+    !member.is_caretaker &&
+    member.role !== 'admin' &&
+    member.user_id !== sessionUserId;
+  const toggleMemberMenu = useCallback(
+    (member: Member) => {
+      if (activeMemberMenuId === member.id) {
+        closeMemberMenu();
+        return;
+      }
+      setActiveMemberMenuId(member.id);
+      setMenuMember(member);
+      const ref = rowRefs.current.get(member.id);
+      if (!ref) {
+        setMenuAnchor(null);
+        return;
+      }
+      ref.measureInWindow((x, y, width, height) => {
+        setMenuAnchor({ x, y, width, height });
+      });
+    },
+    [activeMemberMenuId, closeMemberMenu]
+  );
 
   const buildInviteLink = (inviteId: string) => `verityprotect://invite/${inviteId}`;
   const buildInviteMessage = (invite: Invite) =>
@@ -66,6 +130,7 @@ export default function MembersScreen() {
     try {
       const data = await authorizedFetch(`/profiles/${activeProfile.id}/members`);
       setMembers(data?.members ?? []);
+      setActiveMemberMenuId(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -115,6 +180,112 @@ export default function MembersScreen() {
     }
   };
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      closeMemberMenu();
+    });
+    return unsubscribe;
+  }, [navigation, closeMemberMenu]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', () => {
+      closeMemberMenu();
+    });
+    return unsubscribe;
+  }, [navigation, closeMemberMenu]);
+
+  const windowWidth = Dimensions.get('window').width;
+  const windowHeight = Dimensions.get('window').height;
+  const menuPosition =
+    menuAnchor === null
+      ? null
+      : {
+          top: Math.min(
+            Math.max(16, menuAnchor.y + menuAnchor.height / 2 - MENU_HEIGHT / 2),
+            windowHeight - MENU_HEIGHT - 16
+          ),
+          left: Math.max(
+            16,
+            Math.min(
+              menuAnchor.x + menuAnchor.width - MENU_WIDTH,
+              Math.max(16, windowWidth - MENU_WIDTH - 16)
+            )
+          ),
+        };
+
+  const handleChangeMemberRole = (member: Member, role: MemberRole) => {
+    if (member.role === role) {
+      return;
+    }
+    const name = resolveDisplayName(member);
+    Alert.alert(
+      'Change role',
+      `Set ${name} as ${role}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: () => updateMemberRole(member, role),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const updateMemberRole = async (member: Member, role: MemberRole) => {
+    if (!activeProfile) {
+      return;
+    }
+    setUpdatingMemberId(member.id);
+    try {
+      await authorizedFetch(`/profiles/${activeProfile.id}/members/${member.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      });
+      await fetchMembers();
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Unable to update role', 'Try again later.');
+    } finally {
+      setUpdatingMemberId(null);
+      closeMemberMenu();
+    }
+  };
+
+  const confirmRemoveMember = (member: Member) => {
+    Alert.alert(
+      'Remove member',
+      `Remove ${member.display_name ?? 'this member'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => handleRemoveMember(member),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+  const handleRemoveMember = async (member: Member) => {
+    if (!activeProfile) {
+      return;
+    }
+    setRemovingMemberId(member.id);
+    try {
+      await authorizedFetch(`/profiles/${activeProfile.id}/members/${member.id}`, {
+        method: 'DELETE',
+      });
+      await fetchMembers();
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Unable to remove member', 'Try again later.');
+    } finally {
+      setRemovingMemberId(null);
+      closeMemberMenu();
+    }
+  };
+
   const copyInvite = async (invite: Invite) => {
     await Clipboard.setStringAsync(invite.id);
     Alert.alert('Invite code copied', 'Paste it into the Enter invite code screen.');
@@ -132,7 +303,7 @@ export default function MembersScreen() {
         }),
       });
       const createdInvite: Invite | undefined = data?.invite;
-      setInviteRole('viewer');
+      setInviteRole('editor');
       setInviteMessage('Invite created—Messages will open automatically.');
       await fetchInvites();
       if (createdInvite) {
@@ -145,27 +316,53 @@ export default function MembersScreen() {
     }
   };
 
+  const handleCreateInvite = () => {
+    if (inviteRole === 'admin') {
+      Alert.alert(
+        'Admin invite warning',
+        'Admins have full control and can remove or update members. Continue?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Continue', onPress: createInvite },
+        ],
+        { cancelable: true }
+      );
+      return;
+    }
+    createInvite();
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
       edges={[]}
     >
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color="#f5f7fb" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Account members</Text>
-      </View>
-      <View style={[styles.card, highlightInviteEntry && styles.highlightCard]}>
-        <Text style={styles.subhead}>Current members</Text>
+      <ScrollView contentContainerStyle={styles.contentContainer} scrollEnabled={!menuMember}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color="#f5f7fb" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Account members</Text>
+        </View>
+
+      <View style={[styles.sectionCard, highlightInviteEntry && styles.highlightCard]}>
+        <View style={styles.sectionHeaderRow}>
+          <View style={styles.headerLabel}>
+            <Ionicons name="people-outline" size={18} color="#7d9dff" />
+            <Text style={styles.sectionTitle}>Current members</Text>
+          </View>
+        </View>
+        <Text style={[styles.sectionDescription, styles.sectionDescriptionSpacing]}>
+          Every trusted caretaker with access to this profile.
+        </Text>
         <View style={styles.membersList}>
           {loadingMembers ? (
             <Text style={styles.placeholder}>Loading…</Text>
           ) : members.length === 0 ? (
             <Text style={styles.placeholder}>No one else is added yet.</Text>
           ) : (
-            members.map((member) => {
-              const metadataName = member.user?.user_metadata?.full_name;
+            members.map((member, index) => {
+              const metadataName = member.display_name || member.user?.user_metadata?.full_name;
               const name =
                 metadataName ??
                 member.user?.email ??
@@ -175,24 +372,60 @@ export default function MembersScreen() {
                 member.is_caretaker && activeProfile
                   ? `${activeProfile.first_name} ${activeProfile.last_name}`
                   : name;
+              const avatarColor = avatarColors[index % avatarColors.length];
               return (
-                <View key={member.id + member.user_id} style={styles.memberRow}>
-                  <View>
-                    <Text style={styles.memberName}>{displayName}</Text>
-                    <Text style={styles.memberRole}>{roleLabel}</Text>
+                <View
+                  key={member.id + member.user_id}
+                  ref={(element) => {
+                    if (element) {
+                      rowRefs.current.set(member.id, element);
+                    } else {
+                      rowRefs.current.delete(member.id);
+                    }
+                  }}
+                  collapsable={false}
+                >
+                  <View style={styles.memberItem}>
+                    <View style={styles.memberRow}>
+                      <View style={[styles.memberAvatar, { backgroundColor: avatarColor }]}>
+                        <Text style={styles.memberAvatarText}>
+                          {displayName.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.memberContent}>
+                        <Text style={styles.memberName}>
+                          {displayName}
+                          {member.user_id === sessionUserId ? ' (You)' : ''}
+                        </Text>
+                        <Text style={styles.memberRole}>{roleLabel}</Text>
+                      </View>
+                      {canManageMember(member) && (
+                        <TouchableOpacity
+                          style={styles.menuButton}
+                          onPress={() => toggleMemberMenu(member)}
+                          activeOpacity={0.7}
+                        >
+                          <Ionicons name="ellipsis-vertical" size={18} color="#7d9dff" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   </View>
                 </View>
               );
             })
           )}
         </View>
+      </View>
 
-        <Text style={styles.subhead}>Invite someone</Text>
-        <Text style={styles.infoText}>
-          Tap Create invite and we’ll open Messages with the Verity Protect link ready to send.
-        </Text>
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Invite someone</Text>
+          <Text style={styles.sectionDescription}>
+            Tap Create invite to open Messages with a ready-to-send Verity Protect link.
+          </Text>
+        </View>
         <View style={styles.roleRow}>
-          {(['viewer', 'editor', 'admin'] as MemberRole[]).map((role) => (
+          {(['editor', 'admin'] as MemberRole[]).map((role) => (
             <TouchableOpacity
               key={role}
               style={[styles.rolePill, inviteRole === role && styles.rolePillActive]}
@@ -213,13 +446,20 @@ export default function MembersScreen() {
         {inviteMessage ? <Text style={styles.hint}>{inviteMessage}</Text> : null}
         <TouchableOpacity
           style={[styles.button, isInviting && styles.disabledButton]}
-          onPress={createInvite}
+          onPress={handleCreateInvite}
           disabled={isInviting}
         >
           <Text style={styles.buttonText}>{isInviting ? 'Creating…' : 'Create invite'}</Text>
         </TouchableOpacity>
+      </View>
 
-        <Text style={[styles.subhead, { marginTop: 16 }]}>Pending invites</Text>
+      <View style={styles.sectionCard}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Pending invites</Text>
+          <Text style={styles.sectionDescription}>
+            Share the invite code again or enter it manually when the new member downloads SafeCall.
+          </Text>
+        </View>
         <View style={styles.invitesList}>
           {loadingInvites ? (
             <Text style={styles.placeholder}>Checking invites…</Text>
@@ -258,7 +498,61 @@ export default function MembersScreen() {
           <Ionicons name="chevron-forward" size={18} color="#7d9dff" />
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </ScrollView>
+    {menuMember && menuPosition && (
+      <View style={styles.menuPortal} pointerEvents="box-none">
+        <TouchableWithoutFeedback onPress={closeMemberMenu}>
+          <View style={styles.overlay} />
+        </TouchableWithoutFeedback>
+        <View
+          style={[
+            styles.memberMenu,
+            styles.memberMenuPortal,
+            { top: menuPosition.top, left: menuPosition.left },
+          ]}
+        >
+          {(['editor'] as MemberRole[]).map((option) => (
+            <TouchableOpacity
+              key={option}
+              style={[
+                styles.menuItem,
+                menuMember.role === option && styles.menuItemDisabled,
+              ]}
+              onPress={() => handleChangeMemberRole(menuMember, option)}
+              disabled={menuMember.role === option || updatingMemberId === menuMember.id}
+            >
+              <Text
+                style={[
+                  styles.menuItemText,
+                  menuMember.role === option && styles.menuItemTextDisabled,
+                ]}
+              >
+                Set as {option.charAt(0).toUpperCase() + option.slice(1)}
+              </Text>
+              {updatingMemberId === menuMember.id && (
+                <ActivityIndicator size="small" color="#7d9dff" />
+              )}
+            </TouchableOpacity>
+          ))}
+          <View style={styles.menuDivider} />
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => {
+              if (menuMember) {
+                confirmRemoveMember(menuMember);
+              }
+            }}
+            disabled={removingMemberId === menuMember.id}
+          >
+            <Text style={styles.menuItemText}>Remove member</Text>
+            {removingMemberId === menuMember.id && (
+              <ActivityIndicator size="small" color="#ff6d6d" />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+    )}
+  </SafeAreaView>
   );
 }
 
@@ -267,6 +561,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0b111b',
     paddingHorizontal: 24,
+  },
+  contentContainer: {
+    paddingBottom: 32,
+  },
+  sectionCard: {
+    backgroundColor: '#121a26',
+    borderWidth: 1,
+    borderColor: '#202c3c',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
@@ -289,13 +594,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#f5f7fb',
   },
-  card: {
-    backgroundColor: '#121a26',
-    borderWidth: 1,
-    borderColor: '#202c3c',
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
+  sectionHeader: {
+    marginBottom: 12,
+  },
+  sectionTitle: {
+    color: '#f5f7fb',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sectionDescription: {
+    color: '#95a2bd',
+    fontSize: 13,
+    marginTop: 4,
+  },
+  sectionDescriptionSpacing: {
+    marginBottom: 12,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  headerLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   subhead: {
     color: '#8aa0c6',
@@ -305,13 +629,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   membersList: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#1f2735',
-    paddingBottom: 12,
     gap: 6,
   },
+  memberItem: {
+    position: 'relative',
+  },
   memberRow: {
-    paddingVertical: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#181f2e',
+    gap: 12,
+  },
+  memberAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberAvatarText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  memberContent: {
+    flex: 1,
   },
   memberName: {
     color: '#f5f7fb',
@@ -322,6 +665,53 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  memberMenu: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: '#0f1523',
+    borderRadius: 14,
+    borderColor: '#1f2735',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+    marginVertical: 30,
+  },
+  memberMenuPortal: {
+    position: 'absolute',
+    minWidth: MENU_WIDTH,
+    width: MENU_WIDTH,
+    height: MENU_HEIGHT,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+  },
+  menuItemText: {
+    color: '#f5f7fb',
+    fontWeight: '500',
+  },
+  menuItemDisabled: {
+    opacity: 0.5,
+  },
+  menuItemTextDisabled: {
+    color: '#95a2bd',
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#1b2333',
   },
   placeholder: {
     color: '#95a2bd',
@@ -392,10 +782,15 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
   },
+  menuPortal: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 999,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
+  },
   invitesList: {
-    borderTopWidth: 1,
-    borderTopColor: '#1f2735',
-    paddingTop: 12,
     gap: 10,
   },
   inviteRow: {

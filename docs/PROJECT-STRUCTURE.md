@@ -264,7 +264,7 @@ family_members (Multi-user access control)
 ├─ id (UUID)
 ├─ profile_id → profiles.id
 ├─ user_id → users.id
-├─ role ('admin' | 'editor' | 'viewer')
+├─ role ('admin' | 'editor')
 └─ permissions (detailed access control)
 
 audit_logs (Compliance & security)

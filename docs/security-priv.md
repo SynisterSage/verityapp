@@ -75,12 +75,11 @@ User Types:
 - caretaker (primary user, full access)
 - elder (limited access, can only view their own profile)
 - admin (support staff, limited access)
-- viewer (read-only family member)
+- editor (read-only family member)
 
 Profile-level Roles:
 - admin (can modify settings, block callers, delete recordings)
 - editor (can view/listen, block callers)
-- viewer (can view/listen only)
 ```
 
 **Row-Level Security (RLS) via Supabase:**
@@ -306,7 +305,7 @@ INSERT INTO audit_logs (action, entity_type, entity_id, user_id, details, status
 ('transcript_downloaded', 'call', 'call_12345', 'user_12345', '{}', 'success'),
 ('call_deleted', 'call', 'call_12345', 'user_12345', '{}', 'success'),
 ('user_login', 'user', 'user_12345', 'user_12345', '{"ip": "203.0.113.5"}', 'success'),
-('permission_granted', 'family_members', 'fm_12345', 'user_12345', '{"role": "viewer"}', 'success');
+('permission_granted', 'family_members', 'fm_12345', 'user_12345', '{"role": "editor"}', 'success');
 ```
 
 **Audit logs:**

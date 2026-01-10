@@ -16,6 +16,7 @@ router.post(PATHS.Profiles.Invites, ProfilesController.inviteMember);
 router.get(PATHS.Profiles.Invites, ProfilesController.listInvites);
 router.post(PATHS.Profiles.InviteAccept, ProfileMembersController.acceptInvite);
 router.get(PATHS.Profiles.Members, ProfileMembersController.listMembers);
+router.patch(PATHS.Profiles.Member, ProfileMembersController.changeMemberRole);
 router.delete(PATHS.Profiles.Member, ProfileMembersController.removeMember);
 
 export default router;
