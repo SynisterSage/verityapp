@@ -43,6 +43,7 @@ type Invite = {
   email: string;
   role: MemberRole;
   status: string;
+  short_code?: string | null;
 };
 
 const avatarColors = ['#4c7dff', '#6e60f8', '#00c2ff', '#47d6a5'];
@@ -61,6 +62,11 @@ function resolveDisplayName(member: Member) {
     member.role.charAt(0).toUpperCase() + member.role.slice(1);
   return base;
 }
+
+function formatStatus(status: string) {
+  if (!status) return '';
+  return `${status.charAt(0).toUpperCase()}${status.slice(1)}`;
+}
 export default function MembersScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<SettingsStackParamList, 'Members'>>();
   const route = useRoute<RouteProp<SettingsStackParamList, 'Members'>>();
@@ -73,6 +79,7 @@ export default function MembersScreen() {
   const [inviteRole, setInviteRole] = useState<MemberRole>('editor');
   const [inviteError, setInviteError] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
   const highlightInviteEntry = route.params?.highlightInviteEntry ?? false;
   const { session } = useAuth();
   const [activeMemberMenuId, setActiveMemberMenuId] = useState<string | null>(null);
@@ -83,6 +90,7 @@ export default function MembersScreen() {
   const currentUserIsAdmin = Boolean(
     currentMembership && (currentMembership.is_caretaker || currentMembership.role === 'admin')
   );
+  const currentUserIsCaretaker = Boolean(currentMembership?.is_caretaker);
   const rowRefs = useRef<Map<string, View>>(new Map());
   const [menuAnchor, setMenuAnchor] = useState<{
     x: number;
@@ -125,8 +133,10 @@ export default function MembersScreen() {
   );
 
   const buildInviteLink = (inviteId: string) => `verityprotect://invite/${inviteId}`;
-  const buildInviteMessage = (invite: Invite) =>
-    `Join my Verity Protect circle. Tap ${buildInviteLink(invite.id)} or enter code ${invite.id}.`;
+const buildInviteMessage = (invite: Invite) => {
+  const code = invite.short_code ?? invite.id;
+  return `Join my Verity Protect Circle.\nTap ${buildInviteLink(invite.id)} or use code ${code} to join.`;
+};
 
   const fetchMembers = useCallback(async () => {
     if (!activeProfile) {
@@ -184,6 +194,48 @@ export default function MembersScreen() {
     } catch (err) {
       Alert.alert('Unable to open SMS', 'Please share the invite manually.');
     }
+  };
+
+  const copyInviteCode = async (invite: Invite) => {
+    const code = invite.short_code ?? invite.id ?? '';
+    if (!code) {
+      return;
+    }
+    await Clipboard.setStringAsync(code);
+    Alert.alert('Code copied', 'Paste it into the Enter invite code screen.');
+  };
+
+  const revokePendingInvite = async (invite: Invite) => {
+    if (!activeProfile) {
+      return;
+    }
+    setRevokingInviteId(invite.id);
+    try {
+      await authorizedFetch(`/profiles/${activeProfile.id}/invites/${invite.id}`, {
+        method: 'DELETE',
+      });
+      setInvites((prev) => prev.filter((item) => item.id !== invite.id));
+    } catch (err: any) {
+      Alert.alert(err?.message || 'Unable to revoke invite', 'Try again later.');
+    } finally {
+      setRevokingInviteId(null);
+    }
+  };
+
+  const confirmRevokeInvite = (invite: Invite) => {
+    Alert.alert(
+      'Revoke invite',
+      'This invite will no longer be usable once revoked.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Revoke',
+          style: 'destructive',
+          onPress: () => revokePendingInvite(invite),
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   useEffect(() => {
@@ -303,11 +355,6 @@ export default function MembersScreen() {
     }
   };
 
-  const copyInvite = async (invite: Invite) => {
-    await Clipboard.setStringAsync(invite.id);
-    Alert.alert('Invite code copied', 'Paste it into the Enter invite code screen.');
-  };
-
   const createInvite = async () => {
     if (!activeProfile) return;
     setInviteError('');
@@ -353,19 +400,22 @@ export default function MembersScreen() {
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
       edges={[]}
     >
-      <ScrollView contentContainerStyle={styles.contentContainer} scrollEnabled={!menuMember}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Ionicons name="chevron-back" size={22} color="#f5f7fb" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Account members</Text>
-        </View>
-
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color="#f5f7fb" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Account Members</Text>
+      </View>
+      <ScrollView
+        contentContainerStyle={styles.contentContainer}
+        scrollEnabled={!menuMember}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={[styles.sectionCard, highlightInviteEntry && styles.highlightCard]}>
           <View style={styles.sectionHeaderRow}>
             <View style={styles.headerLabel}>
               <Ionicons name="people-outline" size={18} color="#7d9dff" />
-              <Text style={styles.sectionTitle}>Current members</Text>
+              <Text style={styles.sectionTitle}>Current Members</Text>
             </View>
           </View>
           <Text
@@ -392,7 +442,10 @@ export default function MembersScreen() {
                 </Animated.View>
               ))
             ) : members.length === 0 ? (
-              <Text style={styles.placeholder}>No one else is added yet.</Text>
+          <View style={styles.emptyState}>
+            <Ionicons name="people-outline" size={40} color="#7d9dff" />
+            <Text style={styles.emptyStateTitle}>No members yet</Text>
+          </View>
             ) : (
               members.map((member, index) => {
                 const safeName =
@@ -451,7 +504,7 @@ export default function MembersScreen() {
 
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Invite someone</Text>
+            <Text style={styles.sectionTitle}>Invite Someone</Text>
             <Text style={[styles.sectionDescription, styles.sectionDescriptionSpacing]}>
               Tap Create Invite to send a Verity Protect link.
             </Text>
@@ -488,44 +541,77 @@ export default function MembersScreen() {
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Pending invites</Text>
           <Text style={styles.sectionDescription}>
-            Share the invite code again or enter it manually when the new member downloads SafeCall.
+            Manage your sent invitations below.
           </Text>
         </View>
         <View style={styles.invitesList}>
           {loadingInvites ? (
             <Text style={styles.placeholder}>Checking invites…</Text>
           ) : invites.length === 0 ? (
-            <Text style={styles.placeholder}>No invites outstanding.</Text>
+            <View style={styles.emptyState}>
+              <Ionicons name="mail-open-outline" size={40} color="#7d9dff" />
+              <Text style={styles.emptyStateTitle}>No pending invites</Text>
+            </View>
           ) : (
-            invites.map((invite) => (
-              <View key={invite.id} style={styles.inviteRow}>
-                <View style={styles.inviteInfo}>
-                  <Text style={styles.inviteEmail}>{invite.email}</Text>
-                  <Text style={styles.inviteMeta}>
-                    {invite.role} • {invite.status}
+            invites.map((invite) => {
+              const shortCode = invite.short_code ?? invite.id ?? '';
+              const roleLabel =
+                ROLE_DISPLAY_NAMES[invite.role] ??
+                invite.role.charAt(0).toUpperCase() + invite.role.slice(1);
+              const statusLabel = formatStatus(invite.status);
+              return (
+                <View key={invite.id} style={styles.pendingInviteRow}>
+                  <Text style={styles.pendingInviteLabel}>
+                    {roleLabel} • {statusLabel}
                   </Text>
-                  <Text style={styles.inviteCode}>{invite.id}</Text>
+                  <View style={styles.codeRow}>
+                    <View style={styles.codePill}>
+                      <Text style={styles.codeText}>{shortCode}</Text>
+                    </View>
+                    <View style={styles.codeActions}>
+                      <TouchableOpacity
+                        onPress={() => shareInvite(invite)}
+                        style={styles.actionIcon}
+                      >
+                        <Ionicons name="share-social-outline" size={18} color="#7d9dff" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => shareViaSMS(invite)}
+                        style={styles.actionIcon}
+                      >
+                        <Ionicons name="chatbubble-ellipses-outline" size={18} color="#7d9dff" />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => copyInviteCode(invite)}
+                        style={styles.actionIcon}
+                      >
+                        <Ionicons name="copy-outline" size={18} color="#7d9dff" />
+                      </TouchableOpacity>
+                      {currentUserIsCaretaker && (
+                        <TouchableOpacity
+                          onPress={() => confirmRevokeInvite(invite)}
+                          style={styles.actionIcon}
+                          disabled={revokingInviteId === invite.id}
+                        >
+                          {revokingInviteId === invite.id ? (
+                            <ActivityIndicator size="small" color="#7d9dff" />
+                          ) : (
+                            <Ionicons name="trash-outline" size={18} color="#ff6d6d" />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
                 </View>
-                <View style={styles.inviteActions}>
-                  <TouchableOpacity onPress={() => shareInvite(invite)} style={styles.iconButton}>
-                    <Ionicons name="share-social-outline" size={18} color="#7d9dff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => shareViaSMS(invite)} style={styles.iconButton}>
-                    <Ionicons name="chatbubble-ellipses-outline" size={18} color="#7d9dff" />
-                  </TouchableOpacity>
-                  <TouchableOpacity onPress={() => copyInvite(invite)} style={styles.iconButton}>
-                    <Ionicons name="copy-outline" size={18} color="#7d9dff" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
+              );
+            })
           )}
         </View>
         <TouchableOpacity
-          style={styles.linkRow}
+          style={styles.enterCodeButton}
           onPress={() => navigation.navigate('EnterInviteCode')}
         >
-          <Text style={styles.linkText}>Enter invite code</Text>
+          <Text style={styles.enterCodeText}>Enter invite code</Text>
           <Ionicons name="chevron-forward" size={18} color="#7d9dff" />
         </TouchableOpacity>
       </View>
@@ -792,6 +878,17 @@ const styles = StyleSheet.create({
     color: '#95a2bd',
     fontSize: 13,
   },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 16,
+  },
+  emptyStateTitle: {
+    color: '#f5f7fb',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   input: {
     borderWidth: 1,
     borderColor: '#243247',
@@ -875,42 +972,63 @@ const styles = StyleSheet.create({
   invitesList: {
     gap: 10,
   },
-  inviteRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  pendingInviteRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#1b2333',
+    paddingBottom: 12,
+    marginBottom: 12,
   },
-  inviteInfo: {
-    flex: 1,
-  },
-  inviteEmail: {
+  pendingInviteLabel: {
     color: '#f5f7fb',
     fontWeight: '600',
   },
-  inviteMeta: {
-    color: '#8aa0c6',
-    fontSize: 12,
-  },
-  inviteCode: {
-    color: '#7d9dff',
-    fontSize: 12,
-    marginTop: 2,
-  },
-  inviteActions: {
+  codeRow: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    marginTop: 10,
+    gap: 14,
   },
-  iconButton: {
-    padding: 6,
+  codePill: {
+    borderWidth: 1,
+    borderColor: '#7d9dff',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: '#0f1523',
   },
-  linkRow: {
+  codeText: {
+    color: '#f5f7fb',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  codeActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+  },
+  actionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#1f2735',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 4,
+  },
+  enterCodeButton: {
     marginTop: 6,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1f2735',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
-  linkText: {
-    color: '#7d9dff',
+  enterCodeText: {
+    color: '#f5f7fb',
     fontWeight: '600',
   },
 });

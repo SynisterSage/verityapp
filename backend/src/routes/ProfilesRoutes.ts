@@ -14,6 +14,7 @@ router.post(PATHS.Profiles.Passcode, ProfilesController.setPasscode);
 router.patch(PATHS.Profiles.Alerts, ProfilesController.updateAlertPrefs);
 router.post(PATHS.Profiles.Invites, ProfilesController.inviteMember);
 router.get(PATHS.Profiles.Invites, ProfilesController.listInvites);
+router.delete(PATHS.Profiles.Invite, ProfilesController.revokeInvite);
 router.post(PATHS.Profiles.InviteAccept, ProfileMembersController.acceptInvite);
 router.get(PATHS.Profiles.Members, ProfileMembersController.listMembers);
 router.patch(PATHS.Profiles.Member, ProfileMembersController.changeMemberRole);

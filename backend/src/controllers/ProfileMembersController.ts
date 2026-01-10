@@ -401,18 +401,22 @@ async function acceptInvite(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing inviteId' });
   }
 
-  let { data: invite } = await supabaseAdmin
-    .from('profile_invites')
-    .select('id, profile_id, email, role, status')
-    .eq('id', inviteId)
-    .maybeSingle();
-  if (!invite) {
-    const { data: emailRow } = await supabaseAdmin
+  const inviteFields = 'id, profile_id, email, role, status, short_code';
+  const fetchInvite = async (column: 'id' | 'short_code' | 'email', value: string) => {
+    const { data } = await supabaseAdmin
       .from('profile_invites')
-      .select('id, profile_id, email, role, status')
-      .eq('email', inviteId)
+      .select(inviteFields)
+      .eq(column, value)
       .maybeSingle();
-    invite = emailRow ?? null;
+    return data ?? null;
+  };
+
+  let invite = await fetchInvite('id', inviteId);
+  if (!invite) {
+    invite = await fetchInvite('short_code', inviteId);
+  }
+  if (!invite) {
+    invite = await fetchInvite('email', inviteId);
   }
 
   if (!invite || invite.status !== 'pending') {
@@ -470,7 +474,7 @@ async function acceptInvite(req: Request, res: Response) {
       accepted_at: new Date().toISOString(),
       accepted_by: userId,
     })
-    .eq('id', inviteId);
+    .eq('id', invite.id);
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ member });
 }

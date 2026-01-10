@@ -5,6 +5,7 @@ import logger from 'jet-logger';
 import { hashPasscode } from '@src/services/passcode';
 import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
+import { generateUniqueShortCode } from '@src/common/helpers/invite';
 
 async function getAuthenticatedUserId(req: Request) {
   const authHeader = req.header('authorization') ?? '';
@@ -398,6 +399,7 @@ async function inviteMember(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Ok).json({ member: data, status: 'member' });
   }
 
+  const inviteShortCode = (await generateUniqueShortCode()) ?? undefined;
   const inviteEmail = normalizedEmail ?? `sms-invite-${randomUUID()}@verityprotect.sms`;
   const { data, error } = await supabaseAdmin
     .from('profile_invites')
@@ -408,10 +410,11 @@ async function inviteMember(req: Request, res: Response) {
         role: memberRole,
         invited_by: userId,
         status: 'pending',
+        short_code: inviteShortCode,
       },
       { onConflict: 'profile_id,email' }
     )
-    .select('id, profile_id, email, role, status, created_at')
+    .select('id, profile_id, email, role, status, created_at, short_code')
     .single();
 
   if (error || !data) {
@@ -438,11 +441,76 @@ async function listInvites(req: Request, res: Response) {
 
   const { data } = await supabaseAdmin
     .from('profile_invites')
-    .select('id, email, role, status, created_at, accepted_at')
+    .select('id, email, role, status, created_at, accepted_at, short_code')
     .eq('profile_id', profileId)
+    .eq('status', 'pending')
     .order('created_at', { ascending: false });
 
-  return res.status(HTTP_STATUS_CODES.Ok).json({ invites: data ?? [] });
+  const invitesData = data ?? [];
+  const shortCodeUpdates: Array<{ id: string; code: string }> = [];
+  const invitesWithCode = [];
+  for (const invite of invitesData) {
+    if (invite.short_code) {
+      invitesWithCode.push(invite);
+      continue;
+    }
+    const generated = (await generateUniqueShortCode()) ?? invite.id.slice(0, 8).toUpperCase();
+    shortCodeUpdates.push({ id: invite.id, code: generated });
+    invitesWithCode.push({ ...invite, short_code: generated });
+  }
+
+  if (shortCodeUpdates.length > 0) {
+    await Promise.all(
+      shortCodeUpdates.map((row) =>
+        supabaseAdmin.from('profile_invites').update({ short_code: row.code }).eq('id', row.id)
+      )
+    );
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ invites: invitesWithCode });
+}
+
+async function revokeInvite(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+  const { profileId, inviteId } = req.params as { profileId: string; inviteId: string };
+  if (!profileId || !inviteId) {
+    return res
+      .status(HTTP_STATUS_CODES.BadRequest)
+      .json({ error: 'Missing profileId or inviteId' });
+  }
+
+  const isCaretaker = await userIsCaretaker(userId, profileId);
+  if (!isCaretaker) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { data: invite } = await supabaseAdmin
+    .from('profile_invites')
+    .select('id, status')
+    .eq('profile_id', profileId)
+    .or(`id.eq.${inviteId},short_code.eq.${inviteId}`)
+    .maybeSingle();
+  if (!invite || invite.status !== 'pending') {
+    return res
+      .status(HTTP_STATUS_CODES.NotFound)
+      .json({ error: 'Invite not found or already handled' });
+  }
+
+  const { error } = await supabaseAdmin
+    .from('profile_invites')
+    .delete()
+    .eq('profile_id', profileId)
+    .eq('id', invite.id);
+
+  if (error) {
+    logger.err(error);
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to revoke invite' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ revoked: invite.id });
 }
 
 export default {
@@ -454,4 +522,5 @@ export default {
   deleteProfile,
   inviteMember,
   listInvites,
+  revokeInvite,
 };
