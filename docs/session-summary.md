@@ -90,3 +90,10 @@ Frontend work
 
 Testing
 - Frontend type check: `npx tsc --noEmit`.
+
+Members Integration Status
+
+Backend: profile members/invite endpoints added (ProfileMembersController) plus routing and helpers. Invite accept handles both UUIDs and placeholder emails (used when we auto-generate sms-invite-…@verityprotect.sms). RLS unchanged, invite creation now tolerates missing email by inventing a safe placeholder so SMS-only sharing works.
+Frontend: Brand-new MembersScreen under Settings, plus main Settings/Account navigation that routes there. The screen lists current members, pending invites, lets admins create SMS-only invites (Messages opens automatically), and exposes copy/share actions per code. “Enter invite code” screen still available for manual redemption. Invite flow refreshes profiles and can highlight the pending area if you land there from onboarding.
+Onboarding: Added choice screen with “Create profile” vs “Have an invite code?” paths and the invite-code screen itself so a new user can skip onboarding by redeeming a code. Members screen accepts a highlightInviteEntry flag triggered by this path (still needs testing).
+Testing notes: Members flow works end-to-end via the copy/paste code path (no real device SMS yet). Haven’t yet exercised the onboarding “enter invite code” screen or real-device linking.

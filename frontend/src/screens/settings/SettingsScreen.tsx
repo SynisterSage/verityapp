@@ -15,6 +15,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
 
   const accountItems: SettingsItem[] = [
     { label: 'Account', icon: 'person-outline', onPress: () => navigation.navigate('Account') },
+    { label: 'Members', icon: 'people-outline', onPress: () => navigation.navigate('Members') },
     { label: 'Notifications', icon: 'notifications-outline', onPress: () => navigation.navigate('Notifications') },
     { label: 'Security', icon: 'shield-checkmark-outline', onPress: () => navigation.navigate('Security') },
   ];

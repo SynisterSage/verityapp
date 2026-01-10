@@ -32,6 +32,9 @@ const PATHS = {
     Passcode: '/:profileId/passcode',
     Alerts: '/:profileId/alerts',
     Invites: '/:profileId/invites',
+    Members: '/:profileId/members',
+    Member: '/:profileId/members/:memberId',
+    InviteAccept: '/invites/:inviteId/accept',
   },
 } as const;
 

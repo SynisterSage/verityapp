@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import logger from 'jet-logger';
 
@@ -354,8 +355,8 @@ async function inviteMember(req: Request, res: Response) {
   const { profileId } = req.params as { profileId: string };
   const { email, role } = req.body as { email?: string; role?: string };
   const normalizedEmail = email?.trim().toLowerCase();
-  if (!profileId || !normalizedEmail) {
-    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId or email' });
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
   }
 
   const isCaretaker = await userIsCaretaker(userId, profileId);
@@ -366,11 +367,13 @@ async function inviteMember(req: Request, res: Response) {
   const memberRole =
     role && ['admin', 'editor', 'viewer'].includes(role) ? role : 'viewer';
 
-  const { data: existingUserRow, error: existingUserError } = await supabaseAdmin
-    .from('auth.users')
-    .select('id, email')
-    .eq('email', normalizedEmail)
-    .maybeSingle();
+  const { data: existingUserRow, error: existingUserError } = normalizedEmail
+    ? await supabaseAdmin
+        .from('auth.users')
+        .select('id, email')
+        .eq('email', normalizedEmail)
+        .maybeSingle()
+    : { data: null, error: null };
 
   if (existingUserError) {
     logger.err(existingUserError);
@@ -396,12 +399,13 @@ async function inviteMember(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Ok).json({ member: data, status: 'member' });
   }
 
+  const inviteEmail = normalizedEmail ?? `sms-invite-${randomUUID()}@verityprotect.sms`;
   const { data, error } = await supabaseAdmin
     .from('profile_invites')
     .upsert(
       {
         profile_id: profileId,
-        email: normalizedEmail,
+        email: inviteEmail,
         role: memberRole,
         invited_by: userId,
         status: 'pending',

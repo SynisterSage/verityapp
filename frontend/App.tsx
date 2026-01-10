@@ -1,20 +1,22 @@
 import 'react-native-gesture-handler';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Animated, StyleSheet } from 'react-native';
+import { Animated, Alert, StyleSheet } from 'react-native';
 import {
   SafeAreaProvider,
   initialWindowMetrics,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import * as Linking from 'expo-linking';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ProfileProvider, useProfile } from './src/context/ProfileContext';
+import { authorizedFetch } from './src/services/backend';
 import SignInScreen from './src/screens/auth/SignInScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
 import HomeScreen from './src/screens/dashboard/HomeScreen';
@@ -31,6 +33,8 @@ import SecurityScreen from './src/screens/settings/SecurityScreen';
 import ChangePasscodeScreen from './src/screens/settings/ChangePasscodeScreen';
 import NotificationsScreen from './src/screens/settings/NotificationsScreen';
 import AutomationScreen from './src/screens/settings/AutomationScreen';
+import EnterInviteCodeScreen from './src/screens/settings/EnterInviteCodeScreen';
+import MembersScreen from './src/screens/settings/MembersScreen';
 import CreateProfileScreen from './src/screens/onboarding/CreateProfileScreen';
 import PasscodeScreen from './src/screens/onboarding/PasscodeScreen';
 import OnboardingSafePhrasesScreen from './src/screens/onboarding/OnboardingSafePhrasesScreen';
@@ -41,46 +45,14 @@ import OnboardingTrustedContactsScreen from './src/screens/onboarding/Onboarding
 import OnboardingCallForwardingScreen from './src/screens/onboarding/OnboardingCallForwardingScreen';
 import BottomDock from './src/components/navigation/BottomDock';
 import SplashScreen from './src/components/common/SplashScreen';
-
-export type RootStackParamList = {
-  SignIn: undefined;
-  SignUp: undefined;
-  OnboardingProfile: undefined;
-  OnboardingPasscode: undefined;
-  OnboardingTrustedContacts: undefined;
-  OnboardingSafePhrases: undefined;
-  OnboardingInviteFamily: undefined;
-  OnboardingAlerts: undefined;
-  OnboardingCallForwarding: undefined;
-  OnboardingTestCall: undefined;
-  AppTabs: undefined;
-  CallDetailModal: { callId: string; compact?: boolean };
-};
-
-type TabParamList = {
-  HomeTab: undefined;
-  CallsTab: undefined;
-  AlertsTab: undefined;
-  SettingsTab: undefined;
-};
-
-type CallsStackParamList = {
-  Calls: undefined;
-  CallDetail: { callId: string };
-};
-
-type SettingsStackParamList = {
-  Settings: undefined;
-  Account: undefined;
-  Notifications: undefined;
-  Security: undefined;
-  ChangePasscode: undefined;
-  SafePhrases: undefined;
-  TrustedContacts: undefined;
-  Blocklist: undefined;
-  DataPrivacy: undefined;
-  Automation: undefined;
-};
+import OnboardingChoiceScreen from './src/screens/onboarding/OnboardingChoiceScreen';
+import OnboardingInviteCodeScreen from './src/screens/onboarding/OnboardingInviteCodeScreen';
+import {
+  RootStackParamList,
+  TabParamList,
+  CallsStackParamList,
+  SettingsStackParamList,
+} from './src/navigation/types';
 
 enableScreens(true);
 
@@ -139,8 +111,82 @@ function SettingsStackNavigator() {
       <SettingsStack.Screen name="Blocklist" component={BlocklistScreen} />
       <SettingsStack.Screen name="DataPrivacy" component={DataPrivacyScreen} />
       <SettingsStack.Screen name="Automation" component={AutomationScreen} />
+      <SettingsStack.Screen
+        name="EnterInviteCode"
+        component={EnterInviteCodeScreen}
+      />
+      <SettingsStack.Screen name="Members" component={MembersScreen} />
     </SettingsStack.Navigator>
   );
+}
+
+function parseInviteIdFromUrl(url: string) {
+  const parsed = Linking.parse(url);
+  if (!parsed.path) {
+    return null;
+  }
+  const segments = parsed.path.split('/');
+  const inviteIndex = segments.findIndex((segment) => segment === 'invite' || segment === 'invites');
+  if (inviteIndex >= 0 && segments.length > inviteIndex + 1) {
+    return segments[inviteIndex + 1];
+  }
+  return null;
+}
+
+function InviteLinkHandler() {
+  const { session } = useAuth();
+  const { refreshProfiles } = useProfile();
+  const pendingInviteRef = useRef<string | null>(null);
+
+  const acceptInvite = useCallback(
+    async (inviteId: string) => {
+      try {
+        await authorizedFetch(`/profiles/invites/${inviteId}/accept`, {
+          method: 'POST',
+        });
+        await refreshProfiles();
+        Alert.alert('Invite accepted', 'You now have access to the shared profile.');
+      } catch (err) {
+        console.error('Failed to accept invite', err);
+      }
+    },
+    [refreshProfiles]
+  );
+
+  const handleUrl = useCallback(
+    async (url: string) => {
+      const inviteId = parseInviteIdFromUrl(url);
+      if (!inviteId) {
+        return;
+      }
+      if (!session) {
+        pendingInviteRef.current = inviteId;
+        return;
+      }
+      await acceptInvite(inviteId);
+    },
+    [acceptInvite, session]
+  );
+
+  useEffect(() => {
+    const subscription = Linking.addEventListener('url', (event) => handleUrl(event.url));
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleUrl(url);
+      }
+    });
+    return () => subscription.remove();
+  }, [handleUrl]);
+
+  useEffect(() => {
+    if (session && pendingInviteRef.current) {
+      const pending = pendingInviteRef.current;
+      pendingInviteRef.current = null;
+      acceptInvite(pending);
+    }
+  }, [acceptInvite, session]);
+
+  return null;
 }
 
 function AppTabs() {
@@ -217,6 +263,11 @@ function RootNavigator() {
           !onboardingComplete ? (
             <>
               <RootStack.Screen
+                name="OnboardingChoice"
+                component={OnboardingChoiceScreen}
+                options={{ title: 'Get started' }}
+              />
+              <RootStack.Screen
                 name="OnboardingProfile"
                 component={CreateProfileScreen}
                 options={{ title: 'Create Profile' }}
@@ -255,6 +306,11 @@ function RootNavigator() {
                 name="OnboardingTestCall"
                 component={TestCallScreen}
                 options={{ title: 'Test Call' }}
+              />
+              <RootStack.Screen
+                name="OnboardingInviteCode"
+                component={OnboardingInviteCodeScreen}
+                options={{ title: 'Enter invite code' }}
               />
             </>
           ) : (
@@ -313,6 +369,7 @@ export default function App() {
   return (
     <AuthProvider>
       <ProfileProvider>
+        <InviteLinkHandler />
         <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <NavigationContainer theme={navTheme}>
