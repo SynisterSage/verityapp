@@ -124,6 +124,7 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
         <Text style={styles.signOutText}>Sign out</Text>
       </TouchableOpacity>
       </ScrollView>
+      <View style={styles.bottomMask} pointerEvents="none" />
     </SafeAreaView>
   );
 }
@@ -141,6 +142,14 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '700',
     color: '#f5f7fb',
+  },
+  bottomMask: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 120,
+    backgroundColor: '#0b111b',
   },
   subtitle: {
     marginTop: 8,

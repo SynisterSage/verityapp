@@ -9,7 +9,7 @@ import { getCallerMetadata } from '@src/services/phone';
 import { verifyPasscodeHash } from '@src/services/passcode';
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 
-const DEFAULT_GREETING = 'Hello, you have reached SafeCall.';
+const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call may be recorded for safety.';
 
 /**
  * Build an absolute URL that points back at our recording-ready endpoint.

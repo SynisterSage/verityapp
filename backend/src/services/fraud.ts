@@ -229,30 +229,30 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'gift', weight: 14, category: 'prize' },
 
   // Donations & charities
-  { phrase: 'charity donation', weight: 30, category: 'donation' },
-  { phrase: 'donate now', weight: 30, category: 'donation' },
-  { phrase: 'emergency relief', weight: 28, category: 'donation' },
-  { phrase: 'disaster fund', weight: 28, category: 'donation' },
-  { phrase: 'orphanage', weight: 26, category: 'donation' },
-  { phrase: "children's hospital", weight: 26, category: 'donation' },
-  { phrase: 'donation', weight: 26, category: 'donation' },
-  { phrase: 'charity', weight: 26, category: 'donation' },
-  { phrase: 'charity drive', weight: 26, category: 'donation' },
-  { phrase: 'relief fund', weight: 28, category: 'donation' },
-  { phrase: 'hurricane relief', weight: 28, category: 'donation' },
-  { phrase: 'earthquake relief', weight: 28, category: 'donation' },
-  { phrase: 'widows and orphans', weight: 24, category: 'donation' },
-  { phrase: 'church donation', weight: 24, category: 'donation' },
-  { phrase: 'missionary', weight: 22, category: 'donation' },
-  { phrase: 'charitable contribution', weight: 22, category: 'donation' },
-  { phrase: 'fundraiser', weight: 22, category: 'donation' },
-  { phrase: 'nonprofit', weight: 22, category: 'donation' },
-  { phrase: 'give now', weight: 22, category: 'donation' },
-  { phrase: 'pledge', weight: 18, category: 'donation' },
-  { phrase: 'sponsor', weight: 18, category: 'donation' },
-  { phrase: 'support our cause', weight: 18, category: 'donation' },
-  { phrase: 'tax deductible', weight: 16, category: 'donation' },
-  { phrase: 'organization', weight: 16, category: 'donation' },
+  { phrase: 'charity donation', weight: 38, category: 'donation' },
+  { phrase: 'donate now', weight: 38, category: 'donation' },
+  { phrase: 'donation', weight: 36, category: 'donation' },
+  { phrase: 'charity', weight: 34, category: 'donation' },
+  { phrase: 'charity drive', weight: 32, category: 'donation' },
+  { phrase: 'emergency relief', weight: 32, category: 'donation' },
+  { phrase: 'disaster fund', weight: 32, category: 'donation' },
+  { phrase: 'relief fund', weight: 32, category: 'donation' },
+  { phrase: 'hurricane relief', weight: 32, category: 'donation' },
+  { phrase: 'earthquake relief', weight: 32, category: 'donation' },
+  { phrase: 'widows and orphans', weight: 30, category: 'donation' },
+  { phrase: 'orphanage', weight: 30, category: 'donation' },
+  { phrase: "children's hospital", weight: 30, category: 'donation' },
+  { phrase: 'church donation', weight: 28, category: 'donation' },
+  { phrase: 'missionary', weight: 26, category: 'donation' },
+  { phrase: 'charitable contribution', weight: 26, category: 'donation' },
+  { phrase: 'fundraiser', weight: 26, category: 'donation' },
+  { phrase: 'nonprofit', weight: 24, category: 'donation' },
+  { phrase: 'give now', weight: 24, category: 'donation' },
+  { phrase: 'pledge', weight: 22, category: 'donation' },
+  { phrase: 'sponsor', weight: 22, category: 'donation' },
+  { phrase: 'support our cause', weight: 22, category: 'donation' },
+  { phrase: 'tax deductible', weight: 20, category: 'donation' },
+  { phrase: 'organization', weight: 18, category: 'donation' },
   { phrase: 'call back', weight: 14, category: 'donation' },
 
   // Gift cards & crypto
@@ -320,10 +320,10 @@ const COMBO_RULES = [
   { all: ['wire money', 'bank'], add: 10 },
   { all: ['social security', 'verify'], add: 12 },
   { all: ['donation', 'gift card'], add: 12 },
-  { all: ['charity', 'immediately'], add: 10 },
-  { all: ['donation', 'charity'], add: 12 },
-  { all: ['charity', 'call back'], add: 10 },
-  { all: ['donation', 'organization'], add: 10 },
+  { all: ['charity', 'immediately'], add: 14 },
+  { all: ['donation', 'charity'], add: 16 },
+  { all: ['charity', 'call back'], add: 12 },
+  { all: ['donation', 'organization'], add: 12 },
   { all: ['remote access', 'computer'], add: 10 },
   { all: ['verification code', 'bank'], add: 12 },
   { all: ['one time code', 'account'], add: 12 },
@@ -927,7 +927,7 @@ function comboBoost(text: string) {
       boost += rule.add;
     }
   }
-  return Math.min(20, boost);
+  return Math.min(30, boost);
 }
 
 function heuristicBoosts(text: string) {
@@ -961,7 +961,7 @@ function heuristicBoosts(text: string) {
   if (impersonationHits >= 1) boost += 8;
   if (paymentAppHits >= 1) boost += 12;
   if (codeRequestHits >= 1) boost += 14;
-  if (text.includes('charity') || text.includes('donation')) boost += 12;
+  if (text.includes('charity') || text.includes('donation')) boost += 20;
   if (explicitScamHits >= 1) boost += 28;
   if (paymentRequestHits >= 1) boost += 18;
   if (hardBlockHits >= 1) boost += 30;
