@@ -139,7 +139,14 @@ async function listMembers(req: Request, res: Response) {
       return profileNames.get(userId) ?? null;
     }
     const fallback = profileNames.get(userId);
-    const metaName = entry.user_metadata?.full_name;
+    const fullName = entry.user_metadata?.full_name;
+    const firstLast =
+      [entry.user_metadata?.first_name, entry.user_metadata?.last_name]
+        .filter(Boolean)
+        .map((value) => value.trim())
+        .join(' ')
+        .trim() || undefined;
+    const metaName = fullName ?? firstLast;
     const email = entry.email;
     return (
       formatName(fallback ?? metaName ?? email) ??

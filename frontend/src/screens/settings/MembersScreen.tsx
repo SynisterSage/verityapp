@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  Animated,
   Dimensions,
   Linking,
   ScrollView,
@@ -45,6 +46,10 @@ type Invite = {
 };
 
 const avatarColors = ['#4c7dff', '#6e60f8', '#00c2ff', '#47d6a5'];
+const ROLE_DISPLAY_NAMES: Record<MemberRole, string> = {
+  editor: 'Family',
+  admin: 'Caretaker',
+};
 const MENU_WIDTH = 140;
 const MENU_HEIGHT = 90;
 
@@ -87,6 +92,9 @@ export default function MembersScreen() {
     height: number;
   } | null>(null);
   const [menuMember, setMenuMember] = useState<Member | null>(null);
+  const shimmer = useRef(new Animated.Value(0.6)).current;
+  const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `member-skeleton-${i}`), []);
+  const showMembersSkeleton = loadingMembers && members.length === 0;
   const closeMemberMenu = useCallback(() => {
     setActiveMemberMenuId(null);
     setMenuAnchor(null);
@@ -193,6 +201,17 @@ export default function MembersScreen() {
     });
     return unsubscribe;
   }, [navigation, closeMemberMenu]);
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(shimmer, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(shimmer, { toValue: 0.6, duration: 800, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [shimmer]);
 
   const windowWidth = Dimensions.get('window').width;
   const windowHeight = Dimensions.get('window').height;
@@ -356,8 +375,16 @@ export default function MembersScreen() {
           Every trusted caretaker with access to this profile.
         </Text>
         <View style={styles.membersList}>
-          {loadingMembers ? (
-            <Text style={styles.placeholder}>Loading…</Text>
+          {showMembersSkeleton ? (
+            skeletonRows.map((key) => (
+              <Animated.View key={key} style={[styles.memberRow, styles.memberRowSkeleton, { opacity: shimmer }]}>
+                <View style={styles.skeletonAvatar} />
+                <View style={styles.skeletonContent}>
+                  <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                  <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                </View>
+              </Animated.View>
+            ))
           ) : members.length === 0 ? (
             <Text style={styles.placeholder}>No one else is added yet.</Text>
           ) : (
@@ -367,7 +394,9 @@ export default function MembersScreen() {
                 metadataName ??
                 member.user?.email ??
                 member.role.charAt(0).toUpperCase() + member.role.slice(1);
-              const roleLabel = member.is_caretaker ? 'Owner' : member.role;
+              const roleLabel = member.is_caretaker
+                ? 'Owner'
+                : ROLE_DISPLAY_NAMES[member.role] ?? member.role.charAt(0).toUpperCase() + member.role.slice(1);
               const displayName =
                 member.is_caretaker && activeProfile
                   ? `${activeProfile.first_name} ${activeProfile.last_name}`
@@ -417,35 +446,35 @@ export default function MembersScreen() {
         </View>
       </View>
 
-      <View style={styles.sectionCard}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Invite someone</Text>
-          <Text style={styles.sectionDescription}>
-            Tap Create invite to open Messages with a ready-to-send Verity Protect link.
-          </Text>
-        </View>
-        <View style={styles.roleRow}>
-          {(['editor', 'admin'] as MemberRole[]).map((role) => (
-            <TouchableOpacity
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Invite someone</Text>
+            <Text style={[styles.sectionDescription, styles.sectionDescriptionSpacing]}>
+              Tap Create invite to open Messages with a ready-to-send Verity Protect link.
+            </Text>
+          </View>
+          <View style={styles.roleRow}>
+            {(['editor', 'admin'] as MemberRole[]).map((role) => (
+              <TouchableOpacity
               key={role}
               style={[styles.rolePill, inviteRole === role && styles.rolePillActive]}
               onPress={() => setInviteRole(role)}
             >
-              <Text
-                style={[
-                  styles.roleLabel,
-                  inviteRole === role ? styles.roleLabelActive : undefined,
-                ]}
-              >
-                {role.charAt(0).toUpperCase() + role.slice(1)}
-              </Text>
+                <Text
+                  style={[
+                    styles.roleLabel,
+                    inviteRole === role ? styles.roleLabelActive : undefined,
+                  ]}
+                >
+                  {ROLE_DISPLAY_NAMES[role] ?? role}
+                </Text>
             </TouchableOpacity>
           ))}
         </View>
         {inviteError ? <Text style={styles.error}>{inviteError}</Text> : null}
         {inviteMessage ? <Text style={styles.hint}>{inviteMessage}</Text> : null}
         <TouchableOpacity
-          style={[styles.button, isInviting && styles.disabledButton]}
+          style={[styles.button, styles.inviteButton, isInviting && styles.disabledButton]}
           onPress={handleCreateInvite}
           disabled={isInviting}
         >
@@ -642,6 +671,9 @@ const styles = StyleSheet.create({
     borderBottomColor: '#181f2e',
     gap: 12,
   },
+  memberRowSkeleton: {
+    borderBottomColor: '#1f2735',
+  },
   memberAvatar: {
     width: 38,
     height: 38,
@@ -652,6 +684,28 @@ const styles = StyleSheet.create({
   memberAvatarText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  skeletonAvatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#1f2735',
+  },
+  skeletonContent: {
+    flex: 1,
+    justifyContent: 'center',
+    gap: 6,
+  },
+  skeletonLine: {
+    height: 10,
+    borderRadius: 6,
+    backgroundColor: '#1f2735',
+  },
+  skeletonLineShort: {
+    width: '65%',
+  },
+  skeletonLineTiny: {
+    width: '40%',
   },
   memberContent: {
     flex: 1,
@@ -753,6 +807,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
+  },
+  inviteButton: {
+    marginTop: 12,
   },
   disabledButton: {
     opacity: 0.6,
