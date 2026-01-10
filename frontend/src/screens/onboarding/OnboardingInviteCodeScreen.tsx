@@ -47,7 +47,6 @@ export default function OnboardingInviteCodeScreen() {
       });
       await refreshProfiles();
       setOnboardingComplete(true);
-      navigation.navigate('AppTabs');
     } catch (err: any) {
       setMessage(err?.message || 'Unable to redeem invite code.');
     } finally {

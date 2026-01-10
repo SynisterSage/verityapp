@@ -72,7 +72,6 @@ export default function MembersScreen() {
   const [loadingInvites, setLoadingInvites] = useState(false);
   const [inviteRole, setInviteRole] = useState<MemberRole>('editor');
   const [inviteError, setInviteError] = useState('');
-  const [inviteMessage, setInviteMessage] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const highlightInviteEntry = route.params?.highlightInviteEntry ?? false;
   const { session } = useAuth();
@@ -166,7 +165,6 @@ export default function MembersScreen() {
     fetchMembers();
     fetchInvites();
     setInviteError('');
-    setInviteMessage('');
   }, [activeProfile, fetchMembers, fetchInvites]);
 
   const shareInvite = async (invite: Invite) => {
@@ -323,7 +321,6 @@ export default function MembersScreen() {
       });
       const createdInvite: Invite | undefined = data?.invite;
       setInviteRole('editor');
-      setInviteMessage('Invite created—Messages will open automatically.');
       await fetchInvites();
       if (createdInvite) {
         shareViaSMS(createdInvite);
@@ -478,7 +475,6 @@ export default function MembersScreen() {
             ))}
           </View>
           {inviteError ? <Text style={styles.error}>{inviteError}</Text> : null}
-          {inviteMessage ? <Text style={styles.hint}>{inviteMessage}</Text> : null}
           <TouchableOpacity
             style={[styles.button, styles.inviteButton, isInviting && styles.disabledButton]}
             onPress={handleCreateInvite}
@@ -567,9 +563,6 @@ export default function MembersScreen() {
                 >
                   Set as {optionLabel}
                 </Text>
-                {updatingMemberId === menuMember.id && (
-                  <ActivityIndicator size="small" color="#7d9dff" />
-                )}
               </TouchableOpacity>
             );
           })}
@@ -584,9 +577,6 @@ export default function MembersScreen() {
             disabled={removingMemberId === menuMember.id}
           >
             <Text style={styles.menuItemText}>Remove member</Text>
-            {removingMemberId === menuMember.id && (
-              <ActivityIndicator size="small" color="#ff6d6d" />
-            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -647,7 +637,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sectionDescriptionSpacing: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   headerDescription: {
     marginBottom: 10,
@@ -814,7 +804,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   roleRowSpacing: {
-    marginTop: 12,
+    marginTop: 6,
   },
   rolePill: {
     flex: 1,

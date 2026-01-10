@@ -1,8 +1,29 @@
 import { Request, Response } from 'express';
+import fetch from 'node-fetch';
 import logger from 'jet-logger';
 
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import supabaseAdmin from '@src/services/supabase';
+
+const SUPABASE_ADMIN_URL = process.env.SUPABASE_URL ?? '';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
+
+async function revokeUserSessions(userId: string) {
+  if (!SUPABASE_ADMIN_URL || !SUPABASE_SERVICE_KEY) {
+    return;
+  }
+  try {
+    await fetch(`${SUPABASE_ADMIN_URL}/auth/v1/admin/users/${userId}/sessions`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (sessionError) {
+    logger.warn('Failed to revoke member sessions', sessionError);
+  }
+}
 
 const VALID_ROLES = ['admin', 'editor'] as const;
 
@@ -348,17 +369,22 @@ async function removeMember(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to remove member' });
   }
 
-  await (supabaseAdmin.auth.admin as any).deleteUserSessions(member.user_id).catch((sessionError: any) => {
-    logger.warn('Failed to revoke member sessions', sessionError);
-  });
+  await revokeUserSessions(member.user_id);
 
   const { data: userRow, error: userError } = await supabaseAdmin.auth.admin.getUserById(member.user_id);
+  await supabaseAdmin
+    .from('profile_invites')
+    .update({ status: 'revoked' })
+    .eq('profile_id', member.profile_id)
+    .eq('accepted_by', member.user_id)
+    .eq('status', 'accepted');
   if (!userError && userRow?.user?.email) {
     await supabaseAdmin
       .from('profile_invites')
       .update({ status: 'revoked' })
       .eq('profile_id', member.profile_id)
-      .eq('email', userRow.user.email);
+      .eq('email', userRow.user.email)
+      .eq('status', 'accepted');
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ removed: member });
@@ -424,9 +450,26 @@ async function acceptInvite(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to accept invite' });
   }
 
+  if (displayName) {
+    await supabaseAdmin.auth.admin
+      .updateUserById(userId, {
+        user_metadata: {
+          ...(userRow?.user?.user_metadata ?? {}),
+          full_name: displayName,
+        },
+      })
+      .catch((err) => {
+        logger.warn('Unable to update user metadata with display name', err);
+      });
+  }
+
   await supabaseAdmin
     .from('profile_invites')
-    .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+    .update({
+      status: 'accepted',
+      accepted_at: new Date().toISOString(),
+      accepted_by: userId,
+    })
     .eq('id', inviteId);
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ member });
