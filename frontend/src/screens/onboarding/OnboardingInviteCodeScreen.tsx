@@ -36,13 +36,7 @@ export default function OnboardingInviteCodeScreen() {
       await authorizedFetch(`/profiles/invites/${code.trim()}/accept`, { method: 'POST' });
       await refreshProfiles();
       setOnboardingComplete(true);
-      navigation.navigate('AppTabs', {
-        screen: 'SettingsTab',
-        params: {
-          screen: 'Members',
-          params: { highlightInviteEntry: true },
-        },
-      });
+      navigation.navigate('AppTabs');
     } catch (err: any) {
       setMessage(err?.message || 'Unable to redeem invite code.');
     } finally {
