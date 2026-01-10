@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Alert,
   Keyboard,
   StyleSheet,
   Text,
@@ -21,6 +20,8 @@ export default function OnboardingInviteCodeScreen() {
   const insets = useSafeAreaInsets();
   const { refreshProfiles, setOnboardingComplete } = useProfile();
   const [code, setCode] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -29,11 +30,21 @@ export default function OnboardingInviteCodeScreen() {
       setMessage('Enter the invite code.');
       return;
     }
+    if (!firstName.trim() || !lastName.trim()) {
+      setMessage('Add your first and last name.');
+      return;
+    }
     Keyboard.dismiss();
     setIsSubmitting(true);
     setMessage('');
     try {
-      await authorizedFetch(`/profiles/invites/${code.trim()}/accept`, { method: 'POST' });
+      await authorizedFetch(`/profiles/invites/${code.trim()}/accept`, {
+        method: 'POST',
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+        }),
+      });
       await refreshProfiles();
       setOnboardingComplete(true);
       navigation.navigate('AppTabs');
@@ -49,6 +60,23 @@ export default function OnboardingInviteCodeScreen() {
       <View style={styles.card}>
         <Text style={styles.title}>Have an invite code?</Text>
         <Text style={styles.subtitle}>Paste the code and join the shared profile instantly.</Text>
+        <Text style={styles.label}>Your name</Text>
+        <TextInput
+          style={styles.input}
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholder="First name"
+          placeholderTextColor="#9aa3b2"
+          autoCapitalize="words"
+        />
+        <TextInput
+          style={styles.input}
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Last name"
+          placeholderTextColor="#9aa3b2"
+          autoCapitalize="words"
+        />
         <TextInput
           style={styles.input}
           placeholder="Invite code"
@@ -91,6 +119,11 @@ const styles = StyleSheet.create({
   subtitle: {
     color: '#b5c0d3',
     fontSize: 14,
+  },
+  label: {
+    color: '#8aa0c6',
+    fontSize: 12,
+    letterSpacing: 0.6,
   },
   input: {
     borderWidth: 1,

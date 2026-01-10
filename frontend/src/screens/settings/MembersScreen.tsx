@@ -364,102 +364,108 @@ export default function MembersScreen() {
           <Text style={styles.headerTitle}>Account members</Text>
         </View>
 
-      <View style={[styles.sectionCard, highlightInviteEntry && styles.highlightCard]}>
-        <View style={styles.sectionHeaderRow}>
-          <View style={styles.headerLabel}>
-            <Ionicons name="people-outline" size={18} color="#7d9dff" />
-            <Text style={styles.sectionTitle}>Current members</Text>
+        <View style={[styles.sectionCard, highlightInviteEntry && styles.highlightCard]}>
+          <View style={styles.sectionHeaderRow}>
+            <View style={styles.headerLabel}>
+              <Ionicons name="people-outline" size={18} color="#7d9dff" />
+              <Text style={styles.sectionTitle}>Current members</Text>
+            </View>
           </View>
-        </View>
-        <Text style={[styles.sectionDescription, styles.sectionDescriptionSpacing]}>
-          Every trusted caretaker with access to this profile.
-        </Text>
-        <View style={styles.membersList}>
-          {showMembersSkeleton ? (
-            skeletonRows.map((key) => (
-              <Animated.View key={key} style={[styles.memberRow, styles.memberRowSkeleton, { opacity: shimmer }]}>
-                <View style={styles.skeletonAvatar} />
-                <View style={styles.skeletonContent}>
-                  <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
-                  <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
-                </View>
-              </Animated.View>
-            ))
-          ) : members.length === 0 ? (
-            <Text style={styles.placeholder}>No one else is added yet.</Text>
-          ) : (
-            members.map((member, index) => {
-              const metadataName = member.display_name || member.user?.user_metadata?.full_name;
-              const name =
-                metadataName ??
-                member.user?.email ??
-                member.role.charAt(0).toUpperCase() + member.role.slice(1);
-              const roleLabel = member.is_caretaker
-                ? 'Owner'
-                : ROLE_DISPLAY_NAMES[member.role] ?? member.role.charAt(0).toUpperCase() + member.role.slice(1);
-              const displayName =
-                member.is_caretaker && activeProfile
-                  ? `${activeProfile.first_name} ${activeProfile.last_name}`
-                  : name;
-              const avatarColor = avatarColors[index % avatarColors.length];
-              return (
-                <View
-                  key={member.id + member.user_id}
-                  ref={(element) => {
-                    if (element) {
-                      rowRefs.current.set(member.id, element);
-                    } else {
-                      rowRefs.current.delete(member.id);
-                    }
-                  }}
-                  collapsable={false}
+          <Text
+            style={[
+              styles.sectionDescription,
+              styles.sectionDescriptionSpacing,
+              styles.headerDescription,
+            ]}
+          >
+            Every trusted member with access to this profile.
+          </Text>
+          <View style={styles.membersList}>
+            {showMembersSkeleton ? (
+              skeletonRows.map((key) => (
+                <Animated.View
+                  key={key}
+                  style={[styles.memberRow, styles.memberRowSkeleton, { opacity: shimmer }]}
                 >
-                  <View style={styles.memberItem}>
-                    <View style={styles.memberRow}>
-                      <View style={[styles.memberAvatar, { backgroundColor: avatarColor }]}>
-                        <Text style={styles.memberAvatarText}>
-                          {displayName.charAt(0).toUpperCase()}
-                        </Text>
+                  <View style={styles.skeletonAvatar} />
+                  <View style={styles.skeletonContent}>
+                    <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                    <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                  </View>
+                </Animated.View>
+              ))
+            ) : members.length === 0 ? (
+              <Text style={styles.placeholder}>No one else is added yet.</Text>
+            ) : (
+              members.map((member, index) => {
+                const safeName =
+                  (member.is_caretaker && activeProfile
+                    ? `${activeProfile.first_name} ${activeProfile.last_name}`
+                    : resolveDisplayName(member)) ?? 'Member';
+                const roleLabel = member.is_caretaker
+                  ? 'Owner'
+                  : ROLE_DISPLAY_NAMES[member.role] ??
+                    member.role.charAt(0).toUpperCase() + member.role.slice(1);
+                const avatarColor = avatarColors[index % avatarColors.length];
+                const isCurrentUser = sessionUserId === member.user_id;
+                return (
+                  <View
+                    key={`${member.id}-${member.user_id}`}
+                    ref={(element) => {
+                      if (element) {
+                        rowRefs.current.set(member.id, element);
+                      } else {
+                        rowRefs.current.delete(member.id);
+                      }
+                    }}
+                    collapsable={false}
+                  >
+                    <View style={styles.memberItem}>
+                      <View style={styles.memberRow}>
+                        <View style={[styles.memberAvatar, { backgroundColor: avatarColor }]}>
+                          <Text style={styles.memberAvatarText}>
+                            {safeName.charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.memberContent}>
+                          <View style={styles.memberNameRow}>
+                            <Text style={styles.memberName}>{safeName}</Text>
+                            {isCurrentUser && <Text style={styles.youBadge}>You</Text>}
+                          </View>
+                          <Text style={styles.memberRole}>{roleLabel}</Text>
+                        </View>
+                        {canManageMember(member) && (
+                          <TouchableOpacity
+                            style={styles.menuButton}
+                            onPress={() => toggleMemberMenu(member)}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="ellipsis-vertical" size={18} color="#7d9dff" />
+                          </TouchableOpacity>
+                        )}
                       </View>
-                      <View style={styles.memberContent}>
-                        <Text style={styles.memberName}>
-                          {displayName}
-                          {member.user_id === sessionUserId ? ' (You)' : ''}
-                        </Text>
-                        <Text style={styles.memberRole}>{roleLabel}</Text>
-                      </View>
-                      {canManageMember(member) && (
-                        <TouchableOpacity
-                          style={styles.menuButton}
-                          onPress={() => toggleMemberMenu(member)}
-                          activeOpacity={0.7}
-                        >
-                          <Ionicons name="ellipsis-vertical" size={18} color="#7d9dff" />
-                        </TouchableOpacity>
-                      )}
                     </View>
                   </View>
-                </View>
-              );
-            })
-          )}
+                );
+              })
+            )}
+          </View>
         </View>
-      </View>
 
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Invite someone</Text>
             <Text style={[styles.sectionDescription, styles.sectionDescriptionSpacing]}>
-              Tap Create invite to open Messages with a ready-to-send Verity Protect link.
+              Tap Create Invite to send a Verity Protect link.
             </Text>
           </View>
-          <View style={styles.roleRow}>
+          <View style={[styles.roleRow, styles.roleRowSpacing]}>
             {(['editor', 'admin'] as MemberRole[]).map((role) => (
               <TouchableOpacity
-              key={role}
-              style={[styles.rolePill, inviteRole === role && styles.rolePillActive]}
-              onPress={() => setInviteRole(role)}
-            >
+                key={role}
+                style={[styles.rolePill, inviteRole === role && styles.rolePillActive]}
+                onPress={() => setInviteRole(role)}
+              >
                 <Text
                   style={[
                     styles.roleLabel,
@@ -468,19 +474,19 @@ export default function MembersScreen() {
                 >
                   {ROLE_DISPLAY_NAMES[role] ?? role}
                 </Text>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            ))}
+          </View>
+          {inviteError ? <Text style={styles.error}>{inviteError}</Text> : null}
+          {inviteMessage ? <Text style={styles.hint}>{inviteMessage}</Text> : null}
+          <TouchableOpacity
+            style={[styles.button, styles.inviteButton, isInviting && styles.disabledButton]}
+            onPress={handleCreateInvite}
+            disabled={isInviting}
+          >
+            <Text style={styles.buttonText}>{isInviting ? 'Creating…' : 'Create invite'}</Text>
+          </TouchableOpacity>
         </View>
-        {inviteError ? <Text style={styles.error}>{inviteError}</Text> : null}
-        {inviteMessage ? <Text style={styles.hint}>{inviteMessage}</Text> : null}
-        <TouchableOpacity
-          style={[styles.button, styles.inviteButton, isInviting && styles.disabledButton]}
-          onPress={handleCreateInvite}
-          disabled={isInviting}
-        >
-          <Text style={styles.buttonText}>{isInviting ? 'Creating…' : 'Create invite'}</Text>
-        </TouchableOpacity>
-      </View>
 
       <View style={styles.sectionCard}>
         <View style={styles.sectionHeader}>
@@ -540,29 +546,33 @@ export default function MembersScreen() {
             { top: menuPosition.top, left: menuPosition.left },
           ]}
         >
-          {(['editor'] as MemberRole[]).map((option) => (
-            <TouchableOpacity
-              key={option}
-              style={[
-                styles.menuItem,
-                menuMember.role === option && styles.menuItemDisabled,
-              ]}
-              onPress={() => handleChangeMemberRole(menuMember, option)}
-              disabled={menuMember.role === option || updatingMemberId === menuMember.id}
-            >
-              <Text
+          {(['editor'] as MemberRole[]).map((option) => {
+            const optionLabel =
+              ROLE_DISPLAY_NAMES[option] ?? option.charAt(0).toUpperCase() + option.slice(1);
+            return (
+              <TouchableOpacity
+                key={option}
                 style={[
-                  styles.menuItemText,
-                  menuMember.role === option && styles.menuItemTextDisabled,
+                  styles.menuItem,
+                  menuMember.role === option && styles.menuItemDisabled,
                 ]}
+                onPress={() => handleChangeMemberRole(menuMember, option)}
+                disabled={menuMember.role === option || updatingMemberId === menuMember.id}
               >
-                Set as {option.charAt(0).toUpperCase() + option.slice(1)}
-              </Text>
-              {updatingMemberId === menuMember.id && (
-                <ActivityIndicator size="small" color="#7d9dff" />
-              )}
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.menuItemText,
+                    menuMember.role === option && styles.menuItemTextDisabled,
+                  ]}
+                >
+                  Set as {optionLabel}
+                </Text>
+                {updatingMemberId === menuMember.id && (
+                  <ActivityIndicator size="small" color="#7d9dff" />
+                )}
+              </TouchableOpacity>
+            );
+          })}
           <View style={styles.menuDivider} />
           <TouchableOpacity
             style={styles.menuItem}
@@ -637,7 +647,10 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   sectionDescriptionSpacing: {
-    marginBottom: 12,
+    marginBottom: 8,
+  },
+  headerDescription: {
+    marginBottom: 10,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
@@ -670,6 +683,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#181f2e',
     gap: 12,
+  },
+  memberNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  youBadge: {
+    backgroundColor: '#131c30',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#1f2b46',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    color: '#7d9dff',
+    fontSize: 10,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   memberRowSkeleton: {
     borderBottomColor: '#1f2735',
@@ -728,8 +759,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   memberMenu: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     backgroundColor: '#0f1523',
     borderRadius: 14,
     borderColor: '#1f2735',
@@ -739,13 +770,13 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 10 },
     elevation: 8,
-    marginVertical: 30,
+    zIndex: 2,
   },
   memberMenuPortal: {
     position: 'absolute',
     minWidth: MENU_WIDTH,
-    width: MENU_WIDTH,
-    height: MENU_HEIGHT,
+    maxWidth: MENU_WIDTH,
+    zIndex: 2,
   },
   menuItem: {
     flexDirection: 'row',
@@ -781,6 +812,9 @@ const styles = StyleSheet.create({
   roleRow: {
     flexDirection: 'row',
     gap: 6,
+  },
+  roleRowSpacing: {
+    marginTop: 12,
   },
   rolePill: {
     flex: 1,
@@ -846,6 +880,7 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
+    zIndex: 1,
   },
   invitesList: {
     gap: 10,

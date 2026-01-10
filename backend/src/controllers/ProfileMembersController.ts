@@ -20,6 +20,26 @@ function formatName(value?: string | null) {
     .join(' ');
 }
 
+function buildDisplayName({
+  fallbackName,
+  email,
+  metadata,
+}: {
+  fallbackName?: string | null;
+  email?: string | null;
+  metadata?: { full_name?: string; first_name?: string; last_name?: string } | null;
+}) {
+  const metaFullName = metadata?.full_name;
+  const firstLast = [metadata?.first_name, metadata?.last_name]
+    .filter(Boolean)
+    .map((segment) => segment?.trim())
+    .join(' ')
+    .trim();
+  const metaName = metaFullName ?? (firstLast || undefined);
+  const candidate = formatName(fallbackName ?? metaName ?? email) ?? metaName ?? fallbackName ?? email ?? null;
+  return candidate;
+}
+
 async function getAuthenticatedUserId(req: Request) {
   const authHeader = req.header('authorization') ?? '';
   const token = authHeader.toLowerCase().startsWith('bearer ')
@@ -102,7 +122,7 @@ async function listMembers(req: Request, res: Response) {
 
   const { data: members } = await supabaseAdmin
     .from('profile_members')
-    .select('id, profile_id, user_id, role, created_at')
+    .select('id, profile_id, user_id, role, created_at, display_name')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: true });
 
@@ -139,21 +159,14 @@ async function listMembers(req: Request, res: Response) {
       return profileNames.get(userId) ?? null;
     }
     const fallback = profileNames.get(userId);
-    const fullName = entry.user_metadata?.full_name;
-    const firstLast =
-      [entry.user_metadata?.first_name, entry.user_metadata?.last_name]
-        .filter(Boolean)
-        .map((value) => value.trim())
-        .join(' ')
-        .trim() || undefined;
-    const metaName = fullName ?? firstLast;
+    const metadata = entry.user_metadata;
     const email = entry.email;
     return (
-      formatName(fallback ?? metaName ?? email) ??
-      metaName ??
-      fallback ??
-      email ??
-      null
+      buildDisplayName({
+        fallbackName: fallback,
+        email,
+        metadata,
+      }) ?? null
     );
   };
 
@@ -171,6 +184,8 @@ async function listMembers(req: Request, res: Response) {
     };
   };
 
+  const pendingNameUpdates: Array<{ id: string; name: string }> = [];
+
   const formattedMembers = [
     {
       id: `caretaker-${profile.caretaker_id}`,
@@ -182,13 +197,28 @@ async function listMembers(req: Request, res: Response) {
       display_name: resolveName(profile.caretaker_id, userMap.get(profile.caretaker_id)),
       user: hydrateUser(profile.caretaker_id, userMap.get(profile.caretaker_id) ?? null),
     },
-    ...(members ?? []).map((member) => ({
-      ...member,
-      is_caretaker: false,
-      display_name: resolveName(member.user_id, userMap.get(member.user_id)),
-      user: hydrateUser(member.user_id, userMap.get(member.user_id) ?? null),
-    })),
+    ...(members ?? []).map((member) => {
+      const entry = userMap.get(member.user_id);
+      const resolvedName = resolveName(member.user_id, entry);
+      if (!member.display_name && resolvedName) {
+        pendingNameUpdates.push({ id: member.id, name: resolvedName });
+      }
+      return {
+        ...member,
+        is_caretaker: false,
+        display_name: member.display_name ?? resolvedName,
+        user: hydrateUser(member.user_id, entry ?? null),
+      };
+    }),
   ];
+
+  if (pendingNameUpdates.length > 0) {
+    await Promise.all(
+      pendingNameUpdates.map((update) =>
+        supabaseAdmin.from('profile_members').update({ display_name: update.name }).eq('id', update.id)
+      )
+    );
+  }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ members: formattedMembers });
 }
@@ -322,6 +352,15 @@ async function removeMember(req: Request, res: Response) {
     logger.warn('Failed to revoke member sessions', sessionError);
   });
 
+  const { data: userRow, error: userError } = await supabaseAdmin.auth.admin.getUserById(member.user_id);
+  if (!userError && userRow?.user?.email) {
+    await supabaseAdmin
+      .from('profile_invites')
+      .update({ status: 'revoked' })
+      .eq('profile_id', member.profile_id)
+      .eq('email', userRow.user.email);
+  }
+
   return res.status(HTTP_STATUS_CODES.Ok).json({ removed: member });
 }
 
@@ -354,6 +393,18 @@ async function acceptInvite(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Invite not found or already handled' });
   }
 
+  const { firstName, lastName } = (req.body ?? {}) as { firstName?: string; lastName?: string };
+  const requestedName = [firstName, lastName]
+    .filter(Boolean)
+    .map((segment) => segment?.trim())
+    .join(' ')
+    .trim();
+  const { data: userRow } = await supabaseAdmin.auth.admin.getUserById(userId);
+  const displayName = buildDisplayName({
+    fallbackName: requestedName || null,
+    email: userRow?.user?.email ?? null,
+    metadata: userRow?.user?.user_metadata ?? null,
+  });
   const { data: member, error: memberError } = await supabaseAdmin
     .from('profile_members')
     .upsert(
@@ -361,10 +412,11 @@ async function acceptInvite(req: Request, res: Response) {
         profile_id: invite.profile_id,
         user_id: userId,
         role: invite.role,
+        display_name: displayName,
       },
       { onConflict: 'profile_id,user_id' }
     )
-    .select('id, profile_id, user_id, role, created_at')
+    .select('id, profile_id, user_id, role, created_at, display_name')
     .maybeSingle();
 
   if (memberError || !member) {

@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-  Alert,
   Keyboard,
   StyleSheet,
   Text,
@@ -19,6 +18,8 @@ export default function EnterInviteCodeScreen() {
   const insets = useSafeAreaInsets();
   const { refreshProfiles } = useProfile();
   const [code, setCode] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -27,12 +28,20 @@ export default function EnterInviteCodeScreen() {
       setMessage('Enter the code you received.');
       return;
     }
+    if (!firstName.trim() || !lastName.trim()) {
+      setMessage('Add your first and last name.');
+      return;
+    }
     Keyboard.dismiss();
     setIsSubmitting(true);
     setMessage('');
     try {
       await authorizedFetch(`/profiles/invites/${code.trim()}/accept`, {
         method: 'POST',
+        body: JSON.stringify({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+        }),
       });
       await refreshProfiles();
       setMessage('Invite accepted! You can now see the shared profile.');
@@ -64,6 +73,23 @@ export default function EnterInviteCodeScreen() {
           autoCapitalize="none"
           placeholder="XXXX-XXXX-XXXX"
           placeholderTextColor="#8aa0c6"
+        />
+        <Text style={styles.label}>Your name</Text>
+        <TextInput
+          style={styles.input}
+          value={firstName}
+          onChangeText={setFirstName}
+          placeholder="First name"
+          placeholderTextColor="#8aa0c6"
+          autoCapitalize="words"
+        />
+        <TextInput
+          style={styles.input}
+          value={lastName}
+          onChangeText={setLastName}
+          placeholder="Last name"
+          placeholderTextColor="#8aa0c6"
+          autoCapitalize="words"
         />
         {message ? <Text style={styles.message}>{message}</Text> : null}
         <TouchableOpacity
