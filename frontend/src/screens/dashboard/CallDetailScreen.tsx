@@ -93,7 +93,7 @@ export default function CallDetailScreen({
   const navigation = useNavigation();
   const { callId, compact } = route.params;
   const isCompactModal = compact ?? false;
-  const { activeProfile } = useProfile();
+  const { activeProfile, canManageProfile } = useProfile();
   const [callRow, setCallRow] = useState<CallRow | null>(null);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -484,36 +484,38 @@ export default function CallDetailScreen({
           ) : null}
         </View>
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={[
-              styles.secondaryButton,
-              callRow.feedback_status === 'marked_safe' && styles.buttonDisabled,
-            ]}
-            onPress={() => markFeedback('marked_safe')}
-            activeOpacity={0.85}
-            disabled={callRow.feedback_status === 'marked_safe'}
-          >
-            <Ionicons name="checkmark-circle-outline" size={18} color="#cfe0ff" />
-            <Text style={styles.secondaryText}>
-              {callRow.feedback_status === 'marked_safe' ? 'Marked Safe' : 'Mark Safe'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.dangerButton,
-              callRow.feedback_status === 'marked_fraud' && styles.buttonDisabled,
-            ]}
-            onPress={() => markFeedback('marked_fraud')}
-            activeOpacity={0.85}
-            disabled={callRow.feedback_status === 'marked_fraud'}
-          >
-            <Ionicons name="warning-outline" size={18} color="#ffe3e3" />
-            <Text style={styles.dangerText}>
-              {callRow.feedback_status === 'marked_fraud' ? 'Marked Fraud' : 'Mark Fraud'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {canManageProfile && (
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[
+                styles.secondaryButton,
+                callRow.feedback_status === 'marked_safe' && styles.buttonDisabled,
+              ]}
+              onPress={() => markFeedback('marked_safe')}
+              activeOpacity={0.85}
+              disabled={callRow.feedback_status === 'marked_safe'}
+            >
+              <Ionicons name="checkmark-circle-outline" size={18} color="#cfe0ff" />
+              <Text style={styles.secondaryText}>
+                {callRow.feedback_status === 'marked_safe' ? 'Marked Safe' : 'Mark Safe'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.dangerButton,
+                callRow.feedback_status === 'marked_fraud' && styles.buttonDisabled,
+              ]}
+              onPress={() => markFeedback('marked_fraud')}
+              activeOpacity={0.85}
+              disabled={callRow.feedback_status === 'marked_fraud'}
+            >
+              <Ionicons name="warning-outline" size={18} color="#ffe3e3" />
+              <Text style={styles.dangerText}>
+                {callRow.feedback_status === 'marked_fraud' ? 'Marked Fraud' : 'Mark Fraud'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );

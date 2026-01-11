@@ -211,7 +211,9 @@ async function updateAlertPrefs(req: Request, res: Response) {
   }
   const { profileId } = req.params as { profileId: string };
 
-  const allowed = await userIsCaretaker(userId, profileId);
+  const isCaretaker = await userIsCaretaker(userId, profileId);
+  const isAdmin = await userHasRole(userId, profileId, 'admin');
+  const allowed = isCaretaker || isAdmin;
   if (!allowed) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
@@ -291,7 +293,9 @@ async function updateProfile(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
   }
 
-  const allowed = await userIsCaretaker(userId, profileId);
+  const isCaretaker = await userIsCaretaker(userId, profileId);
+  const isAdmin = await userHasRole(userId, profileId, 'admin');
+  const allowed = isCaretaker || isAdmin;
   if (!allowed) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
@@ -329,6 +333,43 @@ async function updateProfile(req: Request, res: Response) {
   if (error || !data) {
     logger.err(error ?? new Error('Failed to update profile'));
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update profile' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({
+    profile: {
+      ...data,
+      has_passcode: Boolean(data.passcode_hash),
+      passcode_hash: undefined,
+    },
+  });
+}
+
+async function getProfile(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+  const { profileId } = req.params as { profileId: string };
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const allowed = await userCanAccessProfile(userId, profileId);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select(
+      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+    )
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (error || !data) {
+    logger.err(error ?? new Error('Failed to fetch profile'));
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to fetch profile' });
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({
@@ -549,6 +590,7 @@ export default {
   setPasscode,
   updateAlertPrefs,
   updateProfile,
+  getProfile,
   deleteProfile,
   inviteMember,
   listInvites,

@@ -3,6 +3,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../../context/AuthContext';
+import { useProfile } from '../../context/ProfileContext';
 type SettingsItem = {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -12,13 +13,33 @@ type SettingsItem = {
 export default function SettingsScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
+  const { canManageProfile } = useProfile();
 
-  const accountItems: SettingsItem[] = [
-    { label: 'Account', icon: 'person-outline', onPress: () => navigation.navigate('Account') },
-    { label: 'Members', icon: 'people-outline', onPress: () => navigation.navigate('Members') },
-    { label: 'Notifications', icon: 'notifications-outline', onPress: () => navigation.navigate('Notifications') },
-    { label: 'Security', icon: 'shield-checkmark-outline', onPress: () => navigation.navigate('Security') },
-  ];
+  const accountItems: SettingsItem[] = [];
+  if (canManageProfile) {
+    accountItems.push({
+      label: 'Account',
+      icon: 'person-outline',
+      onPress: () => navigation.navigate('Account'),
+    });
+    accountItems.push({
+      label: 'Members',
+      icon: 'people-outline',
+      onPress: () => navigation.navigate('Members'),
+    });
+  }
+  accountItems.push({
+    label: 'Notifications',
+    icon: 'notifications-outline',
+    onPress: () => navigation.navigate('Notifications'),
+  });
+  if (canManageProfile) {
+    accountItems.push({
+      label: 'Security',
+      icon: 'shield-checkmark-outline',
+      onPress: () => navigation.navigate('Security'),
+    });
+  }
 
   const safetyItems: SettingsItem[] = [
     {
@@ -36,12 +57,14 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       icon: 'ban-outline',
       onPress: () => navigation.navigate('Blocklist'),
     },
-    {
+  ];
+  if (canManageProfile) {
+    safetyItems.push({
       label: 'Automation',
       icon: 'flash-outline',
       onPress: () => navigation.navigate('Automation'),
-    },
-  ];
+    });
+  }
 
   const privacyItems: SettingsItem[] = [
     {

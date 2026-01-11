@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Keyboard,
@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
 import { useAuth } from '../../context/AuthContext';
@@ -22,7 +22,7 @@ export default function AccountScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
-  const { activeProfile, refreshProfiles } = useProfile();
+  const { activeProfile, setActiveProfile, canManageProfile, refreshProfiles } = useProfile();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -36,6 +36,8 @@ export default function AccountScreen() {
     setPhoneNumber(activeProfile.phone_number ?? '');
   }, [activeProfile]);
 
+  const isReadOnly = !canManageProfile;
+
   const hasChanges = useMemo(() => {
     if (!activeProfile) return false;
     return (
@@ -45,8 +47,34 @@ export default function AccountScreen() {
     );
   }, [activeProfile, firstName, lastName, phoneNumber]);
 
+  const profileId = activeProfile?.id;
+
+  const fetchProfile = useCallback(async () => {
+    if (!profileId) {
+      return;
+    }
+    try {
+      const data = await authorizedFetch(`/profiles/${profileId}`);
+      if (data?.profile) {
+        setActiveProfile(data.profile);
+      }
+    } catch (err) {
+      console.error('Failed to refresh profile', err);
+    }
+  }, [profileId, setActiveProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, [fetchProfile])
+  );
+
   const saveProfile = async () => {
     if (!activeProfile) return;
+    if (!canManageProfile) {
+      setError('Only caretakers can update profile details.');
+      return;
+    }
     if (!firstName.trim() || !lastName.trim()) {
       setError('First and last name are required.');
       return;
@@ -55,7 +83,7 @@ export default function AccountScreen() {
     Keyboard.dismiss();
     setIsSaving(true);
     try {
-      await authorizedFetch(`/profiles/${activeProfile.id}`, {
+      const data = await authorizedFetch(`/profiles/${activeProfile.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           first_name: firstName.trim(),
@@ -63,7 +91,9 @@ export default function AccountScreen() {
           phone_number: phoneNumber.trim() || null,
         }),
       });
-      await refreshProfiles();
+      if (data?.profile) {
+        setActiveProfile(data.profile);
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to update profile.');
     } finally {
@@ -142,6 +172,8 @@ export default function AccountScreen() {
               onChangeText={setFirstName}
               placeholder="First name"
               placeholderTextColor="#8aa0c6"
+              editable={canManageProfile}
+              selectTextOnFocus={canManageProfile}
             />
           </View>
           <View style={styles.fieldRow}>
@@ -152,6 +184,8 @@ export default function AccountScreen() {
               onChangeText={setLastName}
               placeholder="Last name"
               placeholderTextColor="#8aa0c6"
+              editable={canManageProfile}
+              selectTextOnFocus={canManageProfile}
             />
           </View>
           <View style={styles.fieldRow}>
@@ -163,17 +197,22 @@ export default function AccountScreen() {
               placeholder="+1 555 555 1234"
               placeholderTextColor="#8aa0c6"
               keyboardType="phone-pad"
+              editable={canManageProfile}
+              selectTextOnFocus={canManageProfile}
             />
           </View>
           <View style={styles.fieldRow}>
             <Text style={styles.label}>Created</Text>
             <Text style={styles.readonlyText}>{createdAt}</Text>
           </View>
+          {!canManageProfile && (
+            <Text style={styles.hint}>Only caretakers or admins can update this profile.</Text>
+          )}
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <TouchableOpacity
             style={[styles.saveButton, (!hasChanges || isSaving) && styles.saveDisabled]}
             onPress={saveProfile}
-            disabled={!hasChanges || isSaving}
+            disabled={!hasChanges || isSaving || isReadOnly}
           >
             <Text style={styles.saveText}>{isSaving ? 'Saving…' : 'Save changes'}</Text>
           </TouchableOpacity>
@@ -197,13 +236,17 @@ export default function AccountScreen() {
           </View>
         </View>
 
-      <Text style={styles.sectionTitle}>Account actions</Text>
-      <View style={styles.card}>
-        <TouchableOpacity style={styles.actionRow} onPress={confirmDelete}>
-          <Text style={[styles.actionText, styles.destructive]}>Delete profile</Text>
-          <Ionicons name="trash-outline" size={18} color="#ff9c9c" />
-        </TouchableOpacity>
-      </View>
+      {canManageProfile && (
+        <>
+          <Text style={styles.sectionTitle}>Account actions</Text>
+          <View style={styles.card}>
+            <TouchableOpacity style={styles.actionRow} onPress={confirmDelete}>
+              <Text style={[styles.actionText, styles.destructive]}>Delete profile</Text>
+              <Ionicons name="trash-outline" size={18} color="#ff9c9c" />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -289,6 +332,10 @@ const styles = StyleSheet.create({
   saveText: {
     color: '#f5f7fb',
     fontWeight: '600',
+  },
+  hint: {
+    color: '#9fb0c9',
+    fontSize: 12,
   },
   error: {
     color: '#ff8a8a',

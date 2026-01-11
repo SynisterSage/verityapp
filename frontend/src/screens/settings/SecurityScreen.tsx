@@ -11,7 +11,7 @@ export default function SecurityScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
-  const { activeProfile } = useProfile();
+  const { activeProfile, canManageProfile } = useProfile();
 
   const provider = session?.user?.app_metadata?.provider ?? 'email';
   const isEmailProvider = provider === 'email';
@@ -37,20 +37,27 @@ export default function SecurityScreen() {
       </View>
 
       <Text style={styles.sectionTitle}>Passcode</Text>
-      <View style={styles.card}>
-        <View style={styles.row}>
-          <Text style={styles.label}>Status</Text>
-          <Text style={styles.value}>{passcodeStatus}</Text>
+      {!canManageProfile && (
+        <View style={styles.card}>
+          <Text style={styles.disabledText}>Only caretakers can manage security settings.</Text>
         </View>
-        <Text style={styles.helper}>{helperText}</Text>
-        <TouchableOpacity
-          style={[styles.primaryButton, !isEmailProvider && styles.primaryDisabled]}
-          onPress={() => navigation.navigate('ChangePasscode')}
-          disabled={!isEmailProvider}
-        >
-          <Text style={styles.primaryText}>Change passcode</Text>
-        </TouchableOpacity>
-      </View>
+      )}
+      {canManageProfile && (
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Text style={styles.label}>Status</Text>
+            <Text style={styles.value}>{passcodeStatus}</Text>
+          </View>
+          <Text style={styles.helper}>{helperText}</Text>
+          <TouchableOpacity
+            style={[styles.primaryButton, !isEmailProvider && styles.primaryDisabled]}
+            onPress={() => navigation.navigate('ChangePasscode')}
+            disabled={!isEmailProvider}
+          >
+            <Text style={styles.primaryText}>Change passcode</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -126,5 +133,9 @@ const styles = StyleSheet.create({
   primaryText: {
     color: '#f5f7fb',
     fontWeight: '600',
+  },
+  disabledText: {
+    color: '#8aa0c6',
+    textAlign: 'center',
   },
 });

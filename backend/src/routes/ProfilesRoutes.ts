@@ -7,6 +7,7 @@ import ProfileMembersController from '@src/controllers/ProfileMembersController'
 const router = Router();
 
 router.get(PATHS.Profiles.Get, ProfilesController.listProfiles);
+router.get(PATHS.Profiles.Update, ProfilesController.getProfile);
 router.post(PATHS.Profiles.Create, ProfilesController.createProfile);
 router.patch(PATHS.Profiles.Update, ProfilesController.updateProfile);
 router.delete(PATHS.Profiles.Delete, ProfilesController.deleteProfile);

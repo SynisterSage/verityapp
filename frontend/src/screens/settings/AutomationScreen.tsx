@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { useProfile } from '../../context/ProfileContext';
 import { authorizedFetch } from '../../services/backend';
@@ -11,7 +11,7 @@ import { authorizedFetch } from '../../services/backend';
 export default function AutomationScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { activeProfile, refreshProfiles } = useProfile();
+  const { activeProfile, canManageProfile, setActiveProfile } = useProfile();
   const [autoMarkEnabled, setAutoMarkEnabled] = useState(false);
   const [fraudThreshold, setFraudThreshold] = useState(90);
   const [safeThreshold, setSafeThreshold] = useState(30);
@@ -19,8 +19,15 @@ export default function AutomationScreen() {
   const [autoBlockOnFraud, setAutoBlockOnFraud] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (!activeProfile) return;
+  const syncFromProfile = useCallback(() => {
+    if (!activeProfile) {
+      setAutoMarkEnabled(false);
+      setFraudThreshold(90);
+      setSafeThreshold(30);
+      setAutoTrustOnSafe(false);
+      setAutoBlockOnFraud(true);
+      return;
+    }
     setAutoMarkEnabled(Boolean(activeProfile.auto_mark_enabled));
     setFraudThreshold(
       typeof activeProfile.auto_mark_fraud_threshold === 'number'
@@ -40,6 +47,32 @@ export default function AutomationScreen() {
     );
   }, [activeProfile]);
 
+  useEffect(() => {
+    syncFromProfile();
+  }, [syncFromProfile]);
+
+  const profileId = activeProfile?.id;
+
+  const fetchActiveProfile = useCallback(async () => {
+    if (!profileId) {
+      return;
+    }
+    try {
+      const data = await authorizedFetch(`/profiles/${profileId}`);
+      if (data?.profile) {
+        setActiveProfile(data.profile);
+      }
+    } catch (err) {
+      console.error('Failed to fetch profile', err);
+    }
+  }, [profileId, setActiveProfile]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchActiveProfile();
+    }, [fetchActiveProfile])
+  );
+
   const save = async () => {
     if (!activeProfile) return;
     setSaving(true);
@@ -51,11 +84,13 @@ export default function AutomationScreen() {
         auto_trust_on_safe: autoTrustOnSafe,
         auto_block_on_fraud: autoBlockOnFraud,
       };
-      await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
+      const data = await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
         method: 'PATCH',
         body: JSON.stringify(body),
       });
-      await refreshProfiles();
+      if (data?.profile) {
+        setActiveProfile(data.profile);
+      }
       Alert.alert('Saved', 'Automation preferences updated.');
     } catch (err: any) {
       Alert.alert('Error', err?.message ?? 'Failed to save preferences.');
@@ -63,6 +98,25 @@ export default function AutomationScreen() {
       setSaving(false);
     }
   };
+
+  if (!canManageProfile) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
+        edges={[]}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Ionicons name="chevron-back" size={22} color="#e4ebf7" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Automation</Text>
+        </View>
+        <View style={styles.card}>
+          <Text style={styles.disabledText}>Only caretakers can manage automation settings.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -271,6 +325,9 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.55,
+  },
+  disabledText: {
+    color: '#8aa0c6',
   },
   separator: {
     height: 1,

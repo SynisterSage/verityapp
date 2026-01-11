@@ -1,7 +1,15 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 import { useAuth } from './AuthContext';
 import { authorizedFetch } from '../services/backend';
+import { supabase } from '../services/supabase';
 
 export type Profile = {
   id: string;
@@ -22,9 +30,19 @@ export type Profile = {
   created_at: string;
 };
 
+export type ProfileMembership = {
+  id: string;
+  profile_id: string;
+  user_id: string;
+  role: 'admin' | 'editor';
+  is_caretaker?: boolean;
+};
+
 type ProfileContextValue = {
   profiles: Profile[];
   activeProfile: Profile | null;
+  activeMembership: ProfileMembership | null;
+  canManageProfile: boolean;
   onboardingComplete: boolean;
   isLoading: boolean;
   authInvalid: boolean;
@@ -39,21 +57,20 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const { session, signOut } = useAuth();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
+  const [activeMembership, setActiveMembership] = useState<ProfileMembership | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authInvalid, setAuthInvalid] = useState(false);
 
-  const refreshProfiles = async () => {
+  const refreshProfiles = useCallback(async () => {
     if (!session) {
       setProfiles([]);
       setActiveProfile(null);
+      setActiveMembership(null);
       setAuthInvalid(false);
       return;
     }
-    const showLoader = profiles.length === 0 && !activeProfile;
-    if (showLoader) {
-      setIsLoading(true);
-    }
+    setIsLoading(true);
     try {
       const data = await authorizedFetch('/profiles');
       const list = (data?.profiles ?? []) as Profile[];
@@ -70,19 +87,75 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setProfiles([]);
       setActiveProfile(null);
       setOnboardingComplete(false);
+      setActiveMembership(null);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [session, signOut]);
 
   useEffect(() => {
     refreshProfiles();
-  }, [session]);
+  }, [session, refreshProfiles]);
+
+  useEffect(() => {
+    if (!session || !activeProfile?.id) {
+      setActiveMembership(null);
+      return;
+    }
+    const loadMembership = async () => {
+      const userId = session.user?.id;
+      if (!userId) {
+        setActiveMembership(null);
+        return;
+      }
+      try {
+        const data = await authorizedFetch(`/profiles/${activeProfile.id}/members`);
+        const memberList = (data?.members ?? []) as ProfileMembership[];
+        const membership = memberList.find((member) => member.user_id === userId) ?? null;
+        setActiveMembership(membership);
+      } catch (err) {
+        console.warn('Failed to refresh membership', err);
+        setActiveMembership(null);
+      }
+    };
+    loadMembership();
+  }, [session, activeProfile?.id]);
+
+  useEffect(() => {
+    if (!activeProfile?.id) {
+      return;
+    }
+    const channel = supabase
+      .channel(`profile-${activeProfile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${activeProfile.id}`,
+        },
+        () => {
+          refreshProfiles();
+        }
+      )
+      .subscribe();
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [activeProfile?.id, refreshProfiles]);
+
+  const canManageProfile = useMemo(
+    () => Boolean(activeMembership?.is_caretaker || activeMembership?.role === 'admin'),
+    [activeMembership]
+  );
 
   const value = useMemo<ProfileContextValue>(
     () => ({
       profiles,
       activeProfile,
+      activeMembership,
+      canManageProfile,
       onboardingComplete,
       isLoading,
       authInvalid,
@@ -90,7 +163,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setActiveProfile,
       setOnboardingComplete,
     }),
-    [profiles, activeProfile, onboardingComplete, isLoading, authInvalid]
+    [
+      profiles,
+      activeProfile,
+      activeMembership,
+      canManageProfile,
+      onboardingComplete,
+      isLoading,
+      authInvalid,
+      refreshProfiles,
+    ]
   );
 
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;

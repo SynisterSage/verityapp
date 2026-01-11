@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Keyboard, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Slider from '@react-native-community/slider';
 
 import { authorizedFetch } from '../../services/backend';
@@ -11,7 +11,7 @@ import { useProfile } from '../../context/ProfileContext';
 export default function NotificationsScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { activeProfile, refreshProfiles } = useProfile();
+  const { activeProfile, setActiveProfile } = useProfile();
   const [threshold, setThreshold] = useState(activeProfile?.alert_threshold_score ?? 90);
   const [emailAlerts, setEmailAlerts] = useState(activeProfile?.enable_email_alerts ?? true);
   const [smsAlerts, setSmsAlerts] = useState(activeProfile?.enable_sms_alerts ?? false);
@@ -37,13 +37,37 @@ export default function NotificationsScreen() {
     );
   }, [activeProfile, threshold, emailAlerts, smsAlerts, pushAlerts]);
 
+  const profileId = activeProfile?.id;
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profileId) {
+        return;
+      }
+      let isActive = true;
+      void (async () => {
+        try {
+          const data = await authorizedFetch(`/profiles/${profileId}`);
+          if (isActive && data?.profile) {
+            setActiveProfile(data.profile);
+          }
+        } catch (err) {
+          console.error('Failed to refresh profile', err);
+        }
+      })();
+      return () => {
+        isActive = false;
+      };
+    }, [profileId, setActiveProfile])
+  );
+
   const savePrefs = async () => {
     if (!activeProfile) return;
     setError('');
     Keyboard.dismiss();
     setSaving(true);
     try {
-      await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
+      const data = await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
         method: 'PATCH',
         body: JSON.stringify({
           alert_threshold_score: threshold,
@@ -52,7 +76,9 @@ export default function NotificationsScreen() {
           enable_push_alerts: pushAlerts,
         }),
       });
-      await refreshProfiles();
+      if (data?.profile) {
+        setActiveProfile(data.profile);
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to update preferences.');
     } finally {

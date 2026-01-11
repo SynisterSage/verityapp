@@ -25,7 +25,7 @@ export async function authorizedFetch(path: string, options: RequestInit = {}) {
   });
 
   if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       // Session is invalid (e.g., user deleted) — clear it so the app returns to sign-in.
       await supabase.auth.signOut();
     }
