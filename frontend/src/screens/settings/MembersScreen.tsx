@@ -16,11 +16,12 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RouteProp } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
+import { supabase } from '../../services/supabase';
 import { useProfile } from '../../context/ProfileContext';
 import { SettingsStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
@@ -44,6 +45,7 @@ type Invite = {
   role: MemberRole;
   status: string;
   short_code?: string | null;
+  invited_by?: string | null;
 };
 
 const avatarColors = ['#4c7dff', '#6e60f8', '#00c2ff', '#47d6a5'];
@@ -91,6 +93,8 @@ export default function MembersScreen() {
     currentMembership && (currentMembership.is_caretaker || currentMembership.role === 'admin')
   );
   const currentUserIsCaretaker = Boolean(currentMembership?.is_caretaker);
+  const currentUserIsEditor = currentMembership?.role === 'editor';
+  const canCreateInvite = Boolean(currentMembership && (currentUserIsAdmin || currentUserIsEditor));
   const rowRefs = useRef<Map<string, View>>(new Map());
   const [menuAnchor, setMenuAnchor] = useState<{
     x: number;
@@ -172,10 +176,70 @@ const buildInviteMessage = (invite: Invite) => {
   }, [activeProfile]);
 
   useEffect(() => {
+    if (!activeProfile) {
+      return;
+    }
+    const profileId = activeProfile.id;
+    const channel = supabase
+      .channel(`profile-members-${profileId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'profile_members',
+          filter: `profile_id=eq.${profileId}`,
+        },
+        async (payload) => {
+          const payloadAny = payload as { [key: string]: any };
+          const eventType = payloadAny.eventType ?? payloadAny.type;
+          const deletedUserId =
+            payloadAny.old?.user_id ?? payloadAny.record?.user_id ?? payloadAny.new?.user_id;
+          if (eventType === 'DELETE' && deletedUserId === sessionUserId) {
+            await supabase.auth.signOut();
+            return;
+          }
+          await fetchMembers();
+          await fetchInvites();
+        }
+      )
+      .subscribe();
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [activeProfile, fetchInvites, fetchMembers, sessionUserId]);
+
+  useEffect(() => {
     fetchMembers();
     fetchInvites();
     setInviteError('');
   }, [activeProfile, fetchMembers, fetchInvites]);
+
+  const availableInviteRoles = useMemo<MemberRole[]>(() => {
+    if (currentUserIsCaretaker) {
+      return ['editor', 'admin'];
+    }
+    return ['editor'];
+  }, [currentUserIsCaretaker]);
+
+  useEffect(() => {
+    if (availableInviteRoles.length > 0) {
+      setInviteRole(availableInviteRoles[0]);
+    }
+  }, [availableInviteRoles]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!activeProfile) {
+        return;
+      }
+      const interval = setInterval(() => {
+        fetchMembers();
+        fetchInvites();
+      }, 60_000);
+      return () => clearInterval(interval);
+    }, [activeProfile, fetchInvites, fetchMembers])
+  );
 
   const shareInvite = async (invite: Invite) => {
     const message = buildInviteMessage(invite);
@@ -356,7 +420,10 @@ const buildInviteMessage = (invite: Invite) => {
   };
 
   const createInvite = async () => {
-    if (!activeProfile) return;
+    if (!activeProfile || !canCreateInvite) {
+      setInviteError('You do not have permission to send invites.');
+      return;
+    }
     setInviteError('');
     setIsInviting(true);
     try {
@@ -380,6 +447,9 @@ const buildInviteMessage = (invite: Invite) => {
   };
 
   const handleCreateInvite = () => {
+    if (!canCreateInvite) {
+      return;
+    }
     if (inviteRole === 'admin') {
       Alert.alert(
         'Admin invite warning',
@@ -510,7 +580,7 @@ const buildInviteMessage = (invite: Invite) => {
             </Text>
           </View>
           <View style={[styles.roleRow, styles.roleRowSpacing]}>
-            {(['editor', 'admin'] as MemberRole[]).map((role) => (
+            {availableInviteRoles.map((role) => (
               <TouchableOpacity
                 key={role}
                 style={[styles.rolePill, inviteRole === role && styles.rolePillActive]}
@@ -529,9 +599,13 @@ const buildInviteMessage = (invite: Invite) => {
           </View>
           {inviteError ? <Text style={styles.error}>{inviteError}</Text> : null}
           <TouchableOpacity
-            style={[styles.button, styles.inviteButton, isInviting && styles.disabledButton]}
+            style={[
+              styles.button,
+              styles.inviteButton,
+              (isInviting || !canCreateInvite) && styles.disabledButton,
+            ]}
             onPress={handleCreateInvite}
-            disabled={isInviting}
+            disabled={isInviting || !canCreateInvite}
           >
             <Text style={styles.buttonText}>{isInviting ? 'Creating…' : 'Create invite'}</Text>
           </TouchableOpacity>
@@ -545,66 +619,79 @@ const buildInviteMessage = (invite: Invite) => {
           </Text>
         </View>
         <View style={styles.invitesList}>
-          {loadingInvites ? (
-            <Text style={styles.placeholder}>Checking invites…</Text>
+          {loadingInvites && invites.length === 0 ? (
+            <View style={styles.inviteSkeletonList}>
+              {skeletonRows.map((key) => (
+                <Animated.View
+                  key={key}
+                  style={[styles.inviteSkeletonRow, { opacity: shimmer }]}
+                >
+                  <View style={styles.inviteSkeletonLineShort} />
+                  <View style={styles.inviteSkeletonLineLong} />
+                </Animated.View>
+              ))}
+            </View>
           ) : invites.length === 0 ? (
             <View style={styles.emptyState}>
               <Ionicons name="mail-open-outline" size={40} color="#7d9dff" />
               <Text style={styles.emptyStateTitle}>No pending invites</Text>
             </View>
           ) : (
-            invites.map((invite) => {
-              const shortCode = invite.short_code ?? invite.id ?? '';
-              const roleLabel =
-                ROLE_DISPLAY_NAMES[invite.role] ??
-                invite.role.charAt(0).toUpperCase() + invite.role.slice(1);
-              const statusLabel = formatStatus(invite.status);
-              return (
-                <View key={invite.id} style={styles.pendingInviteRow}>
-                  <Text style={styles.pendingInviteLabel}>
-                    {roleLabel} • {statusLabel}
-                  </Text>
-                  <View style={styles.codeRow}>
-                    <View style={styles.codePill}>
-                      <Text style={styles.codeText}>{shortCode}</Text>
-                    </View>
-                    <View style={styles.codeActions}>
-                      <TouchableOpacity
-                        onPress={() => shareInvite(invite)}
-                        style={styles.actionIcon}
-                      >
-                        <Ionicons name="share-social-outline" size={18} color="#7d9dff" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => shareViaSMS(invite)}
-                        style={styles.actionIcon}
-                      >
-                        <Ionicons name="chatbubble-ellipses-outline" size={18} color="#7d9dff" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => copyInviteCode(invite)}
-                        style={styles.actionIcon}
-                      >
-                        <Ionicons name="copy-outline" size={18} color="#7d9dff" />
-                      </TouchableOpacity>
-                      {currentUserIsCaretaker && (
+            <View style={loadingInvites ? styles.faded : undefined}>
+              {invites.map((invite) => {
+                const shortCode = invite.short_code ?? invite.id ?? '';
+                const roleLabel =
+                  ROLE_DISPLAY_NAMES[invite.role] ??
+                  invite.role.charAt(0).toUpperCase() + invite.role.slice(1);
+                const statusLabel = formatStatus(invite.status);
+                const canRevokeInvite = currentUserIsCaretaker || invite.invited_by === sessionUserId;
+                return (
+                  <View key={invite.id} style={styles.pendingInviteRow}>
+                    <Text style={styles.pendingInviteLabel}>
+                      {roleLabel} • {statusLabel}
+                    </Text>
+                    <View style={styles.codeRow}>
+                      <View style={styles.codePill}>
+                        <Text style={styles.codeText}>{shortCode}</Text>
+                      </View>
+                      <View style={styles.codeActions}>
                         <TouchableOpacity
-                          onPress={() => confirmRevokeInvite(invite)}
+                          onPress={() => shareInvite(invite)}
                           style={styles.actionIcon}
-                          disabled={revokingInviteId === invite.id}
                         >
-                          {revokingInviteId === invite.id ? (
-                            <ActivityIndicator size="small" color="#7d9dff" />
-                          ) : (
-                            <Ionicons name="trash-outline" size={18} color="#ff6d6d" />
-                          )}
+                          <Ionicons name="share-social-outline" size={18} color="#7d9dff" />
                         </TouchableOpacity>
-                      )}
+                        <TouchableOpacity
+                          onPress={() => shareViaSMS(invite)}
+                          style={styles.actionIcon}
+                        >
+                          <Ionicons name="chatbubble-ellipses-outline" size={18} color="#7d9dff" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => copyInviteCode(invite)}
+                          style={styles.actionIcon}
+                        >
+                          <Ionicons name="copy-outline" size={18} color="#7d9dff" />
+                        </TouchableOpacity>
+                        {canRevokeInvite && (
+                          <TouchableOpacity
+                            onPress={() => confirmRevokeInvite(invite)}
+                            style={styles.actionIcon}
+                            disabled={revokingInviteId === invite.id}
+                          >
+                            {revokingInviteId === invite.id ? (
+                              <ActivityIndicator size="small" color="#7d9dff" />
+                            ) : (
+                              <Ionicons name="trash-outline" size={18} color="#ff6d6d" />
+                            )}
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     </View>
                   </View>
-                </View>
-              );
-            })
+                );
+              })}
+            </View>
           )}
         </View>
         <TouchableOpacity
@@ -878,6 +965,9 @@ const styles = StyleSheet.create({
     color: '#95a2bd',
     fontSize: 13,
   },
+  faded: {
+    opacity: 0.5,
+  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -1030,5 +1120,27 @@ const styles = StyleSheet.create({
   enterCodeText: {
     color: '#f5f7fb',
     fontWeight: '600',
+  },
+  inviteSkeletonList: {
+    gap: 10,
+  },
+  inviteSkeletonRow: {
+    borderWidth: 1,
+    borderColor: '#1e2837',
+    borderRadius: 14,
+    padding: 12,
+    gap: 6,
+  },
+  inviteSkeletonLineShort: {
+    height: 12,
+    width: '40%',
+    borderRadius: 6,
+    backgroundColor: '#1f2735',
+  },
+  inviteSkeletonLineLong: {
+    height: 12,
+    width: '70%',
+    borderRadius: 6,
+    backgroundColor: '#1f2735',
   },
 });

@@ -7,6 +7,9 @@ import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { generateUniqueShortCode } from '@src/common/helpers/invite';
 
+const INVITE_ROLES = ['admin', 'editor'] as const;
+type MemberRole = (typeof INVITE_ROLES)[number];
+
 async function getAuthenticatedUserId(req: Request) {
   const authHeader = req.header('authorization') ?? '';
   const token = authHeader.toLowerCase().startsWith('bearer ')
@@ -42,6 +45,23 @@ async function userCanAccessProfile(userId: string, profileId: string) {
     .eq('user_id', userId)
     .maybeSingle();
   return Boolean(member);
+}
+
+async function userHasRole(
+  userId: string,
+  profileId: string,
+  role: 'admin' | 'editor'
+) {
+  if (role === 'admin' && (await userIsCaretaker(userId, profileId))) {
+    return true;
+  }
+  const { data: membership } = await supabaseAdmin
+    .from('profile_members')
+    .select('role')
+    .eq('profile_id', profileId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return membership?.role === role;
 }
 
 async function listProfiles(req: Request, res: Response) {
@@ -165,7 +185,8 @@ async function setPasscode(req: Request, res: Response) {
   }
 
   const isCaretaker = await userIsCaretaker(userId, profileId);
-  if (!isCaretaker) {
+  const isEditor = await userHasRole(userId, profileId, 'editor');
+  if (!isCaretaker && !isEditor) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -361,11 +382,20 @@ async function inviteMember(req: Request, res: Response) {
   }
 
   const isCaretaker = await userIsCaretaker(userId, profileId);
-  if (!isCaretaker) {
+  const isEditor = await userHasRole(userId, profileId, 'editor');
+  if (!isCaretaker && !isEditor) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
-  const memberRole = role && ['admin', 'editor'].includes(role) ? role : 'editor';
+  const allowedRoles: MemberRole[] = isCaretaker ? [...INVITE_ROLES] : ['editor'];
+  if (role && !allowedRoles.includes(role as MemberRole)) {
+    return res
+      .status(HTTP_STATUS_CODES.Forbidden)
+      .json({ error: 'Insufficient permissions for requested role' });
+  }
+
+  const memberRole: MemberRole =
+    role && allowedRoles.includes(role as MemberRole) ? (role as MemberRole) : 'editor';
 
   const { data: existingUserRow, error: existingUserError } = normalizedEmail
     ? await supabaseAdmin
@@ -441,7 +471,7 @@ async function listInvites(req: Request, res: Response) {
 
   const { data } = await supabaseAdmin
     .from('profile_invites')
-    .select('id, email, role, status, created_at, accepted_at, short_code')
+    .select('id, email, role, status, created_at, accepted_at, short_code, invited_by')
     .eq('profile_id', profileId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
@@ -483,13 +513,10 @@ async function revokeInvite(req: Request, res: Response) {
   }
 
   const isCaretaker = await userIsCaretaker(userId, profileId);
-  if (!isCaretaker) {
-    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
-  }
 
   const { data: invite } = await supabaseAdmin
     .from('profile_invites')
-    .select('id, status')
+    .select('id, status, invited_by')
     .eq('profile_id', profileId)
     .or(`id.eq.${inviteId},short_code.eq.${inviteId}`)
     .maybeSingle();
@@ -497,6 +524,10 @@ async function revokeInvite(req: Request, res: Response) {
     return res
       .status(HTTP_STATUS_CODES.NotFound)
       .json({ error: 'Invite not found or already handled' });
+  }
+
+  if (!isCaretaker && invite.invited_by !== userId) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
   const { error } = await supabaseAdmin

@@ -374,14 +374,14 @@ async function removeMember(req: Request, res: Response) {
   const { data: userRow, error: userError } = await supabaseAdmin.auth.admin.getUserById(member.user_id);
   await supabaseAdmin
     .from('profile_invites')
-    .update({ status: 'revoked' })
+    .delete()
     .eq('profile_id', member.profile_id)
     .eq('accepted_by', member.user_id)
     .eq('status', 'accepted');
   if (!userError && userRow?.user?.email) {
     await supabaseAdmin
       .from('profile_invites')
-      .update({ status: 'revoked' })
+      .delete()
       .eq('profile_id', member.profile_id)
       .eq('email', userRow.user.email)
       .eq('status', 'accepted');
