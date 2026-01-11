@@ -254,12 +254,55 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'tax deductible', weight: 20, category: 'donation' },
   { phrase: 'organization', weight: 18, category: 'donation' },
   { phrase: 'call back', weight: 14, category: 'donation' },
+  { phrase: 'subscription', weight: 20, category: 'billing' },
+  { phrase: 'renewal', weight: 18, category: 'billing' },
+  { phrase: 'auto-renew', weight: 18, category: 'billing' },
+  { phrase: 'auto renew', weight: 18, category: 'billing' },
+  { phrase: 'recurring charge', weight: 20, category: 'billing' },
+  { phrase: 'invoice', weight: 24, category: 'billing' },
+  { phrase: 'receipt', weight: 16, category: 'billing' },
+  { phrase: 'billing department', weight: 20, category: 'billing' },
+  { phrase: 'charged', weight: 16, category: 'billing' },
+  { phrase: 'charge of', weight: 16, category: 'billing' },
+  { phrase: 'refund department', weight: 18, category: 'billing' },
+  { phrase: 'norton', weight: 20, category: 'billing' },
+  { phrase: 'mcafee', weight: 20, category: 'billing' },
+  { phrase: 'geek squad', weight: 20, category: 'billing' },
+  { phrase: 'paypal invoice', weight: 18, category: 'billing' },
+  { phrase: 'courier', weight: 16, category: 'logistics' },
+  { phrase: 'pickup', weight: 16, category: 'logistics' },
+  { phrase: 'pick up cash', weight: 18, category: 'logistics' },
+  { phrase: 'collect the money', weight: 18, category: 'logistics' },
+  { phrase: 'send a driver', weight: 18, category: 'logistics' },
+  { phrase: 'agent will come', weight: 18, category: 'logistics' },
+  { phrase: 'hand it to', weight: 18, category: 'logistics' },
+  { phrase: 'package', weight: 16, category: 'logistics' },
+  { phrase: 'drop off', weight: 16, category: 'logistics' },
+  { phrase: 'safe keeping', weight: 14, category: 'logistics' },
+  { phrase: 'verify your identity', weight: 18, category: 'identity' },
+  { phrase: 'confirm your information', weight: 18, category: 'identity' },
+  { phrase: 'date of birth', weight: 16, category: 'identity' },
+  { phrase: 'mother’s maiden name', weight: 16, category: 'identity' },
+  { phrase: 'mother s maiden name', weight: 16, category: 'identity' },
+  { phrase: 'security questions', weight: 16, category: 'identity' },
+  { phrase: 'address verification', weight: 16, category: 'identity' },
+  { phrase: 'verificar', weight: 10, category: 'spanish' },
+  { phrase: 'transferencia', weight: 12, category: 'spanish' },
+  { phrase: 'tarjeta de regalo', weight: 18, category: 'spanish' },
+  { phrase: 'urgente', weight: 12, category: 'spanish' },
+  { phrase: 'código', weight: 12, category: 'spanish' },
 
   // Gift cards & crypto
   { phrase: 'gift card', weight: 28, category: 'payment' },
   { phrase: 'google play card', weight: 20, category: 'payment' },
   { phrase: 'apple gift card', weight: 20, category: 'payment' },
   { phrase: 'steam card', weight: 20, category: 'payment' },
+  { phrase: 'bitcoin', weight: 26, category: 'payment' },
+  { phrase: 'crypto', weight: 26, category: 'payment' },
+  { phrase: 'wallet address', weight: 18, category: 'payment' },
+  { phrase: 'coinbase', weight: 20, category: 'payment' },
+  { phrase: 'binance', weight: 20, category: 'payment' },
+  { phrase: 'kraken', weight: 20, category: 'payment' },
   { phrase: 'crypto', weight: 26, category: 'payment' },
   { phrase: 'bitcoin', weight: 26, category: 'payment' },
   { phrase: 'wallet address', weight: 18, category: 'payment' },
@@ -310,6 +353,14 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
 ];
 
 const NEGATION_MARKERS = ['not ', 'never ', "don't ", 'do not ', 'did not ', 'no '];
+const REPORTING_MARKERS = [
+  'this is a scam',
+  'they asked for my',
+  'someone told me',
+  'he said it was a scam',
+  'they said it was fraudulent',
+  'i think it is a scam',
+];
 
 const COMBO_RULES = [
   { all: ['scam', 'zelle'], add: 25 },
@@ -329,6 +380,17 @@ const COMBO_RULES = [
   { all: ['one time code', 'account'], add: 12 },
   { all: ['zelle', 'urgent'], add: 10 },
   { all: ['paypal', 'urgent'], add: 10 },
+  { all: ['remote access', 'install'], add: 16 },
+  { all: ['call this number', 'stay on the line'], add: 14 },
+  { all: ['call this number', "don't hang up"], add: 14 },
+  { all: ['gift card', 'call this number'], add: 16 },
+  { all: ['subscription', 'remote access'], add: 18 },
+  { all: ['billing department', 'remote access'], add: 18 },
+  { all: ['gift card', 'courier'], add: 20 },
+  { all: ['crypto', 'urgent'], add: 16 },
+  { all: ['crypto', 'fraud department'], add: 14 },
+  { all: ['package', 'money'], add: 16 },
+  { all: ['identity', 'confirm'], add: 10 },
 ];
 
 const URGENCY_TERMS = [
@@ -369,6 +431,107 @@ const THREAT_TERMS = [
   'levy',
   'disconnection',
   'service interruption',
+];
+
+const AUTHORITY_TERMS = [
+  'this is the bank',
+  'i am calling from your bank',
+  'calling from your bank',
+  'this is [company] support',
+  'irs agent',
+  'tax collector',
+  'amazon fraud department',
+  'social security administration',
+  'department of justice',
+  'law enforcement',
+  'police department',
+  'legal department',
+  'sheriff office',
+];
+
+const REMOTE_ACCESS_TERMS = [
+  'anydesk',
+  'teamviewer',
+  'logmein',
+  'remote access',
+  'screen share',
+  'install software',
+  'download this app',
+  'share your screen',
+  'connect to your computer',
+  'remote session',
+  'access your device',
+];
+
+const GIFT_CARD_TERMS = [
+  'gift card',
+  'apple gift card',
+  'google play card',
+  'steam card',
+  'target card',
+  'walmart card',
+  'scratch off the back',
+  'gift card number',
+];
+
+const CALLBACK_TERMS = [
+  'call this number',
+  'don\'t hang up',
+  'don’t hang up',
+  'stay on the line',
+  'transfer me',
+  'press 1',
+  'press 2',
+  'press 3',
+  'press 4',
+  'press 5',
+  'press 6',
+  'press 7',
+  'press 8',
+  'press 9',
+  'press 0',
+  'don\'t disconnect',
+  'do not hang up',
+  'call back this number',
+];
+
+const BRAND_IMPERSONATION_TERMS = [
+  'microsoft support',
+  'apple support',
+  'google support',
+  'paypal support',
+  'geek squad',
+  'norton support',
+  'support center',
+  'help desk',
+  'security team',
+];
+
+const LINK_TERMS = [
+  'open this link',
+  'click the link',
+  'go to this website',
+  'i\'m texting you a link',
+  'check your email',
+  'visit this site',
+];
+
+const URL_PATTERNS = [
+  /(https?:\/\/)?(www\.)?[a-z0-9-]+\.(com|net|org|io|us|co)(\/\S*)?/i,
+  /\bbit\.ly\b/i,
+  /\btinyurl\b/i,
+  /\bgoo\.gl\b/i,
+];
+
+const CARRIER_TERMS = [
+  'sim swap',
+  'port out',
+  'carrier',
+  'esim',
+  'account pin',
+  'porting pin',
+  'transfer your number',
+  'verification code from your carrier',
 ];
 
 const ACCOUNT_ACCESS_TERMS = [
@@ -543,6 +706,76 @@ const TECH_SUPPORT_PHRASES = [
   'service your computer',
   'security alert on your computer',
 ];
+
+const CRYPTO_TERMS = [
+  'bitcoin',
+  'crypto',
+  'wallet address',
+  'crypto wallet',
+  'usdt',
+  'tether',
+  'ethereum',
+  'send to this address',
+  'coinbase',
+  'binance',
+  'kraken',
+];
+
+const SUBSCRIPTION_TERMS = [
+  'subscription',
+  'renewal',
+  'auto-renew',
+  'auto renew',
+  'recurring charge',
+  'invoice',
+  'receipt',
+  'billing department',
+  'charged',
+  'charge of',
+  'refund department',
+  'norton',
+  'mcafee',
+  'geek squad',
+  'paypal invoice',
+  'paypal payment',
+];
+
+const COURIER_TERMS = [
+  'courier',
+  'pickup',
+  'pick up cash',
+  'collect the money',
+  'send a driver',
+  'agent will come',
+  'hand it to',
+  'package',
+  'drop off',
+  'safe keeping',
+  'pick up the card',
+];
+
+const IDENTITY_TERMS = [
+  'verify your identity',
+  'confirm your information',
+  'date of birth',
+  'mother’s maiden name',
+  'mother s maiden name',
+  'security questions',
+  'address verification',
+  'verify identity',
+  'confirm identity',
+];
+
+const ESCALATION_TERMS = [
+  'final notice',
+  'legal action',
+  'last warning',
+  'final warning',
+];
+
+const REPETITION_TERMS = ['send', 'transfer', 'download', 'stay on the line', 'install'];
+
+const SPANISH_TERMS = ['urgente', 'verificar', 'transferencia', 'tarjeta de regalo', 'código'];
 
 // Common obfuscations and near-miss variants
 const FUZZY_KEYWORD_MAP: Record<string, string[]> = {
@@ -875,10 +1108,28 @@ function countTechSupportHits(text: string) {
   return hits;
 }
 
+function countRepetitionHits(text: string, terms: string[]) {
+  let hits = 0;
+  for (const term of terms) {
+    const pattern = new RegExp(`\\b${escapeRegExp(term)}\\b`, 'gi');
+    const matches = text.match(pattern);
+    if (matches && matches.length > 1) {
+      hits += matches.length - 1;
+    }
+  }
+  return hits;
+}
+
 function isNegated(text: string, index: number) {
   const windowStart = Math.max(0, index - 40);
   const window = text.slice(windowStart, index);
   return NEGATION_MARKERS.some((marker) => window.includes(marker));
+}
+
+function isReported(text: string, index: number) {
+  const windowStart = Math.max(0, index - 60);
+  const window = text.slice(windowStart, index).toLowerCase();
+  return REPORTING_MARKERS.some((marker) => window.includes(marker));
 }
 
 function findMatches(text: string, keywords: FraudKeyword[]) {
@@ -901,7 +1152,7 @@ function findMatches(text: string, keywords: FraudKeyword[]) {
     let matched = false;
     while (match) {
       const idx = match.index ?? 0;
-      if (isNegated(text, idx)) {
+      if (isNegated(text, idx) || isReported(text, idx)) {
         negated.push(keyword.phrase);
       } else {
         matched = true;
@@ -954,6 +1205,25 @@ function heuristicBoosts(text: string) {
   );
   const taxScamHits = countPhraseHits(text, TAX_SCAM_TERMS);
   const bankFraudHits = countPhraseHits(text, BANK_FRAUD_TERMS);
+  const authorityHits = countPhraseHits(text, AUTHORITY_TERMS);
+  const remoteAccessHits = countPhraseHits(text, REMOTE_ACCESS_TERMS);
+  const giftCardHits = countPhraseHits(text, GIFT_CARD_TERMS);
+  const callbackHits = countPhraseHits(text, CALLBACK_TERMS);
+  const cryptoHits = countPhraseHits(text, CRYPTO_TERMS);
+  const subscriptionHits = countPhraseHits(text, SUBSCRIPTION_TERMS);
+  const courierHits = countPhraseHits(text, COURIER_TERMS);
+  const identityHits = countPhraseHits(text, IDENTITY_TERMS);
+  const escalationHits = countPhraseHits(text, ESCALATION_TERMS);
+  const repetitionHits = countRepetitionHits(text, REPETITION_TERMS);
+  const spanishHits = countPhraseHits(text, SPANISH_TERMS);
+  const reportingHits = countPhraseHits(text, REPORTING_MARKERS);
+  const brandHits = countPhraseHits(text, BRAND_IMPERSONATION_TERMS);
+  const linkHits = countPhraseHits(text, LINK_TERMS);
+  const linkPatternsHits = URL_PATTERNS.reduce(
+    (count, pattern) => (pattern.test(text) ? count + 1 : count),
+    0
+  );
+  const carrierHits = countPhraseHits(text, CARRIER_TERMS);
 
   let boost = 0;
   if (urgencyHits >= 2) boost += 10;
@@ -972,6 +1242,22 @@ function heuristicBoosts(text: string) {
   if (taxScamHits >= 2) boost += 10;
   if (bankFraudHits >= 1) boost += 28;
   if (bankFraudHits >= 2) boost += 10;
+  if (authorityHits >= 1) boost += 14;
+  if (remoteAccessHits >= 1) boost += 18;
+  if (giftCardHits >= 1) boost += 20;
+  if (callbackHits >= 1) boost += 12;
+  if (cryptoHits >= 1) boost += 18;
+  if (subscriptionHits >= 1) boost += 14;
+  if (courierHits >= 1) boost += 22;
+  if (identityHits >= 1) boost += 12;
+  if (escalationHits >= 1) boost += 10;
+  if (repetitionHits >= 1) boost += Math.min(20, repetitionHits * 8);
+  if (spanishHits >= 1) boost += 6;
+  if (reportingHits >= 1) boost = Math.max(0, boost - 10);
+  if (brandHits >= 1) boost += 10;
+  if (linkHits >= 1) boost += 14;
+  if (linkPatternsHits >= 1) boost += 14;
+  if (carrierHits >= 1) boost += 16;
   if (piiHarvestHits >= 1) boost += 10;
   if (piiHarvestHits >= 2) boost += 8;
   const commandSensitiveHits = countCommandSensitiveCombos(text);
@@ -988,9 +1274,24 @@ function heuristicBoosts(text: string) {
   if (accountAccessHits >= 1 && paymentRequestHits >= 1) boost += 12;
   if (moneyAmountHits >= 1 && paymentRequestHits >= 1) boost += 10;
   if (piiHarvestHits >= 1 && actionBoost > 0) boost += 12;
+  if (authorityHits >= 1 && paymentAppHits >= 1) boost += 10;
+  if (remoteAccessHits >= 1 && actionBoost > 0) boost += 12;
+  if (giftCardHits >= 1 && urgencyHits >= 1) boost += 12;
+  if (callbackHits >= 1 && paymentRequestHits >= 1) boost += 10;
+  if (callbackHits >= 1 && accountAccessHits >= 1) boost += 12;
+  if (cryptoHits >= 1 && urgencyHits >= 1) boost += 16;
+  if (subscriptionHits >= 1 && remoteAccessHits >= 1) boost += 18;
+  if (courierHits >= 1 && paymentRequestHits >= 1) boost += 18;
+  if (identityHits >= 1 && authorityHits >= 1) boost += 12;
+  if (escalationHits >= 1 && urgencyHits >= 1) boost += 12;
+  if (reportingHits >= 1 && paymentRequestHits >= 1) boost = Math.max(0, boost - 5);
+  if (brandHits >= 1 && linkHits >= 1) boost += 10;
+  if (carrierHits >= 1 && accountAccessHits >= 1) boost += 18;
+  if (linkPatternsHits >= 1 && authorityHits >= 1) boost += 14;
 
   return {
     boost: Math.min(70, boost),
+    authorityHits,
     urgencyHits,
     secrecyHits,
     impersonationHits,
@@ -1005,6 +1306,21 @@ function heuristicBoosts(text: string) {
     threatHits,
     accountAccessHits,
     moneyAmountHits,
+    remoteAccessHits,
+    giftCardHits,
+    callbackHits,
+    cryptoHits,
+    subscriptionHits,
+    courierHits,
+    identityHits,
+    escalationHits,
+    repetitionHits,
+    spanishHits,
+    reportingHits,
+    brandHits,
+    linkHits,
+    linkPatternsHits,
+    carrierHits,
     taxScamHits,
     bankFraudHits,
     actionBoost,
