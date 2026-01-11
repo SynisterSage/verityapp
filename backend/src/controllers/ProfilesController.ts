@@ -10,6 +10,22 @@ import { generateUniqueShortCode } from '@src/common/helpers/invite';
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];
 
+function sanitizeProfileRow(row: Record<string, any>): Record<string, any> {
+  if (!row) {
+    return row;
+  }
+  const sanitized = {
+    ...row,
+    has_passcode: Boolean(row.pin_hash ?? row.passcode_hash),
+    pin_hash: undefined,
+    passcode_hash: undefined,
+    pin_salt: undefined,
+    pin_locked_until: undefined,
+    pin_updated_at: undefined,
+  } as Record<string, any>;
+  return sanitized;
+}
+
 async function getAuthenticatedUserId(req: Request) {
   const authHeader = req.header('authorization') ?? '';
   const token = authHeader.toLowerCase().startsWith('bearer ')
@@ -73,7 +89,7 @@ async function listProfiles(req: Request, res: Response) {
   const { data: caretakerProfiles } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .eq('caretaker_id', userId);
 
@@ -88,18 +104,14 @@ async function listProfiles(req: Request, res: Response) {
     const { data } = await supabaseAdmin
       .from('profiles')
       .select(
-        'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+        'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
       )
       .in('id', memberIds);
     memberRows = data ?? [];
   }
 
   const profiles = [...(caretakerProfiles ?? []), ...(memberRows ?? [])]
-    .map((row) => ({
-      ...row,
-      has_passcode: Boolean((row as { passcode_hash?: string | null }).passcode_hash),
-      passcode_hash: undefined,
-    }))
+    .map((row) => sanitizeProfileRow(row))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   return res.status(HTTP_STATUS_CODES.Ok).json({ profiles });
 }
@@ -154,7 +166,7 @@ async function createProfile(req: Request, res: Response) {
         typeof auto_block_on_fraud === 'boolean' ? auto_block_on_fraud : undefined,
     })
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .single();
 
@@ -164,11 +176,7 @@ async function createProfile(req: Request, res: Response) {
   }
 
   return res.status(HTTP_STATUS_CODES.Created).json({
-    profile: {
-      ...data,
-      has_passcode: Boolean(data.passcode_hash),
-      passcode_hash: undefined,
-    },
+    profile: sanitizeProfileRow(data),
   });
 }
 
@@ -190,10 +198,17 @@ async function setPasscode(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
-  const passcode_hash = hashPasscode(pin);
+  const hashed = await hashPasscode(pin);
   const { error } = await supabaseAdmin
     .from('profiles')
-    .update({ passcode_hash })
+    .update({
+      pin_hash: hashed.hash,
+      pin_salt: hashed.salt,
+      pin_pepper_version: hashed.pepperVersion,
+      pin_locked_until: null,
+      pin_updated_at: new Date().toISOString(),
+      passcode_hash: null,
+    })
     .eq('id', profileId);
 
   if (error) {
@@ -264,7 +279,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
     .update(updates)
     .eq('id', profileId)
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .single();
 
@@ -274,11 +289,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({
-    profile: {
-      ...data,
-      has_passcode: Boolean(data.passcode_hash),
-      passcode_hash: undefined,
-    },
+    profile: sanitizeProfileRow(data),
   });
 }
 
@@ -326,7 +337,7 @@ async function updateProfile(req: Request, res: Response) {
     .update(updates)
     .eq('id', profileId)
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
+      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
     )
     .single();
 
@@ -336,11 +347,7 @@ async function updateProfile(req: Request, res: Response) {
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({
-    profile: {
-      ...data,
-      has_passcode: Boolean(data.passcode_hash),
-      passcode_hash: undefined,
-    },
+    profile: sanitizeProfileRow(data),
   });
 }
 
@@ -362,7 +369,7 @@ async function getProfile(req: Request, res: Response) {
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, passcode_hash, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .eq('id', profileId)
     .maybeSingle();
@@ -373,11 +380,7 @@ async function getProfile(req: Request, res: Response) {
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({
-    profile: {
-      ...data,
-      has_passcode: Boolean(data.passcode_hash),
-      passcode_hash: undefined,
-    },
+    profile: sanitizeProfileRow(data),
   });
 }
 

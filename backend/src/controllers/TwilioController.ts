@@ -6,8 +6,14 @@ import supabaseAdmin from '@src/services/supabase';
 import { transcribeWavBuffer } from '@src/services/azure';
 import { analyzeTranscript, hashCallerNumber, matchPhrases, scoreToRiskLevel } from '@src/services/fraud';
 import { getCallerMetadata } from '@src/services/phone';
-import { verifyPasscodeHash } from '@src/services/passcode';
+import {
+  hashPasscode,
+  verifyCurrentPasscode,
+  verifyLegacyPasscode,
+  CURRENT_PEPPER_VERSION,
+} from '@src/services/passcode';
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
+import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
 
 const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call may be recorded for safety.';
 
@@ -238,7 +244,7 @@ async function getProfileByToNumber(to?: string | null) {
   }
   const { data: profile, error } = await supabaseAdmin
     .from('profiles')
-    .select('id, phone_number, passcode_hash')
+    .select('id, phone_number, pin_hash, pin_pepper_version, passcode_hash')
     .eq('twilio_virtual_number', to)
     .single();
   if (error || !profile) {
@@ -304,9 +310,10 @@ async function verifyPin(req: Request, res: Response) {
     }
   }
 
-  const isValid = verifyPasscodeHash(pin, profile.passcode_hash);
+  const pinResult = await validateProfilePin(pin, profile, req.ip);
+  const isValid = pinResult.valid;
   logger.info(
-    `Verify pin result to=${toNumber} pin_len=${pin.length} valid=${isValid} phone=${profile.phone_number ?? 'none'}`
+    `Verify pin result to=${toNumber} pin_len=${pin.length} valid=${isValid} locked=${pinResult.locked} phone=${profile.phone_number ?? 'none'}`
   );
   const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
   if (isValid && profile.phone_number && bridgeEnabled) {
@@ -653,6 +660,62 @@ async function recordingReady(req: Request, res: Response) {
     logger.err(err as Error);
   }
   return res.status(204).end();
+}
+
+interface ProfilePinRow {
+  id: string;
+  pin_hash?: string | null;
+  pin_pepper_version?: number | null;
+  passcode_hash?: string | null;
+}
+
+interface PinValidationResult {
+  valid: boolean;
+  locked: boolean;
+}
+
+async function validateProfilePin(
+  pin: string,
+  profile: ProfilePinRow,
+  clientIp?: string
+): Promise<PinValidationResult> {
+  const lockState = await getPinLockState(profile.id, clientIp);
+  if (lockState.locked) {
+    return { valid: false, locked: true };
+  }
+
+  let valid = false;
+  if (profile.pin_hash) {
+    valid = await verifyCurrentPasscode(
+      pin,
+      profile.pin_hash,
+      profile.pin_pepper_version ?? CURRENT_PEPPER_VERSION
+    );
+  } else if (profile.passcode_hash) {
+    valid = verifyLegacyPasscode(pin, profile.passcode_hash);
+    if (valid) {
+      try {
+        const hashed = await hashPasscode(pin);
+        await supabaseAdmin
+          .from('profiles')
+          .update({
+            pin_hash: hashed.hash,
+            pin_salt: hashed.salt,
+            pin_pepper_version: hashed.pepperVersion,
+            passcode_hash: null,
+            pin_updated_at: new Date().toISOString(),
+          })
+          .eq('id', profile.id);
+        profile.pin_hash = hashed.hash;
+        profile.pin_pepper_version = hashed.pepperVersion;
+      } catch (err) {
+        logger.err(err as Error);
+      }
+    }
+  }
+
+  await recordPinAttempt(profile.id, clientIp, valid);
+  return { valid, locked: false };
 }
 
 export default {
