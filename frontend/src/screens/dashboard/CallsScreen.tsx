@@ -10,7 +10,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { RouteProp, useFocusEffect } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
@@ -18,6 +19,7 @@ import { useProfile } from '../../context/ProfileContext';
 import { subscribeToCallUpdates } from '../../utils/callEvents';
 import RecentCallCard from '../../components/home/RecentCallCard';
 import EmptyState from '../../components/common/EmptyState';
+import type { CallsStackParamList } from '../../navigation/types';
 
 type CallRow = {
   id: string;
@@ -29,7 +31,13 @@ type CallRow = {
   feedback_status?: string | null;
 };
 
-export default function CallsScreen({ navigation }: { navigation: any }) {
+export default function CallsScreen({
+  navigation,
+  route,
+}: {
+  navigation: NativeStackNavigationProp<CallsStackParamList, 'Calls'>;
+  route: RouteProp<CallsStackParamList, 'Calls'>;
+}) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { activeProfile } = useProfile();
@@ -68,6 +76,31 @@ export default function CallsScreen({ navigation }: { navigation: any }) {
   useEffect(() => {
     loadCalls();
   }, [loadCalls]);
+
+  const initialCallIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    initialCallIdRef.current = route.params?.initialCallId ?? null;
+  }, [route.params?.initialCallId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!initialCallIdRef.current) {
+        return;
+      }
+        const rootNavigator = navigation.getParent()?.getParent();
+        if (rootNavigator?.navigate) {
+          rootNavigator.navigate('CallDetailModal', {
+            callId: initialCallIdRef.current,
+            compact: false,
+          });
+        } else {
+          navigation.navigate('CallDetail', { callId: initialCallIdRef.current });
+        }
+        initialCallIdRef.current = null;
+      navigation.setParams({ initialCallId: undefined });
+    }, [navigation])
+  );
 
   useEffect(() => {
     const interval = isAppActive

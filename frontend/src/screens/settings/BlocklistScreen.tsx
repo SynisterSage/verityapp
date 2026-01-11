@@ -11,10 +11,12 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import type { SettingsStackParamList } from '../../navigation/types';
 import EmptyState from '../../components/common/EmptyState';
 
 type BlockedCaller = {
@@ -25,7 +27,8 @@ type BlockedCaller = {
 };
 
 export default function BlocklistScreen() {
-  const navigation = useNavigation();
+  const navigation =
+    useNavigation<NativeStackNavigationProp<SettingsStackParamList, 'Blocklist'>>();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const [blocked, setBlocked] = useState<BlockedCaller[]>([]);
@@ -91,13 +94,21 @@ export default function BlocklistScreen() {
     loadBlocked();
   };
 
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.navigate('Settings');
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
       edges={[]}
     >
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="chevron-back" size={22} color="#e4ebf7" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Blocked Numbers</Text>

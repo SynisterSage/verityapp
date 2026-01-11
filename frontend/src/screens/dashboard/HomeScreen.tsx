@@ -296,7 +296,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       value: blockedCount === null ? '—' : `${blockedCount}`,
       caption: 'blocked',
       icon: 'ban',
-      onPress: () => navigation.navigate('SettingsTab', { screen: 'Blocklist' }),
+      onPress: () =>
+        navigation.navigate('SettingsTab', {
+          screen: 'Settings',
+          params: { initialScreen: 'Blocklist' },
+        }),
     },
   ];
 
@@ -334,39 +338,37 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         ) : null}
         <View style={{ opacity: contentOpacity }}>
           <>
-            <RecentCallCard
-              transcript={
-                recentCall?.transcript ?? (loading ? 'Loading…' : null)
-              }
-              createdAt={recentCall?.created_at}
-              fraudLevel={
-                recentCall?.feedback_status === 'marked_fraud'
-                  ? 'critical'
-                  : recentCall?.feedback_status === 'marked_safe'
-                  ? 'low'
-                  : recentCall?.fraud_risk_level
-              }
-              badgeLabel={
-                recentCall?.feedback_status === 'marked_fraud'
-                  ? 'Fraud'
-                  : recentCall?.feedback_status === 'marked_safe'
-                  ? 'Safe'
-                  : undefined
-              }
-              emptyText={
-                hasTwilioNumber
-                  ? 'No calls recorded yet.'
-                  : 'Add a SafeCall number to start recording calls.'
-              }
-              onPress={() =>
-                recentCall
-                  ? navigation.navigate('CallsTab', {
-                      screen: 'CallDetail',
-                      params: { callId: recentCall.id },
-                    })
-                  : navigation.navigate('CallsTab')
-              }
-            />
+              <RecentCallCard
+                transcript={
+                  recentCall?.transcript ?? (loading ? 'Loading…' : null)
+                }
+                createdAt={recentCall?.created_at}
+                fraudLevel={
+                  recentCall?.feedback_status === 'marked_fraud'
+                    ? 'critical'
+                    : recentCall?.feedback_status === 'marked_safe'
+                    ? 'low'
+                    : recentCall?.fraud_risk_level
+                }
+                badgeLabel={
+                  recentCall?.feedback_status === 'marked_fraud'
+                    ? 'Fraud'
+                    : recentCall?.feedback_status === 'marked_safe'
+                    ? 'Safe'
+                    : undefined
+                }
+                emptyText={
+                  hasTwilioNumber
+                    ? 'No calls recorded yet.'
+                    : 'Add a SafeCall number to start recording calls.'
+                }
+                onPress={() =>
+                  navigation.navigate('CallsTab', {
+                    screen: 'Calls',
+                    params: { initialCallId: recentCall?.id },
+                  })
+                }
+              />
 
             <View style={styles.statsRow}>
               {statTiles.map((tile) => (
@@ -429,12 +431,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                         : item.badgeLevel
                     }
                     onPress={() =>
-                      item.type === 'call'
-                        ? navigation.navigate('CallsTab', {
-                            screen: 'CallDetail',
-                            params: { callId: item.callId },
-                          })
-                        : navigation.navigate('AlertsTab')
+                  item.type === 'call'
+                    ? navigation.navigate('CallsTab', {
+                        screen: 'Calls',
+                        params: { initialCallId: item.callId },
+                      })
+                    : navigation.navigate('AlertsTab')
                     }
                   />
                 ))

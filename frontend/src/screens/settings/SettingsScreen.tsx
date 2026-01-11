@@ -1,16 +1,25 @@
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
+import type { RouteProp } from '@react-navigation/native';
+import type { SettingsStackParamList } from '../../navigation/types';
 type SettingsItem = {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress?: () => void;
 };
 
-export default function SettingsScreen({ navigation }: { navigation: any }) {
+export default function SettingsScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route: RouteProp<SettingsStackParamList, 'Settings'>;
+}) {
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const { canManageProfile } = useProfile();
@@ -73,6 +82,15 @@ export default function SettingsScreen({ navigation }: { navigation: any }) {
       onPress: () => navigation.navigate('DataPrivacy'),
     },
   ];
+
+  useEffect(() => {
+    if (!route.params?.initialScreen) {
+      return;
+    }
+    const { initialScreen } = route.params;
+    navigation.setParams({ initialScreen: undefined });
+    navigation.navigate(initialScreen);
+  }, [route.params?.initialScreen, navigation]);
 
   return (
     <SafeAreaView

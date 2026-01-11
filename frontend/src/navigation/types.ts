@@ -23,12 +23,12 @@ export type TabParamList = {
 };
 
 export type CallsStackParamList = {
-  Calls: undefined;
+  Calls: { initialCallId?: string } | undefined;
   CallDetail: { callId: string };
 };
 
 export type SettingsStackParamList = {
-  Settings: undefined;
+  Settings: { initialScreen?: 'Blocklist' } | undefined;
   Account: undefined;
   Notifications: undefined;
   Security: undefined;

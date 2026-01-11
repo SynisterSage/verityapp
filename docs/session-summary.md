@@ -91,6 +91,24 @@ Frontend work
 Testing
 - Frontend type check: `npx tsc --noEmit`.
 
+2026-01-11
+
+Scope
+- Prevent accidental polling loops on account/config screens while keeping focused data fresh.
+- Surface safe-phrase matches in the call detail transcript without merging them into the fraud keyword list.
+
+Backend work
+- Added a lightweight `GET /api/v1/profiles/:profileId` handler that returns a single profile row for focused screens so we can avoid reloading the entire list.
+
+Frontend work
+- Automation, Notifications, and Account screens now call the focused endpoint via `useFocusEffect`, update the context with the returned profile, and no longer reload the app or hit `/profiles/:profileId` repeatedly.
+- Dashboard tabs (Home, Calls, Alerts) gate their 60‑second polling timers behind `useIsFocused` so the server only sees those requests while you actually have the tab open.
+- Call Detail pulls `fraud_notes.safePhraseMatches` alongside fraud keywords, highlights them with a teal background in the transcript, and renders a “Trusted phrase(s)” block that matches the fraud card styling so trusted language is easy to spot.
+
+Testing
+- Manual walkthrough of the account/notifications/automation screens confirmed only one fetch per entry and no reload behavior.
+- Verified safe phrases (e.g., “golf”) now highlight in the transcript and appear in the call detail fraud block without being labeled as red keywords.
+
 Members Integration Status
 
 Backend: profile members/invite endpoints added (ProfileMembersController) plus routing and helpers. Invite accept handles both UUIDs and placeholder emails (used when we auto-generate sms-invite-…@verityprotect.sms). RLS unchanged, invite creation now tolerates missing email by inventing a safe placeholder so SMS-only sharing works.
