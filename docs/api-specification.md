@@ -9,7 +9,7 @@ Production: https://safecall-api.railway.app/api/v1
 
 ## Authentication
 
-All endpoints (except `/auth/*`) require:
+All endpoints (except `/auth/*`) requires:
 
 ```
 Authorization: Bearer <JWT_TOKEN>
