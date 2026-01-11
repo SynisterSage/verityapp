@@ -92,9 +92,7 @@ export default function MembersScreen() {
   const currentUserIsAdmin = Boolean(
     currentMembership && (currentMembership.is_caretaker || currentMembership.role === 'admin')
   );
-  const currentUserIsCaretaker = Boolean(currentMembership?.is_caretaker);
-  const currentUserIsEditor = currentMembership?.role === 'editor';
-  const canCreateInvite = Boolean(currentMembership && (currentUserIsAdmin || currentUserIsEditor));
+  const canCreateInvite = currentUserIsAdmin;
   const rowRefs = useRef<Map<string, View>>(new Map());
   const [menuAnchor, setMenuAnchor] = useState<{
     x: number;
@@ -216,11 +214,11 @@ const buildInviteMessage = (invite: Invite) => {
   }, [activeProfile, fetchMembers, fetchInvites]);
 
   const availableInviteRoles = useMemo<MemberRole[]>(() => {
-    if (currentUserIsCaretaker) {
+    if (currentUserIsAdmin) {
       return ['editor', 'admin'];
     }
     return ['editor'];
-  }, [currentUserIsCaretaker]);
+  }, [currentUserIsAdmin]);
 
   useEffect(() => {
     if (availableInviteRoles.length > 0) {
@@ -452,8 +450,8 @@ const buildInviteMessage = (invite: Invite) => {
     }
     if (inviteRole === 'admin') {
       Alert.alert(
-        'Admin invite warning',
-        'Admins have full control and can remove or update members. Continue?',
+        'Caretaker invite warning',
+        'Caretakers have full control and can remove or update members. Continue?',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Continue', onPress: createInvite },
@@ -644,7 +642,7 @@ const buildInviteMessage = (invite: Invite) => {
                   ROLE_DISPLAY_NAMES[invite.role] ??
                   invite.role.charAt(0).toUpperCase() + invite.role.slice(1);
                 const statusLabel = formatStatus(invite.status);
-                const canRevokeInvite = currentUserIsCaretaker || invite.invited_by === sessionUserId;
+                const canRevokeInvite = currentUserIsAdmin || invite.invited_by === sessionUserId;
                 return (
                   <View key={invite.id} style={styles.pendingInviteRow}>
                     <Text style={styles.pendingInviteLabel}>

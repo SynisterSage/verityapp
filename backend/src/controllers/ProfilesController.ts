@@ -381,13 +381,12 @@ async function inviteMember(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
   }
 
-  const isCaretaker = await userIsCaretaker(userId, profileId);
-  const isEditor = await userHasRole(userId, profileId, 'editor');
-  if (!isCaretaker && !isEditor) {
+  const isAuthorizedToInvite = await userHasRole(userId, profileId, 'admin');
+  if (!isAuthorizedToInvite) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
-  const allowedRoles: MemberRole[] = isCaretaker ? [...INVITE_ROLES] : ['editor'];
+  const allowedRoles: MemberRole[] = [...INVITE_ROLES];
   if (role && !allowedRoles.includes(role as MemberRole)) {
     return res
       .status(HTTP_STATUS_CODES.Forbidden)
