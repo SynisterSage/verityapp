@@ -20,6 +20,10 @@ import { useProfile } from '../../context/ProfileContext';
 import { emitCallUpdated } from '../../utils/callEvents';
 import { getRiskStyles } from '../../utils/risk';
 
+type FraudNotes = {
+  safePhraseMatches?: string[];
+};
+
 type CallRow = {
   id: string;
   profile_id: string | null;
@@ -28,6 +32,7 @@ type CallRow = {
   fraud_score: number | null;
   fraud_risk_level: string | null;
   fraud_keywords: string[] | null;
+  fraud_notes: FraudNotes | null;
   caller_number: string | null;
   feedback_status?: string | null;
   caller_hash?: string | null;
@@ -39,46 +44,70 @@ function escapeRegExp(value: string) {
 
 const AnimatedText = Animated.createAnimatedComponent(Text);
 
-function highlightTranscript(text: string, keywords: string[]) {
+type KeywordMatch = {
+  start: number;
+  end: number;
+  text: string;
+  type: 'fraud' | 'safe';
+};
+
+type TranscriptSegment = {
+  text: string;
+  type: 'fraud' | 'safe' | null;
+};
+
+function collectMatches(text: string, keywords: string[], type: KeywordMatch['type']) {
+  const cleanKeywords = Array.from(new Set(keywords.map((keyword) => keyword.trim()).filter(Boolean)));
+  const matches: KeywordMatch[] = [];
+  for (const keyword of cleanKeywords) {
+    const pattern = new RegExp(`\\b${escapeRegExp(keyword)}\\b`, 'gi');
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text))) {
+      matches.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        text: match[0],
+        type,
+      });
+    }
+  }
+  return matches;
+}
+
+function highlightTranscript(text: string, fraudKeywords: string[], safeKeywords: string[]) {
   if (!text) {
-    return [{ text, highlight: false }];
+    return [{ text, type: null }];
   }
-  const normalized = Array.from(
-    new Set(
-      keywords
-        .map((keyword) => keyword.trim())
-        .filter(Boolean)
-        .map((keyword) => keyword)
-    )
-  );
-  if (normalized.length === 0) {
-    return [{ text, highlight: false }];
+  const matches = [
+    ...collectMatches(text, fraudKeywords, 'fraud'),
+    ...collectMatches(text, safeKeywords, 'safe'),
+  ];
+  if (matches.length === 0) {
+    return [{ text, type: null }];
   }
-  const sorted = normalized
-    .slice()
-    .sort((a, b) => b.length - a.length)
-    .map((keyword) => escapeRegExp(keyword));
-  const pattern = new RegExp(`(${sorted.join('|')})`, 'gi');
-  const segments: { text: string; highlight: boolean }[] = [];
+  matches.sort((a, b) => (a.start === b.start ? b.end - a.end : a.start - b.start));
+  const segments: TranscriptSegment[] = [];
   let lastIndex = 0;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(text))) {
-    if (match.index > lastIndex) {
+  for (const match of matches) {
+    if (match.start < lastIndex) {
+      continue;
+    }
+    if (match.start > lastIndex) {
       segments.push({
-        text: text.slice(lastIndex, match.index),
-        highlight: false,
+        text: text.slice(lastIndex, match.start),
+        type: null,
       });
     }
     segments.push({
-      text: match[0],
-      highlight: true,
+      text: text.slice(match.start, match.end),
+      type: match.type,
     });
-    lastIndex = pattern.lastIndex;
+    lastIndex = match.end;
   }
   if (lastIndex < text.length) {
     segments.push({
       text: text.slice(lastIndex),
-      highlight: false,
+      type: null,
     });
   }
   return segments;
@@ -108,7 +137,7 @@ export default function CallDetailScreen({
       const { data } = await supabase
         .from('calls')
         .select(
-          'id, profile_id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords, caller_number, feedback_status, caller_hash'
+          'id, profile_id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords, fraud_notes, caller_number, feedback_status, caller_hash'
         )
         .eq('id', callId)
         .single();
@@ -291,11 +320,23 @@ export default function CallDetailScreen({
     }
   };
 
+  const safePhraseMatches = useMemo(() => {
+    if (!callRow?.fraud_notes?.safePhraseMatches) {
+      return [];
+    }
+    return callRow.fraud_notes.safePhraseMatches.filter(Boolean);
+  }, [callRow?.fraud_notes]);
   const isSafeCall = callRow?.fraud_score === 0;
   const highlightedTranscript = useMemo(
     () =>
-      callRow ? highlightTranscript(callRow.transcript ?? '', callRow.fraud_keywords ?? []) : [],
-    [callRow?.transcript, callRow?.fraud_keywords]
+      callRow
+        ? highlightTranscript(
+            callRow.transcript ?? '',
+            callRow.fraud_keywords ?? [],
+            safePhraseMatches
+          )
+        : [],
+    [callRow?.transcript, callRow?.fraud_keywords, safePhraseMatches]
   );
   const fraudRiskStyle = useMemo(
     () => getRiskStyles(callRow?.fraud_risk_level ?? 'unknown'),
@@ -326,6 +367,10 @@ export default function CallDetailScreen({
   const highlightBackground = highlightAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['rgba(255, 182, 193, 0)', 'rgba(255, 182, 193, 0.28)'],
+  });
+  const safeHighlightBackground = highlightAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['rgba(71, 214, 165, 0)', 'rgba(71, 214, 165, 0.2)'],
   });
 
   if (!callRow) {
@@ -382,23 +427,27 @@ export default function CallDetailScreen({
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Transcript</Text>
           {callRow.transcript ? (
-          <Text style={styles.body}>
-            {highlightedTranscript.map((segment, index) =>
-              segment.highlight ? (
-                <AnimatedText
-                  key={`segment-${index}`}
-                  style={[
-                    styles.transcriptHighlightText,
-                    { backgroundColor: highlightBackground },
-                  ]}
-                >
-                  {segment.text}
-                </AnimatedText>
-              ) : (
-                <Text key={`segment-${index}`}>{segment.text}</Text>
-              )
-            )}
-          </Text>
+            <Text style={styles.body}>
+              {highlightedTranscript.map((segment, index) =>
+                segment.type ? (
+                  <AnimatedText
+                    key={`segment-${index}`}
+                    style={[
+                      styles.transcriptHighlightText,
+                      segment.type === 'safe' && styles.transcriptSafeHighlightText,
+                      {
+                        backgroundColor:
+                          segment.type === 'safe' ? safeHighlightBackground : highlightBackground,
+                      },
+                    ]}
+                  >
+                    {segment.text}
+                  </AnimatedText>
+                ) : (
+                  <Text key={`segment-${index}`}>{segment.text}</Text>
+                )
+              )}
+            </Text>
           ) : (
             <Text style={styles.body}>No transcript</Text>
           )}
@@ -426,7 +475,6 @@ export default function CallDetailScreen({
             <>
               <Text style={styles.safeCaption}>Safe call</Text>
               <Text style={styles.safeNote}>No suspicious behavior detected.</Text>
-              <View style={styles.safeBar} />
             </>
           ) : (
             <>
@@ -448,6 +496,12 @@ export default function CallDetailScreen({
                 />
               </View>
             </>
+          )}
+          {safePhraseMatches.length > 0 && (
+            <View style={styles.safePhraseBlock}>
+              <Text style={styles.safePhraseLabel}>Trusted phrase{safePhraseMatches.length > 1 ? 's' : ''}</Text>
+              <Text style={styles.safePhraseText}>{safePhraseMatches.join(', ')}</Text>
+            </View>
           )}
         </View>
 
@@ -601,6 +655,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     marginHorizontal: 0,
   },
+  transcriptSafeHighlightText: {
+    color: '#a5f0e9',
+  },
   safeCaption: {
     color: '#8ab4ff',
     fontSize: 12,
@@ -611,6 +668,25 @@ const styles = StyleSheet.create({
     color: '#9fb0c9',
     fontSize: 12,
     marginBottom: 10,
+  },
+  safePhraseBlock: {
+    borderTopWidth: 1,
+    borderTopColor: '#1b2331',
+    marginTop: 12,
+    paddingTop: 10,
+  },
+  safePhraseLabel: {
+    color: '#98a7c2',
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.7,
+    marginBottom: 2,
+  },
+  safePhraseText: {
+    color: '#71d6a5',
+    fontSize: 14,
+    fontWeight: '700',
   },
   recordingHeader: {
     flexDirection: 'row',
@@ -684,12 +760,6 @@ const styles = StyleSheet.create({
   riskFill: {
     height: '100%',
     borderRadius: 999,
-  },
-  safeBar: {
-    height: 2,
-    marginTop: 6,
-    borderRadius: 999,
-    backgroundColor: '#1d2737',
   },
   secondaryText: {
     color: '#d7e3f7',
