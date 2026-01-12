@@ -27,7 +27,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
     >
       <View style={styles.card}>
         <Text style={styles.title}>Create account</Text>
-        <Text style={styles.subtitle}>Set up SafeCall in minutes</Text>
+        <Text style={styles.subtitle}>Set up Verity in minutes</Text>
 
         <TextInput
           placeholder="Email"

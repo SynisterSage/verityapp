@@ -26,7 +26,7 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>SafeCall</Text>
+        <Text style={styles.title}>Verity Protect</Text>
         <Text style={styles.subtitle}>Sign in to protect your loved one</Text>
 
         <TextInput
