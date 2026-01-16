@@ -320,8 +320,16 @@ function RootNavigator() {
           )
         ) : (
           <>
-            <RootStack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
-            <RootStack.Screen name="SignUp" component={SignUpScreen} />
+            <RootStack.Screen
+              name="SignIn"
+              component={SignInScreen}
+              options={{ headerShown: false, animation: 'none' }}
+            />
+            <RootStack.Screen
+              name="SignUp"
+              component={SignUpScreen}
+              options={{ headerShown: false, animation: 'none' }}
+            />
           </>
         )}
       </RootStack.Navigator>

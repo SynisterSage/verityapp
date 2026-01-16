@@ -120,6 +120,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     width: '100%',
     paddingBottom: 32,
+    transform: [{ translateY: 95 }],
   },
   primaryButton: {
     height: 60,

@@ -1,7 +1,5 @@
 import { useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -9,11 +7,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 
 export default function SignInScreen({ navigation }: { navigation: any }) {
@@ -40,7 +38,7 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
     focusField === field ? theme.colors.accent : theme.colors.border;
 
   return (
-    <KeyboardAvoidingView
+    <SafeAreaView
       style={[
         styles.container,
         {
@@ -49,7 +47,7 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
           paddingBottom: 24 + insets.bottom,
         },
       ]}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      edges={['bottom']}
     >
       <View style={styles.content}>
         <View>
@@ -165,7 +163,7 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
           </View>
         }
       />
-    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
