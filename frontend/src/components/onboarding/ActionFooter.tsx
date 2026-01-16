@@ -163,4 +163,8 @@ const styles = StyleSheet.create({
   secondaryIcon: {
     marginRight: 8,
   },
+  customFooter: {
+    marginTop: 12,
+    alignItems: 'center',
+  },
 });

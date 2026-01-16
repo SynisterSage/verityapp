@@ -1,62 +1,172 @@
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, View, Text, Pressable, StyleSheet } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
+import { useTheme } from '../../context/ThemeContext';
+
 type Props = {
-  title: string;
+  chapter: string;
+  totalSteps?: number;
+  activeStep?: number;
+  showBack?: boolean;
 };
 
-export default function OnboardingHeader({ title }: Props) {
+const TOTAL_SEGMENTS = 10;
+
+export default function OnboardingHeader({
+  chapter,
+  activeStep = 0,
+  totalSteps = TOTAL_SEGMENTS,
+  showBack = true,
+}: Props) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
+  const steps = useMemo(() => Array.from({ length: totalSteps }, (_, index) => index), [totalSteps]);
+  const animatedWidthsRef = useRef<Animated.Value[]>([]);
+
+  if (animatedWidthsRef.current.length !== steps.length) {
+    animatedWidthsRef.current = steps.map(() => new Animated.Value(6));
+  }
+
+  useEffect(() => {
+    animatedWidthsRef.current.forEach((value, index) => {
+      const targetWidth = index < activeStep ? 12 : 6;
+      Animated.spring(value, {
+        toValue: targetWidth,
+        useNativeDriver: false,
+        stiffness: 180,
+        damping: 18,
+      }).start();
+    });
+  }, [activeStep, steps]);
+
+  const animatedWidths = animatedWidthsRef.current;
 
   return (
-    <SafeAreaView edges={['top']} style={styles.safeArea}>
-      <View style={[styles.container, { paddingTop: Math.max(insets.top, 14) }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+    <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: theme.colors.bg }]}>
+      <BlurView intensity={100} tint="dark" style={styles.blur}>
+        <View style={[styles.overlay, { backgroundColor: theme.colors.bg }]} pointerEvents="none" />
+        <View
+          style={[
+            styles.container,
+            {
+              // SafeAreaView already accounts for the notch/status bar; keep internal padding minimal.
+              paddingTop: 8,
+              paddingBottom: 16,
+              paddingHorizontal: 32,
+              borderBottomColor: theme.colors.border,
+            },
+          ]}
         >
-          <Ionicons name="chevron-back" size={22} color="#e4ebf7" />
-        </TouchableOpacity>
-        <Text style={styles.title}>{title}</Text>
-        <View style={styles.backButtonPlaceholder} />
-      </View>
+          <View style={[styles.leftSlot, !showBack && styles.leftSlotHidden]}>
+            {showBack ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.backButton,
+                  {
+                    borderColor: theme.colors.border,
+                    backgroundColor: theme.colors.surfaceAlt,
+                    transform: [{ scale: pressed ? 0.9 : 1 }],
+                  },
+                ]}
+                onPress={() => navigation.goBack()}
+              >
+                <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={[styles.chapterContainer, !showBack && styles.chapterContainerFlush]}>
+            <Text style={[styles.chapter, { color: theme.colors.text, opacity: 0.7 }]}>
+              {chapter.toUpperCase()}
+            </Text>
+          </View>
+
+          <View style={styles.progress}>
+            {steps.map((step) => {
+              const isActive = step < activeStep;
+              const width = animatedWidths[step];
+              return (
+                <Animated.View
+                  key={step}
+                  style={[
+                    styles.pill,
+                    step !== steps.length - 1 && styles.pillSpacing,
+                    {
+                      width,
+                      backgroundColor: isActive ? '#2d6df6' : 'rgba(45,109,246,0.1)',
+                    },
+                  ]}
+                />
+              );
+            })}
+          </View>
+        </View>
+      </BlurView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: {
-    backgroundColor: '#0b111b',
+    width: '100%',
+  },
+  blur: {
+    width: '100%',
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    opacity: 0.95,
   },
   container: {
+    borderBottomWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-    backgroundColor: '#0b111b',
+    minHeight: 88,
+  },
+  leftSlot: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+  },
+  leftSlotHidden: {
+    width: 0,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#1f2a3a',
-    backgroundColor: '#121a26',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
-    color: '#f5f7fb',
-    fontSize: 18,
-    fontWeight: '600',
+  chapter: {
+    fontSize: 10,
+    letterSpacing: 6,
+    fontWeight: '900',
   },
-  backButtonPlaceholder: {
-    width: 36,
-    height: 36,
+  chapterContainer: {
+    flex: 1,
+    marginLeft: 12,
+    justifyContent: 'center',
+  },
+  chapterContainerFlush: {
+    marginLeft: 0,
+  },
+  progress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pill: {
+    height: 8,
+    borderRadius: 4,
+  },
+  pillSpacing: {
+    marginRight: 4,
   },
 });

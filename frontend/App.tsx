@@ -243,7 +243,7 @@ function RootNavigator() {
             <RootStack.Screen
               name="OnboardingChoice"
               component={OnboardingChoiceScreen}
-              options={{ title: 'Get started' }}
+              options={{ headerShown: false }}
             />
             <RootStack.Screen
               name="OnboardingProfile"
@@ -288,7 +288,7 @@ function RootNavigator() {
             <RootStack.Screen
               name="OnboardingInviteCode"
               component={OnboardingInviteCodeScreen}
-              options={{ title: 'Enter invite code' }}
+              options={{ headerShown: false }}
             />
           </>
         ) : (
