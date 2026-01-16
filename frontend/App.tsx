@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -228,117 +228,98 @@ function AppTabs() {
 function RootNavigator() {
   const { session, isLoading } = useAuth();
   const { onboardingComplete, isLoading: profileLoading, authInvalid } = useProfile();
-  const [renderSplash, setRenderSplash] = useState(true);
 
   const isBusy = isLoading || (session && profileLoading);
-
-  useEffect(() => {
-    if (isBusy) {
-      setRenderSplash(true);
-      return;
-    }
-    const timer = setTimeout(() => {
-      setRenderSplash(false);
-    }, 2600);
-    return () => clearTimeout(timer);
-  }, [isBusy]);
 
   if (isBusy) {
     return <SplashScreen />;
   }
 
   return (
-    <>
-      <RootStack.Navigator>
-        {session && !authInvalid ? (
-          !onboardingComplete ? (
-            <>
-              <RootStack.Screen
-                name="OnboardingChoice"
-                component={OnboardingChoiceScreen}
-                options={{ title: 'Get started' }}
-              />
-              <RootStack.Screen
-                name="OnboardingProfile"
-                component={CreateProfileScreen}
-                options={{ title: 'Create Profile' }}
-              />
-              <RootStack.Screen
-                name="OnboardingPasscode"
-                component={PasscodeScreen}
-                options={{ title: 'Set Passcode' }}
-              />
-              <RootStack.Screen
-                name="OnboardingTrustedContacts"
-                component={OnboardingTrustedContactsScreen}
-                options={{ title: 'Trusted Contacts' }}
-              />
-              <RootStack.Screen
-                name="OnboardingSafePhrases"
-                component={OnboardingSafePhrasesScreen}
-                options={{ title: 'Safe Phrases' }}
-              />
-              <RootStack.Screen
-                name="OnboardingInviteFamily"
-                component={InviteFamilyScreen}
-                options={{ title: 'Invite Family' }}
-              />
-              <RootStack.Screen
-                name="OnboardingAlerts"
-                component={AlertPrefsScreen}
-                options={{ title: 'Alert Preferences' }}
-              />
-              <RootStack.Screen
-                name="OnboardingCallForwarding"
-                component={OnboardingCallForwardingScreen}
-                options={{ title: 'Call Forwarding' }}
-              />
-              <RootStack.Screen
-                name="OnboardingTestCall"
-                component={TestCallScreen}
-                options={{ title: 'Test Call' }}
-              />
-              <RootStack.Screen
-                name="OnboardingInviteCode"
-                component={OnboardingInviteCodeScreen}
-                options={{ title: 'Enter invite code' }}
-              />
-            </>
-          ) : (
-            <>
-              <RootStack.Screen
-                name="AppTabs"
-                component={AppTabs}
-                options={{ headerShown: false }}
-              />
-              <RootStack.Screen
-                name="CallDetailModal"
-                component={CallDetailScreen}
-                options={{ headerShown: false, presentation: 'modal' }}
-              />
-            </>
-          )
+    <RootStack.Navigator>
+      {session && !authInvalid ? (
+        !onboardingComplete ? (
+          <>
+            <RootStack.Screen
+              name="OnboardingChoice"
+              component={OnboardingChoiceScreen}
+              options={{ title: 'Get started' }}
+            />
+            <RootStack.Screen
+              name="OnboardingProfile"
+              component={CreateProfileScreen}
+              options={{ title: 'Create Profile' }}
+            />
+            <RootStack.Screen
+              name="OnboardingPasscode"
+              component={PasscodeScreen}
+              options={{ title: 'Set Passcode' }}
+            />
+            <RootStack.Screen
+              name="OnboardingTrustedContacts"
+              component={OnboardingTrustedContactsScreen}
+              options={{ title: 'Trusted Contacts' }}
+            />
+            <RootStack.Screen
+              name="OnboardingSafePhrases"
+              component={OnboardingSafePhrasesScreen}
+              options={{ title: 'Safe Phrases' }}
+            />
+            <RootStack.Screen
+              name="OnboardingInviteFamily"
+              component={InviteFamilyScreen}
+              options={{ title: 'Invite Family' }}
+            />
+            <RootStack.Screen
+              name="OnboardingAlerts"
+              component={AlertPrefsScreen}
+              options={{ title: 'Alert Preferences' }}
+            />
+            <RootStack.Screen
+              name="OnboardingCallForwarding"
+              component={OnboardingCallForwardingScreen}
+              options={{ title: 'Call Forwarding' }}
+            />
+            <RootStack.Screen
+              name="OnboardingTestCall"
+              component={TestCallScreen}
+              options={{ title: 'Test Call' }}
+            />
+            <RootStack.Screen
+              name="OnboardingInviteCode"
+              component={OnboardingInviteCodeScreen}
+              options={{ title: 'Enter invite code' }}
+            />
+          </>
         ) : (
           <>
             <RootStack.Screen
-              name="SignIn"
-              component={SignInScreen}
-              options={{ headerShown: false, animation: 'none' }}
+              name="AppTabs"
+              component={AppTabs}
+              options={{ headerShown: false }}
             />
             <RootStack.Screen
-              name="SignUp"
-              component={SignUpScreen}
-              options={{ headerShown: false, animation: 'none' }}
+              name="CallDetailModal"
+              component={CallDetailScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
             />
           </>
-        )}
-      </RootStack.Navigator>
-      {renderSplash && (
-        <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { zIndex: 10 }]}>
-          <SplashScreen />
-        </View>
+        )
+      ) : (
+        <>
+          <RootStack.Screen
+            name="SignIn"
+            component={SignInScreen}
+            options={{ headerShown: false, animation: 'none' }}
+          />
+          <RootStack.Screen
+            name="SignUp"
+            component={SignUpScreen}
+            options={{ headerShown: false, animation: 'none' }}
+          />
+        </>
       )}
-    </>
+    </RootStack.Navigator>
   );
 }
 
