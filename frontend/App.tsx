@@ -248,12 +248,12 @@ function RootNavigator() {
             <RootStack.Screen
               name="OnboardingProfile"
               component={CreateProfileScreen}
-              options={{ title: 'Create Profile' }}
+              options={{ headerShown: false }}
             />
             <RootStack.Screen
               name="OnboardingPasscode"
               component={PasscodeScreen}
-              options={{ title: 'Set Passcode' }}
+              options={{ headerShown: false }}
             />
             <RootStack.Screen
               name="OnboardingTrustedContacts"
