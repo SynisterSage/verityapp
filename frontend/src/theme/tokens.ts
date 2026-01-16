@@ -11,20 +11,19 @@ const baseSpacing = {
 } as const;
 
 const baseRadii = {
-  xs: 8,
-  sm: 12,
-  md: 16,
-  lg: 20,
+  sm: 16,
+  md: 24,
+  lg: 32,
 } as const;
 
 const baseTypography = {
-  fontFamily: 'System', // Swap with your brand font if available.
-  title: { size: 24, weight: '700', lineHeight: 32 },
+  fontFamily: 'System',
+  title: { size: 34, weight: '700', lineHeight: 40 },
   subtitle: { size: 18, weight: '600', lineHeight: 26 },
-  body: { size: 16, weight: '400', lineHeight: 24 },
   bodyStrong: { size: 16, weight: '600', lineHeight: 24 },
+  body: { size: 16, weight: '400', lineHeight: 24 },
+  captionStrong: { size: 13, weight: '900', lineHeight: 18 },
   caption: { size: 13, weight: '400', lineHeight: 18 },
-  captionStrong: { size: 13, weight: '600', lineHeight: 18 },
 } as const;
 
 const colors = {
@@ -33,28 +32,30 @@ const colors = {
     surface: '#121a26',
     surfaceAlt: '#1a2333',
     text: '#f5f7fb',
-    textMuted: '#b5c0d3',
-    border: '#243247',
+    textMuted: '#94a3b8',
+    textDim: '#64748b',
+    border: 'rgba(255, 255, 255, 0.1)',
     accent: '#2d6df6',
-    accentMuted: '#1f4bbd',
+    accentMuted: 'rgba(45, 109, 246, 0.3)',
     success: '#16a34a',
     danger: '#e11d48',
     warning: '#f59e0b',
-    overlay: 'rgba(0,0,0,0.6)',
+    overlay: 'rgba(0, 0, 0, 0.6)',
   },
   light: {
-    bg: '#f6f8fb',
+    bg: '#f8fafc',
     surface: '#ffffff',
-    surfaceAlt: '#e8f0ff',
-    text: '#0b111b',
-    textMuted: '#4b5565',
-    border: '#d7dce5',
+    surfaceAlt: '#f1f5f9',
+    text: '#0f172a',
+    textMuted: '#475569',
+    textDim: '#94a3b8',
+    border: 'rgba(15, 23, 42, 0.1)',
     accent: '#2d6df6',
-    accentMuted: '#1f4bbd',
+    accentMuted: 'rgba(45, 109, 246, 0.3)',
     success: '#16a34a',
     danger: '#e11d48',
     warning: '#f59e0b',
-    overlay: 'rgba(0,0,0,0.25)',
+    overlay: 'rgba(0, 0, 0, 0.2)',
   },
 } as const;
 
@@ -68,33 +69,62 @@ const shadows = {
   },
   md: {
     shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 8,
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 12,
+  },
+  card: {
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 48,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 18,
+  },
+  bottomAction: {
+    shadowColor: '#000',
+    shadowOpacity: 0.5,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: -12 },
+    elevation: 20,
   },
 } as const;
 
 const components = {
   button: {
-    height: 48,
-    radius: baseRadii.sm,
-    paddingHorizontal: baseSpacing.md,
+    height: 60,
+    radius: baseRadii.md,
+    paddingHorizontal: baseSpacing.lg,
   },
   input: {
-    height: 48,
-    radius: baseRadii.sm,
-    paddingHorizontal: baseSpacing.sm,
+    height: 60,
+    radius: baseRadii.md,
+    paddingHorizontal: baseSpacing.lg,
     borderWidth: 1,
   },
   card: {
-    radius: baseRadii.md,
-    padding: baseSpacing.md,
+    radius: baseRadii.lg,
+    padding: baseSpacing.lg,
   },
   listItem: {
     paddingVertical: baseSpacing.sm,
     paddingHorizontal: baseSpacing.md,
     radius: baseRadii.sm,
+  },
+} as const;
+
+const motion = {
+  transition: 'cubic-bezier(0.32, 1, 0.2, 1)',
+  pulse: 600,
+  shake: 400,
+} as const;
+
+const onboarding = {
+  progress: {
+    segmentActiveWidth: 12,
+    segmentInactiveWidth: 6,
+    segmentHeight: 6,
+    gap: 8,
   },
 } as const;
 
@@ -105,6 +135,8 @@ export const tokens = {
   typography: baseTypography,
   shadows,
   components,
+  motion,
+  onboarding,
 };
 
 export type AppTheme = {
@@ -114,6 +146,8 @@ export type AppTheme = {
   typography: typeof baseTypography;
   shadows: typeof shadows;
   components: typeof components;
+  motion: typeof motion;
+  onboarding: typeof onboarding;
 };
 
 export const getTheme = (mode: ThemeMode): AppTheme => ({
@@ -123,4 +157,6 @@ export const getTheme = (mode: ThemeMode): AppTheme => ({
   typography: baseTypography,
   shadows,
   components,
+  motion,
+  onboarding,
 });

@@ -1,65 +1,170 @@
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
+import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import ActionFooter from '../../components/onboarding/ActionFooter';
 
 export default function SignInScreen({ navigation }: { navigation: any }) {
   const { signIn, signInWithGoogle } = useAuth();
+  const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [loginError, setLoginError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [focusField, setFocusField] = useState<'email' | 'password' | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const insets = useSafeAreaInsets();
   const handleSubmit = async () => {
-    setError('');
+    setLoginError('');
     setIsSubmitting(true);
     const message = await signIn(email.trim(), password);
     if (message) {
-      setError(message);
+      setLoginError(message);
     }
     setIsSubmitting(false);
   };
 
+  const inputBorderColor = (field: 'email' | 'password') =>
+    focusField === field ? theme.colors.accent : theme.colors.border;
+
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[
+        styles.container,
+        {
+          backgroundColor: theme.colors.bg,
+          paddingTop: 24 + insets.top,
+          paddingBottom: 24 + insets.bottom,
+        },
+      ]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.card}>
-        <Text style={styles.title}>Verity Protect</Text>
-        <Text style={styles.subtitle}>Sign in to protect your loved one</Text>
+      <View style={styles.content}>
+        <View>
+          <Text style={[styles.title, { color: theme.colors.text, fontFamily: theme.typography.fontFamily }]}>
+            Welcome Back
+          </Text>
+          <Text
+            style={[
+              styles.subtitle,
+              { color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily },
+            ]}
+          >
+            Sign in to your secure account.
+          </Text>
+        </View>
 
-        <TextInput
-          placeholder="Email"
-          placeholderTextColor="#9aa3b2"
-          autoCapitalize="none"
-          keyboardType="email-address"
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-        />
-        <TextInput
-          placeholder="Password"
-          placeholderTextColor="#9aa3b2"
-          secureTextEntry
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-        />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        <View style={styles.fields}>
+        <View style={styles.fieldWrapper}>
+            <Text style={[styles.fieldLabel, { color: theme.colors.textDim }]}>Email</Text>
+            <TextInput
+              placeholder="name@email.com"
+              placeholderTextColor={theme.colors.textDim}
+              autoCapitalize="none"
+              keyboardType="email-address"
+              style={[
+                styles.input,
+                {
+                  borderColor: inputBorderColor('email'),
+                  backgroundColor: theme.colors.surfaceAlt,
+                  color: theme.colors.text,
+                },
+              ]}
+              value={email}
+              onChangeText={setEmail}
+              onFocus={() => setFocusField('email')}
+              onBlur={() => setFocusField((prev) => (prev === 'email' ? null : prev))}
+            />
+          </View>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={handleSubmit} disabled={isSubmitting}>
-          <Text style={styles.primaryButtonText}>{isSubmitting ? 'Signing in…' : 'Sign In'}</Text>
+          <View style={styles.fieldWrapper}>
+            <Text style={[styles.fieldLabel, { color: theme.colors.textDim }]}>Password</Text>
+            <View style={styles.passwordRow}>
+            <TextInput
+                placeholder="••••••••"
+                placeholderTextColor={theme.colors.textDim}
+                secureTextEntry={!showPassword}
+                style={[
+                  styles.input,
+                  {
+                    borderColor: inputBorderColor('password'),
+                    backgroundColor: theme.colors.surfaceAlt,
+                    color: theme.colors.text,
+                    paddingRight: 60,
+                  },
+                ]}
+                value={password}
+                onChangeText={setPassword}
+                onFocus={() => setFocusField('password')}
+                onBlur={() => setFocusField((prev) => (prev === 'password' ? null : prev))}
+              />
+              <Pressable
+                style={styles.eyeButton}
+                onPress={() => setShowPassword((prev) => !prev)}
+                android_ripple={{ color: 'rgba(255,255,255,0.15)', borderless: true }}
+              >
+                <Svg
+                  width={22}
+                  height={22}
+                  viewBox="0 0 24 24"
+                  style={styles.eyeIcon}
+                  fill="none"
+                  stroke={showPassword ? theme.colors.accent : theme.colors.textMuted}
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <Path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z" />
+                  <Path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" />
+                  {showPassword ? null : <Path d="M4 4l16 16" />}
+                </Svg>
+              </Pressable>
+            </View>
+          </View>
+
+        <TouchableOpacity style={[styles.forgotButton, { alignSelf: 'flex-end' }]} onPress={() => {}}>
+          <Text style={[styles.forgotText, { color: theme.colors.accent }]}>Forgot Password?</Text>
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.secondaryButton} onPress={signInWithGoogle}>
-          <Text style={styles.secondaryButtonText}>Continue with Google</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity onPress={() => navigation.navigate('SignUp')}>
-          <Text style={styles.link}>Create an account</Text>
-        </TouchableOpacity>
+        {loginError ? (
+          <View
+            style={[
+              styles.loginError,
+              { borderColor: theme.colors.danger, marginTop: styles.loginError.marginTop },
+            ]}
+          >
+            <Text style={[styles.loginErrorText, { color: theme.colors.danger }]}>{loginError}</Text>
+          </View>
+        ) : null}
+        </View>
       </View>
+
+      <ActionFooter
+        primaryLabel={isSubmitting ? 'Signing In…' : 'Sign In'}
+        onPrimaryPress={handleSubmit}
+        primaryLoading={isSubmitting}
+        secondaryLabel="Continue with Google"
+        onSecondaryPress={signInWithGoogle}
+        helperPrefix="New to Verity?"
+        helperActionLabel="Join Now"
+        onHelperPress={() => navigation.navigate('SignUp')}
+        secondaryIcon={
+          <View style={styles.googleIcon}>
+            <Text style={styles.googleIconText}>G</Text>
+          </View>
+        }
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -67,61 +172,94 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b111b',
-    justifyContent: 'center',
-    padding: 24,
+    justifyContent: 'space-between',
+    paddingHorizontal: 0,
   },
-  card: {
-    backgroundColor: '#121a26',
-    borderRadius: 18,
-    padding: 24,
-    gap: 14,
+  content: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 24,
   },
   title: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: '700',
-    color: '#f5f7fb',
+    lineHeight: 36,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 14,
-    color: '#b5c0d3',
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  fields: {
+    marginTop: 32,
+    marginBottom: 36,
+  },
+  fieldWrapper: {
+    marginBottom: 14,
+  },
+  fieldLabel: {
+    fontSize: 13,
+    letterSpacing: 0.6,
+    marginBottom: 4,
   },
   input: {
+    height: 60,
     borderWidth: 1,
-    borderColor: '#243247',
-    borderRadius: 12,
-    padding: 12,
-    color: '#e6ebf5',
+    borderRadius: 24,
+    paddingHorizontal: 20,
+    fontSize: 16,
   },
-  primaryButton: {
-    backgroundColor: '#2d6df6',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
+  passwordRow: {
+    position: 'relative',
   },
-  primaryButtonText: {
-    color: '#f5f7fb',
+  eyeButton: {
+    position: 'absolute',
+    right: 16,
+    top: 14,
+    height: 32,
+    width: 64,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  eyeText: {
+    fontSize: 14,
     fontWeight: '600',
   },
-  secondaryButton: {
-    backgroundColor: '#1a2333',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#2b3c57',
+  forgotButton: {
+    marginTop: 2,
   },
-  secondaryButtonText: {
-    color: '#d2daea',
-    fontWeight: '600',
-  },
-  link: {
-    color: '#8ab4ff',
-    textAlign: 'center',
-    marginTop: 6,
+  forgotText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   error: {
-    color: '#ff8a8a',
     fontSize: 12,
+  },
+  googleIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  googleIconText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2d6df6',
+  },
+  loginError: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 12,
+    backgroundColor: 'rgba(225, 29, 72, 0.08)',
+    marginTop: 14,
+  },
+  loginErrorText: {
+    fontSize: 14,
+  },
+  eyeIcon: {
+    marginRight: 4,
   },
 });

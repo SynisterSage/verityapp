@@ -6,7 +6,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Animated, Alert, StyleSheet } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import {
   SafeAreaProvider,
   initialWindowMetrics,
@@ -16,6 +16,7 @@ import * as Linking from 'expo-linking';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ProfileProvider, useProfile } from './src/context/ProfileContext';
+import { ThemeProvider } from './src/context/ThemeContext';
 import { authorizedFetch } from './src/services/backend';
 import SignInScreen from './src/screens/auth/SignInScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
@@ -228,29 +229,19 @@ function RootNavigator() {
   const { session, isLoading } = useAuth();
   const { onboardingComplete, isLoading: profileLoading, authInvalid } = useProfile();
   const [renderSplash, setRenderSplash] = useState(true);
-  const splashProgress = useRef(new Animated.Value(0)).current;
 
   const isBusy = isLoading || (session && profileLoading);
 
   useEffect(() => {
     if (isBusy) {
       setRenderSplash(true);
-      splashProgress.setValue(0);
       return;
     }
     const timer = setTimeout(() => {
-      Animated.timing(splashProgress, {
-        toValue: 1,
-        duration: 380,
-        useNativeDriver: true,
-      }).start(({ finished }) => {
-        if (finished) {
-          setRenderSplash(false);
-        }
-      });
-    }, 900);
+      setRenderSplash(false);
+    }, 2600);
     return () => clearTimeout(timer);
-  }, [isBusy, splashProgress]);
+  }, [isBusy]);
 
   if (isBusy) {
     return <SplashScreen />;
@@ -329,37 +320,15 @@ function RootNavigator() {
           )
         ) : (
           <>
-            <RootStack.Screen name="SignIn" component={SignInScreen} />
+            <RootStack.Screen name="SignIn" component={SignInScreen} options={{ headerShown: false }} />
             <RootStack.Screen name="SignUp" component={SignUpScreen} />
           </>
         )}
       </RootStack.Navigator>
       {renderSplash && (
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            StyleSheet.absoluteFillObject,
-            {
-              zIndex: 10,
-              opacity: splashProgress.interpolate({
-                inputRange: [0, 1],
-                outputRange: [1, 0],
-                extrapolate: 'clamp',
-              }),
-              transform: [
-                {
-                  translateY: splashProgress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, -600],
-                    extrapolate: 'clamp',
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
+        <View pointerEvents="none" style={[StyleSheet.absoluteFillObject, { zIndex: 10 }]}>
           <SplashScreen />
-        </Animated.View>
+        </View>
       )}
     </>
   );
@@ -367,18 +336,20 @@ function RootNavigator() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <ProfileProvider>
-        <InviteLinkHandler />
-        <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <NavigationContainer theme={navTheme}>
-              <RootNavigator />
-              <StatusBar style="light" />
-            </NavigationContainer>
-          </GestureHandlerRootView>
-        </SafeAreaProvider>
-      </ProfileProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ProfileProvider>
+          <InviteLinkHandler />
+          <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <NavigationContainer theme={navTheme}>
+                <RootNavigator />
+                <StatusBar style="light" />
+              </NavigationContainer>
+            </GestureHandlerRootView>
+          </SafeAreaProvider>
+        </ProfileProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

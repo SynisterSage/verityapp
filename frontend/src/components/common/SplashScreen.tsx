@@ -1,99 +1,88 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, Text, StyleSheet, useColorScheme, View } from 'react-native';
+import { Animated, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { getTheme, ThemeMode } from '../../theme/tokens';
+import { useTheme } from '../../context/ThemeContext';
 
-const LOGO_CARD_SIZE = 232;
-const LOGO_ICON_SIZE = 156;
+const ICON_SIZE = 120;
 
 const SplashScreen: React.FC = () => {
-  const scheme = useColorScheme();
-  const mode: ThemeMode = scheme === 'light' ? 'light' : 'dark';
-  const theme = getTheme(mode);
-  const fade = useRef(new Animated.Value(0.85)).current;
-  const scale = useRef(new Animated.Value(0.96)).current;
+  const { theme } = useTheme();
+  const opacity = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fade, {
-        toValue: 1,
-        duration: 260,
-        useNativeDriver: true,
-      }),
-      Animated.spring(scale, {
-        toValue: 1,
-        damping: 12,
-        stiffness: 120,
-        mass: 0.6,
-        useNativeDriver: true,
-      }),
+    Animated.sequence([
+      Animated.delay(100),
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 700,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.delay(1200),
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1.05,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
     ]).start();
-  }, [fade, scale]);
+  }, [opacity, scale]);
 
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          backgroundColor: theme.colors.bg,
-          opacity: fade,
-          transform: [{ scale }],
-        },
-      ]}
-    >
-      <View
+    <View style={[styles.container, { backgroundColor: theme.colors.bg }]}>
+      <Animated.View
         style={[
-          styles.logoCard,
+          styles.logoContainer,
           {
-            backgroundColor: theme.colors.surface,
-            borderRadius: theme.radii.lg,
-            ...theme.shadows.md,
+            opacity,
+            transform: [{ scale }],
           },
         ]}
       >
-        <Svg width={LOGO_ICON_SIZE} height={LOGO_ICON_SIZE} viewBox="0 0 240 240">
+        <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 150 150">
           <Path
-            d="M0 51.9856C0 23.2747 23.2747 0 51.9856 0L188.014 0C216.725 0 240 23.2747 240 51.9856V188.014C240 216.725 216.725 240 188.014 240H51.9856C23.2747 240 0 216.725 0 188.014L0 51.9856Z"
-            fill={theme.colors.surfaceAlt}
+            d="M0 32.491C0 14.5467 14.5467 0 32.491 0H117.509C135.453 0 150 14.5467 150 32.491V117.509C150 135.453 135.453 150 117.509 150H32.491C14.5467 150 0 135.453 0 117.509V32.491Z"
+            fill={theme.colors.bg}
           />
           <Path
-            d="M46.6266 143.015C36.0291 143.015 27.3694 134.191 29.4668 123.803C38.442 79.3501 73.4574 44.3352 117.91 35.3602C128.298 33.2629 137.123 41.9226 137.123 52.52C137.123 62.5915 129.061 70.6325 119.383 73.4221C94.4098 80.6208 74.7276 100.303 67.5287 125.276C64.739 134.953 56.698 143.015 46.6266 143.015Z"
-            fill="#8AB4FF"
+            d="M33.1248 89.6841C26.5014 89.6841 21.0891 84.1689 22.3999 77.6765C28.0094 49.8934 49.8942 28.0092 77.6775 22.3999C84.1699 21.0891 89.6851 26.5014 89.6851 33.1248C89.6851 39.4194 84.6464 44.4451 78.598 46.1885C62.9895 50.6877 50.6879 62.9887 46.1886 78.597C44.4451 84.6454 39.4194 89.6841 33.1248 89.6841Z"
+            fill={theme.colors.accent}
           />
           <Path
-            d="M83.1432 143.015C77.5439 143.015 72.9759 138.36 73.9933 132.854C78.9533 106.009 100.116 84.8456 126.961 79.885C132.467 78.8675 137.123 83.4357 137.123 89.0353C137.123 94.3643 132.866 98.6325 127.698 99.9327C111.189 104.086 98.1936 117.082 94.0401 133.591C92.74 138.759 88.4719 143.015 83.1432 143.015Z"
-            fill="#8AB4FF"
+            d="M55.9485 89.6841C52.4488 89.6841 49.5937 86.7744 50.2296 83.3329C53.3296 66.5555 66.555 53.3299 83.3324 50.2297C86.7741 49.5937 89.6841 52.449 89.6841 55.949C89.6841 59.2798 87.0237 61.9476 83.7935 62.7603C73.476 65.3559 65.3549 73.4766 62.7592 83.794C61.9467 87.0239 59.2791 89.6841 55.9485 89.6841Z"
+            fill={theme.colors.accent}
           />
           <Path
-            d="M118.773 143.015C108.432 143.015 99.8051 133.984 104.964 125.022C108.349 119.141 113.249 114.242 119.13 110.857C128.092 105.699 137.123 114.325 137.123 124.666C137.123 134.8 128.907 143.015 118.773 143.015Z"
-            fill="#8AB4FF"
+            d="M78.2164 89.6841C71.7531 89.6841 66.3613 84.0396 69.5858 78.4382C71.7017 74.7626 74.7637 71.7008 78.4395 69.5852C84.041 66.3613 89.6851 71.7526 89.6851 78.2156C89.6851 84.5495 84.5502 89.6841 78.2164 89.6841Z"
+            fill={theme.colors.accent}
           />
           <Path
-            d="M198.256 143.658L198.256 115.539C198.256 105.277 189.937 96.9585 179.675 96.9585L161.831 96.9585C151.624 96.9585 143.329 105.191 143.25 115.397L143.12 132.404C143.041 142.61 134.746 150.843 124.54 150.843L108.814 150.843C98.3088 150.843 89.8928 159.544 90.2433 170.043L90.8171 187.23C91.1515 197.245 99.367 205.191 109.387 205.191L137.093 205.191C142.049 205.191 146.799 203.211 150.288 199.692L192.87 156.739C196.32 153.259 198.256 148.558 198.256 143.658Z"
+            d="M127.893 90.0856L127.893 72.5115C127.893 66.0979 122.693 60.8986 116.28 60.8986L105.127 60.8986C98.7479 60.8986 93.5631 66.0437 93.5142 72.4224L93.4326 83.0523C93.3836 89.431 88.1988 94.5761 81.82 94.5761L71.9912 94.5761C65.4257 94.5761 60.1657 100.015 60.3847 106.577L60.7434 117.319C60.9524 123.578 66.087 128.544 72.3499 128.544L89.6657 128.544C92.763 128.544 95.7321 127.307 97.9127 125.107L124.527 98.2616C126.683 96.0867 127.893 93.1481 127.893 90.0856Z"
             fill={theme.colors.accent}
           />
         </Svg>
-      </View>
-      <View style={styles.textBlock}>
-        <Text
-          style={[
-            styles.title,
-            { color: '#8AB4FF', fontFamily: theme.typography.fontFamily },
-          ]}
-        >
-          VERITY
+        <Text style={[styles.primaryText, { color: theme.colors.text, fontFamily: theme.typography.fontFamily }]}>
+          Verity
         </Text>
-        <Text
-          style={[
-            styles.title,
-            { color: theme.colors.accent, fontFamily: theme.typography.fontFamily },
-          ]}
-        >
-          PROTECT
+        <Text style={[styles.secondaryText, { color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily }]}>
+          Protect
         </Text>
-      </View>
-    </Animated.View>
+      </Animated.View>
+    </View>
   );
 };
 
@@ -102,23 +91,21 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
   },
-  logoCard: {
-    width: LOGO_CARD_SIZE,
-    height: LOGO_CARD_SIZE,
+  logoContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  textBlock: {
-    alignItems: 'center',
-    marginTop: 28,
+  primaryText: {
+    marginTop: 16,
+    fontSize: 32,
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
-  title: {
-    fontSize: 40,
-    fontWeight: '800',
-    letterSpacing: 0.4,
-    lineHeight: 46,
+  secondaryText: {
+    fontSize: 18,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    marginTop: 4,
   },
 });
 
