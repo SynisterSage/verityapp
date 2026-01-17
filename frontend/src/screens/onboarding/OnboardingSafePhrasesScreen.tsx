@@ -26,6 +26,12 @@ type SafePhrase = {
   created_at: string;
 };
 
+const normalizePhrase = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+};
+
 export default function OnboardingSafePhrasesScreen({ navigation }: { navigation: any }) {
   const { activeProfile } = useProfile();
   const insets = useSafeAreaInsets();
@@ -57,7 +63,11 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
     if (!activeProfile) return;
     setLoading(true);
     const data = await authorizedFetch(`/fraud/safe-phrases?profileId=${activeProfile.id}`);
-    setPhrases(data?.safe_phrases ?? []);
+    const normalizedPhrases = (data?.safe_phrases ?? []).map((item: SafePhrase) => ({
+      ...item,
+      phrase: normalizePhrase(item.phrase),
+    }));
+    setPhrases(normalizedPhrases);
     setLoading(false);
   };
 
@@ -69,9 +79,10 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
     if (!input.trim() || !activeProfile) return;
     setError('');
     try {
+      const phrase = normalizePhrase(input);
       await authorizedFetch('/fraud/safe-phrases', {
         method: 'POST',
-        body: JSON.stringify({ profileId: activeProfile.id, phrase: input.trim() }),
+        body: JSON.stringify({ profileId: activeProfile.id, phrase }),
       });
       setInput('');
       loadPhrases();

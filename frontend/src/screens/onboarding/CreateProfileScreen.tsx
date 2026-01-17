@@ -48,6 +48,9 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [twilioDigits, setTwilioDigits] = useState('');
   const lastPhoneKey = useRef<string | null>(null);
   const lastTwilioKey = useRef<string | null>(null);
+  const lastNameRef = useRef<TextInput | null>(null);
+  const phoneRef = useRef<TextInput | null>(null);
+  const twilioRef = useRef<TextInput | null>(null);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -192,6 +195,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
+                returnKeyType="next"
+                onSubmitEditing={() => lastNameRef.current?.focus()}
               />
             </View>
 
@@ -205,6 +210,9 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
                 value={lastName}
                 onChangeText={setLastName}
                 autoCapitalize="words"
+                ref={lastNameRef}
+                returnKeyType="next"
+                onSubmitEditing={() => phoneRef.current?.focus()}
               />
             </View>
 
@@ -220,6 +228,9 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
                 value={formattedPhone}
                 onChangeText={handlePhoneChange}
                 onKeyPress={handlePhoneKeyPress}
+                ref={phoneRef}
+                returnKeyType="next"
+                onSubmitEditing={() => twilioRef.current?.focus()}
               />
             </View>
 
@@ -235,6 +246,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
                 value={formattedTwilio}
                 onChangeText={handleTwilioChange}
                 onKeyPress={handleTwilioKeyPress}
+                ref={twilioRef}
               />
             </View>
           </View>
