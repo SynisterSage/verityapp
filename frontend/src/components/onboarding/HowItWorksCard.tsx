@@ -60,5 +60,8 @@ const styles = StyleSheet.create({
   text: {
     color: '#e6ebf5',
     fontSize: 14,
+    flex: 1,
+    flexWrap: 'wrap',
+    flexShrink: 1,
   },
 });

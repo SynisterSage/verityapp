@@ -46,9 +46,11 @@ type ProfileContextValue = {
   onboardingComplete: boolean;
   isLoading: boolean;
   authInvalid: boolean;
+  passcodeDraft: string;
   refreshProfiles: () => Promise<void>;
   setActiveProfile: (profile: Profile | null) => void;
   setOnboardingComplete: (value: boolean) => void;
+  setPasscodeDraft: (value: string) => void;
 };
 
 const ProfileContext = createContext<ProfileContextValue | undefined>(undefined);
@@ -61,6 +63,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [authInvalid, setAuthInvalid] = useState(false);
+  const [passcodeDraft, setPasscodeDraft] = useState('');
 
   const refreshProfiles = useCallback(async () => {
     if (!session) {
@@ -162,6 +165,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       refreshProfiles,
       setActiveProfile,
       setOnboardingComplete,
+      passcodeDraft,
+      setPasscodeDraft,
     }),
     [
       profiles,
@@ -172,6 +177,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       isLoading,
       authInvalid,
       refreshProfiles,
+      passcodeDraft,
     ]
   );
 

@@ -6,6 +6,23 @@ import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { hashCallerNumber } from '@src/services/fraud';
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 
+function normalizeCallerNumber(input?: string | null) {
+  if (!input) {
+    return null;
+  }
+  const digits = input.replace(/[^\d]/g, '');
+  if (!digits) {
+    return null;
+  }
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  return `+${digits}`;
+}
+
 async function getAuthenticatedUserId(req: Request) {
   const authHeader = req.header('authorization') ?? '';
   const token = authHeader.toLowerCase().startsWith('bearer ')
@@ -290,7 +307,7 @@ async function listTrustedContacts(req: Request, res: Response) {
 
   const { data, error } = await supabaseAdmin
     .from('trusted_contacts')
-    .select('id, caller_number, source, created_at')
+    .select('id, caller_number, source, created_at, relationship_tag, contact_name, caller_hash')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false });
 
@@ -299,7 +316,21 @@ async function listTrustedContacts(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to load trusted contacts' });
   }
 
-  return res.status(HTTP_STATUS_CODES.Ok).json({ trusted_contacts: data ?? [] });
+  const seen = new Set<string>();
+  const deduped = (data ?? []).filter((contact) => {
+    const canonical = normalizeCallerNumber(contact.caller_number) ?? '';
+    const key = canonical || contact.caller_hash || contact.caller_number;
+    if (!key) {
+      return false;
+    }
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ trusted_contacts: deduped });
 }
 
 async function addTrustedContacts(req: Request, res: Response) {
@@ -308,11 +339,12 @@ async function addTrustedContacts(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
   }
 
-  const { profileId, callerNumber, callerNumbers, source } = req.body as {
+  const { profileId, callerNumber, callerNumbers, source, contactNames } = req.body as {
     profileId?: string;
     callerNumber?: string;
     callerNumbers?: string[];
     source?: string;
+    contactNames?: Record<string, string>;
   };
 
   if (!profileId) {
@@ -330,26 +362,59 @@ async function addTrustedContacts(req: Request, res: Response) {
       ? [callerNumber]
       : [];
 
+  const normalizedNumbers = Array.from(
+    new Set(
+      rawNumbers
+        .map((number) => normalizeCallerNumber(number))
+        .filter((value): value is string => Boolean(value))
+    )
+  );
+
   const normalizedSource = source === 'contacts' ? 'contacts' : 'manual';
-  const rows = rawNumbers
-    .map((number) => {
-      const trimmed = number?.trim();
-      const callerHash = hashCallerNumber(trimmed);
-      if (!trimmed || !callerHash) {
-        return null;
-      }
-      return {
-        profile_id: profileId,
-        caller_hash: callerHash,
-        caller_number: trimmed,
-        source: normalizedSource,
-      };
-    })
+  const normalizedContactNames: Record<string, string> = {};
+  Object.entries(contactNames ?? {}).forEach(([rawNumber, name]) => {
+    const normalized = normalizeCallerNumber(rawNumber);
+    if (normalized && name) {
+      normalizedContactNames[normalized] = name;
+    }
+  });
+  const { data: existingRows } = await supabaseAdmin
+    .from('trusted_contacts')
+    .select('caller_number')
+    .eq('profile_id', profileId);
+  const existingCanonicalNumbers = new Set<string>();
+  (existingRows ?? []).forEach((row: { caller_number?: string | null }) => {
+    const normalizedNumber = normalizeCallerNumber(row.caller_number || '');
+    if (normalizedNumber) {
+      existingCanonicalNumbers.add(normalizedNumber);
+    }
+  });
+  const filteredNumbers = normalizedNumbers.filter(
+    (number) => !existingCanonicalNumbers.has(number)
+  );
+  if (filteredNumbers.length === 0) {
+    return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true, added: 0 });
+  }
+  const rows = filteredNumbers.map((normalizedNumber) => {
+    const callerHash = hashCallerNumber(normalizedNumber);
+    if (!callerHash) {
+      return null;
+    }
+    const contactName = normalizedContactNames[normalizedNumber];
+    return {
+      profile_id: profileId,
+      caller_hash: callerHash,
+      caller_number: normalizedNumber,
+      source: normalizedSource,
+      contact_name: contactName?.trim() || null,
+    };
+  })
     .filter(Boolean) as {
       profile_id: string;
       caller_hash: string;
       caller_number: string;
       source: 'manual' | 'contacts';
+      contact_name?: string | null;
     }[];
 
   if (rows.length === 0) {
@@ -368,6 +433,82 @@ async function addTrustedContacts(req: Request, res: Response) {
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true, added: rows.length });
+}
+
+async function updateTrustedContact(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId, callerNumber, relationshipTag, contactName } = req.body as {
+    profileId?: string;
+    callerNumber?: string;
+    relationshipTag?: string;
+    contactName?: string;
+  };
+
+  if (!profileId || !callerNumber?.trim() || !relationshipTag?.trim()) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId, callerNumber, or relationshipTag' });
+  }
+
+  const allowed = await userIsCaretaker(userId, profileId);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const trimmed = callerNumber.trim();
+  const normalizedNumber = normalizeCallerNumber(trimmed);
+  const candidates = Array.from(
+    new Map(
+      [normalizedNumber, trimmed]
+        .filter((value): value is string => Boolean(value))
+        .map((value) => {
+          const hash = hashCallerNumber(value);
+          return hash ? [hash, value] : null;
+        })
+        .filter((entry): entry is [string, string] => Boolean(entry))
+    )
+  );
+
+  if (candidates.length === 0) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid callerNumber' });
+  }
+
+  const hashes = candidates.map(([hash]) => hash);
+  const { data: existing } = await supabaseAdmin
+    .from('trusted_contacts')
+    .select('caller_hash')
+    .eq('profile_id', profileId)
+    .in('caller_hash', hashes)
+    .limit(1)
+    .maybeSingle();
+
+  if (!existing) {
+    return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Trusted contact not found' });
+  }
+
+  const callerHash = existing.caller_hash;
+
+  const updates: Record<string, string> = {
+    relationship_tag: relationshipTag.trim(),
+  };
+  if (contactName?.trim()) {
+    updates.contact_name = contactName.trim();
+  }
+
+  const { error } = await supabaseAdmin
+    .from('trusted_contacts')
+    .update(updates)
+    .eq('profile_id', profileId)
+    .eq('caller_hash', callerHash);
+
+  if (error) {
+    logger.err(error);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to update trusted contact' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
 }
 
 async function getCallerStatus(req: Request, res: Response) {
@@ -460,5 +601,6 @@ export default {
   listTrustedContacts,
   addTrustedContacts,
   deleteTrustedContact,
+  updateTrustedContact,
   getCallerStatus,
 };

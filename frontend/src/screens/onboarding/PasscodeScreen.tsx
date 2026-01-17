@@ -31,9 +31,12 @@ const PIN_LENGTH = 6;
 const formatDigits = (digits: string[]) => digits.join('');
 
 export default function PasscodeScreen({ navigation }: { navigation: any }) {
-  const { activeProfile, setActiveProfile } = useProfile();
+  const { activeProfile, setActiveProfile, passcodeDraft, setPasscodeDraft } = useProfile();
   const insets = useSafeAreaInsets();
-  const [createDigits, setCreateDigits] = useState<string[]>(Array(PIN_LENGTH).fill(''));
+  const [createDigits, setCreateDigits] = useState<string[]>(() => {
+    const base = passcodeDraft.slice(0, PIN_LENGTH).split('');
+    return [...base, ...Array(PIN_LENGTH - base.length).fill('')];
+  });
   const [confirmDigits, setConfirmDigits] = useState<string[]>(Array(PIN_LENGTH).fill(''));
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,6 +80,10 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
       confirmRefs.current[0]?.focus();
     }
   }, [createComplete]);
+
+  useEffect(() => {
+    setPasscodeDraft(createValue);
+  }, [createValue, setPasscodeDraft]);
 
   const updateDigits = (
     index: number,
@@ -135,6 +142,7 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
         body: JSON.stringify({ pin: createValue }),
       });
       setActiveProfile({ ...activeProfile, has_passcode: true });
+      setPasscodeDraft('');
       navigation.navigate('OnboardingTrustedContacts');
     } catch (err: any) {
       setError(err?.message || 'Failed to save passcode.');

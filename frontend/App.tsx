@@ -258,12 +258,12 @@ function RootNavigator() {
             <RootStack.Screen
               name="OnboardingTrustedContacts"
               component={OnboardingTrustedContactsScreen}
-              options={{ title: 'Trusted Contacts' }}
+              options={{ headerShown: false }}
             />
             <RootStack.Screen
               name="OnboardingSafePhrases"
               component={OnboardingSafePhrasesScreen}
-              options={{ title: 'Safe Phrases' }}
+              options={{ headerShown: false }}
             />
             <RootStack.Screen
               name="OnboardingInviteFamily"
