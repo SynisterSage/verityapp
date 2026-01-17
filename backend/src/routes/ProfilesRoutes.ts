@@ -3,6 +3,7 @@ import { Router } from 'express';
 import PATHS from '@src/common/constants/PATHS';
 import ProfilesController from '@src/controllers/ProfilesController';
 import ProfileMembersController from '@src/controllers/ProfileMembersController';
+import TwilioClientController from '@src/controllers/TwilioClientController';
 
 const router = Router();
 
@@ -20,5 +21,7 @@ router.post(PATHS.Profiles.InviteAccept, ProfileMembersController.acceptInvite);
 router.get(PATHS.Profiles.Members, ProfileMembersController.listMembers);
 router.patch(PATHS.Profiles.Member, ProfileMembersController.changeMemberRole);
 router.delete(PATHS.Profiles.Member, ProfileMembersController.removeMember);
+router.post('/:profileId/twilio-client/token', TwilioClientController.createClientToken);
+router.post('/:profileId/twilio-client/heartbeat', TwilioClientController.recordClientHeartbeat);
 
 export default router;

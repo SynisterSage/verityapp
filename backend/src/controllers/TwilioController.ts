@@ -53,6 +53,8 @@ function extractPin(digits?: string, speechResult?: string) {
   return numeric.length >= 6 ? numeric.slice(0, 6) : '';
 }
 
+const CLIENT_SESSION_TTL_MS = Number(process.env.TWILIO_CLIENT_SESSION_TTL ?? '120') * 1000;
+
 async function isCallerTrusted(profileId: string, fromNumber?: string | null) {
   const callerHash = hashCallerNumber(fromNumber);
   if (!callerHash) {
@@ -92,7 +94,27 @@ function appendHangupMessage(
   twimlResponse.hangup();
 }
 
-function appendBridge(
+function shouldUseTwilioClient(profile: {
+  twilio_client_last_seen_at?: string | null;
+}) {
+  if (!profile.twilio_client_last_seen_at) {
+    return false;
+  }
+  const lastSeen = new Date(profile.twilio_client_last_seen_at).getTime();
+  if (!Number.isFinite(lastSeen)) {
+    return false;
+  }
+  return Date.now() - lastSeen <= CLIENT_SESSION_TTL_MS;
+}
+
+function getClientIdentity(profile: {
+  id: string;
+  twilio_client_identity?: string | null;
+}) {
+  return profile.twilio_client_identity || `profile-${profile.id}`;
+}
+
+function appendNumberBridge(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
   callerId: string,
@@ -114,6 +136,52 @@ function appendBridge(
   );
 }
 
+function appendClientBridge(
+  twimlResponse: twilio.twiml.VoiceResponse,
+  dialStatusUrl: string,
+  callerId: string,
+  clientIdentity: string
+) {
+  twimlResponse.say({ voice: 'Polly.Joanna' }, 'Thank you. Connecting your call.');
+  const dial = twimlResponse.dial({
+    callerId,
+    timeout: 20,
+    answerOnBridge: true,
+  });
+  dial.client(
+    {
+      statusCallback: dialStatusUrl,
+      statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
+      statusCallbackMethod: 'POST',
+    },
+    clientIdentity
+  );
+}
+
+function bridgeToProfile(
+  twimlResponse: twilio.twiml.VoiceResponse,
+  dialStatusUrl: string,
+  callerId: string,
+  toNumber: string,
+  profile: {
+    id: string;
+    phone_number?: string | null;
+    twilio_client_identity?: string | null;
+    twilio_client_last_seen_at?: string | null;
+  }
+) {
+  if (shouldUseTwilioClient(profile)) {
+    const clientIdentity = getClientIdentity(profile);
+    appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity);
+    return `client=${clientIdentity}`;
+  }
+  if (profile.phone_number) {
+    appendNumberBridge(twimlResponse, dialStatusUrl, callerId, profile.phone_number);
+    return `number=${profile.phone_number}`;
+  }
+  return null;
+}
+
 /**
  * Respond to Twilio when a call comes in. We play a greeting, record the voicemail,
  * and point recordingStatusCallback to our recording-ready webhook.
@@ -133,11 +201,19 @@ async function callIncoming(req: Request, res: Response) {
     const trusted = await isCallerTrusted(profile.id, fromNumber);
     if (trusted) {
       const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
-      if (bridgeEnabled && profile.phone_number) {
+      if (bridgeEnabled) {
         const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
-        appendBridge(twimlResponse, dialStatusUrl, outboundCallerId, profile.phone_number);
-        logger.info(`Trusted caller bridged to=${toNumber} from=${fromNumber}`);
-        return res.type('text/xml').send(twimlResponse.toString());
+        const bridgeTarget = bridgeToProfile(
+          twimlResponse,
+          dialStatusUrl,
+          outboundCallerId,
+          toNumber,
+          profile
+        );
+        if (bridgeTarget) {
+          logger.info(`Trusted caller bridged ${bridgeTarget} to=${toNumber} from=${fromNumber}`);
+          return res.type('text/xml').send(twimlResponse.toString());
+        }
       }
       await supabaseAdmin.from('alerts').insert({
         profile_id: profile.id,
@@ -244,7 +320,9 @@ async function getProfileByToNumber(to?: string | null) {
   }
   const { data: profile, error } = await supabaseAdmin
     .from('profiles')
-    .select('id, phone_number, pin_hash, pin_pepper_version, passcode_hash')
+    .select(
+      'id, phone_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at'
+    )
     .eq('twilio_virtual_number', to)
     .single();
   if (error || !profile) {
@@ -276,10 +354,19 @@ async function verifyPin(req: Request, res: Response) {
   const trusted = await isCallerTrusted(profile.id, fromNumber);
   if (trusted) {
     const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
-    if (bridgeEnabled && profile.phone_number) {
+    if (bridgeEnabled) {
       const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
-      appendBridge(twimlResponse, dialStatusUrl, outboundCallerId, profile.phone_number);
-      return res.type('text/xml').send(twimlResponse.toString());
+      const bridgeTarget = bridgeToProfile(
+        twimlResponse,
+        dialStatusUrl,
+        outboundCallerId,
+        toNumber,
+        profile
+      );
+      if (bridgeTarget) {
+        logger.info(`Trusted caller bridged ${bridgeTarget} to=${toNumber} from=${fromNumber}`);
+        return res.type('text/xml').send(twimlResponse.toString());
+      }
     }
     appendHangupMessage(twimlResponse, 'Thank you. We will let them know you called.');
     return res.type('text/xml').send(twimlResponse.toString());
@@ -316,13 +403,23 @@ async function verifyPin(req: Request, res: Response) {
     `Verify pin result to=${toNumber} pin_len=${pin.length} valid=${isValid} locked=${pinResult.locked} phone=${profile.phone_number ?? 'none'}`
   );
   const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
-  if (isValid && profile.phone_number && bridgeEnabled) {
+  if (isValid && bridgeEnabled) {
     const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
-    logger.info(
-      `Dialing profile_number=${profile.phone_number} callerId=${outboundCallerId}`
-    );
-    appendBridge(twimlResponse, dialStatusUrl, outboundCallerId, profile.phone_number);
-    return res.type('text/xml').send(twimlResponse.toString());
+    if (shouldUseTwilioClient(profile)) {
+      const clientIdentity = getClientIdentity(profile);
+      logger.info(
+        `Dialing client=${clientIdentity} callerId=${outboundCallerId}`
+      );
+      appendClientBridge(twimlResponse, dialStatusUrl, outboundCallerId, clientIdentity);
+      return res.type('text/xml').send(twimlResponse.toString());
+    }
+    if (profile.phone_number) {
+      logger.info(
+        `Dialing profile_number=${profile.phone_number} callerId=${outboundCallerId}`
+      );
+      appendNumberBridge(twimlResponse, dialStatusUrl, outboundCallerId, profile.phone_number);
+      return res.type('text/xml').send(twimlResponse.toString());
+    }
   }
 
   if (isValid && !bridgeEnabled) {

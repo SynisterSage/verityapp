@@ -54,6 +54,7 @@ import {
   CallsStackParamList,
   SettingsStackParamList,
 } from './src/navigation/types';
+import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientManager';
 
 enableScreens(true);
 
@@ -338,6 +339,7 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <ProfileProvider>
+          <TwilioVoiceClientManager />
           <InviteLinkHandler />
           <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
             <GestureHandlerRootView style={{ flex: 1 }}>

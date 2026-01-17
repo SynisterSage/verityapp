@@ -4,12 +4,17 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 
 import { useAuth } from './AuthContext';
 import { authorizedFetch } from '../services/backend';
 import { supabase } from '../services/supabase';
+import {
+  requestTwilioClientToken,
+  sendTwilioClientHeartbeat,
+} from '../services/twilioClient';
 
 export type Profile = {
   id: string;
@@ -53,6 +58,12 @@ type ProfileContextValue = {
   setOnboardingComplete: (value: boolean) => void;
   setPasscodeDraft: (value: string) => void;
   setRedirectToSettings: (value: boolean) => void;
+  twilioClientToken: string | null;
+  twilioClientIdentity: string | null;
+  twilioClientError: string | null;
+  twilioClientHeartbeatActive: boolean;
+  isTwilioClientReady: boolean;
+  refreshTwilioClientSession: () => Promise<void>;
 };
 
 const ProfileContext = createContext<ProfileContextValue | undefined>(undefined);
@@ -67,6 +78,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [authInvalid, setAuthInvalid] = useState(false);
   const [passcodeDraft, setPasscodeDraft] = useState('');
   const [redirectToSettings, setRedirectToSettings] = useState(false);
+  const [twilioClientToken, setTwilioClientToken] = useState<string | null>(null);
+  const [twilioClientIdentity, setTwilioClientIdentity] = useState<string | null>(null);
+  const [twilioClientError, setTwilioClientError] = useState<string | null>(null);
+  const [twilioClientHeartbeatActive, setTwilioClientHeartbeatActive] = useState(false);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const refreshProfiles = useCallback(async () => {
     if (!session) {
@@ -102,6 +118,31 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshProfiles();
   }, [session, refreshProfiles]);
+
+  const refreshTwilioClientToken = useCallback(async (profileId: string) => {
+    try {
+      setTwilioClientError(null);
+      const data = await requestTwilioClientToken(profileId);
+      setTwilioClientToken(data.token);
+      setTwilioClientIdentity(data.identity);
+      await sendTwilioClientHeartbeat(profileId, data.identity);
+      setTwilioClientHeartbeatActive(true);
+    } catch (err) {
+      setTwilioClientToken(null);
+      setTwilioClientIdentity(null);
+      setTwilioClientHeartbeatActive(false);
+      const message = err instanceof Error ? err.message : 'Failed to fetch Twilio client token';
+      setTwilioClientError(message);
+      throw err;
+    }
+  }, []);
+
+  const refreshTwilioClientSession = useCallback(async () => {
+    if (!activeProfile?.id) {
+      return;
+    }
+    await refreshTwilioClientToken(activeProfile.id);
+  }, [activeProfile?.id, refreshTwilioClientToken]);
 
   useEffect(() => {
     if (!session || !activeProfile?.id) {
@@ -151,10 +192,68 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     };
   }, [activeProfile?.id, refreshProfiles]);
 
+  useEffect(() => {
+    setTwilioClientToken(null);
+    setTwilioClientIdentity(null);
+    setTwilioClientError(null);
+    setTwilioClientHeartbeatActive(false);
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
+    if (!activeProfile?.id) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        await refreshTwilioClientToken(activeProfile.id);
+      } catch (err) {
+        if (!cancelled) {
+          console.warn('Failed to refresh Twilio client token', err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+    };
+  }, [activeProfile?.id, refreshTwilioClientToken]);
+
+  useEffect(() => {
+    if (!activeProfile?.id || !twilioClientIdentity) {
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+      setTwilioClientHeartbeatActive(false);
+      return;
+    }
+    const interval = setInterval(() => {
+      sendTwilioClientHeartbeat(activeProfile.id, twilioClientIdentity).catch((err) => {
+        console.warn('Twilio client heartbeat failed', err);
+        setTwilioClientHeartbeatActive(false);
+      });
+    }, 45_000);
+    heartbeatRef.current = interval;
+    setTwilioClientHeartbeatActive(true);
+    return () => {
+      if (heartbeatRef.current) {
+        clearInterval(heartbeatRef.current);
+        heartbeatRef.current = null;
+      }
+    };
+  }, [activeProfile?.id, twilioClientIdentity]);
+
   const canManageProfile = useMemo(
     () => Boolean(activeMembership?.is_caretaker || activeMembership?.role === 'admin'),
     [activeMembership]
   );
+
+  const isTwilioClientReady = Boolean(twilioClientToken && twilioClientIdentity);
 
   const value = useMemo<ProfileContextValue>(
     () => ({
@@ -172,6 +271,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setOnboardingComplete,
       setPasscodeDraft,
       setRedirectToSettings,
+      twilioClientToken,
+      twilioClientIdentity,
+      twilioClientError,
+      twilioClientHeartbeatActive,
+      isTwilioClientReady,
+      refreshTwilioClientSession,
     }),
     [
       profiles,
@@ -184,6 +289,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       refreshProfiles,
       passcodeDraft,
       redirectToSettings,
+      twilioClientToken,
+      twilioClientIdentity,
+      twilioClientError,
+      twilioClientHeartbeatActive,
+      isTwilioClientReady,
+      refreshTwilioClientSession,
     ]
   );
 
