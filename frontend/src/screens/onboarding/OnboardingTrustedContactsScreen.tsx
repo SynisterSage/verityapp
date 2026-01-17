@@ -19,6 +19,7 @@ import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import ActionFooter from '../../components/onboarding/ActionFooter';
 import { selectContacts } from '../../native/ContactPicker';
 
 type DeviceContact = {
@@ -425,7 +426,7 @@ const safeList = useMemo(() => {
           contentContainerStyle={[
             styles.body,
             {
-              paddingBottom: 32 + Math.max(insets.bottom, 32),
+              paddingBottom: Math.max(insets.bottom, 32) + 220,
             },
           ]}
           showsVerticalScrollIndicator={false}
@@ -503,22 +504,12 @@ const safeList = useMemo(() => {
           <HowItWorksCard items={helperItems} />
         </ScrollView>
 
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              {
-                opacity: pressed ? 0.9 : 1,
-              },
-            ]}
-            onPress={() => navigation.navigate('OnboardingSafePhrases')}
-          >
-            <Text style={styles.primaryButtonText}>Save Safe List</Text>
-          </Pressable>
-          <TouchableOpacity onPress={() => navigation.navigate('OnboardingSafePhrases')}>
-            <Text style={styles.secondaryLink}>Skip for now</Text>
-          </TouchableOpacity>
-        </View>
+        <ActionFooter
+          primaryLabel="Save Safe List"
+          onPrimaryPress={() => navigation.navigate('OnboardingSafePhrases')}
+          secondaryLabel="Skip for now"
+          onSecondaryPress={() => navigation.navigate('OnboardingSafePhrases')}
+        />
 
         {isTrayMounted && trayContact && trayMode && (
           <View style={styles.trayOverlay}>
@@ -758,30 +749,6 @@ const styles = StyleSheet.create({
   error: {
     color: '#ff8a8a',
     marginBottom: 12,
-  },
-  footer: {
-    paddingHorizontal: 32,
-    paddingTop: 0,
-    backgroundColor: '#0b111b',
-    marginTop: 20,
-  },
-  primaryButton: {
-    height: 60,
-    borderRadius: 24,
-    backgroundColor: '#2d6df6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  secondaryLink: {
-    color: '#8aa0c6',
-    textAlign: 'center',
-    fontWeight: '600',
   },
   skeletonWrapper: {
     marginBottom: 12,

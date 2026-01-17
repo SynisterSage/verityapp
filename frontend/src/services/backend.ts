@@ -30,7 +30,24 @@ export async function authorizedFetch(path: string, options: RequestInit = {}) {
       await supabase.auth.signOut();
     }
     const text = await response.text();
-    throw new Error(text || 'Request failed');
+    let message = text;
+    if (text) {
+      try {
+        const json = JSON.parse(text);
+        if (json?.message) {
+          message = json.message;
+        } else if (Array.isArray(json?.errors) && json.errors[0]?.message) {
+          message = json.errors[0].message;
+        } else if (json?.error?.message) {
+          message = json.error.message;
+        } else {
+          message = JSON.stringify(json);
+        }
+      } catch {
+        message = text;
+      }
+    }
+    throw new Error(message || 'Request failed');
   }
   if (response.status === 204) {
     return null;

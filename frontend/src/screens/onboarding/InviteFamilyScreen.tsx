@@ -18,8 +18,10 @@ import { useAuth } from '../../context/AuthContext';
 import { authorizedFetch } from '../../services/backend';
 import { supabase } from '../../services/supabase';
 import { useProfile } from '../../context/ProfileContext';
+import { useTheme } from '../../context/ThemeContext';
 import * as Clipboard from 'expo-clipboard';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import ActionFooter from '../../components/onboarding/ActionFooter';
 import { Ionicons } from '@expo/vector-icons';
 type MemberRole = 'admin' | 'editor';
 
@@ -69,6 +71,7 @@ type Props = {
 export default function InviteFamilyScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
+  const { theme } = useTheme();
   const { session } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -351,7 +354,15 @@ export default function InviteFamilyScreen({ navigation }: Props) {
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <OnboardingHeader chapter="Circle" activeStep={7} totalSteps={9} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingBottom: Math.max(insets.bottom, 32) + 220,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.headerSection}>
           <Text style={styles.title}>Invite Family</Text>
           <Text style={styles.subtitle}>
@@ -386,15 +397,16 @@ export default function InviteFamilyScreen({ navigation }: Props) {
                 key={role}
                 style={[
                   styles.rolePill,
-                  inviteRole === role && styles.rolePillActive,
-                  inviteRole !== role && styles.rolePillInactive,
+                  inviteRole === role
+                    ? styles.rolePillActive
+                    : { backgroundColor: theme.colors.surfaceAlt },
                 ]}
                 onPress={() => setInviteRole(role)}
               >
                 <Text
                   style={[
                     styles.roleLabel,
-                    inviteRole === role ? styles.roleLabelActive : styles.roleLabelInactive,
+                    inviteRole === role ? styles.roleLabelActive : { color: theme.colors.textDim },
                   ]}
                 >
                   {ROLE_DISPLAY_NAMES[role] ?? role}
@@ -402,7 +414,9 @@ export default function InviteFamilyScreen({ navigation }: Props) {
                 <Text
                   style={[
                     styles.roleSubLabel,
-                    inviteRole === role ? styles.roleSubLabelActive : styles.roleSubLabelInactive,
+                    inviteRole === role
+                      ? styles.roleSubLabelActive
+                      : { color: theme.colors.textDim },
                   ]}
                 >
                   {role === 'admin' ? 'Full access' : 'Alerts only'}
@@ -482,20 +496,12 @@ export default function InviteFamilyScreen({ navigation }: Props) {
 
         <View style={{ height: Math.max(insets.bottom, 40) }} />
       </ScrollView>
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.primaryButton,
-            { opacity: pressed ? 0.9 : 1 },
-          ]}
-          onPress={() => navigation.navigate('OnboardingAlerts')}
-        >
-          <Text style={styles.primaryButtonText}>Continue</Text>
-        </Pressable>
-        <TouchableOpacity onPress={() => navigation.navigate('OnboardingAlerts')}>
-          <Text style={styles.secondaryLink}>Skip for now</Text>
-        </TouchableOpacity>
-      </View>
+      <ActionFooter
+        primaryLabel="Continue"
+        onPrimaryPress={() => navigation.navigate('OnboardingAlerts')}
+        secondaryLabel="Skip for now"
+        onSecondaryPress={() => navigation.navigate('OnboardingAlerts')}
+      />
       {selectedInvite && (
         <View style={styles.actionOverlay} pointerEvents="box-none">
           <TouchableWithoutFeedback onPress={closeInviteActions}>
@@ -703,9 +709,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#141b2a',
     borderWidth: 1,
     borderColor: '#1f2937',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 12,
+    borderRadius: 28,
+    padding: 24,
+    marginBottom: 16,
   },
   sectionHeader: {
     marginBottom: 12,
@@ -866,9 +872,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f1729',
     borderWidth: 1,
     borderColor: '#1b2534',
-    borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    borderRadius: 24,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
     marginBottom: 6,
   },
   pendingInfo: {
@@ -1019,28 +1025,5 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 6,
     backgroundColor: '#1b2735',
-  },
-  footer: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    backgroundColor: '#0b111b',
-  },
-  primaryButton: {
-    height: 60,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    backgroundColor: '#2d6df6',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  secondaryLink: {
-    color: '#8aa0c6',
-    textAlign: 'center',
-    fontWeight: '600',
   },
 });

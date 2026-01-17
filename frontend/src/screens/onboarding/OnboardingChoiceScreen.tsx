@@ -6,6 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { RootStackParamList } from '../../navigation/types';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import { useTheme } from '../../context/ThemeContext';
 
 type OnboardingChoiceTarget = 'OnboardingProfile' | 'OnboardingInviteCode';
 
@@ -31,6 +32,7 @@ const cards = [
 export default function OnboardingChoiceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'OnboardingChoice'>>();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
 
   const handlePress = (target: OnboardingChoiceTarget) => {
     navigation.navigate(target);
@@ -39,14 +41,15 @@ export default function OnboardingChoiceScreen() {
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
       <OnboardingHeader chapter="setup" activeStep={2} showBack={false} />
-      <ScrollView
-        contentContainerStyle={[
-          styles.body,
-          {
-            paddingTop: 28,
-            flexGrow: 1,
-          },
-        ]}
+        <ScrollView
+          contentContainerStyle={[
+            styles.body,
+            {
+              paddingTop: 28,
+              flexGrow: 1,
+              paddingBottom: Math.max(insets.bottom, 32) + 220,
+            },
+          ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -90,9 +93,19 @@ export default function OnboardingChoiceScreen() {
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 12 }]}>
+      <View
+        style={[
+          styles.footerCard,
+          {
+            paddingBottom: Math.max(insets.bottom, 16) + 8,
+            backgroundColor: theme.colors.surfaceAlt ?? theme.colors.surface,
+            borderColor: theme.colors.border,
+            shadowColor: theme.colors.border,
+          },
+        ]}
+      >
         <Text style={styles.footerCaption}>Need help deciding?</Text>
-        <Text style={styles.footerLink}>Speak with our team</Text>
+        <Text style={[styles.footerLink, { color: theme.colors.accent }]}>Speak with our team</Text>
       </View>
     </SafeAreaView>
   );
@@ -102,11 +115,11 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: '#0b111b',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   body: {
     paddingHorizontal: 32,
-    paddingBottom: 140,
+    paddingBottom: 160,
   },
   header: {
     marginBottom: 32,
@@ -187,16 +200,22 @@ const styles = StyleSheet.create({
     color: '#8aa0c6',
     marginTop: 4,
   },
-  footer: {
+  footerCard: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
     paddingHorizontal: 32,
     paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#11162a',
+    borderWidth: 1,
+    shadowOpacity: 0.25,
+    shadowOffset: { width: 0, height: -12 },
+    shadowRadius: 40,
+    elevation: 16,
     alignItems: 'center',
-    backgroundColor: '#0b111b',
-    paddingBottom: 20,
     justifyContent: 'center',
-    minHeight: 96,
   },
   cardSpacing: {
     marginBottom: 20,

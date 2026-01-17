@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import { useCallback, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { DefaultTheme, NavigationContainer, NavigationProp, useNavigation } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
@@ -194,6 +194,16 @@ function AppTabs() {
   const insets = useSafeAreaInsets();
   const dockBottom = Math.max(10, insets.bottom + 3);
   const dockHeight = 40 + Math.max(0, insets.bottom - 6);
+  const navigation = useNavigation<NavigationProp<TabParamList>>();
+  const { redirectToSettings, setRedirectToSettings } = useProfile();
+
+  useEffect(() => {
+    if (!redirectToSettings) {
+      return;
+    }
+    navigation.navigate('SettingsTab');
+    setRedirectToSettings(false);
+  }, [redirectToSettings, navigation, setRedirectToSettings]);
 
   return (
     <Tab.Navigator
@@ -273,7 +283,7 @@ function RootNavigator() {
             <RootStack.Screen
               name="OnboardingAlerts"
               component={AlertPrefsScreen}
-              options={{ title: 'Alert Preferences' }}
+              options={{ headerShown: false }}
             />
             <RootStack.Screen
               name="OnboardingCallForwarding"

@@ -1,44 +1,65 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View, ScrollView } from 'react-native';
+import { useLayoutEffect } from 'react';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useProfile } from '../../context/ProfileContext';
+import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import ActionFooter from '../../components/onboarding/ActionFooter';
 
-export default function TestCallScreen() {
+export default function TestCallScreen({ navigation }: { navigation: any }) {
   const { activeProfile, refreshProfiles, setOnboardingComplete } = useProfile();
-
+  const insets = useSafeAreaInsets();
   const finishOnboarding = async () => {
     setOnboardingComplete(true);
     await refreshProfiles();
+    navigation.navigate('OnboardingDone');
   };
 
+  useLayoutEffect(() => {
+    navigation.setOptions({ headerShown: false });
+  }, [navigation]);
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Test the Call Flow</Text>
-      <Text style={styles.subtitle}>
-        Call the SafeCall number and try the passcode + voicemail flow.
-      </Text>
-
-      <View style={styles.card}>
-        <Text style={styles.label}>Twilio number</Text>
-        <Text style={styles.value}>
-          {activeProfile?.twilio_virtual_number ?? 'Set this later in settings'}
+    <SafeAreaView style={styles.screen} edges={['bottom']}>
+      <OnboardingHeader chapter="Security" activeStep={9} totalSteps={9} />
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingBottom: Math.max(insets.bottom, 32) + 220,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>Test the Call Flow</Text>
+        <Text style={styles.subtitle}>
+          Call the SafeCall number and try the passcode + voicemail flow.
         </Text>
-        <Text style={styles.hint}>
-          Dial this number, enter the passcode, and leave a voicemail if prompted.
-        </Text>
-      </View>
 
-      <TouchableOpacity style={styles.primaryButton} onPress={finishOnboarding}>
-        <Text style={styles.primaryButtonText}>Finish Setup</Text>
-      </TouchableOpacity>
-    </View>
+        <View style={styles.card}>
+          <Text style={styles.label}>Twilio number</Text>
+          <Text style={styles.value}>
+            {activeProfile?.twilio_virtual_number ?? 'Set this later in settings'}
+          </Text>
+          <Text style={styles.hint}>
+            Dial this number, enter the passcode, and leave a voicemail if prompted.
+          </Text>
+        </View>
+      </ScrollView>
+
+      <ActionFooter primaryLabel="Finish Setup" onPrimaryPress={finishOnboarding} />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  screen: {
     flex: 1,
     backgroundColor: '#0b111b',
-    padding: 24,
+  },
+  content: {
+    padding: 32,
+    flexGrow: 1,
   },
   title: {
     fontSize: 22,
@@ -52,7 +73,7 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#121a26',
-    borderRadius: 14,
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
     borderColor: '#202c3c',
@@ -73,16 +94,5 @@ const styles = StyleSheet.create({
     color: '#9fb0c8',
     marginTop: 10,
     lineHeight: 20,
-  },
-  primaryButton: {
-    backgroundColor: '#2d6df6',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  primaryButtonText: {
-    color: '#f5f7fb',
-    fontWeight: '600',
   },
 });

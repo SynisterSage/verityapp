@@ -2,7 +2,6 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +19,7 @@ import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import { RootStackParamList } from '../../navigation/types';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import ActionFooter from '../../components/onboarding/ActionFooter';
 
 const CODE_LENGTH = 6;
 
@@ -110,13 +110,14 @@ export default function OnboardingInviteCodeScreen() {
         <ScrollView
           contentContainerStyle={[
             styles.body,
-          {
-            paddingTop: 28,
-            flexGrow: 1,
-          },
-          ]}
-          showsVerticalScrollIndicator={false}
-        >
+              {
+                paddingTop: 28,
+                flexGrow: 1,
+                paddingBottom: Math.max(insets.bottom, 32) + 220,
+              },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
           <View>
             <Text style={styles.title}>Join your circle</Text>
             <Text style={styles.subtitle}>Enter your name and the code shared with you.</Text>
@@ -177,22 +178,12 @@ export default function OnboardingInviteCodeScreen() {
           {message ? <Text style={styles.message}>{message}</Text> : null}
         </ScrollView>
 
-        <View style={styles.actionContainer}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.actionButton,
-              {
-                backgroundColor: isCodeComplete ? '#2d6df6' : 'rgba(45,109,246,0.4)',
-                opacity: isCodeComplete ? 1 : 0.6,
-                transform: [{ scale: pressed && isCodeComplete ? 0.98 : 1 }],
-              },
-            ]}
-            onPress={acceptCode}
-            disabled={!isCodeComplete || isSubmitting}
-          >
-            <Text style={styles.actionText}>Connect to Circle</Text>
-          </Pressable>
-        </View>
+        <ActionFooter
+          primaryLabel="Connect to Circle"
+          onPrimaryPress={acceptCode}
+          primaryLoading={isSubmitting}
+          primaryDisabled={!isCodeComplete || isSubmitting}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   );

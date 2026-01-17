@@ -25,6 +25,7 @@ import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import ActionFooter from '../../components/onboarding/ActionFooter';
 
 const PIN_LENGTH = 6;
 
@@ -187,7 +188,7 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
           contentContainerStyle={[
             styles.body,
             {
-              paddingBottom: 32 + Math.max(insets.bottom, 24),
+              paddingBottom: 220,
             },
           ]}
           showsVerticalScrollIndicator={false}
@@ -239,23 +240,12 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>
 
-        <View style={styles.actionContainer}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              {
-                opacity: canActivate && !isSubmitting ? (pressed ? 0.95 : 1) : 0.3,
-                backgroundColor: '#2d6df6',
-              },
-            ]}
-            onPress={handleContinue}
-            disabled={!canActivate || isSubmitting}
-          >
-            <Text style={styles.primaryButtonText}>
-              {isSubmitting ? 'Activating…' : 'Activate Protection'}
-            </Text>
-          </Pressable>
-        </View>
+        <ActionFooter
+          primaryLabel={isSubmitting ? 'Activating…' : 'Activate Protection'}
+          onPrimaryPress={handleContinue}
+          primaryLoading={isSubmitting}
+          primaryDisabled={!canActivate || isSubmitting}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -345,20 +335,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 12,
-  },
-  actionContainer: {
-    paddingHorizontal: 32,
-    paddingBottom: 32,
-  },
-  primaryButton: {
-    height: 60,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
   },
 });

@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../context/ThemeContext';
 
@@ -7,6 +8,7 @@ type ActionFooterProps = {
   primaryLabel: string;
   onPrimaryPress: () => void;
   primaryLoading?: boolean;
+  primaryDisabled?: boolean;
   secondaryLabel?: string;
   onSecondaryPress?: () => void;
   secondaryIcon?: ReactNode;
@@ -20,6 +22,7 @@ export default function ActionFooter({
   primaryLabel,
   onPrimaryPress,
   primaryLoading,
+  primaryDisabled,
   secondaryLabel,
   onSecondaryPress,
   secondaryIcon,
@@ -29,43 +32,49 @@ export default function ActionFooter({
   style,
 }: ActionFooterProps) {
   const { theme } = useTheme();
+  const colors = theme.colors as { surfaceAlt?: string; surface: string; border: string };
+  const insets = useSafeAreaInsets();
 
   return (
     <View
       style={[
         styles.footer,
         {
-          backgroundColor: theme.colors.surface,
-          shadowColor: theme.colors.border,
+          backgroundColor: colors.surfaceAlt ?? colors.surface,
+          shadowColor: colors.border,
+          paddingBottom: Math.max(insets.bottom, 24) + 8,
         },
         theme.shadows.card,
         style,
       ]}
     >
-      <Pressable
-        style={({ pressed }) => [
-          styles.primaryButton,
-          {
-            backgroundColor: theme.colors.accent,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-            ...theme.shadows.bottomAction,
-          },
-        ]}
-        onPress={onPrimaryPress}
-      >
-        <Text style={[styles.primaryButtonText, { fontFamily: theme.typography.fontFamily }]}>
-          {primaryLoading ? 'Working…' : primaryLabel}
-        </Text>
-      </Pressable>
+      {primaryLabel ? (
+        <TouchableOpacity
+          activeOpacity={primaryLoading ? 1 : 0.85}
+          style={[
+            styles.primaryButton,
+            {
+              backgroundColor: theme.colors.accent,
+              opacity: primaryDisabled || primaryLoading ? 0.5 : 1,
+            },
+          ]}
+          onPress={onPrimaryPress}
+          disabled={primaryDisabled || primaryLoading}
+        >
+          <Text style={[styles.primaryButtonText, { fontFamily: theme.typography.fontFamily }]}>
+            {primaryLoading ? 'Working…' : primaryLabel}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
 
       {secondaryLabel && onSecondaryPress ? (
-        <Pressable
-          style={({ pressed }) => [
+        <TouchableOpacity
+          activeOpacity={0.8}
+          style={[
             styles.secondaryButton,
             {
               borderColor: theme.colors.border,
               backgroundColor: theme.colors.surfaceAlt,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
             },
           ]}
           onPress={onSecondaryPress}
@@ -79,7 +88,7 @@ export default function ActionFooter({
           >
             {secondaryLabel}
           </Text>
-        </Pressable>
+        </TouchableOpacity>
       ) : null}
 
       {helperPrefix && helperActionLabel && onHelperPress ? (
@@ -110,17 +119,21 @@ export default function ActionFooter({
 
 const styles = StyleSheet.create({
   footer: {
-    borderRadius: 28,
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    minHeight: 120,
     paddingVertical: 24,
     paddingHorizontal: 32,
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.25,
     shadowOffset: { width: 0, height: -12 },
     shadowRadius: 40,
-    elevation: 16,
+    elevation: 20,
     alignSelf: 'stretch',
-    width: '100%',
     paddingBottom: 32,
-    transform: [{ translateY: 95 }],
   },
   primaryButton: {
     height: 60,

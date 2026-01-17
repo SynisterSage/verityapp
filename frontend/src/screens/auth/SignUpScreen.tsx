@@ -36,9 +36,13 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
       return;
     }
 
-    if (password.length < 8 || !/[A-Za-z]/.test(password)) {
+    const hasLetter = /[A-Za-z]/.test(password);
+    const hasSpecial = /[^A-Za-z0-9]/.test(password);
+
+    if (password.length < 8 || !hasLetter || !hasSpecial) {
       setAlert({
-        message: 'Password must be at least 8 characters and include a letter.',
+        message:
+          'Password must be at least 8 characters and include a letter and a special character.',
         type: 'warning',
       });
       return;

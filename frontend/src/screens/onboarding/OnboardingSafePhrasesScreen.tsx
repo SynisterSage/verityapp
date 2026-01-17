@@ -18,6 +18,7 @@ import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
+import ActionFooter from '../../components/onboarding/ActionFooter';
 
 type SafePhrase = {
   id: string;
@@ -105,7 +106,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
           contentContainerStyle={[
             styles.content,
             {
-              paddingBottom: Math.max(insets.bottom, 32) + 120,
+              paddingBottom: Math.max(insets.bottom, 32) + 220,
             },
           ]}
           showsVerticalScrollIndicator={false}
@@ -174,20 +175,12 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
           <HowItWorksCard items={helperItems} />
         </ScrollView>
 
-        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              { opacity: pressed ? 0.9 : 1 },
-            ]}
-            onPress={() => navigation.navigate('OnboardingInviteFamily')}
-          >
-            <Text style={styles.primaryButtonText}>Save Safe Topics</Text>
-          </Pressable>
-          <TouchableOpacity onPress={() => navigation.navigate('OnboardingInviteFamily')}>
-            <Text style={styles.secondaryLink}>Skip for now</Text>
-          </TouchableOpacity>
-        </View>
+        <ActionFooter
+          primaryLabel="Save Safe Topics"
+          onPrimaryPress={() => navigation.navigate('OnboardingInviteFamily')}
+          secondaryLabel="Skip for now"
+          onSecondaryPress={() => navigation.navigate('OnboardingInviteFamily')}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -312,29 +305,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1c1c22',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  footer: {
-    paddingHorizontal: 28,
-    paddingTop: 16,
-    backgroundColor: '#0b111b',
-  },
-  primaryButton: {
-    height: 60,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-    backgroundColor: '#2d6df6',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  secondaryLink: {
-    color: '#8aa0c6',
-    textAlign: 'center',
-    fontWeight: '600',
   },
   skeletonWrapper: {
     backgroundColor: 'transparent',

@@ -1,20 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import ActionFooter from '../../components/onboarding/ActionFooter';
 
 const formatPhone = (digits: string) => {
   const area = digits.slice(0, 3);
@@ -40,26 +40,48 @@ const formatPhone = (digits: string) => {
 };
 
 export default function CreateProfileScreen({ navigation }: { navigation: any }) {
+  const insets = useSafeAreaInsets();
   const { activeProfile, setActiveProfile, setOnboardingComplete } = useProfile();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [twilioDigits, setTwilioDigits] = useState('');
+  const lastPhoneKey = useRef<string | null>(null);
+  const lastTwilioKey = useRef<string | null>(null);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const formattedPhone = useMemo(() => formatPhone(phoneDigits), [phoneDigits]);
   const formattedTwilio = useMemo(() => formatPhone(twilioDigits), [twilioDigits]);
   const isFormValid = Boolean(firstName.trim() && lastName.trim() && phoneDigits.length === 10);
+  const primaryDisabled = activeProfile ? isSubmitting : !isFormValid || isSubmitting;
 
   const handlePhoneChange = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 10);
-    setPhoneDigits(digits);
+    if (lastPhoneKey.current === 'Backspace' && digits.length === phoneDigits.length) {
+      setPhoneDigits((prev) => prev.slice(0, -1));
+    } else {
+      setPhoneDigits(digits);
+    }
+    lastPhoneKey.current = null;
   };
 
   const handleTwilioChange = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 10);
-    setTwilioDigits(digits);
+    if (lastTwilioKey.current === 'Backspace' && digits.length === twilioDigits.length) {
+      setTwilioDigits((prev) => prev.slice(0, -1));
+    } else {
+      setTwilioDigits(digits);
+    }
+    lastTwilioKey.current = null;
+  };
+
+  const handlePhoneKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
+    lastPhoneKey.current = nativeEvent.key;
+  };
+
+  const handleTwilioKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
+    lastTwilioKey.current = nativeEvent.key;
   };
 
   const handleContinue = async () => {
@@ -107,7 +129,11 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           <ScrollView
             contentContainerStyle={[
               styles.body,
-              { paddingTop: 28, flexGrow: 1 },
+              {
+                paddingTop: 28,
+                flexGrow: 1,
+                paddingBottom: Math.max(insets.bottom, 32) + 220,
+              },
             ]}
             showsVerticalScrollIndicator={false}
           >
@@ -118,20 +144,12 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
               </Text>
             </View>
           </ScrollView>
-          <View style={styles.actionContainer}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.primaryButton,
-                {
-                  opacity: pressed ? 0.9 : 1,
-                  backgroundColor: '#2d6df6',
-                },
-              ]}
-              onPress={handleContinue}
-            >
-              <Text style={styles.primaryButtonText}>Continue</Text>
-            </Pressable>
-          </View>
+        <ActionFooter
+          primaryLabel="Continue"
+          onPrimaryPress={handleContinue}
+          primaryDisabled={primaryDisabled}
+          primaryLoading={isSubmitting}
+        />
         </SafeAreaView>
       </KeyboardAvoidingView>
     );
@@ -151,6 +169,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
             {
               paddingTop: 28,
               flexGrow: 1,
+              paddingBottom: Math.max(insets.bottom, 32) + 220,
             },
           ]}
           showsVerticalScrollIndicator={false}
@@ -200,6 +219,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
                 keyboardType="phone-pad"
                 value={formattedPhone}
                 onChangeText={handlePhoneChange}
+                onKeyPress={handlePhoneKeyPress}
               />
             </View>
 
@@ -214,6 +234,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
                 keyboardType="phone-pad"
                 value={formattedTwilio}
                 onChangeText={handleTwilioChange}
+                onKeyPress={handleTwilioKeyPress}
               />
             </View>
           </View>
@@ -221,23 +242,12 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           {error ? <Text style={styles.error}>{error}</Text> : null}
         </ScrollView>
 
-        <View style={styles.actionContainer}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.primaryButton,
-              {
-                opacity: !isFormValid || isSubmitting ? 0.3 : pressed ? 0.85 : 1,
-                backgroundColor: '#2d6df6',
-              },
-            ]}
-            onPress={handleContinue}
-            disabled={!isFormValid || isSubmitting}
-          >
-            <Text style={styles.primaryButtonText}>
-              {isSubmitting ? 'Saving…' : 'Continue'}
-            </Text>
-          </Pressable>
-        </View>
+        <ActionFooter
+          primaryLabel="Continue"
+          primaryLoading={isSubmitting}
+          onPrimaryPress={handleContinue}
+          primaryDisabled={primaryDisabled}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -311,20 +321,5 @@ const styles = StyleSheet.create({
     color: '#ff8a8a',
     fontSize: 12,
     textAlign: 'center',
-  },
-  actionContainer: {
-    paddingHorizontal: 32,
-    paddingBottom: 32,
-  },
-  primaryButton: {
-    height: 60,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
   },
 });
