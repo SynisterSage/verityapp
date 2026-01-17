@@ -128,7 +128,7 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
       {
   icon: 'speedometer',
   color: '#2d6df6',
-  text: 'Adjust how strict call protection is before a call reaches your phone.',
+  text: 'Higher settings stop more suspicious calls before your phone rings.',
 },
 {
   icon: 'notifications-outline',
