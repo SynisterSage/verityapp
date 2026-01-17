@@ -1,7 +1,5 @@
 import {
   Animated,
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -33,12 +31,15 @@ export default function OnboardingInviteCodeScreen() {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [codeDigits, setCodeDigits] = useState(Array(CODE_LENGTH).fill(''));
+  const firstNameRef = useRef<TextInput | null>(null);
+  const lastNameRef = useRef<TextInput | null>(null);
 
   const codeRefs = useRef<Array<TextInput | null>>(Array(CODE_LENGTH).fill(null));
   const pulse = useRef(new Animated.Value(1)).current;
 
   const codeValue = useMemo(() => codeDigits.join(''), [codeDigits]);
   const isCodeComplete = codeDigits.every((digit) => digit.length === 1);
+  const areNamesEntered = firstName.trim().length > 0 && lastName.trim().length > 0;
 
   useEffect(() => {
     if (isCodeComplete) {
@@ -73,7 +74,7 @@ export default function OnboardingInviteCodeScreen() {
   };
 
   const acceptCode = async () => {
-    if (!firstName.trim() || !lastName.trim()) {
+    if (!areNamesEntered) {
       setMessage('Add your first and last name.');
       return;
     }
@@ -101,15 +102,13 @@ export default function OnboardingInviteCodeScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.outer}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
         <OnboardingHeader chapter="Circle" activeStep={2} totalSteps={2} showBack />
-        <ScrollView
-          contentContainerStyle={[
-            styles.body,
+        <View style={styles.keyboardAvoiding}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.body,
               {
                 paddingTop: 28,
                 flexGrow: 1,
@@ -117,75 +116,83 @@ export default function OnboardingInviteCodeScreen() {
               },
             ]}
             showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentInsetAdjustmentBehavior="automatic"
           >
-          <View>
-            <Text style={styles.title}>Join your circle</Text>
-            <Text style={styles.subtitle}>Enter your name and the code shared with you.</Text>
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>First name</Text>
-            <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
-              <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Robert"
-                placeholderTextColor="#8aa0c6"
-                value={firstName}
-                onChangeText={setFirstName}
-                autoCapitalize="words"
-              />
+            <View>
+              <Text style={styles.title}>Join your circle</Text>
+              <Text style={styles.subtitle}>Enter your name and the code shared with you.</Text>
             </View>
-            <Text style={styles.inputLabel}>Last name</Text>
-            <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
-              <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Miller"
-                placeholderTextColor="#8aa0c6"
-                value={lastName}
-                onChangeText={setLastName}
-                autoCapitalize="words"
-              />
-            </View>
-          </View>
 
-          <View style={styles.codeSection}>
-            <Text style={styles.codeLabel}>6-digit invite code</Text>
-            <Animated.View style={[styles.codeRow, { transform: [{ scale: pulse }] }]}>
-              {codeDigits.map((digit, index) => (
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>First name</Text>
+              <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
+                <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
                 <TextInput
-                  key={`digit-${index}`}
-                ref={(ref) => {
-                  codeRefs.current[index] = ref;
-                }}
-                  style={[
-                    styles.codeBox,
-                    { borderColor: digit ? '#2d6df6' : '#1b2534' },
-                  ]}
-                  keyboardType="number-pad"
-                  maxLength={1}
-                  value={digit}
-                  onChangeText={(value) => handleDigitChange(value, index)}
-                  onKeyPress={(event) => handleKeyPress(event, index)}
-                  textAlign="center"
-                  autoFocus={index === 0}
+                  style={styles.input}
+                  placeholder="e.g. Robert"
+                  placeholderTextColor="#8aa0c6"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  autoCapitalize="words"
+                  ref={firstNameRef}
+                  returnKeyType="next"
+                  onSubmitEditing={() => lastNameRef.current?.focus()}
                 />
-              ))}
-            </Animated.View>
-          </View>
+              </View>
+              <Text style={styles.inputLabel}>Last name</Text>
+              <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
+                <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Miller"
+                  placeholderTextColor="#8aa0c6"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  autoCapitalize="words"
+                  ref={lastNameRef}
+                  returnKeyType="next"
+                  onSubmitEditing={() => codeRefs.current[0]?.focus()}
+                />
+              </View>
+            </View>
 
-          {message ? <Text style={styles.message}>{message}</Text> : null}
-        </ScrollView>
+            <View style={styles.codeSection}>
+              <Text style={styles.codeLabel}>6-digit invite code</Text>
+              <Animated.View style={[styles.codeRow, { transform: [{ scale: pulse }] }]}>
+                {codeDigits.map((digit, index) => (
+                  <TextInput
+                    key={`digit-${index}`}
+                    ref={(ref) => {
+                      codeRefs.current[index] = ref;
+                    }}
+                    style={[
+                      styles.codeBox,
+                      { borderColor: digit ? '#2d6df6' : '#1b2534' },
+                    ]}
+                    keyboardType="number-pad"
+                    maxLength={1}
+                    value={digit}
+                    onChangeText={(value) => handleDigitChange(value, index)}
+                    onKeyPress={(event) => handleKeyPress(event, index)}
+                    textAlign="center"
+                  />
+                ))}
+              </Animated.View>
+            </View>
+
+            {message ? <Text style={styles.message}>{message}</Text> : null}
+          </ScrollView>
+        </View>
 
         <ActionFooter
           primaryLabel="Connect to Circle"
           onPrimaryPress={acceptCode}
           primaryLoading={isSubmitting}
-          primaryDisabled={!isCodeComplete || isSubmitting}
+          primaryDisabled={!areNamesEntered || !isCodeComplete || isSubmitting}
         />
       </SafeAreaView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -271,6 +278,10 @@ const styles = StyleSheet.create({
     color: '#ff8a8a',
     fontSize: 12,
     textAlign: 'center',
+  },
+  keyboardAvoiding: {
+    flex: 1,
+    width: '100%',
   },
   actionContainer: {
     paddingHorizontal: 32,

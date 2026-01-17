@@ -42,56 +42,58 @@ export default function OnboardingCallForwardingScreen({ navigation }: { navigat
   const instructionSets = useMemo(
     () => ({
       ios: [
-        {
-          title: 'Open Settings',
-          instruction: 'Locate the Settings app on your home screen.',
-          context: 'This is the starting point for all iOS system changes.',
-        },
-        {
-          title: 'Phone & Forwarding',
-          instruction: 'Tap Phone, then select Call Forwarding and switch it on.',
-          context: 'Emphasize the “Phone” and “Call Forwarding” labels so older users can scan quicker.',
-        },
-        {
-          title: 'Forward To',
-          instruction: 'Tap Forward To and paste your Verity number.',
-          context: 'This is the final bridge where the user inputs the number copied from the hero card.',
-        },
-      ],
-      droid: [
-        {
-          title: 'Phone App',
-          instruction: 'Open the Dialer, tap ⋮, and choose Settings.',
-          context: 'Android call settings live inside the Phone app.',
-        },
-        {
-          title: 'Supplementary Services',
-          instruction: 'Find Supplementary Services or Calling Accounts.',
-          context: 'Samsung and Pixel use these two headers most often.',
-        },
-        {
-          title: 'Always Forward',
-          instruction: 'Select Always Forward and enter your Verity number.',
-          context: '“Always Forward” diverts all incoming traffic.',
-        },
-      ],
-      home: [
-        {
-          title: 'Activation Code',
-          instruction: 'On your home phone, dial *72.',
-          context: 'Emphasize the *72 sequence so it stands out.',
-        },
-        {
-          title: 'Enter Number',
-          instruction: 'Immediately after the code, enter the 10-digit Verity number.',
-          context: 'Don’t wait for a second dial tone before typing.',
-        },
-        {
-          title: 'Listen',
-          instruction: 'Stay on the line for the confirmation tone then hang up.',
-          context: 'This confirms the carrier accepted the forwarding.',
-        },
-      ],
+  {
+    title: 'Open Settings',
+    instruction: 'Open the Settings app on your iPhone.',
+    context: 'This is where you change phone settings.',
+  },
+  {
+    title: 'Turn On Call Forwarding',
+    instruction: 'Tap Phone, then tap Call Forwarding, and switch it on.',
+    context: 'Look for the words “Phone” and “Call Forwarding.”',
+  },
+  {
+    title: 'Enter Your Verity Number',
+    instruction: 'Tap Forward To and paste your Verity number.',
+    context: 'Calls will now go through Verity before reaching you.',
+  },
+],
+
+droid: [
+  {
+    title: 'Open Phone Settings',
+    instruction: 'Open the Phone app, tap the menu (⋮), then tap Settings.',
+    context: 'Call forwarding is inside the Phone app on Android.',
+  },
+  {
+    title: 'Find Call Forwarding',
+    instruction: 'Tap Supplementary Services or Calling Accounts.',
+    context: 'The name may vary by phone model.',
+  },
+  {
+    title: 'Turn On Always Forward',
+    instruction: 'Tap Always Forward and enter your Verity number.',
+    context: 'This sends all calls through Verity first.',
+  },
+],
+
+home: [
+  {
+    title: 'Dial the Activation Code',
+    instruction: 'On your home phone, dial *72.',
+    context: 'You will not hear a second dial tone.',
+  },
+  {
+    title: 'Enter Your Verity Number',
+    instruction: 'Immediately enter your 10-digit Verity number.',
+    context: 'Type the number right after *72.',
+  },
+  {
+    title: 'Wait for Confirmation',
+    instruction: 'Stay on the line until you hear a confirmation tone, then hang up.',
+    context: 'This means call forwarding is active.',
+  },
+],
     }),
     []
   );
@@ -155,7 +157,7 @@ export default function OnboardingCallForwardingScreen({ navigation }: { navigat
             <Ionicons name="keypad-outline" size={20} color="#fff" />
           </View>
           <View style={styles.numberText}>
-            <Text style={styles.numberLabel}>Your forwarding number</Text>
+            <Text style={styles.numberLabel}>Your Verity number</Text>
             <Text style={[styles.numberValue, !twilioNumber && styles.missingValue]}>
               {twilioNumber || 'Missing #'}
             </Text>
@@ -302,7 +304,7 @@ const styles = StyleSheet.create({
   },
   numberValue: {
     color: '#f5f7fb',
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
   },
   numberHint: {

@@ -20,6 +20,7 @@ import { supabase } from '../../services/supabase';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import * as Clipboard from 'expo-clipboard';
+import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { Ionicons } from '@expo/vector-icons';
@@ -96,6 +97,26 @@ export default function InviteFamilyScreen({ navigation }: Props) {
     [currentUserIsAdmin]
   );
   const canCreateInvite = currentUserIsAdmin;
+  const roleHelperItems = useMemo(
+    () => [
+      {
+        icon: 'shield-checkmark',
+        color: '#4ade80',
+        text: 'Family members (Full access) can manage the protected profile and alerts.',
+      },
+      {
+        icon: 'eye',
+        color: '#2d6df6',
+        text: 'Caretaker alerts just monitor activity and receive recordings.',
+      },
+      {
+        icon: 'refresh',
+        color: '#64748b',
+        text: 'You can update roles anytime via the Manage button on each member.',
+      },
+    ],
+    []
+  );
   const [selectedInvite, setSelectedInvite] = useState<Invite | null>(null);
   const actionAnim = useRef(new Animated.Value(0)).current;
 
@@ -493,7 +514,7 @@ export default function InviteFamilyScreen({ navigation }: Props) {
             <Ionicons name="chevron-forward" size={18} color="#2d6df6" />
           </TouchableOpacity>
         </View>
-
+            <HowItWorksCard caption="HOW IT WORKS" items={roleHelperItems} />
         <View style={{ height: Math.max(insets.bottom, 40) }} />
       </ScrollView>
       <ActionFooter
@@ -647,7 +668,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#121a26',
+    backgroundColor: '#0f1724',
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#1f2937',
@@ -691,12 +712,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1b2534',
     padding: 12,
-    backgroundColor: '#121a26',
+    backgroundColor: '#0f1724',
   },
   skeletonLine: {
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#1f2937',
+    backgroundColor: '#0f1724',
     marginBottom: 8,
   },
   skeletonLineShort: {
@@ -706,7 +727,7 @@ const styles = StyleSheet.create({
     width: '40%',
   },
   sectionCard: {
-    backgroundColor: '#141b2a',
+    backgroundColor: '#0f1724',
     borderWidth: 1,
     borderColor: '#1f2937',
     borderRadius: 28,
@@ -743,7 +764,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#101726',
+    backgroundColor: '#0f1724',
   },
   rolePillActive: {
     backgroundColor: '#2d6df6',
@@ -781,7 +802,7 @@ const styles = StyleSheet.create({
   },
   inviteButton: {},
   disabledButton: {
-    opacity: 0.5,
+    opacity: .5,
   },
   buttonText: {
     color: '#fff',

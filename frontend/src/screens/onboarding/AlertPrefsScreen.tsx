@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 
 type NotificationChannel = {
@@ -122,6 +123,21 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
   };
 
   const footerSecondary = () => navigation.navigate('OnboardingCallForwarding');
+  const helperItems = useMemo(
+    () => [
+      {
+  icon: 'speedometer',
+  color: '#2d6df6',
+  text: 'Adjust how strict call protection is before a call reaches your phone.',
+},
+{
+  icon: 'notifications-outline',
+  color: '#4ade80',
+  text: 'Choose which alerts your trusted circle receives.',
+},
+    ],
+    []
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
@@ -216,6 +232,10 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
         </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        <HowItWorksCard
+          caption="HOW IT WORKS"
+          items={helperItems}
+        />
       </ScrollView>
 
       <ActionFooter

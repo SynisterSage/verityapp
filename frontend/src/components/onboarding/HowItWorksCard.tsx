@@ -36,6 +36,7 @@ const styles = StyleSheet.create({
     borderColor: '#1b2534',
     padding: 20,
     marginBottom: 20,
+    marginTop: 5,
   },
   caption: {
     fontSize: 11,

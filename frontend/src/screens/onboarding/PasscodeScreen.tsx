@@ -10,8 +10,6 @@ import {
 } from 'react';
 import {
   Animated,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -115,8 +113,9 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
   };
 
   const howCardItems = [
-    { icon: 'people-outline', color: '#4ade80', text: 'Trusted contacts always skip the code.' },
-    { icon: 'shield-checkmark-outline', color: '#2d6df6', text: 'Unknown callers must enter the PIN.' },
+    { icon: 'people-outline', color: '#4ade80', text: 'Trusted Contacts can call you without the PIN.' },
+    { icon: 'shield-checkmark-outline', color: '#2d6df6', text: 'All other callers must enter your Safety PIN.' },
+    { icon: 'ban-outline', color: '#ef4444', text: 'Blocked numbers and callers not in Trusted Contacts are stopped before your phone rings.' },
   ];
 
   const handleContinue = async () => {
@@ -178,67 +177,66 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
   );
 
   return (
-    <KeyboardAvoidingView
-      style={styles.outer}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
         <OnboardingHeader chapter="Security" activeStep={4} totalSteps={9} />
-        <ScrollView
-          contentContainerStyle={[
-            styles.body,
-            {
-              paddingBottom: 220,
-            },
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View style={styles.header}>
-            <Text style={styles.title}>Safety PIN</Text>
-            <Text style={styles.subtitle}>
-              Create a 6-digit code to protect your phone from unknown callers.
-            </Text>
-          </View>
-
-          <View style={styles.pinSection}>
-            <View style={styles.pinHeader}>
-              <Text style={styles.pinLabel}>Create PIN</Text>
-              <Pressable onPress={() => setShowPin((prev) => !prev)}>
-                <Text style={styles.toggleText}>{showPin ? 'Hide' : 'Show'}</Text>
-              </Pressable>
-            </View>
-            {renderPinBoxes(createDigits, setCreateDigits, createRefs, false, undefined, true)}
-          </View>
-
-          <View
-            style={[
-              styles.pinSection,
+        <View style={styles.keyboardAvoiding}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.body,
               {
-                opacity: createComplete ? 1 : 0.1,
+                paddingBottom: 220,
               },
             ]}
-            pointerEvents={createComplete ? 'auto' : 'none'}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentInsetAdjustmentBehavior="automatic"
           >
-            <View style={styles.pinHeader}>
-              <Text style={styles.pinLabel}>Confirm PIN</Text>
-              <Text style={styles.helperText}>Match previous PIN</Text>
+            <View style={styles.header}>
+              <Text style={styles.title}>Safety PIN</Text>
+              <Text style={styles.subtitle}>
+                Unknown callers must enter this PIN before your phone rings.              </Text>
             </View>
-            <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
-              {renderPinBoxes(
-                confirmDigits,
-                setConfirmDigits,
-                confirmRefs,
-                !createComplete,
-                isMismatch ? '#e11d48' : undefined
-              )}
-            </Animated.View>
-          </View>
 
-          <HowItWorksCard items={howCardItems} />
+            <View style={styles.pinSection}>
+              <View style={styles.pinHeader}>
+                <Text style={styles.pinLabel}>Create PIN</Text>
+                <Pressable onPress={() => setShowPin((prev) => !prev)}>
+                  <Text style={styles.toggleText}>{showPin ? 'Hide' : 'Show'}</Text>
+                </Pressable>
+              </View>
+              {renderPinBoxes(createDigits, setCreateDigits, createRefs, false, undefined, false)}
+            </View>
 
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-        </ScrollView>
+            <View
+              style={[
+                styles.pinSection,
+                {
+                  opacity: createComplete ? 1 : 0.1,
+                },
+              ]}
+              pointerEvents={createComplete ? 'auto' : 'none'}
+            >
+              <View style={styles.pinHeader}>
+                <Text style={styles.pinLabel}>Confirm PIN</Text>
+                <Text style={styles.helperText}>Match previous PIN</Text>
+              </View>
+              <Animated.View style={{ transform: [{ translateX: shakeAnim }] }}>
+                {renderPinBoxes(
+                  confirmDigits,
+                  setConfirmDigits,
+                  confirmRefs,
+                  !createComplete,
+                  isMismatch ? '#e11d48' : undefined
+                )}
+              </Animated.View>
+            </View>
+
+            <HowItWorksCard items={howCardItems} />
+
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+          </ScrollView>
+        </View>
 
         <ActionFooter
           primaryLabel={isSubmitting ? 'Activating…' : 'Activate Protection'}
@@ -247,7 +245,7 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
           primaryDisabled={!canActivate || isSubmitting}
         />
       </SafeAreaView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -335,5 +333,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 12,
+  },
+  keyboardAvoiding: {
+    flex: 1,
+    width: '100%',
   },
 });

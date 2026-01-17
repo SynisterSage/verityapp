@@ -108,12 +108,12 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
       {
         icon: 'people-outline',
         color: '#4ade80',
-        text: 'Trusted contacts skip the screening process entirely.',
+        text: 'Trusted Contacts can call you directly, without the Safety PIN.\nTheir calls are never screened or recorded.',
       },
       {
         icon: 'ban',
         color: '#ef4444',
-        text: 'Blocked numbers are stopped before they reach you.',
+        text: 'Calls from numbers not in Trusted Contacts, or from blocked numbers, are stopped before your phone rings.',
       },
     ],
     []
@@ -432,9 +432,9 @@ const safeList = useMemo(() => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.header}>
-            <Text style={styles.title}>Trusted People</Text>
+            <Text style={styles.title}>Trusted Contacts</Text>
             <Text style={styles.subtitle}>
-              People on this list skip the PIN and connect to you directly.
+              People on this list skip the Safety PIN and connect to you directly.
             </Text>
           </View>
 
@@ -474,8 +474,13 @@ const safeList = useMemo(() => {
               ))}
             </View>
           ) : safeList.length === 0 ? (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyText}>No trusted people yet.</Text>
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="person-circle-outline" size={30} color="#4ade80" />
+              </View>
+              <Text style={styles.emptyBody}>
+                Import someone from your phone or create an invite above.
+              </Text>
             </View>
           ) : (
             safeList.map((contact) => (
@@ -513,17 +518,19 @@ const safeList = useMemo(() => {
 
         {isTrayMounted && trayContact && trayMode && (
           <View style={styles.trayOverlay}>
-            <Animated.View
-              style={[
-                styles.trayBackdrop,
-                {
-                  opacity: trayAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0, 0.45],
-                  }),
-                },
-              ]}
-            />
+            <Pressable style={StyleSheet.absoluteFill} onPress={closeTray}>
+              <Animated.View
+                style={[
+                  styles.trayBackdrop,
+                  {
+                    opacity: trayAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 0.45],
+                    }),
+                  },
+                ]}
+              />
+            </Pressable>
             <Animated.View
               style={[
                 styles.tray,
@@ -734,17 +741,37 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     fontWeight: '700',
   },
-  emptyState: {
-    borderRadius: 24,
+  emptyCard: {
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: '#1b2534',
+    borderColor: '#1f2937',
     borderStyle: 'dashed',
     padding: 24,
+    backgroundColor: '#121a26',
     alignItems: 'center',
     marginBottom: 16,
+    gap: 12,
   },
-  emptyText: {
+  emptyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0f1b2d',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 6,
+  },
+  emptyTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#f5f7fb',
+  },
+  emptyBody: {
     color: '#8aa0c6',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+    maxWidth: 240,
   },
   error: {
     color: '#ff8a8a',
@@ -794,6 +821,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -12 },
     shadowRadius: 30,
     elevation: 20,
+    marginBottom:  -2,
   },
   trayHandle: {
     width: 40,

@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Animated,
-  KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -50,12 +48,12 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
     {
       icon: 'shield-checkmark',
       color: '#4ade80',
-      text: 'Safe phrases automatically lower the fraud risk score of any incoming caller.',
+      text: 'Safe Phrases help confirm a caller is legitimate.',
     },
     {
       icon: 'flash',
       color: '#2d6df6',
-      text: 'Matches are instantly flagged as "Verified Context" for your circle to see.',
+      text: 'When a phrase is used, it helps lower the risk, but the call is still screened.',
     },
   ];
 
@@ -110,7 +108,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   const showSkeleton = loading;
 
   return (
-    <KeyboardAvoidingView style={styles.outer} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
         <OnboardingHeader chapter="Phrases" activeStep={6} totalSteps={9} />
         <ScrollView
@@ -121,11 +119,13 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
             },
           ]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="automatic"
         >
           <View style={styles.headerSection}>
             <Text style={styles.title}>Safe Phrases</Text>
             <Text style={styles.subtitle}>
-              Whitelist phrases that are normal for you to help our AI recognize safe calls.
+              Add phrases that are normal for you to help identify safer calls.
             </Text>
           </View>
 
@@ -193,7 +193,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
           onSecondaryPress={() => navigation.navigate('OnboardingInviteFamily')}
         />
       </SafeAreaView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
