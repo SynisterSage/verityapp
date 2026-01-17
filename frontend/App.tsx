@@ -194,16 +194,15 @@ function AppTabs() {
   const insets = useSafeAreaInsets();
   const dockBottom = Math.max(10, insets.bottom + 3);
   const dockHeight = 40 + Math.max(0, insets.bottom - 6);
-  const navigation = useNavigation<NavigationProp<TabParamList>>();
   const { redirectToSettings, setRedirectToSettings } = useProfile();
+  const initialRoute = redirectToSettings ? 'SettingsTab' : 'HomeTab';
 
   useEffect(() => {
     if (!redirectToSettings) {
       return;
     }
-    navigation.navigate('SettingsTab');
     setRedirectToSettings(false);
-  }, [redirectToSettings, navigation, setRedirectToSettings]);
+  }, [redirectToSettings, setRedirectToSettings]);
 
   return (
     <Tab.Navigator
@@ -218,6 +217,7 @@ function AppTabs() {
           containerStyle={{ bottom: dockBottom }}
         />
       )}
+      initialRouteName={initialRoute}
     >
       <Tab.Screen name="HomeTab" component={HomeScreen} options={{ title: 'Home' }} />
       <Tab.Screen name="CallsTab" component={CallsStackNavigator} options={{ title: 'Calls' }} />

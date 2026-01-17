@@ -98,7 +98,7 @@ export default function OnboardingChoiceScreen() {
           styles.footerCard,
           {
             paddingBottom: Math.max(insets.bottom, 16) + 8,
-            backgroundColor: theme.colors.surfaceAlt ?? theme.colors.surface,
+            backgroundColor: theme.colors.surfaceAlt,
             borderColor: theme.colors.border,
             shadowColor: theme.colors.border,
           },

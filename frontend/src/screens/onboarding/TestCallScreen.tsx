@@ -7,12 +7,17 @@ import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 
 export default function TestCallScreen({ navigation }: { navigation: any }) {
-  const { activeProfile, refreshProfiles, setOnboardingComplete } = useProfile();
+  const { activeProfile, refreshProfiles, setOnboardingComplete, setRedirectToSettings } =
+    useProfile();
   const insets = useSafeAreaInsets();
   const finishOnboarding = async () => {
     setOnboardingComplete(true);
+    setRedirectToSettings(false);
     await refreshProfiles();
-    navigation.navigate('OnboardingDone');
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'AppTabs' }],
+    });
   };
 
   useLayoutEffect(() => {
