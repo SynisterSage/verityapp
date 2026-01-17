@@ -268,7 +268,7 @@ function RootNavigator() {
             <RootStack.Screen
               name="OnboardingInviteFamily"
               component={InviteFamilyScreen}
-              options={{ title: 'Invite Family' }}
+              options={{ headerShown: false }}
             />
             <RootStack.Screen
               name="OnboardingAlerts"

@@ -100,7 +100,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   return (
     <KeyboardAvoidingView style={styles.outer} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <OnboardingHeader chapter="Intelligence" activeStep={6} totalSteps={9} />
+        <OnboardingHeader chapter="Phrases" activeStep={6} totalSteps={9} />
         <ScrollView
           contentContainerStyle={[
             styles.content,
@@ -111,7 +111,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.headerSection}>
-            <Text style={styles.title}>Safe Topics</Text>
+            <Text style={styles.title}>Safe Phrases</Text>
             <Text style={styles.subtitle}>
               Whitelist phrases that are normal for you to help our AI recognize safe calls.
             </Text>
