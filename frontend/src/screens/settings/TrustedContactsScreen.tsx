@@ -609,7 +609,6 @@ export default function TrustedContactsScreen() {
       <SafeAreaView style={styles.screen} edges={['bottom']}>
         <SettingsHeader
           title="Trusted Contacts"
-          subtitle="People on this list skip the Safety PIN and connect to you directly."
         />
         <ScrollView
           contentContainerStyle={[

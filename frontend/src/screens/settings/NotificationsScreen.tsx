@@ -1,23 +1,47 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Keyboard, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Keyboard,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import Slider from '@react-native-community/slider';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
+import SettingsHeader from '../../components/common/SettingsHeader';
+import ActionFooter from '../../components/onboarding/ActionFooter';
+
+const LEVELS = [
+  { label: 'Standard', breakpoint: 39 },
+  { label: 'Strict', breakpoint: 74 },
+  { label: 'Maximum', breakpoint: 100 },
+];
+
+type NotificationChannel = {
+  key: 'phone' | 'email' | 'sms';
+  title: string;
+  description: string;
+  icon: string;
+  active: boolean;
+};
 
 export default function NotificationsScreen() {
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { activeProfile, setActiveProfile } = useProfile();
   const [threshold, setThreshold] = useState(activeProfile?.alert_threshold_score ?? 90);
   const [emailAlerts, setEmailAlerts] = useState(activeProfile?.enable_email_alerts ?? true);
-  const [smsAlerts, setSmsAlerts] = useState(activeProfile?.enable_sms_alerts ?? false);
   const [pushAlerts, setPushAlerts] = useState(activeProfile?.enable_push_alerts ?? true);
+  const [smsAlerts, setSmsAlerts] = useState(activeProfile?.enable_sms_alerts ?? false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [levelLabel, setLevelLabel] = useState(() => getLevelLabel(threshold));
 
   useEffect(() => {
     if (!activeProfile) return;
@@ -26,6 +50,50 @@ export default function NotificationsScreen() {
     setSmsAlerts(activeProfile.enable_sms_alerts ?? false);
     setPushAlerts(activeProfile.enable_push_alerts ?? true);
   }, [activeProfile]);
+
+  useEffect(() => {
+    const nextLabel = getLevelLabel(threshold);
+    if (nextLabel !== levelLabel) {
+      Haptics.selectionAsync();
+      setLevelLabel(nextLabel);
+    }
+  }, [threshold, levelLabel]);
+
+  const notificationChannels = useMemo<NotificationChannel[]>(() => {
+    return [
+      {
+        key: 'phone',
+        title: 'Phone alerts',
+        description: 'Instant notifications',
+        icon: 'notifications-outline',
+        active: pushAlerts,
+      },
+      {
+        key: 'email',
+        title: 'Email reports',
+        description: 'Daily summaries',
+        icon: 'mail-outline',
+        active: emailAlerts,
+      },
+      {
+        key: 'sms',
+        title: 'SMS alerts',
+        description: 'Delivered when we detect urgent risk',
+        icon: 'chatbubble-ellipses-outline',
+        active: smsAlerts,
+      },
+    ];
+  }, [emailAlerts, pushAlerts, smsAlerts]);
+
+  const handleToggle = useCallback((key: NotificationChannel['key']) => {
+    if (key === 'email') {
+      setEmailAlerts((prev) => !prev);
+    } else if (key === 'phone') {
+      setPushAlerts((prev) => !prev);
+    } else if (key === 'sms') {
+      setSmsAlerts((prev) => !prev);
+    }
+  }, []);
 
   const hasChanges = useMemo(() => {
     if (!activeProfile) return false;
@@ -37,40 +105,17 @@ export default function NotificationsScreen() {
     );
   }, [activeProfile, threshold, emailAlerts, smsAlerts, pushAlerts]);
 
-  const profileId = activeProfile?.id;
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!profileId) {
-        return;
-      }
-      let isActive = true;
-      void (async () => {
-        try {
-          const data = await authorizedFetch(`/profiles/${profileId}`);
-          if (isActive && data?.profile) {
-            setActiveProfile(data.profile);
-          }
-        } catch (err) {
-          console.error('Failed to refresh profile', err);
-        }
-      })();
-      return () => {
-        isActive = false;
-      };
-    }, [profileId, setActiveProfile])
-  );
-
   const savePrefs = async () => {
     if (!activeProfile) return;
     setError('');
     Keyboard.dismiss();
     setSaving(true);
     try {
+      const roundedThreshold = Math.round(threshold);
       const data = await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
         method: 'PATCH',
         body: JSON.stringify({
-          alert_threshold_score: threshold,
+          alert_threshold_score: roundedThreshold,
           enable_email_alerts: emailAlerts,
           enable_sms_alerts: smsAlerts,
           enable_push_alerts: pushAlerts,
@@ -86,175 +131,286 @@ export default function NotificationsScreen() {
     }
   };
 
+  const helperItems = useMemo(
+    () => [
+      {
+        icon: 'speedometer',
+        color: '#2d6df6',
+        text: 'Higher settings stop more suspicious calls before your phone rings.',
+      },
+      {
+        icon: 'notifications-outline',
+        color: '#4ade80',
+        text: 'Choose which alerts your trusted circle receives.',
+      },
+    ],
+    []
+  );
+
   return (
-    <SafeAreaView
-      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
-      edges={[]}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color="#e4ebf7" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
-      </View>
-
-      <Text style={styles.sectionTitle}>Fraud threshold</Text>
-      <View style={styles.card}>
-        <View style={styles.thresholdRow}>
-          <Text style={styles.label}>Alert score</Text>
-          <Text style={styles.value}>{threshold}</Text>
-        </View>
-        <Slider
-          value={threshold}
-          minimumValue={1}
-          maximumValue={100}
-          step={1}
-          minimumTrackTintColor="#8ab4ff"
-          maximumTrackTintColor="#1b2534"
-          thumbTintColor="#2d6df6"
-          onValueChange={setThreshold}
-        />
-        <TextInput
-          style={styles.input}
-          value={String(threshold)}
-          onChangeText={(text) => {
-            const numeric = Number(text);
-            if (Number.isNaN(numeric)) return;
-            setThreshold(Math.max(1, Math.min(100, numeric)));
-          }}
-          keyboardType="number-pad"
-        />
-      </View>
-
-      <Text style={styles.sectionTitle}>Alert channels</Text>
-      <View style={styles.card}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Email alerts</Text>
-          <Switch value={emailAlerts} onValueChange={setEmailAlerts} />
-        </View>
-        <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>SMS alerts</Text>
-          <Switch value={smsAlerts} onValueChange={setSmsAlerts} />
-        </View>
-        <View style={styles.toggleRow}>
-          <View>
-            <Text style={styles.toggleLabel}>Push alerts</Text>
-            <Text style={styles.toggleHint}>Coming soon</Text>
-          </View>
-          <Switch value={pushAlerts} onValueChange={setPushAlerts} />
-        </View>
-      </View>
-
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-
-      <TouchableOpacity
-        style={[styles.saveButton, (!hasChanges || saving) && styles.saveDisabled]}
-        onPress={savePrefs}
-        disabled={!hasChanges || saving}
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <SettingsHeader title="Notifications" subtitle="Manage how we alert you" />
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingBottom: Math.max(insets.bottom, 32) + 120,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save preferences'}</Text>
-      </TouchableOpacity>
+        <View style={styles.headerSection}>
+          <Text style={styles.title}>Safety Level</Text>
+          <Text style={styles.subtitle}>
+            Choose how strictly Verity filters your calls and how we notify your circle.
+          </Text>
+        </View>
+
+        <View style={styles.sensitivityCard}>
+          <View style={styles.sensitivityHeader}>
+            <Text style={styles.sensitivityLabel}>SENSITIVITY</Text>
+            <Text style={styles.sensitivityValue}>{levelLabel}</Text>
+          </View>
+          <Slider
+            style={styles.slider}
+            value={threshold}
+            minimumValue={1}
+            maximumValue={100}
+            step={1}
+            minimumTrackTintColor="#2d6df6"
+            maximumTrackTintColor="#1b2534"
+            thumbTintColor="#fff"
+            onValueChange={setThreshold}
+          />
+          <View style={styles.sliderLabels}>
+            <Text style={styles.sliderLabel}>Lower</Text>
+            <Text style={styles.sliderLabel}>Higher</Text>
+          </View>
+        </View>
+
+        <View style={styles.notificationsSection}>
+          <Text style={styles.sectionTitle}>Notifications</Text>
+          {notificationChannels.map((channel) => (
+            <View
+              key={channel.key}
+              style={[
+                styles.notificationRow,
+                channel.active ? styles.notificationRowActive : styles.notificationRowInactive,
+              ]}
+            >
+              <View
+                style={[
+                  styles.iconBox,
+                  channel.active ? styles.iconBoxActive : styles.iconBoxInactive,
+                ]}
+              >
+                <Ionicons
+                  name={channel.icon as any}
+                  size={20}
+                  color={channel.active ? '#fff' : '#5b657d'}
+                />
+              </View>
+              <View style={styles.notificationText}>
+                <Text
+                  style={[
+                    styles.notificationTitle,
+                    channel.active && styles.notificationTitleActive,
+                  ]}
+                >
+                  {channel.title}
+                </Text>
+                <Text style={styles.notificationSubtitle}>{channel.description}</Text>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.toggle,
+                  channel.active ? styles.toggleActive : styles.toggleInactive,
+                ]}
+                onPress={() => handleToggle(channel.key)}
+              >
+                <View
+                  style={[
+                    styles.toggleThumb,
+                    channel.active ? styles.toggleThumbActive : styles.toggleThumbInactive,
+                  ]}
+                />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+
+        <HowItWorksCard caption="HOW IT WORKS" items={helperItems} />
+      </ScrollView>
+
+      <ActionFooter
+        primaryLabel="Save preferences"
+        onPrimaryPress={savePrefs}
+        primaryLoading={saving}
+        primaryDisabled={!hasChanges || saving}
+      />
     </SafeAreaView>
   );
+}
+
+function getLevelLabel(value: number) {
+  if (value <= LEVELS[0].breakpoint) return LEVELS[0].label;
+  if (value <= LEVELS[1].breakpoint) return LEVELS[1].label;
+  return LEVELS[2].label;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0b111b',
-    paddingHorizontal: 24,
   },
-  header: {
-    paddingTop: 0,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+  content: {
+    paddingHorizontal: 28,
+    paddingTop: 28,
+    gap: 24,
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#121a26',
-    borderWidth: 1,
-    borderColor: '#1f2a3a',
+  headerSection: {
+    marginBottom: 16,
   },
-  headerTitle: {
-    color: '#f5f7fb',
-    fontSize: 28,
+  title: {
+    fontSize: 34,
     fontWeight: '700',
-    marginLeft: 12,
+    letterSpacing: -0.35,
+    color: '#f5f7fb',
+    marginBottom: 6,
   },
-  sectionTitle: {
-    color: '#98a7c2',
-    fontWeight: '600',
-    marginTop: 10,
-    marginBottom: 8,
+  subtitle: {
+    fontSize: 17,
+    fontWeight: '500',
+    color: '#8aa0c6',
   },
-  card: {
+  sensitivityCard: {
     backgroundColor: '#121a26',
-    borderRadius: 16,
+    borderRadius: 40,
+    padding: 20,
     borderWidth: 1,
-    borderColor: '#202c3c',
-    padding: 16,
+    borderColor: '#1b2534',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    shadowOffset: { width: 0, height: 12 },
+  },
+  sensitivityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sensitivityLabel: {
+    fontSize: 10,
+    letterSpacing: 1.5,
+    fontWeight: '900',
+    color: '#8aa0c6',
+  },
+  sensitivityValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2d6df6',
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  sliderLabel: {
+    fontSize: 11,
+    letterSpacing: 1,
+    color: '#7b8aa5',
+    fontWeight: '600',
+  },
+  notificationsSection: {
     gap: 12,
   },
-  thresholdRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  sectionTitle: {
+    fontSize: 11,
+    letterSpacing: 2,
+    color: '#8796b0',
+    fontWeight: '700',
+    marginBottom: 8,
   },
-  label: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  value: {
-    color: '#e6ebf5',
-    fontWeight: '600',
-  },
-  input: {
+  notificationRow: {
+    height: 92,
+    borderRadius: 32,
     borderWidth: 1,
-    borderColor: '#243247',
-    borderRadius: 12,
-    padding: 10,
-    color: '#e6ebf5',
-    textAlign: 'center',
-  },
-  toggleRow: {
+    borderColor: '#1f2735',
+    backgroundColor: '#121a26',
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
-  toggleLabel: {
-    color: '#e6ebf5',
-    fontWeight: '500',
+  notificationRowActive: {
+    borderColor: '#2d6df6',
+    backgroundColor: '#0f1724',
   },
-  toggleHint: {
-    color: '#7b8aa5',
-    fontSize: 12,
-    marginTop: 2,
+  notificationRowInactive: {
+    backgroundColor: '#0f1724',
   },
-  saveButton: {
-    marginTop: 18,
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  iconBoxActive: {
     backgroundColor: '#2d6df6',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
   },
-  saveDisabled: {
-    opacity: 0.6,
+  iconBoxInactive: {
+    backgroundColor: '#101726',
   },
-  saveText: {
-    color: '#f5f7fb',
+  notificationText: {
+    flex: 1,
+  },
+  notificationTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  notificationTitleActive: {
+    color: '#fff',
+  },
+  notificationSubtitle: {
+    fontSize: 13,
     fontWeight: '600',
+    color: '#7b8aa5',
+  },
+  toggle: {
+    width: 51,
+    height: 31,
+    borderRadius: 16,
+    padding: 3,
+    justifyContent: 'center',
+  },
+  toggleActive: {
+    backgroundColor: '#2d6df6',
+  },
+  toggleInactive: {
+    backgroundColor: '#1f2735',
+  },
+  toggleThumb: {
+    width: 25,
+    height: 25,
+    borderRadius: 12.5,
+    backgroundColor: '#fff',
+  },
+  toggleThumbActive: {
+    alignSelf: 'flex-end',
+  },
+  toggleThumbInactive: {
+    alignSelf: 'flex-start',
   },
   error: {
     color: '#ff8a8a',
-    fontSize: 12,
-    marginTop: 10,
+    marginTop: 12,
   },
 });
