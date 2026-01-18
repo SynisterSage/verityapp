@@ -80,7 +80,7 @@ const MANAGE_ACTIONS: Array<{
 ];
 
 const PERMISSIONS = [
-  { name: 'Contacts', description: 'Required for the native contact picker', icon: 'people-outline' },
+  { name: 'Contacts', description: 'Required to import Trusted Contacts', icon: 'people-outline' },
 ];
 
 function SettingRow({
@@ -432,7 +432,7 @@ export default function DataPrivacyScreen() {
               <Text style={styles.manageMessage}>{manageMessageText}</Text>
             ) : null}
           </View>
-          <Text style={styles.footnote}>By using Verity Protect, you acknowledge our privacy and data processing terms.</Text>
+          <Text style={styles.footnote}>By using Verity Protect, you acknowledge our privacy and data processing terms. {"\n"} {"\n"}  Last Updated Jan 18th, 2026</Text>
         </ScrollView>
         {pinModalAction ? (
           <Modal
