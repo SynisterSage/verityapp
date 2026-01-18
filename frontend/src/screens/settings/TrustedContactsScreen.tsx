@@ -1,33 +1,28 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Alert,
-  Animated,
-  FlatList,
-  Modal,
-  RefreshControl,
   ActivityIndicator,
+  Animated,
+  Easing,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
-import EmptyState from '../../components/common/EmptyState';
+import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
+import SettingsHeader from '../../components/common/SettingsHeader';
 import { getAllContacts, selectContacts } from '../../native/ContactPicker';
-
-type TrustedContact = {
-  id: string;
-  caller_number: string | null;
-  source: string | null;
-  created_at: string;
-};
 
 type DeviceContact = {
   id: string;
@@ -35,10 +30,30 @@ type DeviceContact = {
   numbers: string[];
 };
 
+type TrustedContactRow = {
+  id: string;
+  caller_number: string;
+  source: string;
+  relationship_tag?: string | null;
+  contact_name?: string | null;
+  caller_hash?: string | null;
+};
+
 type ContactMapEntry = {
   name: string;
-  numbers: string[];
+  relationship?: string;
 };
+
+const relationshipTags = [
+  'Wife',
+  'Husband',
+  'Son',
+  'Daughter',
+  'Grandchild',
+  'Friend',
+  'Doctor',
+  'Neighbor',
+];
 
 function normalizePhoneNumber(input: string) {
   const raw = input.trim();
@@ -58,25 +73,13 @@ function normalizePhoneNumber(input: string) {
   return `+${digits}`;
 }
 
-function contactMapKey(profileId: string) {
-  return `trusted_contacts_map:${profileId}`;
-}
+const contactMapKey = (profileId: string) => `trusted_contacts_map:${profileId}`;
 
 async function readContactMap(profileId: string) {
   const raw = await AsyncStorage.getItem(contactMapKey(profileId));
   if (!raw) return {};
   try {
-    const parsed = JSON.parse(raw) as Record<string, ContactMapEntry | string[]>;
-    const normalized: Record<string, ContactMapEntry> = {};
-    Object.entries(parsed).forEach(([key, value]) => {
-      if (Array.isArray(value)) {
-        normalized[key] = { name: 'Unknown', numbers: value };
-      } else if (value && typeof value === 'object') {
-        const numbers = Array.isArray(value.numbers) ? value.numbers : [];
-        normalized[key] = { name: value.name ?? 'Unknown', numbers };
-      }
-    });
-    return normalized;
+    return JSON.parse(raw) as Record<string, ContactMapEntry>;
   } catch {
     return {};
   }
@@ -90,166 +93,181 @@ export default function TrustedContactsScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
-  const [trusted, setTrusted] = useState<TrustedContact[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [input, setInput] = useState('');
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [contacts, setContacts] = useState<DeviceContact[]>([]);
-  const [selectedMap, setSelectedMap] = useState<Record<string, boolean>>({});
-  const [contactsLoading, setContactsLoading] = useState(false);
-  const [contactsError, setContactsError] = useState('');
+  const [trustedList, setTrustedList] = useState<TrustedContactRow[]>([]);
+  const [contactMap, setContactMap] = useState<Record<string, ContactMapEntry>>({});
+  const [importing, setImporting] = useState(false);
+  const [manualNumber, setManualNumber] = useState('');
+  const [manualNumberDigits, setManualNumberDigits] = useState('');
+  const [error, setError] = useState('');
+  const [pendingImports, setPendingImports] = useState<DeviceContact[]>([]);
+  const [trayContact, setTrayContact] = useState<DeviceContact | TrustedContactRow | null>(null);
+  const [trayMode, setTrayMode] = useState<'import' | 'manage' | 'manual' | null>(null);
+  const [selectedTag, setSelectedTag] = useState('Friend');
+  const [isTrayMounted, setIsTrayMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
-  const [contactNames, setContactNames] = useState<Record<string, string>>({});
-  const inputRef = useRef<TextInput>(null);
-  const shimmer = useRef(new Animated.Value(0.6)).current;
-  const listRef = useRef<FlatList<TrustedContact>>(null);
+  const [manualContactName, setManualContactName] = useState('');
+  const [manualNameEditing, setManualNameEditing] = useState(false);
+  const [isSavingTag, setIsSavingTag] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const trayAnim = useRef(new Animated.Value(0)).current;
+  const shimmer = useRef(new Animated.Value(0.65)).current;
 
-  const loadContactNames = async () => {
-    if (!activeProfile) {
-      setContactNames({});
-      return;
-    }
-    const raw = await AsyncStorage.getItem(contactMapKey(activeProfile.id));
-    if (!raw) {
-      setContactNames({});
-      return;
-    }
-    try {
-      const parsed = JSON.parse(raw) as Record<string, ContactMapEntry | string[]>;
-      const map: Record<string, string> = {};
-      Object.values(parsed).forEach((entry) => {
-        if (Array.isArray(entry)) {
-          entry.forEach((number) => {
-            if (number) {
-              map[number] = map[number] ?? 'Trusted contact';
-            }
-          });
-        } else if (entry && typeof entry === 'object') {
-          const name = entry.name ?? 'Trusted contact';
-          entry.numbers.forEach((number) => {
-            if (number) {
-              map[number] = name;
-            }
-          });
-        }
+  const helperItems = useMemo(
+    () => [
+      {
+        icon: 'people-outline',
+        color: '#4ade80',
+        text: 'Trusted Contacts skip the Safety PIN and connect directly.',
+      },
+      {
+        icon: 'ban',
+        color: '#ef4444',
+        text: 'Unknown or blocked numbers are screened before they ring.',
+      },
+    ],
+    []
+  );
+
+  const skeletonRows = useMemo(
+    () => Array.from({ length: 3 }, (_, i) => `trusted-settings-skeleton-${i}`),
+    []
+  );
+  const showSkeleton = loading && trustedList.length === 0;
+
+  const refreshContactMap = useCallback(async () => {
+    if (!activeProfile) return;
+    const map = await readContactMap(activeProfile.id);
+    setContactMap(map);
+  }, [activeProfile]);
+
+  const mergeContactMapEntries = async (
+    entries: { numbers: string[]; name: string; relationship?: string }[]
+  ) => {
+    if (!activeProfile) return;
+    const map = await readContactMap(activeProfile.id);
+    entries.forEach((entry) => {
+      entry.numbers.forEach((number) => {
+        if (!number) return;
+        map[number] = {
+          name: entry.name,
+          relationship: entry.relationship ?? map[number]?.relationship,
+        };
       });
-      setContactNames(map);
-    } catch {
-      setContactNames({});
-    }
+    });
+    await writeContactMap(activeProfile.id, map);
+    setContactMap(map);
   };
 
-  const loadTrusted = async () => {
-    if (!activeProfile) return;
+  const loadTrustedList = useCallback(async () => {
+    if (!activeProfile) {
+      setLoading(false);
+      return [];
+    }
     setLoading(true);
     try {
-      const data = await authorizedFetch(
-        `/fraud/trusted-contacts?profileId=${activeProfile.id}`
-      );
-      setTrusted(data?.trusted_contacts ?? []);
-    } catch {
-      setTrusted([]);
+      const data = await authorizedFetch(`/fraud/trusted-contacts?profileId=${activeProfile.id}`);
+      const contacts = data?.trusted_contacts ?? [];
+      setTrustedList(contacts);
+      return contacts;
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load trusted contacts.');
+      return [];
+    } finally {
+      setLoading(false);
     }
-    await loadContactNames();
-    setLoading(false);
+  }, [activeProfile]);
+
+  const persistRelationshipTag = async (
+    profileId: string,
+    number: string,
+    tag: string,
+    contactName?: string
+  ) => {
+    await authorizedFetch('/fraud/trusted-contacts', {
+      method: 'PATCH',
+      body: JSON.stringify({
+        profileId,
+        callerNumber: number,
+        relationshipTag: tag,
+        contactName,
+      }),
+    });
+  };
+
+  const showTray = () => {
+    setIsTrayMounted(true);
+    trayAnim.setValue(0);
+    Animated.timing(trayAnim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideTray = (callback?: () => void) => {
+    Animated.timing(trayAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsTrayMounted(false);
+      callback?.();
+    });
   };
 
   useEffect(() => {
-    loadTrusted();
-  }, [activeProfile]);
-
-  useFocusEffect(
-    useCallback(() => {
-      listRef.current?.scrollToOffset({ offset: 0, animated: false });
-    }, [])
-  );
+    refreshContactMap();
+    loadTrustedList();
+  }, [refreshContactMap, loadTrustedList]);
 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(shimmer, { toValue: 1, duration: 800, useNativeDriver: true }),
-        Animated.timing(shimmer, { toValue: 0.6, duration: 800, useNativeDriver: true }),
+        Animated.timing(shimmer, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(shimmer, {
+          toValue: 0.65,
+          duration: 800,
+          useNativeDriver: true,
+        }),
       ])
     );
     loop.start();
     return () => loop.stop();
   }, [shimmer]);
 
-  const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
-  const showSkeleton = loading && trusted.length === 0;
-
-  const fetchBlockedNumbers = async () => {
-    if (!activeProfile) return new Set<string>();
-    try {
-      const data = await authorizedFetch(`/fraud/blocked-callers?profileId=${activeProfile.id}`);
-      const list = data?.blocked_callers ?? [];
-      return new Set(list.map((entry: any) => entry.caller_number).filter(Boolean));
-    } catch {
-      return new Set<string>();
-    }
-  };
-
-  const confirmTrust = (callerNumber: string) =>
-    new Promise<boolean>((resolve) => {
-      Alert.alert(
-        'Override block',
-        'This number is currently blocked. Trusting it will remove the block. Continue?',
-        [
-          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-          { text: 'Trust number', onPress: () => resolve(true) },
-        ],
-        { cancelable: true }
-      );
+  const upsertContactMap = async (numbers: string[], name: string, relationship?: string) => {
+    if (!activeProfile) return;
+    const map = await readContactMap(activeProfile.id);
+    numbers.forEach((number) => {
+      if (!number) return;
+      map[number] = {
+        name,
+        relationship: relationship ?? map[number]?.relationship,
+      };
     });
-
-  const addTrustedNumbers = async (numbers: string[], source: 'manual' | 'contacts') => {
-    if (!activeProfile || numbers.length === 0) return;
-    const blockedNumbers = await fetchBlockedNumbers();
-    const resolvedNumbers: string[] = [];
-    for (const number of numbers) {
-      const normalized = number.trim();
-      if (!normalized) continue;
-      if (blockedNumbers.has(normalized)) {
-        const allowed = await confirmTrust(normalized);
-        if (!allowed) {
-          continue;
-        }
-      }
-      resolvedNumbers.push(normalized);
-    }
-    if (resolvedNumbers.length === 0) {
-      return;
-    }
-    await authorizedFetch('/fraud/trusted-contacts', {
-      method: 'POST',
-      body: JSON.stringify({
-        profileId: activeProfile.id,
-        callerNumbers: resolvedNumbers,
-        source,
-      }),
-    });
+    await writeContactMap(activeProfile.id, map);
+    setContactMap(map);
   };
 
-  const addManual = async () => {
-    const normalized = normalizePhoneNumber(input);
-    if (!normalized || !activeProfile) return;
-    await addTrustedNumbers([normalized], 'manual');
-    setInput('');
-    loadTrusted();
+  const removeFromContactMap = async (number: string) => {
+    if (!activeProfile) return;
+    const map = await readContactMap(activeProfile.id);
+    delete map[number];
+    await writeContactMap(activeProfile.id, map);
+    setContactMap(map);
   };
 
-  const removeTrusted = async (trustedId: string, shouldReload = true) => {
-    await authorizedFetch(`/fraud/trusted-contacts/${trustedId}`, { method: 'DELETE' });
-    if (shouldReload) {
-      loadTrusted();
-    }
-  };
-
-  const openContactPicker = async () => {
-    setContactsError('');
-    setContactsLoading(true);
-    setContacts([]);
-    setSelectedMap({});
+  const handleImport = async () => {
+    if (!activeProfile) return;
+    setError('');
+    setImporting(true);
     try {
       const pickedContacts = await selectContacts();
       const normalized = pickedContacts
@@ -257,556 +275,1002 @@ export default function TrustedContactsScreen() {
           const numbers = (contact.numbers ?? [])
             .map((number) => normalizePhoneNumber(number))
             .filter(Boolean);
-          if (!numbers.length) return null;
+          const primaryNumber = numbers[0];
+          if (!primaryNumber) return null;
           return {
             id: contact.id,
             name: contact.name || 'Unknown',
-            numbers: Array.from(new Set(numbers)),
+            numbers: [primaryNumber],
           };
         })
         .filter(Boolean) as DeviceContact[];
-      if (normalized.length === 0) {
-        setContactsLoading(false);
+      if (!normalized.length) {
+        setImporting(false);
         return;
       }
-      setContacts(normalized);
-      const initialSelection: Record<string, boolean> = {};
+      const numbers = Array.from(new Set(normalized.flatMap((contact) => contact.numbers)));
+      const contactNames: Record<string, string> = {};
       normalized.forEach((contact) => {
-        initialSelection[contact.id] = true;
+        contact.numbers.forEach((number) => {
+          if (!contactNames[number]) {
+            contactNames[number] = contact.name;
+          }
+        });
       });
-      setSelectedMap(initialSelection);
-      setPickerOpen(true);
-    } catch (err) {
-      setContactsError((err as Error).message);
+      await authorizedFetch('/fraud/trusted-contacts', {
+        method: 'POST',
+        body: JSON.stringify({
+          profileId: activeProfile.id,
+          callerNumbers: numbers,
+          source: 'contacts',
+          contactNames,
+        }),
+      });
+      await loadTrustedList();
+      await mergeContactMapEntries(
+        normalized.map((contact) => ({ numbers: contact.numbers, name: contact.name }))
+      );
+      startTagging(normalized);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to import contacts.');
     } finally {
-      setContactsLoading(false);
+      setImporting(false);
     }
   };
 
-  const closeContactPicker = () => {
-    setPickerOpen(false);
-    setContacts([]);
-    setSelectedMap({});
-    setContactsLoading(false);
+  const startTagging = (contacts: DeviceContact[]) => {
+    if (!contacts.length) return;
+    setPendingImports(contacts);
+    setTrayMode('import');
+    setTrayContact(contacts[0]);
+    setSelectedTag('Friend');
+    showTray();
   };
 
-  const toggleContact = (contactId: string) => {
-    setSelectedMap((prev) => ({
-      ...prev,
-      [contactId]: !prev[contactId],
-    }));
-  };
-
-  const selectAllContacts = () => {
-    const next: Record<string, boolean> = {};
-    contacts.forEach((contact) => {
-      next[contact.id] = true;
-    });
-    setSelectedMap(next);
-  };
-
-  const importSelected = async () => {
-    if (!activeProfile) return;
-    const selectedContacts = contacts.filter((contact) => selectedMap[contact.id]);
-    const numbers = Array.from(
-      new Set(selectedContacts.flatMap((contact) => contact.numbers))
-    );
-    if (numbers.length === 0) {
-      setPickerOpen(false);
-      setContacts([]);
-      setSelectedMap({});
-      return;
+  const openManageTray = (contact: TrustedContactRow) => {
+    setTrayMode('manage');
+    setTrayContact(contact);
+    const existingTag =
+      contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Friend';
+    setSelectedTag(existingTag);
+    if (contact.source === 'manual') {
+      setManualContactName(
+        contact.contact_name ?? contactMap[contact.caller_number]?.name ?? ''
+      );
+      setManualNameEditing(false);
+    } else {
+      setManualContactName('');
+      setManualNameEditing(false);
     }
-    await addTrustedNumbers(numbers, 'contacts');
-    const contactMap = await readContactMap(activeProfile.id);
-    selectedContacts.forEach((contact) => {
-      contactMap[contact.id] = { name: contact.name, numbers: contact.numbers };
+    showTray();
+  };
+
+  const closeTray = () => {
+    hideTray(() => {
+      setTrayMode(null);
+      setTrayContact(null);
+      setPendingImports([]);
+      setSelectedTag('Friend');
+      setManualContactName('');
+      setManualNameEditing(false);
     });
-    await writeContactMap(activeProfile.id, contactMap);
-    setPickerOpen(false);
-    setContacts([]);
-    setSelectedMap({});
-    loadTrusted();
+  };
+
+  const handleTagSave = async () => {
+    if (!trayContact || !trayMode || !activeProfile) return;
+    setIsSavingTag(true);
+    try {
+      setError('');
+      if (trayMode === 'manual') {
+        const contact = trayContact as DeviceContact;
+        const number = contact.numbers[0];
+        const displayName = getManualContactDisplayName(number) || number;
+        await authorizedFetch('/fraud/trusted-contacts', {
+          method: 'POST',
+          body: JSON.stringify({
+            profileId: activeProfile.id,
+            callerNumbers: [number],
+            source: 'manual',
+            contactNames: { [number]: displayName },
+          }),
+        });
+        await persistRelationshipTag(activeProfile.id, number, selectedTag, displayName);
+        await mergeContactMapEntries([{ numbers: [number], name: displayName, relationship: selectedTag }]);
+        await loadTrustedList();
+        closeTray();
+        return;
+      }
+      if (trayMode === 'import') {
+        const contact = trayContact as DeviceContact;
+        await Promise.all(
+          contact.numbers.map((number) =>
+            persistRelationshipTag(activeProfile.id, number, selectedTag, contact.name)
+          )
+        );
+        await upsertContactMap(contact.numbers, contact.name, selectedTag);
+        const remaining = pendingImports.slice(1);
+        setPendingImports(remaining);
+        if (remaining.length === 0) {
+          await loadTrustedList();
+          closeTray();
+        } else {
+          setTrayContact(remaining[0]);
+          setSelectedTag('Friend');
+        }
+        return;
+      }
+      const row = trayContact as TrustedContactRow;
+      const isManualRow = row.source === 'manual';
+      const displayName =
+        isManualRow && manualContactName.trim().length > 0
+          ? manualContactName.trim()
+          : row.contact_name ?? contactMap[row.caller_number]?.name ?? row.caller_number;
+      await persistRelationshipTag(
+        activeProfile.id,
+        row.caller_number,
+        selectedTag,
+        displayName
+      );
+      await upsertContactMap(
+        [row.caller_number],
+        displayName,
+        selectedTag
+      );
+      await loadTrustedList();
+      closeTray();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to save tag.');
+    } finally {
+      setIsSavingTag(false);
+    }
+  };
+
+  const handleRemoveContact = async () => {
+    if (!trayContact || trayMode !== 'manage') return;
+    setIsRemoving(true);
+    const row = trayContact as TrustedContactRow;
+    try {
+      await authorizedFetch(`/fraud/trusted-contacts/${row.id}`, {
+        method: 'DELETE',
+      });
+      await removeFromContactMap(row.caller_number);
+      await loadTrustedList();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to remove contact.');
+    } finally {
+      setIsRemoving(false);
+      closeTray();
+    }
+  };
+
+  const formatPhoneNumberDisplay = (digits: string) => {
+    if (!digits) return '';
+    const hasCountryCode = digits.length === 11 && digits.startsWith('1');
+    const core = hasCountryCode ? digits.slice(1) : digits;
+    const area = core.slice(0, 3);
+    const prefix = core.slice(3, 6);
+    const line = core.slice(6, 10);
+    let formatted = '';
+    if (hasCountryCode) {
+      formatted += '+1 ';
+    }
+    if (area) {
+      formatted += `(${area}`;
+    }
+    if (area.length === 3) {
+      formatted += ') ';
+    }
+    if (prefix) {
+      formatted += prefix;
+    }
+    if (line) {
+      formatted += `-${line}`;
+    }
+    return formatted;
+  };
+
+  const getManualContactDisplayName = (number: string) => {
+    if (!number) return '';
+    const digits = number.replace(/\D/g, '');
+    return manualContactName.trim() || formatPhoneNumberDisplay(digits) || number;
+  };
+
+  const handleManualNumberChange = (text: string) => {
+    const digits = text.replace(/\D/g, '').slice(0, 11);
+    setManualNumberDigits(digits);
+    setManualNumber(formatPhoneNumberDisplay(digits));
+  };
+
+  const addManualNumber = async () => {
+    if (!manualNumberDigits || !activeProfile) return;
+    const normalized = normalizePhoneNumber(manualNumberDigits);
+    if (!normalized) return;
+    setManualContactName('');
+    setManualNameEditing(false);
+    const manualContact: DeviceContact = {
+      id: `manual-${normalized}`,
+      name: '',
+      numbers: [normalized],
+    };
+    setTrayMode('manual');
+    setTrayContact(manualContact);
+    setSelectedTag('Friend');
+    showTray();
+    setManualNumber('');
+    setManualNumberDigits('');
   };
 
   const syncContacts = async () => {
-    if (!activeProfile) return;
+    if (!activeProfile || syncing) return;
     setSyncing(true);
-      setContactsError('');
+    setError('');
     try {
-      const contactMap = await readContactMap(activeProfile.id);
-      const trackedIds = Object.keys(contactMap);
-      if (trackedIds.length === 0) {
-        setSyncing(false);
-        return;
-      }
       const rawContacts = await getAllContacts();
-      const deviceContacts = rawContacts
-        .map((contact) => {
-          const numbers = (contact.numbers ?? [])
-            .map((number) => normalizePhoneNumber(number))
-            .filter(Boolean);
-          if (!numbers.length) return null;
-          return {
-            id: contact.id,
-            name: contact.name || 'Unknown',
-            numbers: Array.from(new Set(numbers)),
-          };
-        })
-        .filter(Boolean) as DeviceContact[];
-      const byId = new Map(deviceContacts.map((contact) => [contact.id, contact]));
-      const nextMap: Record<string, ContactMapEntry> = {};
-      trackedIds.forEach((id) => {
-        const contact = byId.get(id);
-        if (!contact) return;
-        if (contact.numbers.length === 0) return;
-        nextMap[id] = { name: contact.name, numbers: contact.numbers };
+      const nameMap = new Map<string, string>();
+      rawContacts.forEach((contact) => {
+        const normalizedNumbers = (contact.numbers ?? [])
+          .map((number) => normalizePhoneNumber(number))
+          .filter(Boolean);
+        normalizedNumbers.forEach((number) => {
+          if (!nameMap.has(number)) {
+            nameMap.set(number, contact.name || 'Trusted contact');
+          }
+        });
       });
 
-      const previousNumbers = new Set(
-        Object.values(contactMap).flatMap((entry) => entry.numbers).filter(Boolean)
-      );
-      const nextNumbers = new Set(
-        Object.values(nextMap).flatMap((entry) => entry.numbers).filter(Boolean)
-      );
-
-      const currentContacts = trusted.filter((entry) => entry.source === 'contacts');
-      const currentNumberSet = new Set(
-        currentContacts.map((entry) => entry.caller_number).filter(Boolean) as string[]
-      );
-      const numberToId = new Map(
-        currentContacts
-          .filter((entry) => entry.caller_number)
-          .map((entry) => [entry.caller_number as string, entry.id])
-      );
-
-      const numbersToRemove = Array.from(previousNumbers).filter(
-        (number) => !nextNumbers.has(number)
-      );
-      for (const number of numbersToRemove) {
-        const trustedId = numberToId.get(number);
-        if (trustedId) {
-          await removeTrusted(trustedId, false);
+      const updates: Array<{ number: string; name: string }> = [];
+      trustedList.forEach((entry) => {
+        if (entry.source !== 'contacts') return;
+        const normalized = normalizePhoneNumber(entry.caller_number ?? '');
+        if (!normalized) return;
+        const mappedName = nameMap.get(normalized);
+        if (!mappedName) return;
+        if (
+          mappedName &&
+          mappedName !== contactMap[normalized]?.name &&
+          mappedName !== entry.contact_name
+        ) {
+          updates.push({ number: normalized, name: mappedName });
         }
+      });
+
+      if (updates.length > 0) {
+        await Promise.all(
+          updates.map((update) =>
+            authorizedFetch('/fraud/trusted-contacts', {
+              method: 'PATCH',
+              body: JSON.stringify({
+                profileId: activeProfile.id,
+                callerNumber: update.number,
+                contactName: update.name,
+              }),
+            })
+          )
+        );
+        await mergeContactMapEntries(
+          updates.map((update) => ({ numbers: [update.number], name: update.name }))
+        );
       }
 
-      const numbersToAdd = Array.from(nextNumbers).filter(
-        (number) => !currentNumberSet.has(number)
-      );
-      if (numbersToAdd.length > 0) {
-        await addTrustedNumbers(numbersToAdd, 'contacts');
-      }
-
-      await writeContactMap(activeProfile.id, nextMap);
-      loadTrusted();
-    } catch (err) {
-      setContactsError((err as Error).message);
+      await loadTrustedList();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to sync contacts.');
     } finally {
       setSyncing(false);
     }
   };
 
-  const selectedCount = useMemo(
-    () => Object.values(selectedMap).filter(Boolean).length,
-    [selectedMap]
+  const getContactDisplayName = (contact: TrustedContactRow) =>
+    contact.contact_name ?? contactMap[contact.caller_number]?.name ?? contact.caller_number;
+  const getRelationshipLabel = (contact: TrustedContactRow) =>
+    contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Trusted Safe Contact';
+  const safeList = useMemo(() => {
+    const seen = new Set<string>();
+    return trustedList.filter((contact) => {
+      const canonical = normalizePhoneNumber(contact.caller_number);
+      const key = canonical || contact.caller_hash || contact.caller_number;
+      if (!key) {
+        return false;
+      }
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }, [trustedList]);
+  const isManualManageContact =
+    trayMode === 'manage' &&
+    trayContact &&
+    'source' in trayContact &&
+    (trayContact as TrustedContactRow).source === 'manual';
+  const manualManageRow = isManualManageContact ? (trayContact as TrustedContactRow) : null;
+  const manualManageNumber = manualManageRow?.caller_number ?? '';
+  const manualManageDisplayName =
+    manualContactName.trim() ||
+    manualManageRow?.contact_name ||
+    contactMap[manualManageNumber]?.name ||
+    formatPhoneNumberDisplay(manualManageNumber.replace(/\D/g, '')) ||
+    manualManageNumber;
+
+  const manualTrayNumber =
+    trayMode === 'manual' && trayContact ? (trayContact as DeviceContact).numbers[0] : '';
+  const manualAvatarInitial = (
+    (manualContactName.trim() || manualTrayNumber.replace(/\D/g, '') || 'T')
+      .charAt(0)
+      .toUpperCase()
   );
 
   return (
-    <SafeAreaView
-      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
-      edges={[]}
+    <KeyboardAvoidingView
+      style={styles.outer}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color="#e4ebf7" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Trusted Contacts</Text>
-      </View>
-      <Text style={styles.subtitle}>
-        Calls from trusted contacts skip the passcode and go straight to voicemail or bridging.
-      </Text>
-
-      <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={[styles.actionButton, contactsLoading && styles.actionDisabled]}
-          onPress={openContactPicker}
-          disabled={contactsLoading}
-        >
-          <Ionicons name="people-outline" size={18} color="#e6ebf5" />
-          <Text style={styles.actionText}>Import Contacts</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.actionButton, syncing && styles.actionDisabled]}
-          onPress={syncContacts}
-          disabled={syncing}
-        >
-          <Ionicons name="sync-outline" size={18} color="#e6ebf5" />
-          <Text style={styles.actionText}>Sync</Text>
-        </TouchableOpacity>
-      </View>
-      {contactsError ? <Text style={styles.warning}>{contactsError}</Text> : null}
-
-      <View style={styles.inputRow}>
-        <TextInput
-          ref={inputRef}
-          style={styles.input}
-          placeholder="Add caller number…"
-          placeholderTextColor="#8aa0c6"
-          value={input}
-          onChangeText={setInput}
+      <SafeAreaView style={styles.screen} edges={['bottom']}>
+        <SettingsHeader
+          title="Trusted Contacts"
+          subtitle="People on this list skip the Safety PIN and connect to you directly."
         />
-        <TouchableOpacity style={styles.addButton} onPress={addManual}>
-          <Text style={styles.addText}>Add</Text>
-        </TouchableOpacity>
-      </View>
-
-      {showSkeleton ? (
-        <View style={styles.listContent}>
-          {skeletonRows.map((key) => (
-            <Animated.View key={key} style={[styles.skeletonCard, { opacity: shimmer }]}>
-              <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
-              <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
-            </Animated.View>
-          ))}
-        </View>
-      ) : (
-        <FlatList
-          ref={listRef}
-          data={trusted}
-          keyExtractor={(item) => item.id}
-          refreshControl={
-            <RefreshControl
-              refreshing={loading}
-              onRefresh={loadTrusted}
-              tintColor="#8ab4ff"
-              colors={['#8ab4ff']}
-            />
-          }
-          indicatorStyle="white"
+        <ScrollView
           contentContainerStyle={[
-            styles.listContent,
-            !loading && trusted.length === 0 && styles.listEmptyContent,
+            styles.body,
+            {
+              paddingBottom: Math.max(insets.bottom, 32) + 0,
+              paddingTop: Math.max(insets.top, 12) + 0,
+            },
           ]}
-          renderItem={({ item }) => {
-            const source = (item.source ?? '').toLowerCase();
-            let badgeText = 'Manual';
-            if (source === 'contacts') {
-              badgeText = 'Imported';
-            } else if (source === 'auto') {
-              badgeText = 'Auto trusted';
-            }
-            return (
-              <View style={styles.card}>
-                <View>
-                  <Text style={styles.cardText}>
-                    {item.caller_number && contactNames[item.caller_number]
-                      ? contactNames[item.caller_number]
-                      : item.caller_number ?? 'Unknown number'}
-                  </Text>
-                  <Text style={styles.meta}>
-                    {badgeText}
-                    {item.caller_number && contactNames[item.caller_number]
-                      ? ` • ${item.caller_number}`
-                      : ''}
-                  </Text>
-                </View>
-                <TouchableOpacity onPress={() => removeTrusted(item.id)}>
-                  <Text style={styles.remove}>Remove</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          }}
-          ListEmptyComponent={
-            !activeProfile ? null : (
-              <View style={styles.emptyStateWrap}>
-                <EmptyState
-                  icon="people-outline"
-                  title="No trusted contacts"
-                  body="Import contacts or add a number to let trusted callers skip the passcode."
-                  ctaLabel="Add a number"
-                  onPress={() => inputRef.current?.focus()}
-                />
-              </View>
-            )
-          }
-        />
-      )}
+          showsVerticalScrollIndicator={false}
+        >
 
-      {!activeProfile ? (
-        <Text style={styles.warning}>Finish onboarding to add trusted contacts.</Text>
-      ) : null}
+          <Pressable
+            style={({ pressed }) => [
+              styles.importCard,
+              { opacity: pressed || importing ? 0.85 : 1 },
+            ]}
+            onPress={handleImport}
+            disabled={importing}
+          >
+            <View style={styles.importIcon}>
+              <Ionicons name="person-add" size={24} color="#fff" />
+            </View>
+            <View style={styles.importText}>
+              <Text style={styles.importTitle}>Import from Phone</Text>
+              <Text style={styles.importSubtitle}>Add friends &amp; family</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color="#2d6df6" />
+          </Pressable>
 
-      <Modal
-        transparent
-        animationType="slide"
-        visible={pickerOpen}
-        onRequestClose={closeContactPicker}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select contacts</Text>
-              <TouchableOpacity onPress={closeContactPicker}>
-                <Ionicons name="close" size={20} color="#e4ebf7" />
-              </TouchableOpacity>
+          <View style={styles.syncRow}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.syncButton,
+                syncing && styles.syncButtonDisabled,
+                pressed && !syncing && styles.syncButtonPressed,
+              ]}
+              onPress={syncContacts}
+              disabled={syncing}
+            >
+              {syncing ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Ionicons name="sync-outline" size={18} color="#fff" />
+              )}
+              <Text style={styles.syncButtonText}>
+                {syncing ? 'Syncing contacts…' : 'Sync contacts'}
+              </Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.sectionLabel}>Add a caller number</Text>
+          <View style={styles.inputRow}>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter phone number"
+              placeholderTextColor="#8aa0c6"
+              value={manualNumber}
+              onChangeText={handleManualNumberChange}
+              keyboardType="phone-pad"
+            />
+            <Pressable
+              style={({ pressed }) => [
+                styles.addButton,
+                { opacity: pressed || !manualNumberDigits ? 0.4 : 1 },
+              ]}
+              onPress={addManualNumber}
+              disabled={!manualNumberDigits}
+            >
+              <Ionicons name="add" size={20} color="#fff" />
+            </Pressable>
+          </View>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <Text style={styles.sectionLabel}>Current Safe List</Text>
+
+          {showSkeleton ? (
+            <View style={styles.skeletonWrapper}>
+              {skeletonRows.map((key) => (
+                <Animated.View key={key} style={[styles.skeletonCard, { opacity: shimmer }]}>
+                  <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                  <View style={styles.skeletonLine} />
+                  <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                </Animated.View>
+              ))}
             </View>
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalAction} onPress={selectAllContacts}>
-                <Text style={styles.modalActionText}>Select all</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalAction} onPress={importSelected}>
-                <Text style={styles.modalActionText}>
-                  Add selected ({selectedCount})
-                </Text>
-              </TouchableOpacity>
-            </View>
-            {contactsLoading ? (
-              <View style={styles.modalEmpty}>
-                <ActivityIndicator color="#8ab4ff" />
+          ) : safeList.length === 0 ? (
+            <View style={styles.emptyCard}>
+              <View style={styles.emptyIcon}>
+                <Ionicons name="person-circle-outline" size={30} color="#4ade80" />
               </View>
-            ) : (
-              <FlatList
-                data={contacts}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.contactRow}
-                    onPress={() => toggleContact(item.id)}
-                  >
-                    <Ionicons
-                      name={selectedMap[item.id] ? 'checkmark-circle' : 'ellipse-outline'}
-                      size={18}
-                      color={selectedMap[item.id] ? '#8ab4ff' : '#4f5f78'}
-                    />
-                    <View style={styles.contactInfo}>
-                      <Text style={styles.contactName}>{item.name}</Text>
-                      <Text style={styles.contactNumbers}>
-                        {item.numbers.slice(0, 2).join(', ')}
-                        {item.numbers.length > 2 ? '…' : ''}
+              <Text style={styles.emptyBody}>
+                Import someone from your phone or add a number from above.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.safeList}>
+              {safeList.map((contact) => (
+                <View key={contact.id} style={styles.listCard}>
+                  <View style={styles.identity}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>
+                        {getContactDisplayName(contact)?.charAt(0).toUpperCase()}
                       </Text>
                     </View>
-                  </TouchableOpacity>
-                )}
-                ListEmptyComponent={
-                  <View style={styles.modalEmpty}>
-                    <Text style={styles.modalEmptyText}>No contacts with phone numbers found.</Text>
+                    <View style={styles.identityText}>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.personName}>{getContactDisplayName(contact)}</Text>
+                        <Ionicons name="shield-checkmark" size={18} color="#4ade80" />
+                      </View>
+                      <Text style={styles.relationship}>{getRelationshipLabel(contact)}</Text>
+                    </View>
                   </View>
-                }
-              />
-            )}
+                  <TouchableOpacity onPress={() => openManageTray(contact)}>
+                    <Text style={styles.manageLabel}>Manage</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
+
+          <View style={styles.helperWrap}>
+            <HowItWorksCard items={helperItems} />
           </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+        </ScrollView>
+
+        {isTrayMounted && trayContact && trayMode && (
+          <View style={styles.trayOverlay}>
+            <Pressable style={StyleSheet.absoluteFill} onPress={closeTray}>
+              <Animated.View
+                style={[
+                  styles.trayBackdrop,
+                  {
+                    opacity: trayAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 0.45],
+                    }),
+                  },
+                ]}
+              />
+            </Pressable>
+            <Animated.View
+              style={[
+                styles.tray,
+                {
+                  transform: [
+                    {
+                      translateY: trayAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [220, 0],
+                      }),
+                    },
+                  ],
+                  opacity: trayAnim,
+                },
+              ]}
+            >
+              <View style={styles.trayHandle} />
+              <View style={styles.trayHeader}>
+                <Text style={styles.trayTitle}>
+                  {trayMode === 'import' ? 'Tag Contact' : 'Manage Contact'}
+                </Text>
+                <Pressable onPress={closeTray}>
+                  <Ionicons name="close" size={20} color="#fff" />
+                </Pressable>
+              </View>
+              <View style={styles.trayIdentity}>
+                <View style={styles.trayAvatar}>
+                  <Text style={styles.trayAvatarText}>
+                    {trayMode === 'import'
+                      ? (trayContact as DeviceContact).name.charAt(0).toUpperCase()
+                      : trayMode === 'manual'
+                      ? manualAvatarInitial
+                      : isManualManageContact
+                      ? manualAvatarInitial
+                      : getContactDisplayName(trayContact as TrustedContactRow)
+                          .charAt(0)
+                          .toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.trayIdentityText}>
+                  {trayMode === 'manual' ? (
+                    <>
+                      <View style={styles.trayNameRow}>
+                        {manualNameEditing ? (
+                          <TextInput
+                            value={manualContactName}
+                            onChangeText={setManualContactName}
+                            placeholder="Display name"
+                            placeholderTextColor="#94a3b8"
+                            style={styles.trayManualInput}
+                            autoFocus
+                          />
+                        ) : (
+                          <Text style={styles.trayName}>
+                            {getManualContactDisplayName(manualTrayNumber)}
+                          </Text>
+                        )}
+                        <Pressable
+                          onPress={() => setManualNameEditing((prev) => !prev)}
+                          style={styles.trayManualEditIcon}
+                        >
+                          <Ionicons name="pencil-outline" size={18} color="#8ab4ff" />
+                        </Pressable>
+                      </View>
+                      <Text style={styles.trayHint}>Manual trusted caller</Text>
+                    </>
+                  ) : isManualManageContact ? (
+                    <>
+                      <View style={styles.trayNameRow}>
+                        {manualNameEditing ? (
+                          <TextInput
+                            value={manualContactName}
+                            onChangeText={setManualContactName}
+                            placeholder="Display name"
+                            placeholderTextColor="#94a3b8"
+                            style={styles.trayManualInput}
+                            autoFocus
+                          />
+                        ) : (
+                          <Text style={styles.trayName}>{manualManageDisplayName}</Text>
+                        )}
+                        <Pressable
+                          onPress={() => setManualNameEditing((prev) => !prev)}
+                          style={styles.trayManualEditIcon}
+                        >
+                          <Ionicons name="pencil-outline" size={18} color="#8ab4ff" />
+                        </Pressable>
+                      </View>
+                      <Text style={styles.trayHint}>Manual trusted caller</Text>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.trayName}>
+                          {trayMode === 'import'
+                            ? (trayContact as DeviceContact).name
+                            : getContactDisplayName(trayContact as TrustedContactRow)}
+                        </Text>
+                        <Ionicons name="shield-checkmark" size={18} color="#4ade80" />
+                      </View>
+                      <Text style={styles.trayHint}>Trusted Safe Contact</Text>
+                    </>
+                  )}
+                </View>
+              </View>
+              <Text style={styles.trayLabel}>Relationship Tag</Text>
+              <View style={styles.tagGrid}>
+                {relationshipTags.map((tag) => (
+                  <Pressable
+                    key={tag}
+                    style={[
+                      styles.tagPill,
+                      selectedTag === tag && styles.tagPillActive,
+                    ]}
+                    onPress={() => setSelectedTag(tag)}
+                  >
+                    <Text
+                      style={[
+                        styles.tagText,
+                        selectedTag === tag && styles.tagTextActive,
+                      ]}
+                    >
+                      {tag}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.trayPrimary,
+                  { opacity: pressed || isSavingTag ? 0.85 : 1 },
+                ]}
+                onPress={handleTagSave}
+                disabled={isSavingTag}
+              >
+                <Text style={styles.trayPrimaryText}>
+                  {isSavingTag
+                    ? 'Working…'
+                    : trayMode === 'import'
+                    ? 'Add to Safe List'
+                    : 'Save Changes'}
+                </Text>
+              </Pressable>
+              {trayMode === 'manage' ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.trayDanger,
+                    { opacity: pressed || isRemoving ? 0.85 : 1 },
+                  ]}
+                  onPress={handleRemoveContact}
+                  disabled={isRemoving}
+                >
+                  <Text style={styles.trayDangerText}>
+                    {isRemoving ? 'Working…' : 'Remove from List'}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </Animated.View>
+          </View>
+        )}
+      </SafeAreaView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  outer: {
     flex: 1,
     backgroundColor: '#0b111b',
-    paddingHorizontal: 24,
-    paddingTop: 16,
   },
-  header: {
-    paddingTop: 0,
-    paddingBottom: 12,
+  screen: {
+    flex: 1,
+    backgroundColor: '#0b111b',
+  },
+  body: {
+    paddingHorizontal: 32,
+    paddingTop: 24,
+    gap: 24,
+  },
+  importCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#121a26',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: '#1b2534',
+    padding: 18,
+    gap: 12,
+    marginBottom: 0,
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  importIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 20,
+    backgroundColor: '#2d6df6',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#121a26',
-    borderWidth: 1,
-    borderColor: '#1f2a3a',
   },
-  headerTitle: {
-    color: '#f5f7fb',
-    fontSize: 28,
-    fontWeight: '700',
-    marginLeft: 12,
-  },
-  subtitle: {
-    color: '#8aa0c6',
-    marginBottom: 16,
-  },
-  actionsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
-  },
-  actionButton: {
+  importText: {
     flex: 1,
+  },
+  importTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2d6df6',
+  },
+  importSubtitle: {
+    fontSize: 13,
+    color: '#8aa0c6',
+  },
+  sectionLabel: {
+    fontSize: 12,
+    letterSpacing: 1.5,
+    color: '#8796b0',
+    marginBottom: 0,
+    textTransform: 'uppercase',
+  },
+  syncRow: {
+    width: '100%',
+    marginBottom: 12,
+    marginTop: -8,
+  },
+  syncButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingVertical: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#243247',
-    backgroundColor: '#121a26',
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: '#2d6df6',
+    width: '100%',
   },
-  actionDisabled: {
+  syncButtonPressed: {
+    opacity: 0.85,
+  },
+  syncButtonDisabled: {
     opacity: 0.6,
   },
-  actionText: {
-    color: '#e6ebf5',
+  syncButtonText: {
+    color: '#fff',
     fontWeight: '600',
   },
   inputRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1f2937',
+    borderRadius: 32,
+    backgroundColor: '#121a26',
+    paddingHorizontal: 16,
     gap: 12,
-    marginBottom: 16,
+    height: 60,
   },
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#243247',
-    borderRadius: 12,
-    padding: 12,
     color: '#e6ebf5',
+    fontSize: 16,
   },
   addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#2d6df6',
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  addText: {
+  error: {
+    color: '#ff8a8a',
+    marginBottom: 4,
+  },
+  listCard: {
+    backgroundColor: '#121a26',
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: '#1b2534',
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  identity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#2d6df6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 18,
+  },
+  identityText: {
+    gap: 4,
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  trayIdentityText: {
+    gap: 4,
+  },
+  trayNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  trayManualInput: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#2d6df6',
     color: '#f5f7fb',
+    fontSize: 18,
+    fontWeight: '700',
+    minWidth: 120,
+  },
+  trayManualEditIcon: {
+    padding: 4,
+  },
+  personName: {
+    color: '#f5f7fb',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  relationship: {
+    color: '#8aa0c6',
+    fontSize: 13,
     fontWeight: '600',
   },
-  card: {
-    backgroundColor: '#121a26',
-    borderRadius: 12,
-    padding: 14,
+  manageLabel: {
+    color: '#2d6df6',
+    fontSize: 11,
+    letterSpacing: 1,
+    fontWeight: '700',
+  },
+  emptyCard: {
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: '#202c3c',
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    borderColor: '#1f2937',
+    borderStyle: 'dashed',
+    padding: 24,
+    backgroundColor: '#121a26',
     alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
   },
-  cardText: {
-    color: '#f1f4fa',
-  },
-  meta: {
-    color: '#8aa0c6',
-    fontSize: 12,
-  },
-  remove: {
-    color: '#ff9c9c',
-  },
-  emptyStateWrap: {
+  emptyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#0f1b2d',
     alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  warning: {
-    color: '#f7c16e',
-    marginTop: 8,
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
-  listEmptyContent: {
-    flexGrow: 1,
     justifyContent: 'center',
+    marginBottom: 6,
+  },
+  emptyBody: {
+    color: '#8aa0c6',
+    fontSize: 13,
+    textAlign: 'center',
+  },
+  skeletonWrapper: {
+    marginBottom: 12,
   },
   skeletonCard: {
     backgroundColor: '#121a26',
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    borderRadius: 24,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#202c3c',
+    borderColor: '#1b2534',
+    marginBottom: 12,
+  },
+  safeList: {
+    marginBottom: 0,
+    gap: 8,
+  },
+  helperWrap: {
+    marginTop: 0,
   },
   skeletonLine: {
     height: 10,
     borderRadius: 6,
-    backgroundColor: '#1c2636',
-    marginTop: 10,
+    backgroundColor: '#1c2430',
+    marginTop: 8,
   },
   skeletonLineShort: {
     width: '55%',
-    marginTop: 2,
+    marginTop: 4,
   },
   skeletonLineTiny: {
-    width: '35%',
+    width: '30%',
   },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(7, 10, 16, 0.7)',
+  trayOverlay: {
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'flex-end',
   },
-  modalCard: {
-    backgroundColor: '#0f1724',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-    maxHeight: '75%',
-    borderWidth: 1,
-    borderColor: '#1c2636',
+  trayBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
   },
-  modalHeader: {
+  tray: {
+    backgroundColor: '#0d1119',
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
+    padding: 24,
+    borderColor: '#1b2534',
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowOffset: { width: 0, height: -12 },
+    shadowRadius: 30,
+    elevation: 20,
+    marginBottom: -2,
+  },
+  trayHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#1b2534',
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  trayHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  modalTitle: {
+  trayTitle: {
     color: '#f5f7fb',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
   },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  modalAction: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#243247',
-    backgroundColor: '#121a26',
-  },
-  modalActionText: {
-    color: '#e6ebf5',
-    fontWeight: '600',
-  },
-  contactRow: {
+  trayIdentity: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1b2534',
+    gap: 12,
+    marginBottom: 12,
   },
-  contactInfo: {
-    flex: 1,
+  trayAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#2d6df6',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  contactName: {
-    color: '#f1f4fa',
-    fontWeight: '600',
+  trayAvatarText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
   },
-  contactNumbers: {
+  trayName: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  trayHint: {
+    color: '#8aa0c6',
+    fontSize: 13,
+  },
+  trayLabel: {
     color: '#8aa0c6',
     fontSize: 12,
-    marginTop: 2,
+    letterSpacing: 1,
+    marginBottom: 12,
   },
-  modalEmpty: {
-    paddingVertical: 24,
+  tagGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 20,
+  },
+  tagPill: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1b2534',
+  },
+  tagPillActive: {
+    backgroundColor: '#2d6df6',
+    borderColor: '#2d6df6',
+  },
+  tagText: {
+    color: '#f5f7fb',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  tagTextActive: {
+    color: '#fff',
+  },
+  trayPrimary: {
+    backgroundColor: '#2d6df6',
+    borderRadius: 20,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  trayPrimaryText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
+  },
+  trayDanger: {
+    backgroundColor: '#1f1b25',
+    borderRadius: 20,
+    paddingVertical: 16,
     alignItems: 'center',
   },
-  modalEmptyText: {
-    color: '#8aa0c6',
+  trayDangerText: {
+    color: '#ef4444',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });

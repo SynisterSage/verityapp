@@ -99,6 +99,8 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
   const [trayMode, setTrayMode] = useState<'import' | 'manage' | null>(null);
   const [selectedTag, setSelectedTag] = useState('Friend');
   const [isTrayMounted, setIsTrayMounted] = useState(false);
+  const [isSavingTag, setIsSavingTag] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.65)).current;
   const [safeListLoading, setSafeListLoading] = useState(true);
@@ -339,6 +341,7 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
 
   const handleTagSave = async () => {
     if (!trayContact || !trayMode || !activeProfile) return;
+    setIsSavingTag(true);
     try {
       setError('');
       if (trayMode === 'import') {
@@ -376,12 +379,15 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
       closeTray();
     } catch (err: any) {
       setError(err?.message || 'Failed to save tag.');
+    } finally {
+      setIsSavingTag(false);
     }
   };
 
   const handleRemoveContact = async () => {
     if (!trayContact || trayMode !== 'manage') return;
     const row = trayContact as TrustedContactRow;
+    setIsRemoving(true);
     try {
       await authorizedFetch(`/fraud/trusted-contacts/${row.id}`, {
         method: 'DELETE',
@@ -391,6 +397,7 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
     } catch (err: any) {
       setError(err?.message || 'Failed to remove contact.');
     } finally {
+      setIsRemoving(false);
       closeTray();
     }
   };
@@ -600,17 +607,31 @@ const safeList = useMemo(() => {
               <Pressable
                 style={({ pressed }) => [
                   styles.trayPrimary,
-                  { opacity: pressed ? 0.85 : 1 },
+                  { opacity: pressed || isSavingTag ? 0.85 : 1 },
                 ]}
                 onPress={handleTagSave}
+                disabled={isSavingTag}
               >
                 <Text style={styles.trayPrimaryText}>
-                  {trayMode === 'import' ? 'Add to Safe List' : 'Save Changes'}
+                  {isSavingTag
+                    ? 'Working…'
+                    : trayMode === 'import'
+                    ? 'Add to Safe List'
+                    : 'Save Changes'}
                 </Text>
               </Pressable>
               {trayMode === 'manage' ? (
-                <Pressable style={styles.trayDanger} onPress={handleRemoveContact}>
-                  <Text style={styles.trayDangerText}>Remove from List</Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.trayDanger,
+                    { opacity: pressed || isRemoving ? 0.85 : 1 },
+                  ]}
+                  onPress={handleRemoveContact}
+                  disabled={isRemoving}
+                >
+                  <Text style={styles.trayDangerText}>
+                    {isRemoving ? 'Working…' : 'Remove from List'}
+                  </Text>
                 </Pressable>
               ) : null}
             </Animated.View>
