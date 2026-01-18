@@ -1,42 +1,86 @@
-import { useState } from 'react';
 import {
-  Keyboard,
+  Animated,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
-
-import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import { authorizedFetch } from '../../services/backend';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+
+import SettingsHeader from '../../components/common/SettingsHeader';
+import ActionFooter from '../../components/onboarding/ActionFooter';
+
+const CODE_LENGTH = 6;
 
 export default function EnterInviteCodeScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { refreshProfiles } = useProfile();
-  const [code, setCode] = useState('');
+  const { refreshProfiles, setOnboardingComplete } = useProfile();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [codeDigits, setCodeDigits] = useState(Array(CODE_LENGTH).fill(''));
+  const firstNameRef = useRef<TextInput | null>(null);
+  const lastNameRef = useRef<TextInput | null>(null);
+  const codeRefs = useRef<Array<TextInput | null>>(Array(CODE_LENGTH).fill(null));
+  const pulse = useRef(new Animated.Value(1)).current;
 
-  const submitCode = async () => {
-    if (!code.trim()) {
-      setMessage('Enter the code you received.');
-      return;
+  const codeValue = useMemo(() => codeDigits.join(''), [codeDigits]);
+  const isCodeComplete = codeDigits.every((digit) => digit.length === 1);
+  const areNamesEntered = firstName.trim() && lastName.trim();
+
+  useEffect(() => {
+    if (isCodeComplete) {
+      Animated.sequence([
+        Animated.spring(pulse, { toValue: 1.03, useNativeDriver: true }),
+        Animated.spring(pulse, { toValue: 1, useNativeDriver: true }),
+      ]).start();
     }
-    if (!firstName.trim() || !lastName.trim()) {
+  }, [isCodeComplete, pulse]);
+
+  const handleDigitChange = (text: string, index: number) => {
+    const digit = text.replace(/\D/g, '').slice(-1);
+    setCodeDigits((prev) => {
+      const next = [...prev];
+      next[index] = digit;
+      return next;
+    });
+    if (digit && index < CODE_LENGTH - 1) {
+      codeRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleKeyPress = ({ nativeEvent }: any, index: number) => {
+    if (nativeEvent.key === 'Backspace' && !codeDigits[index] && index > 0) {
+      codeRefs.current[index - 1]?.focus();
+      setCodeDigits((prev) => {
+        const next = [...prev];
+        next[index - 1] = '';
+        return next;
+      });
+    }
+  };
+
+  const acceptCode = async () => {
+    if (!areNamesEntered) {
       setMessage('Add your first and last name.');
       return;
     }
-    Keyboard.dismiss();
-    setIsSubmitting(true);
+    if (!isCodeComplete) {
+      setMessage('Fill the 6-digit code.');
+      return;
+    }
     setMessage('');
+    setIsSubmitting(true);
     try {
-      await authorizedFetch(`/profiles/invites/${code.trim()}/accept`, {
+      await authorizedFetch(`/profiles/invites/${codeValue}/accept`, {
         method: 'POST',
         body: JSON.stringify({
           firstName: firstName.trim(),
@@ -44,126 +88,184 @@ export default function EnterInviteCodeScreen() {
         }),
       });
       await refreshProfiles();
-      setMessage('Invite accepted! You can now see the shared profile.');
-      navigation.goBack();
+      setOnboardingComplete(true);
     } catch (err: any) {
-      setMessage(err?.message || 'Unable to accept invite.');
+      setMessage(err?.message || 'Unable to redeem invite code.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
-      edges={[]}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.back}>
-          <Text style={styles.backText}>Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Enter invite code</Text>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.label}>Code</Text>
-        <TextInput
-          style={styles.input}
-          value={code}
-          onChangeText={setCode}
-          autoCapitalize="none"
-          placeholder="XXXX-XXXX-XXXX"
-          placeholderTextColor="#8aa0c6"
-        />
-        <Text style={styles.label}>Your name</Text>
-        <TextInput
-          style={styles.input}
-          value={firstName}
-          onChangeText={setFirstName}
-          placeholder="First name"
-          placeholderTextColor="#8aa0c6"
-          autoCapitalize="words"
-        />
-        <TextInput
-          style={styles.input}
-          value={lastName}
-          onChangeText={setLastName}
-          placeholder="Last name"
-          placeholderTextColor="#8aa0c6"
-          autoCapitalize="words"
-        />
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-        <TouchableOpacity
-          style={[styles.button, isSubmitting && styles.saveDisabled]}
-          onPress={submitCode}
-          disabled={isSubmitting}
+    <View style={styles.outer}>
+      <SafeAreaView style={styles.screen} edges={['bottom']}>
+        <SettingsHeader title="Enter invite code" subtitle="Tap the code shared with you to join." />
+        <ScrollView
+          contentContainerStyle={[
+            styles.body,
+            {
+              paddingBottom: Math.max(insets.bottom, 32) + 220,
+              paddingTop: Math.max(insets.top, 12) + 0,
+
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="automatic"
         >
-          <Text style={styles.buttonText}>{isSubmitting ? 'Saving…' : 'Redeem code'}</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          <View style={styles.inputGroup}>
+
+            <Text style={styles.inputLabel}>First name</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Robert"
+                placeholderTextColor="#8aa0c6"
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCapitalize="words"
+                ref={firstNameRef}
+                returnKeyType="next"
+                onSubmitEditing={() => lastNameRef.current?.focus()}
+              />
+            </View>
+            <Text style={styles.inputLabel}>Last name</Text>
+            <View style={styles.inputContainer}>
+              <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Miller"
+                placeholderTextColor="#8aa0c6"
+                value={lastName}
+                onChangeText={setLastName}
+                autoCapitalize="words"
+                ref={lastNameRef}
+                returnKeyType="next"
+                onSubmitEditing={() => codeRefs.current[0]?.focus()}
+              />
+            </View>
+          </View>
+
+          <View style={styles.codeSection}>
+            <Text style={styles.codeLabel}>6-digit invite code</Text>
+            <Animated.View style={[styles.codeRow, { transform: [{ scale: pulse }] }]}>
+              {codeDigits.map((digit, index) => (
+                <TextInput
+                  key={`digit-${index}`}
+                  ref={(ref) => {
+                    codeRefs.current[index] = ref;
+                  }}
+                  style={[
+                    styles.codeBox,
+                    { borderColor: digit ? '#2d6df6' : '#1b2534' },
+                  ]}
+                  keyboardType="number-pad"
+                  maxLength={1}
+                  value={digit}
+                  onChangeText={(value) => handleDigitChange(value, index)}
+                  onKeyPress={(event) => handleKeyPress(event, index)}
+                  textAlign="center"
+                />
+              ))}
+            </Animated.View>
+          </View>
+
+          {message ? <Text style={styles.message}>{message}</Text> : null}
+        </ScrollView>
+
+        <ActionFooter
+          primaryLabel="Connect to Circle"
+          onPrimaryPress={acceptCode}
+          primaryLoading={isSubmitting}
+          primaryDisabled={!areNamesEntered || !isCodeComplete || isSubmitting}
+          secondaryLabel="Never mind"
+          onSecondaryPress={() => navigation.goBack()}
+        />
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  outer: {
     flex: 1,
     backgroundColor: '#0b111b',
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: '#0b111b',
+  },
+  body: {
     paddingHorizontal: 24,
+    flexGrow: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-  },
-  back: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  backText: {
-    color: '#7d9dff',
+  inputGroup: {
+    gap: 12,
+    marginBottom: 24,
   },
   title: {
-    color: '#f5f7fb',
-    fontSize: 24,
+    fontSize: 34,
     fontWeight: '700',
-    marginLeft: 12,
+    color: '#f5f7fb',
+    marginBottom: 6,
   },
-  card: {
-    backgroundColor: '#121a26',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#202c3c',
-    padding: 16,
-    gap: 10,
-  },
-  label: {
+  subtitle: {
+    fontSize: 17,
+    fontWeight: '500',
     color: '#8aa0c6',
+  },
+  inputLabel: {
     fontSize: 12,
-    letterSpacing: 0.6,
+    letterSpacing: 1.5,
+    color: '#8796b0',
+    marginBottom: 6,
+    textTransform: 'uppercase',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1b2534',
+    borderRadius: 16,
+    backgroundColor: '#121a26',
+    paddingHorizontal: 12,
+    height: 52,
+    gap: 8,
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#243247',
-    borderRadius: 12,
-    padding: 12,
+    flex: 1,
     color: '#e6ebf5',
+    fontSize: 16,
+  },
+  codeSection: {
+    marginBottom: 20,
+  },
+  codeLabel: {
+    fontSize: 12,
+    letterSpacing: 1.5,
+    color: '#8796b0',
+    marginBottom: 12,
+    textTransform: 'uppercase',
+  },
+  codeRow: {
+    flexDirection: 'row',
+    gap: 6,
+    justifyContent: 'flex-start',
+    width: '100%',
+  },
+  codeBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: '#1b2534',
+    backgroundColor: '#121a26',
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '700',
   },
   message: {
-    color: '#98a7c2',
-    fontSize: 12,
-  },
-  button: {
-    marginTop: 8,
-    backgroundColor: '#2d6df6',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  saveDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#f5f7fb',
-    fontWeight: '600',
+    color: '#ff8a8a',
   },
 });

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Animated,
   Linking,
   ScrollView,
@@ -571,8 +572,13 @@ export default function InviteFamilyScreen({ navigation }: Props) {
             <TouchableOpacity
               style={styles.actionDanger}
               onPress={() => confirmRevokeInvite(selectedInvite)}
+              disabled={revokingInviteId === selectedInvite.id}
             >
-              <Text style={styles.actionDangerText}>Revoke invite</Text>
+              {revokingInviteId === selectedInvite.id ? (
+                <ActivityIndicator size="small" color="#f97316" />
+              ) : (
+                <Text style={styles.actionDangerText}>Revoke invite</Text>
+              )}
             </TouchableOpacity>
           </Animated.View>
         </View>
@@ -890,7 +896,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#0f1729',
+    backgroundColor: '#0f1724',
     borderWidth: 1,
     borderColor: '#1b2534',
     borderRadius: 24,

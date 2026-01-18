@@ -609,6 +609,7 @@ export default function TrustedContactsScreen() {
       <SafeAreaView style={styles.screen} edges={['bottom']}>
         <SettingsHeader
           title="Trusted Contacts"
+          subtitle="Add friends & family you trust"
         />
         <ScrollView
           contentContainerStyle={[
