@@ -115,3 +115,10 @@ Backend: profile members/invite endpoints added (ProfileMembersController) plus 
 Frontend: Brand-new MembersScreen under Settings, plus main Settings/Account navigation that routes there. The screen lists current members, pending invites, lets admins create SMS-only invites (Messages opens automatically), and exposes copy/share actions per code. “Enter invite code” screen still available for manual redemption. Invite flow refreshes profiles and can highlight the pending area if you land there from onboarding.
 Onboarding: Added choice screen with “Create profile” vs “Have an invite code?” paths and the invite-code screen itself so a new user can skip onboarding by redeeming a code. Members screen accepts a highlightInviteEntry flag triggered by this path (still needs testing).
 Testing notes: Members flow works end-to-end via the copy/paste code path (no real device SMS yet). Haven’t yet exercised the onboarding “enter invite code” screen or real-device linking.
+
+
+sat jan 17 26
+Shared permissions cache now drives both the Data & Privacy toggle and Trusted Contacts import/sync buttons so the settings screens stay in sync, while Trusted Contacts also shows helpful messaging when contacts access is blocked.
+“Manage data” got full backend support (export, clear records, delete profile) plus pin-gated modals, native-sharing for exports, improved error normalization, and centralized delete helpers reused by the Account screen.
+The passcode modal now blurs the background, dismisses on outside taps, and keeps the UI consistent, and the manual phone input no longer fights deletions, bringing settings closer to the onboarding style you’ve rolled out.
+Onboarding is looking solid—only the test flow still needs a quick pass for minor inconsistencies. You’ve begun refactoring the settings pages to match onboarding; we’ll keep prototyping that tomorrow and then tackle the remaining main screens.
