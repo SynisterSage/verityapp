@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Pressable,
   ScrollView,
@@ -37,6 +38,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   const [phrases, setPhrases] = useState<SafePhrase[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const shimmer = useMemo(() => new Animated.Value(0.6), []);
   const skeletonRows = useMemo(
@@ -90,8 +92,14 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   };
 
   const removePhrase = async (phraseId: string) => {
-    await authorizedFetch(`/fraud/safe-phrases/${phraseId}`, { method: 'DELETE' });
-    loadPhrases();
+    if (!phraseId || deletingId === phraseId) return;
+    setDeletingId(phraseId);
+    try {
+      await authorizedFetch(`/fraud/safe-phrases/${phraseId}`, { method: 'DELETE' });
+      loadPhrases();
+    } finally {
+      setDeletingId((current) => (current === phraseId ? null : current));
+    }
   };
 
   useEffect(() => {
@@ -176,8 +184,16 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
                   <Ionicons name="chatbubble-ellipses" size={20} color="#22c55e" />
                 </View>
                 <Text style={styles.phraseText}>{item.phrase}</Text>
-                <Pressable style={styles.deleteButton} onPress={() => removePhrase(item.id)}>
-                  <Ionicons name="trash" size={18} color="#e11d48" />
+                <Pressable
+                  style={styles.deleteButton}
+                  onPress={() => removePhrase(item.id)}
+                  disabled={deletingId === item.id}
+                >
+                  {deletingId === item.id ? (
+                    <ActivityIndicator size="small" color="#e11d48" />
+                  ) : (
+                    <Ionicons name="trash" size={18} color="#e11d48" />
+                  )}
                 </Pressable>
               </View>
             ))
