@@ -23,6 +23,10 @@ import { useProfile } from '../../context/ProfileContext';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import { getAllContacts, selectContacts } from '../../native/ContactPicker';
+import {
+  getContactsPermissionEnabled,
+  subscribeToContactsPermissionChange,
+} from '../../services/permissions';
 
 type DeviceContact = {
   id: string;
@@ -98,6 +102,7 @@ export default function TrustedContactsScreen() {
   const [importing, setImporting] = useState(false);
   const [manualNumber, setManualNumber] = useState('');
   const [manualNumberDigits, setManualNumberDigits] = useState('');
+  const [prevManualValue, setPrevManualValue] = useState('');
   const [error, setError] = useState('');
   const [pendingImports, setPendingImports] = useState<DeviceContact[]>([]);
   const [trayContact, setTrayContact] = useState<DeviceContact | TrustedContactRow | null>(null);
@@ -106,6 +111,7 @@ export default function TrustedContactsScreen() {
   const [isTrayMounted, setIsTrayMounted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [contactsPermissionEnabled, setContactsAccessEnabled] = useState(true);
   const [manualContactName, setManualContactName] = useState('');
   const [manualNameEditing, setManualNameEditing] = useState(false);
   const [isSavingTag, setIsSavingTag] = useState(false);
@@ -134,6 +140,8 @@ export default function TrustedContactsScreen() {
     []
   );
   const showSkeleton = loading && trustedList.length === 0;
+  const isImportDisabled = importing || !contactsPermissionEnabled;
+  const isSyncDisabled = syncing || !contactsPermissionEnabled;
 
   const refreshContactMap = useCallback(async () => {
     if (!activeProfile) return;
@@ -219,6 +227,24 @@ export default function TrustedContactsScreen() {
   };
 
   useEffect(() => {
+    let active = true;
+    getContactsPermissionEnabled().then((value) => {
+      if (active) {
+        setContactsAccessEnabled(value);
+      }
+    });
+    const unsubscribe = subscribeToContactsPermissionChange((value) => {
+      if (active) {
+        setContactsAccessEnabled(value);
+      }
+    });
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
     refreshContactMap();
     loadTrustedList();
   }, [refreshContactMap, loadTrustedList]);
@@ -266,6 +292,10 @@ export default function TrustedContactsScreen() {
 
   const handleImport = async () => {
     if (!activeProfile) return;
+    if (!contactsPermissionEnabled) {
+      setError('Allow contacts access in Data & Privacy before importing from your phone.');
+      return;
+    }
     setError('');
     setImporting(true);
     try {
@@ -478,7 +508,11 @@ export default function TrustedContactsScreen() {
   const handleManualNumberChange = (text: string) => {
     const digits = text.replace(/\D/g, '').slice(0, 11);
     setManualNumberDigits(digits);
-    setManualNumber(formatPhoneNumberDisplay(digits));
+    const formatted = formatPhoneNumberDisplay(digits);
+    const isDeleting = text.length < prevManualValue.length;
+    const nextValue = isDeleting ? text : formatted;
+    setManualNumber(nextValue);
+    setPrevManualValue(nextValue);
   };
 
   const addManualNumber = async () => {
@@ -497,11 +531,17 @@ export default function TrustedContactsScreen() {
     setSelectedTag('Friend');
     showTray();
     setManualNumber('');
+    setPrevManualValue('');
     setManualNumberDigits('');
   };
 
   const syncContacts = async () => {
-    if (!activeProfile || syncing) return;
+    if (!activeProfile || syncing || !contactsPermissionEnabled) {
+      if (!contactsPermissionEnabled) {
+        setError('Enable contacts access in Data & Privacy before syncing.');
+      }
+      return;
+    }
     setSyncing(true);
     setError('');
     try {
@@ -625,10 +665,11 @@ export default function TrustedContactsScreen() {
           <Pressable
             style={({ pressed }) => [
               styles.importCard,
-              { opacity: pressed || importing ? 0.85 : 1 },
+              isImportDisabled && styles.importCardDisabled,
+              !isImportDisabled && pressed && styles.importCardPressed,
             ]}
-            onPress={handleImport}
-            disabled={importing}
+            onPress={isImportDisabled ? undefined : handleImport}
+            disabled={isImportDisabled}
           >
             <View style={styles.importIcon}>
               <Ionicons name="person-add" size={24} color="#fff" />
@@ -639,16 +680,21 @@ export default function TrustedContactsScreen() {
             </View>
             <Ionicons name="chevron-forward" size={20} color="#2d6df6" />
           </Pressable>
+          {!contactsPermissionEnabled && (
+            <Text style={styles.permissionHint}>
+              Allow contact access in Data & Privacy to import & sync your phonebook.
+            </Text>
+          )}
 
           <View style={styles.syncRow}>
             <Pressable
               style={({ pressed }) => [
                 styles.syncButton,
-                syncing && styles.syncButtonDisabled,
-                pressed && !syncing && styles.syncButtonPressed,
+                isSyncDisabled && styles.syncButtonDisabled,
+                !isSyncDisabled && pressed && styles.syncButtonPressed,
               ]}
-              onPress={syncContacts}
-              disabled={syncing}
+              onPress={isSyncDisabled ? undefined : syncContacts}
+              disabled={isSyncDisabled}
             >
               {syncing ? (
                 <ActivityIndicator color="#fff" />
@@ -661,11 +707,11 @@ export default function TrustedContactsScreen() {
             </Pressable>
           </View>
 
-          <Text style={styles.sectionLabel}>Add a caller number</Text>
+          <Text style={styles.sectionLabel}>Manual Entry</Text>
           <View style={styles.inputRow}>
             <TextInput
               style={styles.input}
-              placeholder="Enter phone number"
+              placeholder="Phone #"
               placeholderTextColor="#8aa0c6"
               value={manualNumber}
               onChangeText={handleManualNumberChange}
@@ -941,6 +987,13 @@ const styles = StyleSheet.create({
     gap: 12,
     marginBottom: 0,
   },
+  importCardDisabled: {
+    borderColor: '#0b131f',
+    backgroundColor: '#0b131f',
+  },
+  importCardPressed: {
+    opacity: 0.85,
+  },
   importIcon: {
     width: 48,
     height: 48,
@@ -1021,6 +1074,13 @@ const styles = StyleSheet.create({
   error: {
     color: '#ff8a8a',
     marginBottom: 4,
+  },
+  permissionHint: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginTop: -2,
+    marginBottom: 12,
+    paddingHorizontal: 4,
   },
   listCard: {
     backgroundColor: '#121a26',

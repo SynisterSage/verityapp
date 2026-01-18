@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
+import { deleteProfile } from '../../services/profile';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 
@@ -122,9 +123,7 @@ export default function AccountScreen() {
                   style: 'destructive',
                   onPress: async () => {
                     try {
-                      await authorizedFetch(`/profiles/${activeProfile.id}`, {
-                        method: 'DELETE',
-                      });
+                      await deleteProfile(activeProfile.id);
                       await refreshProfiles();
                       await signOut();
                     } catch (err: any) {

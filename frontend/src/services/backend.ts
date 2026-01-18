@@ -2,12 +2,16 @@ import { supabase } from './supabase';
 
 const baseUrl = process.env.EXPO_PUBLIC_API_URL ?? '';
 
+type AuthorizedFetchOptions = RequestInit & {
+  skipUnauthorizedSignOut?: boolean;
+};
+
 async function getAccessToken() {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? '';
 }
 
-export async function authorizedFetch(path: string, options: RequestInit = {}) {
+export async function authorizedFetch(path: string, options: AuthorizedFetchOptions = {}) {
   const token = await getAccessToken();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
@@ -19,13 +23,14 @@ export async function authorizedFetch(path: string, options: RequestInit = {}) {
     headers['Content-Type'] = 'application/json';
   }
 
+  const { skipUnauthorizedSignOut, ...rest } = options;
   const response = await fetch(`${baseUrl}${path}`, {
-    ...options,
+    ...rest,
     headers,
   });
 
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 && !skipUnauthorizedSignOut) {
       // Session is invalid (e.g., user deleted) — clear it so the app returns to sign-in.
       await supabase.auth.signOut();
     }

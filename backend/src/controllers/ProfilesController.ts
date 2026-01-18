@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import logger from 'jet-logger';
 
-import { hashPasscode } from '@src/services/passcode';
+import { hashPasscode, verifyCurrentPasscode, verifyLegacyPasscode } from '@src/services/passcode';
 import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { generateUniqueShortCode } from '@src/common/helpers/invite';
@@ -219,6 +219,50 @@ async function setPasscode(req: Request, res: Response) {
   return res.status(HTTP_STATUS_CODES.Ok).json({ message: 'Passcode updated' });
 }
 
+async function verifyPasscode(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId } = req.params as { profileId: string };
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const { pin } = req.body as { pin?: string };
+  if (!pin) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing pin' });
+  }
+
+  const isCaretaker = await userIsCaretaker(userId, profileId);
+  const isAdmin = await userHasRole(userId, profileId, 'admin');
+  if (!isCaretaker && !isAdmin) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { data: profileRow, error } = await supabaseAdmin
+    .from('profiles')
+    .select('pin_hash, pin_pepper_version, passcode_hash')
+    .eq('id', profileId)
+    .maybeSingle();
+  if (error || !profileRow) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to load profile' });
+  }
+
+  const isValidPin =
+    (profileRow.pin_hash &&
+      profileRow.pin_pepper_version &&
+      (await verifyCurrentPasscode(pin, profileRow.pin_hash, profileRow.pin_pepper_version))) ||
+    verifyLegacyPasscode(pin, profileRow.passcode_hash ?? null);
+
+  if (!isValidPin) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Invalid passcode' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ valid: true });
+}
+
 async function updateAlertPrefs(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
@@ -382,6 +426,106 @@ async function getProfile(req: Request, res: Response) {
   return res.status(HTTP_STATUS_CODES.Ok).json({
     profile: sanitizeProfileRow(data),
   });
+}
+
+async function exportProfileData(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId } = req.params as { profileId: string };
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const allowed = await userCanAccessProfile(userId, profileId);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const [
+    { data: profileRow, error: profileError },
+    { data: calls, error: callsError },
+    { data: alerts, error: alertsError },
+    { data: trustedContacts, error: trustedError },
+    { data: safePhrases, error: safePhrasesError },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('profiles')
+      .select(
+        'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+      )
+      .eq('id', profileId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from('calls')
+      .select('*')
+      .eq('profile_id', profileId),
+    supabaseAdmin
+      .from('alerts')
+      .select('*')
+      .eq('profile_id', profileId),
+    supabaseAdmin
+      .from('trusted_contacts')
+      .select('*')
+      .eq('profile_id', profileId),
+    supabaseAdmin
+      .from('fraud_safe_phrases')
+      .select('*')
+      .eq('profile_id', profileId),
+  ]);
+
+  if (profileError || !profileRow) {
+    logger.err(profileError ?? new Error('Failed to load profile for export'));
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to load profile' });
+  }
+
+  if (callsError || alertsError || trustedError || safePhrasesError) {
+    logger.err(callsError ?? alertsError ?? trustedError ?? safePhrasesError);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({
+      error: 'Failed to gather export data, please try again later',
+    });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({
+    profile: sanitizeProfileRow(profileRow),
+    calls: calls ?? [],
+    alerts: alerts ?? [],
+    trusted_contacts: trustedContacts ?? [],
+    safe_phrases: safePhrases ?? [],
+  });
+}
+
+async function clearProfileRecords(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId } = req.params as { profileId: string };
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const allowed = await userIsCaretaker(userId, profileId);
+  if (!allowed) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const [{ error: callsError }, { error: alertsError }] = await Promise.all([
+    supabaseAdmin.from('calls').delete().eq('profile_id', profileId),
+    supabaseAdmin.from('alerts').delete().eq('profile_id', profileId),
+  ]);
+
+  if (callsError || alertsError) {
+    logger.err(callsError ?? alertsError);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({
+      error: 'Failed to clear records, please try again later',
+    });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
 }
 
 async function deleteProfile(req: Request, res: Response) {
@@ -591,9 +735,12 @@ export default {
   listProfiles,
   createProfile,
   setPasscode,
+  verifyPasscode,
   updateAlertPrefs,
   updateProfile,
   getProfile,
+  exportProfileData,
+  clearProfileRecords,
   deleteProfile,
   inviteMember,
   listInvites,

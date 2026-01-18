@@ -30,12 +30,15 @@ const PATHS = {
     Update: '/:profileId',
     Delete: '/:profileId',
     Passcode: '/:profileId/passcode',
+    PasscodeVerify: '/:profileId/passcode/verify',
     Alerts: '/:profileId/alerts',
     Invites: '/:profileId/invites',
     Invite: '/:profileId/invites/:inviteId',
     Members: '/:profileId/members',
     Member: '/:profileId/members/:memberId',
     InviteAccept: '/invites/:inviteId/accept',
+    Records: '/:profileId/records',
+    Export: '/:profileId/export',
   },
 } as const;
 
