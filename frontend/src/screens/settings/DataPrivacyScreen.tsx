@@ -330,7 +330,7 @@ export default function DataPrivacyScreen() {
 
   return (
     <View style={styles.outer}>
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
+      <SafeAreaView style={styles.screen} edges={[]}>
         <SettingsHeader title="Data & Privacy" subtitle="Your protection and privacy come first." />
         <ScrollView
           contentContainerStyle={[

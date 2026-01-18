@@ -646,7 +646,7 @@ export default function TrustedContactsScreen() {
       style={styles.outer}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
+      <SafeAreaView style={styles.screen} edges={[]}>
         <SettingsHeader
           title="Trusted Contacts"
           subtitle="Add friends & family you trust"

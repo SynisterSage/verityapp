@@ -98,7 +98,7 @@ export default function EnterInviteCodeScreen() {
 
   return (
     <View style={styles.outer}>
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
+      <SafeAreaView style={styles.screen} edges={[]}>
         <SettingsHeader title="Enter invite code" subtitle="Tap the code shared with you to join." />
         <ScrollView
           contentContainerStyle={[

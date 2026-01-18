@@ -474,7 +474,7 @@ export default function MembersScreen() {
 
   return (
     <View style={styles.outer}>
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
+      <SafeAreaView style={styles.screen} edges={[]}>
         <SettingsHeader title="Account Members" />
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 32), paddingTop: Math.max(insets.top, 12 + 0) }]}

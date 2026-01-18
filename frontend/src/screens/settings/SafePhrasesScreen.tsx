@@ -125,7 +125,7 @@ export default function SafePhrasesScreen() {
 
   return (
     <View style={styles.outer}>
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
+      <SafeAreaView style={styles.screen} edges={[]}>
         <SettingsHeader title="Safe Phrases" subtitle="Add phrases you normally say during calls." />
         <ScrollView
           contentContainerStyle={[
