@@ -122,3 +122,16 @@ Shared permissions cache now drives both the Data & Privacy toggle and Trusted C
 “Manage data” got full backend support (export, clear records, delete profile) plus pin-gated modals, native-sharing for exports, improved error normalization, and centralized delete helpers reused by the Account screen.
 The passcode modal now blurs the background, dismisses on outside taps, and keeps the UI consistent, and the manual phone input no longer fights deletions, bringing settings closer to the onboarding style you’ve rolled out.
 Onboarding is looking solid—only the test flow still needs a quick pass for minor inconsistencies. You’ve begun refactoring the settings pages to match onboarding; we’ll keep prototyping that tomorrow and then tackle the remaining main screens.
+
+2026-01-18
+Scope
+- Align the remaining settings screens (Blocklist, Automation, Account, Security, etc.) with the refreshed onboarding experience while keeping the interactions familiar.
++ Ensure automation sliders/switches live inside a tactile card + shared footer, and tighten the blocklist manual entry/list layout to match Trusted Contacts.
+
+Frontend work
+- Reworked `BlocklistScreen` so manual entry mirrors trusted contacts (inline row + label spacing), added avatar/icon rows for blocked numbers, normalized the tray copy/UI, and tightened the “Current block list” spacing.
+- Updated `AutomationScreen` to reuse `SettingsHeader`, `ActionFooter`, and the notifications-inspired card layout; added helper messaging, change detection, and saved footer behavior.
+- Standardized the tray, spacing, and slider/toggle language so the remaining settings screens now follow the onboarding design system, keeping labels readable for older users.
+
+Next suggested steps
+- Prototype the remaining main pages and confirm the new headers/footers carry over everywhere; continue pairing the settings experience to onboarding before moving on to any backend follow-up.

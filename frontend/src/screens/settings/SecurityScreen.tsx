@@ -21,6 +21,7 @@ import { useProfile } from '../../context/ProfileContext';
 import { verifyPasscode } from '../../services/profile';
 import { supabase } from '../../services/supabase';
 import { BlurView } from 'expo-blur';
+import ActionFooter from '../../components/onboarding/ActionFooter';
 
 type ModalAction = 'password' | null;
 
@@ -184,22 +185,11 @@ export default function SecurityScreen() {
                 />
               </View>
             </View>
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-            {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
-            <TouchableOpacity
-              style={[styles.primaryButton, (!canManageProfile || isSaving) && styles.primaryDisabled]}
-              onPress={handleSavePress}
-              disabled={!canManageProfile || isSaving}
-            >
-              {isSaving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.primaryText}>Save new password</Text>
-              )}
-            </TouchableOpacity>
-            <Text style={styles.footerLabel}>Security managed by Verity Protect.</Text>
-          </View>
-        ) : (
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
+          <Text style={styles.footerLabel}>Security managed by Verity Protect.</Text>
+        </View>
+      ) : (
           <View style={styles.card}>
             <View style={styles.googleBadge}>
               <Ionicons name="logo-google" size={28} color="#fff" />
@@ -213,10 +203,25 @@ export default function SecurityScreen() {
               <Text style={styles.secondaryText}>Go to Google settings</Text>
               <Ionicons name="open-outline" size={18} color="#94a3b8" />
             </TouchableOpacity>
-            <Text style={styles.footerLabel}>Security managed by Verity Protect.</Text>
-          </View>
-        )}
-      </ScrollView>
+          <Text style={styles.footerLabel}>Security managed by Verity Protect.</Text>
+        </View>
+      )}
+    </ScrollView>
+
+      {isEmailProvider ? (
+        <ActionFooter
+          primaryLabel="Save new password"
+          onPrimaryPress={handleSavePress}
+          primaryLoading={isSaving}
+          primaryDisabled={
+            !canManageProfile ||
+            isSaving ||
+            !currentPassword ||
+            !newPassword ||
+            !confirmPassword
+          }
+        />
+      ) : null}
 
       {modalAction ? (
         <Modal visible transparent animationType="fade" onRequestClose={closeModal}>

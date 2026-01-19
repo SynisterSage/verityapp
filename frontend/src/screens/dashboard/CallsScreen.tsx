@@ -19,6 +19,7 @@ import { useProfile } from '../../context/ProfileContext';
 import { subscribeToCallUpdates } from '../../utils/callEvents';
 import RecentCallCard from '../../components/home/RecentCallCard';
 import EmptyState from '../../components/common/EmptyState';
+import DashboardHeader from '../../components/common/DashboardHeader';
 import type { CallsStackParamList } from '../../navigation/types';
 
 type CallRow = {
@@ -158,7 +159,7 @@ export default function CallsScreen({
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
       edges={[]}
     >
-      <Text style={styles.title}>Recent Calls</Text>
+      <DashboardHeader title="Recent Calls" subtitle="See who you've talked to" />
       <View style={styles.listWrapper}>
         {showSkeleton ? (
           <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>
@@ -251,12 +252,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0b111b',
     paddingHorizontal: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#f5f7fb',
-    marginBottom: 12,
   },
   empty: {
     color: '#8aa0c6',

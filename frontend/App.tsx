@@ -193,8 +193,8 @@ function InviteLinkHandler() {
 
 function AppTabs() {
   const insets = useSafeAreaInsets();
-  const dockBottom = Math.max(10, insets.bottom + 3);
-  const dockHeight = 40 + Math.max(0, insets.bottom - 6);
+  const dockBottom = 0;
+  const dockHeight = 96 + Math.max(insets.bottom, 16);
   const { redirectToSettings, setRedirectToSettings } = useProfile();
   const initialRoute = redirectToSettings ? 'SettingsTab' : 'HomeTab';
 

@@ -1,6 +1,8 @@
-import { View, TouchableOpacity, StyleSheet, Text, ViewStyle } from 'react-native';
+import { Animated, View, TouchableOpacity, StyleSheet, Text, ViewStyle } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useRef } from 'react';
 
 const ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap; }> = {
   HomeTab: { active: 'home', inactive: 'home-outline' },
@@ -21,44 +23,87 @@ export default function BottomDock({
   dockHeight,
   containerStyle,
 }: BottomDockProps) {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, 16);
   const focusedRoute = state.routes[state.index];
   const nestedState = focusedRoute?.state as { index?: number } | undefined;
   if (nestedState && typeof nestedState.index === 'number' && nestedState.index > 0) {
     return null;
   }
-  return (
-    <View style={[styles.container, { height: dockHeight }, containerStyle]}>
-      {state.routes.map((route, index) => {
-        const focused = state.index === index;
-        const onPress = () => {
-          const event = navigation.emit({
-            type: 'tabPress',
-            target: route.key,
-            canPreventDefault: true,
-          });
-          if (!focused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
-        };
-        const { active, inactive } = ICONS[route.name] ?? {
-          active: 'ellipse',
-          inactive: 'ellipse',
-        };
-        const iconName = focused ? active : inactive;
-        const label = descriptors[route.key].options.title ?? route.name.replace(/Tab$/, '');
+  const scaleValuesRef = useRef<Animated.Value[]>([]);
+  if (scaleValuesRef.current.length !== state.routes.length) {
+    scaleValuesRef.current = state.routes.map(() => new Animated.Value(1));
+  }
 
-        return (
-          <TouchableOpacity
-            key={route.key}
-            style={styles.tabButton}
-            onPress={onPress}
-            activeOpacity={0.75}
-          >
-            <Ionicons name={iconName} size={20} color={focused ? '#8ab4ff' : '#51607a'} />
-            <Text style={[styles.label, focused && styles.labelActive]}>{label}</Text>
-          </TouchableOpacity>
-        );
-      })}
+  useEffect(() => {
+    scaleValuesRef.current.forEach((anim, idx) => {
+      Animated.timing(anim, {
+        toValue: state.index === idx ? 1.15 : 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    });
+  }, [state.index, state.routes.length]);
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          height: 96 + bottomPadding,
+          paddingBottom: bottomPadding,
+        },
+        containerStyle,
+      ]}
+    >
+      <View style={styles.bar}>
+        {state.routes.map((route, index) => {
+          const focused = state.index === index;
+          const onPress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
+            if (!focused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+          const { active, inactive } = ICONS[route.name] ?? {
+            active: 'ellipse',
+            inactive: 'ellipse',
+          };
+          const iconName = focused ? active : inactive;
+          const label = descriptors[route.key].options.title ?? route.name.replace(/Tab$/, '');
+
+          return (
+            <TouchableOpacity
+              key={route.key}
+              style={styles.tabButton}
+              onPress={onPress}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.tabContent, focused && styles.tabContentActive]}>
+                <Animated.View
+                  style={[
+                    styles.iconWrapper,
+                    { transform: [{ scale: scaleValuesRef.current[index] }] },
+                  ]}
+                >
+                  <Ionicons name={iconName} size={30} color={focused ? '#2d6df6' : '#51607a'} />
+                </Animated.View>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  style={[styles.label, focused && styles.labelActive]}
+                >
+                  {label}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -69,34 +114,62 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    marginHorizontal: 16,
-    backgroundColor: '#101827',
-    borderRadius: 22,
+    backgroundColor: '#0b111b',
+    borderTopWidth: 2,
+    borderTopColor: '#202c3c',
+    paddingHorizontal: 0,
     paddingTop: 6,
-    paddingBottom: 8,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    elevation: 12,
     shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: -10 },
+    zIndex: 20,
+  },
+  bar: {
+    height: 96,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    paddingHorizontal: 12,
   },
   tabButton: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    paddingVertical: 0,
-    height: '100%',
+    paddingVertical: 10,
+  },
+  tabContent: {
+    width: 88,
+    height: 66,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+  },
+  tabContentActive: {
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    shadowColor: '#000',
+  shadowOpacity: 0.45,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 8 },
+
+  // Android elevation
+  elevation: 10,
+  },
+
+  iconWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   label: {
     marginTop: 4,
-    fontSize: 12,
-    color: '#51607a',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: 'rgba(255,255,255,0.6)',
   },
   labelActive: {
-    color: '#8ab4ff',
+    color: '#2d6df6',
   },
 });

@@ -2,7 +2,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { useEffect } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-
+import DashboardHeader from '../../components/common/DashboardHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import type { RouteProp } from '@react-navigation/native';
@@ -97,10 +97,10 @@ export default function SettingsScreen({
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
       edges={[]}
     >
+      <DashboardHeader title="Settings" subtitle="Manage your preferences" />
+      
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Settings</Text>
-        <Text style={styles.subtitle}>Manage safety controls and account access.</Text>
-
+        
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.card}>
@@ -180,11 +180,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 120,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#f5f7fb',
-  },
   bottomMask: {
     position: 'absolute',
     left: 0,
@@ -192,10 +187,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 120,
     backgroundColor: '#0b111b',
-  },
-  subtitle: {
-    marginTop: 8,
-    color: '#8aa0c6',
   },
   section: {
     marginTop: 24,

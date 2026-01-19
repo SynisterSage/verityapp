@@ -23,6 +23,7 @@ import RecentCallCard from '../../components/home/RecentCallCard';
 import StatTile from '../../components/home/StatTile';
 import ActivityRow from '../../components/home/ActivityRow';
 import EmptyState from '../../components/common/EmptyState';
+import DashboardHeader from '../../components/common/DashboardHeader';
 
 type CallRow = {
   id: string;
@@ -304,17 +305,21 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     },
   ];
 
+  const bottomGap = Math.max(insets.bottom, 0) + 0;
+
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
-      edges={[]}
+      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12), paddingBottom: bottomGap }]}
+      edges={['bottom']}
     >
-      <Text style={styles.title}>SafeCall</Text>
-      <Text style={styles.subtitle}>{activeProfile?.first_name ?? email}</Text>
+      <DashboardHeader
+        title="SafeCall"
+        subtitle={activeProfile?.first_name ?? email}
+      />
 
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.grid}
+        contentContainerStyle={[styles.grid, { paddingBottom: bottomGap }]}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -454,16 +459,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0b111b',
     paddingHorizontal: 24,
-    paddingBottom: 120,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#f5f7fb',
-  },
-  subtitle: {
-    color: '#8aa0c6',
-    marginTop: 6,
   },
   grid: {
     marginTop: 24,
