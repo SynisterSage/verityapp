@@ -22,7 +22,7 @@ const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call may 
  * We derive the host from the incoming request so ngrok + production both work.
  */
 function getPublicBaseUrl(req: Request) {
-  const host = req.get('host') ?? 'localhost:3000';
+  const host = req.get('host') ?? 'localhost:5001';
   const forwardedProto = req.header('x-forwarded-proto') ?? '';
   const protocol =
     forwardedProto ||

@@ -97,7 +97,7 @@ export default function SettingsScreen({
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
       edges={[]}
     >
-      <DashboardHeader title="Settings" subtitle="Manage your preferences" />
+      <DashboardHeader title="Settings" subtitle="Manage your preferences" align="left" />
       
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
