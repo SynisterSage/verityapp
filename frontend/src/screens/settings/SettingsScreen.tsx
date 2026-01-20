@@ -98,7 +98,6 @@ export default function SettingsScreen({
       edges={[]}
     >
       <DashboardHeader title="Settings" subtitle="Manage your preferences" align="left" />
-      
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         
       <View style={styles.section}>
@@ -179,6 +178,10 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 24,
     paddingBottom: 120,
+  },
+  headerWrap: {
+    paddingHorizontal: 24,
+    marginBottom: 8,
   },
   bottomMask: {
     position: 'absolute',

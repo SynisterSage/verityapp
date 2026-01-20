@@ -23,6 +23,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { useProfile } from '../../context/ProfileContext';
 import { subscribeToCallUpdates } from '../../utils/callEvents';
+import DashboardHeader from '../../components/common/DashboardHeader';
+
 
 type AlertRow = {
   id: string;
@@ -304,84 +306,86 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
       edges={[]}
     >
-      <View style={styles.headerRow}>
-        <Text style={styles.title}>Alerts</Text>
-        <View style={styles.filterWrapper}>
-          <TouchableOpacity
-            style={styles.filterButton}
-            onPress={() => setShowFilterMenu((prev) => !prev)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.filterButtonText}>
-              {filter === 'all'
-                ? 'All'
-                : filter === 'new'
-                ? 'New'
-                : filter === 'critical'
-                ? 'Critical'
-                : 'Muted'}
-            </Text>
-            <Ionicons
-              name={showFilterMenu ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color="#cfe0ff"
-            />
-          </TouchableOpacity>
-          {showFilterMenu ? (
-            <>
-              <TouchableOpacity
-                style={styles.menuOverlay}
-                activeOpacity={1}
-                onPress={() => setShowFilterMenu(false)}
+      <DashboardHeader
+        title="Alerts"
+        subtitle="Keep track of suspicious calls"
+        right={
+          <View style={styles.filterWrapper}>
+            <TouchableOpacity
+              style={styles.filterButton}
+              onPress={() => setShowFilterMenu((prev) => !prev)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.filterButtonText}>
+                {filter === 'all'
+                  ? 'All'
+                  : filter === 'new'
+                  ? 'New'
+                  : filter === 'critical'
+                  ? 'Critical'
+                  : 'Muted'}
+              </Text>
+              <Ionicons
+                name={showFilterMenu ? 'chevron-up' : 'chevron-down'}
+                size={16}
+                color="#cfe0ff"
               />
-              <Animated.View
-                style={[
-                  styles.filterMenu,
-                  {
-                    opacity: menuAnim,
-                    transform: [
-                      {
-                        translateY: menuAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-4, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-            {(['all', 'new', 'critical', 'muted'] as const).map((key, idx, arr) => (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.filterMenuItem, idx === arr.length - 1 && styles.filterMenuItemLast]}
-                    onPress={() => {
-                      setFilter(key);
-                      setShowFilterMenu(false);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.filterMenuText,
-                        filter === key && styles.filterMenuTextActive,
-                      ]}
+            </TouchableOpacity>
+            {showFilterMenu ? (
+              <>
+                <TouchableOpacity
+                  style={styles.menuOverlay}
+                  activeOpacity={1}
+                  onPress={() => setShowFilterMenu(false)}
+                />
+                <Animated.View
+                  style={[
+                    styles.filterMenu,
+                    {
+                      opacity: menuAnim,
+                      transform: [
+                        {
+                          translateY: menuAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-4, 0],
+                          }),
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  {(['all', 'new', 'critical', 'muted'] as const).map((key, idx, arr) => (
+                    <TouchableOpacity
+                      key={key}
+                      style={[styles.filterMenuItem, idx === arr.length - 1 && styles.filterMenuItemLast]}
+                      onPress={() => {
+                        setFilter(key);
+                        setShowFilterMenu(false);
+                      }}
+                      activeOpacity={0.8}
                     >
-                      {key === 'all'
-                        ? 'All'
-                        : key === 'new'
-                        ? 'New'
-                        : key === 'critical'
-                        ? 'Critical'
-                        : 'Muted'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </Animated.View>
-            </>
-          ) : null}
-        </View>
-      </View>
-      <Text style={styles.hint}>Swipe left on an alert to delete it forever.</Text>
+                      <Text
+                        style={[
+                          styles.filterMenuText,
+                          filter === key && styles.filterMenuTextActive,
+                        ]}
+                      >
+                        {key === 'all'
+                          ? 'All alerts'
+                          : key === 'new'
+                          ? 'New alerts'
+                          : key === 'critical'
+                          ? 'Critical alerts'
+                          : 'Muted alerts'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </Animated.View>
+              </>
+            ) : null}
+          </View>
+        }
+      />
       <View style={styles.listWrapper}>
         {showSkeleton ? (
           <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>

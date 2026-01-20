@@ -9,7 +9,7 @@ type DashboardHeaderProps = {
   align?: 'left' | 'center';
 };
 
-export default function DashboardHeader({ title, subtitle, right, align = 'center' }: DashboardHeaderProps) {
+export default function DashboardHeader({ title, subtitle, right, align = 'left' }: DashboardHeaderProps) {
   return (
     <View style={styles.header}>
       <View style={[styles.textStack, align === 'center' ? styles.centerText : styles.alignLeft]}>
