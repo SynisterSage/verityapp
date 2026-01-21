@@ -12,7 +12,9 @@ import { copy, copyFilesRec, exec, remove } from './common/utils';
   try {
     // Remove current build
     await remove('./dist/');
-    await exec('npm run lint', '../');
+    if (process.env.SKIP_LINT !== 'true') {
+      await exec('npm run lint', '../');
+    }
     await exec('tsc --project tsconfig.prod.json', '../');
     // Copy
     await copyFilesRec('./src', './dist', ['.ts']);
