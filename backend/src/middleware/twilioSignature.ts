@@ -1,12 +1,15 @@
 import { Request, Response, NextFunction } from 'express';
 import twilio from 'twilio';
 
+const PUBLIC_API_URL = process.env.PUBLIC_API_URL?.replace(/\/+$/, '');
+
 function getPublicBaseUrl(req: Request) {
-  const host = req.get('host') ?? '';
+  if (PUBLIC_API_URL) {
+    return PUBLIC_API_URL;
+  }
+  const host = req.get('host') ?? 'localhost:4000';
   const forwardedProto = req.header('x-forwarded-proto') ?? '';
-  const protocol =
-    forwardedProto ||
-    (host.includes('ngrok-free.dev') || host.includes('ngrok-free.app') ? 'https' : req.protocol);
+  const protocol = forwardedProto || req.protocol || 'http';
   return `${protocol}://${host}`;
 }
 
