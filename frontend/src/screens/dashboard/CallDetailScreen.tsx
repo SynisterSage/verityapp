@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -131,6 +131,24 @@ export default function CallDetailScreen({
   const [recordingStatus, setRecordingStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const riskBarAnim = useRef(new Animated.Value(0)).current;
+  const [audioModeConfigured, setAudioModeConfigured] = useState(false);
+
+  const fetchRecordingLink = useCallback(async () => {
+    const urlData = await authorizedFetch(`/calls/${callId}/recording-url`);
+    const url = urlData?.url ?? null;
+    if (soundRef.current) {
+      try {
+        await soundRef.current.unloadAsync();
+      } catch {
+        // ignore
+      }
+      soundRef.current = null;
+      setIsPlaying(false);
+    }
+    setRecordingUrl(url);
+    setRecordingStatus(url ? 'ready' : 'error');
+    return url;
+  }, [callId]);
 
   useEffect(() => {
     const load = async () => {
@@ -142,19 +160,31 @@ export default function CallDetailScreen({
         .eq('id', callId)
         .single();
       setCallRow(data ?? null);
+      setRecordingStatus('loading');
       try {
-        const urlData = await authorizedFetch(`/calls/${callId}/recording-url`); 
-        setRecordingUrl(urlData?.url ?? null);
-        setRecordingStatus(urlData?.url ? 'ready' : 'error');
+        await fetchRecordingLink();
       } catch (err) {
         console.warn('Failed to prefetch recording URL', err);
         setRecordingStatus('error');
       }
     };
     load();
-  }, [callId]);
+  }, [callId, fetchRecordingLink]);
 
   useEffect(() => {
+    if (!audioModeConfigured) {
+      Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+        shouldDuckAndroid: true,
+        interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+      }).catch((error) => {
+        console.warn('Failed to configure audio mode', error);
+      });
+      setAudioModeConfigured(true);
+    }
     return () => {
       if (soundRef.current) {
         soundRef.current.unloadAsync();
@@ -163,9 +193,20 @@ export default function CallDetailScreen({
   }, []);
 
   const playOrPause = async () => {
-    if (!recordingUrl) {
-      Alert.alert('Recording', 'No recording URL available yet. Try again in a moment.');
-      return;
+    let url = recordingUrl;
+    if (!url) {
+      setRecordingStatus('loading');
+      try {
+        url = await fetchRecordingLink();
+      } catch (err) {
+        setRecordingStatus('error');
+        Alert.alert('Recording', 'No recording URL available yet. Try again in a moment.');
+        return;
+      }
+      if (!url) {
+        Alert.alert('Recording', 'No recording URL available yet. Try again in a moment.');
+        return;
+      }
     }
     try {
       const sound = soundRef.current;
@@ -178,7 +219,7 @@ export default function CallDetailScreen({
       let nextSound = sound;
       if (!nextSound) {
         const { sound: created } = await Audio.Sound.createAsync(
-          { uri: recordingUrl },
+          { uri: url },
           { shouldPlay: true },
           (status) => {
             if (!status.isLoaded) return;
@@ -213,9 +254,7 @@ export default function CallDetailScreen({
   const retryUrl = async () => {
     setRecordingStatus('loading');
     try {
-      const urlData = await authorizedFetch(`/calls/${callId}/recording-url`);
-      setRecordingUrl(urlData?.url ?? null);
-      setRecordingStatus(urlData?.url ? 'ready' : 'error');
+      await fetchRecordingLink();
     } catch (err) {
       setRecordingStatus('error');
       Alert.alert('Error', 'Failed to refresh recording link.');

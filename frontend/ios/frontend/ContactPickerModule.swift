@@ -1,17 +1,19 @@
 import Contacts
 import ContactsUI
 import UIKit
-import React
 
 @objc(ContactPicker)
-class ContactPicker: NSObject, RCTBridgeModule {
+class ContactPicker: NSObject {
   static func moduleName() -> String! {
     "ContactPicker"
   }
 
-  static func requiresMainQueueSetup() -> Bool {
+  @objc static func requiresMainQueueSetup() -> Bool {
     true
   }
+
+  typealias RCTPromiseResolveBlock = @convention(block) (Any?) -> Void
+  typealias RCTPromiseRejectBlock = @convention(block) (String?, String?, Error?) -> Void
 
   private let contactStore = CNContactStore()
   private var selectContactsResolver: RCTPromiseResolveBlock?
@@ -38,11 +40,12 @@ class ContactPicker: NSObject, RCTBridgeModule {
         }
         let picker = CNContactPickerViewController()
         picker.delegate = self
-        picker.displayedPropertyKeys = [
-          CNContactGivenNameKey as CNKeyDescriptor,
-          CNContactFamilyNameKey as CNKeyDescriptor,
-          CNContactPhoneNumbersKey as CNKeyDescriptor,
+        let displayedKeys = [
+          CNContactGivenNameKey,
+          CNContactFamilyNameKey,
+          CNContactPhoneNumbersKey,
         ]
+        picker.displayedPropertyKeys = displayedKeys
         picker.modalPresentationStyle = .formSheet
         self.selectContactsResolver = resolve
         self.selectContactsRejecter = rejecter
@@ -116,14 +119,11 @@ class ContactPicker: NSObject, RCTBridgeModule {
   }
 
   private func topViewController() -> UIViewController? {
-    if #available(iOS 13, *) {
-      return UIApplication.shared.connectedScenes
-        .compactMap { $0 as? UIWindowScene }
-        .flatMap { $0.windows }
-        .first { $0.isKeyWindow }
-        .flatMap { self.findTopController(from: $0.rootViewController) }
-    }
-    return self.findTopController(from: UIApplication.shared.keyWindow?.rootViewController)
+    let keyWindow = UIApplication.shared.connectedScenes
+      .compactMap { $0 as? UIWindowScene }
+      .flatMap { $0.windows }
+      .first { $0.isKeyWindow }
+    return self.findTopController(from: keyWindow?.rootViewController)
   }
 
   private func findTopController(from controller: UIViewController?) -> UIViewController? {
