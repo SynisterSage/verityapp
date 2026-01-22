@@ -14,6 +14,7 @@ type ContactPickerModule = {
 const ContactPicker = NativeModules.ContactPicker as ContactPickerModule | undefined;
 
 function ensureModule() {
+  console.log('Native ContactPicker module detected:', !!ContactPicker);
   if (!ContactPicker) {
     throw new Error('Native ContactPicker module is not available.');
   }
