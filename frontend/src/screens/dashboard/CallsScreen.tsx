@@ -21,6 +21,7 @@ import RecentCallCard from '../../components/home/RecentCallCard';
 import EmptyState from '../../components/common/EmptyState';
 import DashboardHeader from '../../components/common/DashboardHeader';
 import type { CallsStackParamList } from '../../navigation/types';
+import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 
 type CallRow = {
   id: string;
@@ -205,9 +206,10 @@ export default function CallsScreen({
                 : feedback === 'marked_safe'
                 ? 'low'
                 : item.fraud_risk_level;
+            const formattedTitle = formatPhoneNumber(item.caller_number, item.caller_number ?? 'Unknown caller');
             return (
               <RecentCallCard
-                title={item.caller_number ?? 'Unknown caller'}
+                title={formattedTitle}
                 transcript={item.transcript}
                 createdAt={item.created_at}
                 fraudLevel={badgeLevel}

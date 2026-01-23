@@ -1,3 +1,6 @@
+import { tokens } from '../theme/tokens';
+import { withOpacity } from './color';
+
 export type RiskSeverity = 'low' | 'medium' | 'high' | 'critical' | 'unknown';
 
 type RiskPalette = {
@@ -8,31 +11,33 @@ type RiskPalette = {
   };
 };
 
+const { success, warning, danger, accent } = tokens.colors.dark;
+
 const RISK_PALETTE: RiskPalette = {
   critical: {
     text: '#ffecec',
-    background: 'rgba(255, 107, 107, 0.25)',
-    accent: '#ff6b6b',
+    background: withOpacity(danger, 0.3),
+    accent: danger,
   },
   high: {
-    text: '#fff3e2',
-    background: 'rgba(255, 149, 92, 0.25)',
-    accent: '#ff955c',
+    text: '#fff8e1',
+    background: withOpacity(warning, 0.3),
+    accent: warning,
   },
   medium: {
-    text: '#fff9e3',
-    background: 'rgba(242, 193, 78, 0.25)',
-    accent: '#f2c14e',
+    text: '#fffce7',
+    background: withOpacity(accent, 0.18),
+    accent,
   },
   low: {
-    text: '#d2ddf0',
-    background: 'rgba(138, 180, 255, 0.2)',
-    accent: '#8ab4ff',
+    text: '#dff9ec',
+    background: withOpacity(success, 0.26),
+    accent: success,
   },
   unknown: {
     text: '#e6effc',
-    background: 'rgba(94, 125, 172, 0.22)',
-    accent: '#7c8cb9',
+    background: withOpacity(accent, 0.18),
+    accent,
   },
 };
 

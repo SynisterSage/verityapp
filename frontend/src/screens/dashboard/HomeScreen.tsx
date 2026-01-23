@@ -10,10 +10,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
@@ -22,8 +24,12 @@ import { authorizedFetch } from '../../services/backend';
 import RecentCallCard from '../../components/home/RecentCallCard';
 import StatTile from '../../components/home/StatTile';
 import ActivityRow from '../../components/home/ActivityRow';
+import NeedAssistanceCard from '../../components/home/NeedAssistanceCard';
 import EmptyState from '../../components/common/EmptyState';
 import DashboardHeader from '../../components/common/DashboardHeader';
+import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
+import { withOpacity } from '../../utils/color';
+import { useTheme } from '../../context/ThemeContext';
 
 type CallRow = {
   id: string;
@@ -47,8 +53,8 @@ type AlertRow = {
 };
 
 type ActivityItem =
-  | { type: 'call'; created_at: string; label: string; badge: string; badgeLevel?: string; callId: string }
-  | { type: 'alert'; created_at: string; label: string; badge: string; badgeLevel?: string };
+  | { type: 'call'; id: string; created_at: string; label: string; badge: string; badgeLevel?: string; callId: string }
+  | { type: 'alert'; id: string; created_at: string; label: string; badge: string; badgeLevel?: string };
 
 type StatTile = {
   key: string;
@@ -56,6 +62,8 @@ type StatTile = {
   value: string;
   caption: string;
   icon: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
+  iconBackgroundColor?: string;
   onPress: () => void;
 };
 
@@ -63,6 +71,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { activeProfile } = useProfile();
+  const { theme } = useTheme();
   const [recentCall, setRecentCall] = useState<CallRow | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [alertsThisWeek, setAlertsThisWeek] = useState<number | null>(null);
@@ -188,6 +197,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               : 'CALL';
           return {
             type: 'call' as const,
+            id: call.id,
             created_at: call.created_at,
             label: call.caller_number ?? 'Unknown caller',
             badge: badgeLabel,
@@ -218,6 +228,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               : alert.risk_level ?? alert.payload?.riskLevel ?? undefined;
           return {
             type: 'alert' as const,
+            id: alert.id,
             created_at: alert.created_at,
             label: isTrusted ? 'Trusted call' : 'Fraud alert',
             badge,
@@ -285,10 +296,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const statTiles: StatTile[] = [
     {
       key: 'alerts',
-      label: 'Weekly Alerts',
+      label: 'Weekly \nAlerts',
       value: alertsThisWeek === null ? '—' : `${alertsThisWeek}`,
       caption: 'alerts',
       icon: 'alert-circle',
+      iconColor: theme.colors.warning,
+      iconBackgroundColor: withOpacity(theme.colors.warning, 0.15),
       onPress: () => navigation.navigate('AlertsTab'),
     },
     {
@@ -297,6 +310,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       value: blockedCount === null ? '—' : `${blockedCount}`,
       caption: 'blocked',
       icon: 'ban',
+      iconColor: theme.colors.danger,
+      iconBackgroundColor: withOpacity(theme.colors.danger, 0.15),
       onPress: () =>
         navigation.navigate('SettingsTab', {
           screen: 'Settings',
@@ -305,31 +320,72 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     },
   ];
 
-  const bottomGap = Math.max(insets.bottom, 0) + 0;
+  const triggerLightHaptic = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+  };
+
+  const heroTitle = formatPhoneNumber(recentCall?.caller_number, 'Recent Call');
+  const heroTranscript = recentCall?.transcript ?? (loading ? 'Loading…' : null);
+  const heroFraudLevel =
+    recentCall?.feedback_status === 'marked_fraud'
+      ? 'critical'
+      : recentCall?.feedback_status === 'marked_safe'
+      ? 'low'
+      : recentCall?.fraud_risk_level;
+  const heroBadgeLabel =
+    recentCall?.feedback_status === 'marked_fraud'
+      ? 'Fraud'
+      : recentCall?.feedback_status === 'marked_safe'
+      ? 'Safe'
+      : undefined;
+
+  const bottomGap = Math.max(insets.bottom, 0) + 20;
+
+  const handleViewAllPress = () => {
+    triggerLightHaptic();
+    navigation.navigate('AlertsTab');
+  };
 
   return (
     <SafeAreaView
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12), paddingBottom: bottomGap }]}
       edges={['bottom']}
     >
-      <DashboardHeader
-        title="SafeCall"
-        subtitle={activeProfile?.first_name ?? email}
-      />
-
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={[styles.grid, { paddingBottom: bottomGap }]}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => loadStats(true)}
-            tintColor="#8ab4ff"
-            colors={['#8ab4ff']}
+      <View style={{}}>
+        <DashboardHeader
+            title="SafeCall"
+            subtitle={activeProfile?.first_name ?? email}
+            right={
+              <TouchableOpacity
+                style={styles.headerAction}
+                onPress={() =>
+                  navigation.navigate('SettingsTab', {
+                    screen: 'Settings',
+                    params: { initialScreen: 'Security' },
+                  })
+                }
+                activeOpacity={0.8}
+              >
+                <Ionicons name="shield-checkmark" size={20} color="#f5f7fb" />
+              </TouchableOpacity>
+            }
           />
-        }
-      >
+      </View>
+
+        <ScrollView
+          ref={scrollRef}
+          contentContainerStyle={[styles.content, { paddingBottom: bottomGap + 40 }]}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => loadStats(true)}
+              tintColor={theme.colors.accent}
+              colors={[theme.colors.accent]}
+              progressBackgroundColor={theme.colors.surfaceAlt}
+            />
+          }
+        >
         {showSkeleton ? (
           <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>
             {skeletonRows.map((key) => (
@@ -342,112 +398,128 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </Animated.View>
         ) : null}
         <View style={{ opacity: contentOpacity }}>
-          <>
-              <RecentCallCard
-                transcript={
-                  recentCall?.transcript ?? (loading ? 'Loading…' : null)
-                }
-                createdAt={recentCall?.created_at}
-                fraudLevel={
-                  recentCall?.feedback_status === 'marked_fraud'
-                    ? 'critical'
-                    : recentCall?.feedback_status === 'marked_safe'
-                    ? 'low'
-                    : recentCall?.fraud_risk_level
-                }
-                badgeLabel={
-                  recentCall?.feedback_status === 'marked_fraud'
-                    ? 'Fraud'
-                    : recentCall?.feedback_status === 'marked_safe'
-                    ? 'Safe'
-                    : undefined
-                }
-                emptyText={
-                  hasTwilioNumber
-                    ? 'No calls recorded yet.'
-                    : 'Add a SafeCall number to start recording calls.'
-                }
-                onPress={() =>
-                  navigation.navigate('CallsTab', {
-                    screen: 'Calls',
-                    params: { initialCallId: recentCall?.id },
-                  })
-                }
-              />
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Featured Event</Text>
+            <RecentCallCard
+              title={heroTitle}
+              transcript={heroTranscript}
+              createdAt={recentCall?.created_at}
+              fraudLevel={heroFraudLevel}
+              badgeLabel={heroBadgeLabel}
+              emptyText={
+                hasTwilioNumber ? 'No calls recorded yet.' : 'Add a SafeCall number to start recording calls.'
+              }
+              onPress={() =>
+                navigation.navigate('CallsTab', {
+                  screen: 'Calls',
+                  params: { initialCallId: recentCall?.id },
+                })
+              }
+            />
+          </View>
 
-            <View style={styles.statsRow}>
-              {statTiles.map((tile) => (
-                <StatTile
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Quick Stats</Text>
+            <View style={styles.statsGrid}>
+              {statTiles.map((tile, index) => (
+                <View
                   key={tile.key}
-                  label={tile.label}
-                  value={tile.value}
-                  caption={tile.caption}
-                  icon={tile.icon}
-                  onPress={tile.onPress}
-                />
+                  style={[styles.statColumn, index % 2 === 0 ? styles.rightMargin : null]}
+                >
+                  <StatTile
+                    label={tile.label}
+                    value={tile.value}
+                    caption={tile.caption}
+                    icon={tile.icon}
+                    iconColor={tile.iconColor}
+                    iconBackgroundColor={tile.iconBackgroundColor}
+                    onPress={tile.onPress}
+                  />
+                </View>
               ))}
             </View>
+          </View>
 
-            <View style={styles.activitySection}>
+          <View style={styles.section}>
+            <View style={styles.activityHeader}>
               <Text style={styles.sectionTitle}>Recent Activity</Text>
-              {loading && recentActivity.length === 0 ? (
-                <View>
-                  {skeletonRows.map((key) => (
-                    <Animated.View key={`activity-${key}`} style={[styles.activityRow, styles.skeletonCard, { opacity: shimmer }]}>
-                      <View>
-                        <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
-                        <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
-                      </View>
-                      <View style={[styles.skeletonPill]} />
-                    </Animated.View>
-                  ))}
-                </View>
-              ) : recentActivity.length === 0 ? (
-                <View style={styles.emptyStateWrap}>
-                  {hasTwilioNumber ? (
-                    <EmptyState
-                      icon="pulse-outline"
-                      title="No activity yet"
-                      body="Calls and alerts will show up here once they start."
-                    />
-                  ) : (
-                    <EmptyState
-                      icon="call-outline"
-                      title="Connect a SafeCall number"
-                      body="Add your virtual number to start receiving and reviewing calls."
-                      ctaLabel="Set up number"
-                      onPress={() => navigation.navigate('SettingsTab')}
-                    />
-                  )}
-                </View>
-              ) : (
-                recentActivity.map((item) => (
-                  <ActivityRow
-                    key={`${item.type}-${item.created_at}`}
-                    type={item.type}
-                    label={item.label}
-                    createdAt={item.created_at}
-                    badge={item.badge}
-                    badgeLevel={
-                      item.badge === 'FRAUD'
-                        ? 'critical'
-                        : item.badge === 'SAFE'
-                        ? 'low'
-                        : item.badgeLevel
-                    }
-                    onPress={() =>
-                  item.type === 'call'
-                    ? navigation.navigate('CallsTab', {
-                        screen: 'Calls',
-                        params: { initialCallId: item.callId },
-                      })
-                    : navigation.navigate('AlertsTab')
-                    }
-                  />
-                ))
-              )}
+              <TouchableOpacity
+                style={styles.viewAllButton}
+                onPress={handleViewAllPress}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.viewAllText}>View All</Text>
+                <Ionicons name="chevron-forward" size={16} color="#2d6df6" style={styles.viewAllIcon} />
+              </TouchableOpacity>
             </View>
-          </>
+
+            {loading && recentActivity.length === 0 ? (
+              <View>
+                {skeletonRows.map((key) => (
+                  <Animated.View
+                    key={`activity-${key}`}
+                    style={[styles.skeletonCard, { opacity: shimmer }]}
+                  >
+                    <View>
+                      <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                      <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                    </View>
+                    <View style={styles.skeletonPill} />
+                  </Animated.View>
+                ))}
+              </View>
+            ) : recentActivity.length === 0 ? (
+              <View style={styles.emptyStateWrap}>
+                {hasTwilioNumber ? (
+                  <EmptyState
+                    icon="pulse-outline"
+                    title="No activity yet"
+                    body="Calls and alerts will show up here once they start."
+                  />
+                ) : (
+                  <EmptyState
+                    icon="call-outline"
+                    title="Connect a SafeCall number"
+                    body="Add your virtual number to start receiving and reviewing calls."
+                    ctaLabel="Set up number"
+                    onPress={() => navigation.navigate('SettingsTab')}
+                  />
+                )}
+              </View>
+            ) : (
+              <View style={styles.activityList}>
+                {recentActivity.map((item) => (
+                  <View key={item.id} style={styles.activityItem}>
+                    <ActivityRow
+                      type={item.type}
+                      label={item.label}
+                      createdAt={item.created_at}
+                      badge={item.badge}
+                      badgeLevel={
+                        item.badge === 'FRAUD'
+                          ? 'critical'
+                          : item.badge === 'SAFE'
+                          ? 'low'
+                          : item.badgeLevel
+                      }
+                      onPress={() =>
+                        item.type === 'call'
+                          ? navigation.navigate('CallsTab', {
+                              screen: 'Calls',
+                              params: { initialCallId: item.callId },
+                            })
+                          : navigation.navigate('AlertsTab')
+                      }
+                    />
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
+          <View style={styles.section}>
+            <NeedAssistanceCard onPress={() => navigation.navigate('SettingsTab')} />
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -460,78 +532,74 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f141d',
     paddingHorizontal: 24,
   },
-  grid: {
-    marginTop: 24,
-    gap: 18,
-    position: 'relative',
+  headerAction: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  statsRow: {
+  content: {
+    paddingTop: 12,
+  },
+  section: {
+    marginTop: 20,
+  },
+  sectionLabel: {
+    color: '#8aa0c6',
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
+  statsGrid: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
   },
-  activitySection: {
-    marginTop: 24,
-    gap: 12,
+  statColumn: {
+    width: '48%',
+    marginBottom: 12,
+  },
+  rightMargin: {
+    marginRight: 8,
+  },
+  activityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   sectionTitle: {
     color: '#98a7c2',
     fontWeight: '600',
-    marginBottom: 4,
-  },
-  activityRow: {
-    backgroundColor: '#121a26',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#202c3c',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  activityRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  activityIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#1b2634',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  activityLabel: {
-    color: '#e4ebf7',
-    fontWeight: '600',
-  },
-  activityMeta: {
-    color: '#8aa0c6',
-    marginTop: 4,
-    fontSize: 12,
-  },
-  activityBadge: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    borderWidth: 1,
     letterSpacing: 0.5,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  viewAllText: {
+    color: '#2d6df6',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  viewAllIcon: {
+    marginLeft: 4,
+  },
+  activityList: {
+    marginTop: 8,
+  },
+  activityItem: {
+    marginBottom: 12,
   },
   emptyStateWrap: {
     alignItems: 'center',
     paddingHorizontal: 16,
-  },
-  listContent: {
-    paddingBottom: 120,
-  },
-  listWrapper: {
-    flex: 1,
-    position: 'relative',
   },
   skeletonOverlay: {
     position: 'absolute',
@@ -541,11 +609,14 @@ const styles = StyleSheet.create({
   },
   skeletonCard: {
     backgroundColor: '#121a26',
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 18,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#202c3c',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   skeletonLine: {
     height: 10,
@@ -554,7 +625,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   skeletonLineShort: {
-    width: '45%',
+    width: '50%',
     marginTop: 2,
   },
   skeletonLineTiny: {

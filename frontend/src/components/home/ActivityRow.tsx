@@ -1,7 +1,12 @@
 import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
+import { useTheme } from '../../context/ThemeContext';
 import { getRiskStyles } from '../../utils/risk';
+import { formatTimestamp } from '../../utils/formatTimestamp';
+import { withOpacity } from '../../utils/color';
+import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 
 export type ActivityType = 'call' | 'alert';
 
@@ -27,41 +32,60 @@ export default function ActivityRow({
   badgeLevel,
   onPress,
 }: ActivityRowProps) {
+  const { theme } = useTheme();
   const riskStyles = getRiskStyles(badgeLevel ?? badge);
+  const iconBg = withOpacity(riskStyles.accent, 0.12);
+  const digitsOnly = label.replace(/\D/g, '');
+  const shouldFormatPhone = digitsOnly.length >= 10 && !/[A-Za-z]/.test(label);
+  const formattedLabel = shouldFormatPhone ? formatPhoneNumber(label, label) : label;
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    onPress();
+  };
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={[
+        styles.row,
+        {
+          backgroundColor: theme.colors.surface,
+          borderColor: theme.colors.border,
+        },
+      ]}
+      onPress={handlePress}
+      activeOpacity={0.85}
+    >
       <View style={styles.rowLeft}>
-        <View style={styles.iconCircle}>
-          <Ionicons name={ICONS[type]} size={18} color="#8ab4ff" />
+        <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
+          <Ionicons name={ICONS[type]} size={18} color={riskStyles.accent} />
         </View>
-        <View>
-          <Text style={styles.label}>{label}</Text>
-          <Text style={styles.meta}>{new Date(createdAt).toLocaleString()}</Text>
+        <View style={styles.metaGroup}>
+          <Text style={[styles.label, { color: theme.colors.text }]} numberOfLines={1}>
+            {formattedLabel}
+          </Text>
+          <Text style={[styles.meta, { color: theme.colors.textMuted }]} numberOfLines={1}>
+            {formatTimestamp(createdAt)}
+          </Text>
         </View>
       </View>
-      <Text
+      <View
         style={[
           styles.badge,
           {
             backgroundColor: riskStyles.background,
-            color: riskStyles.text,
-            borderColor: riskStyles.accent,
           },
         ]}
       >
-        {badge}
-      </Text>
+        <Text style={[styles.badgeText, { color: riskStyles.text }]}>{badge}</Text>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   row: {
-    backgroundColor: '#121a26',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#202c3c',
+    borderRadius: 22,
+    padding: 20,
+    borderWidth: StyleSheet.hairlineWidth,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -72,31 +96,33 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#1b2634',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 14,
+  },
+  metaGroup: {
+    flex: 1,
   },
   label: {
-    color: '#e4ebf7',
+    fontSize: 16,
     fontWeight: '600',
   },
   meta: {
-    color: '#8aa0c6',
     marginTop: 4,
-    fontSize: 12,
+    fontSize: 13,
   },
   badge: {
-    fontSize: 11,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 14,
+  },
+  badgeText: {
+    fontSize: 12,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 999,
-    borderWidth: 1,
     letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
 });

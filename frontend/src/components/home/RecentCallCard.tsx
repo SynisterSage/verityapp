@@ -1,7 +1,10 @@
 import { Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
+import { useTheme } from '../../context/ThemeContext';
 import { getRiskStyles } from '../../utils/risk';
+import { formatTimestamp } from '../../utils/formatTimestamp';
 
 type RecentCallCardProps = {
   title?: string;
@@ -9,6 +12,7 @@ type RecentCallCardProps = {
   createdAt?: string;
   fraudLevel?: string | null;
   badgeLabel?: string;
+  subtitleLabel?: string;
   emptyText?: string;
   maxLength?: number;
   onPress: () => void;
@@ -20,10 +24,13 @@ export default function RecentCallCard({
   createdAt,
   fraudLevel,
   badgeLabel,
+  subtitleLabel,
   emptyText = 'No calls recorded yet',
   maxLength = 90,
   onPress,
 }: RecentCallCardProps) {
+  const { theme } = useTheme();
+  const formattedCreatedAt = createdAt ? formatTimestamp(createdAt) : undefined;
   const riskStyles = getRiskStyles(fraudLevel);
   const badgeText = (badgeLabel ?? fraudLevel ?? 'unknown').toUpperCase();
   const body = transcript
@@ -31,36 +38,48 @@ export default function RecentCallCard({
       ? `${transcript.slice(0, Math.max(0, maxLength - 1))}…`
       : transcript
     : emptyText;
+  const subtitleParts = [formattedCreatedAt, subtitleLabel].filter(Boolean);
+  const subtitle = subtitleParts.join(' · ');
+  const handlePress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    onPress();
+  };
+
   return (
-    <TouchableOpacity style={[styles.card, styles.recentCard]} onPress={onPress} activeOpacity={0.85}>
-      <View style={styles.header}>
-        <View style={styles.iconCircle}>
-          <Ionicons name="call" size={20} color="#8ab4ff" />
-        </View>
-        <Text style={styles.cardTitle}>{title}</Text>
-      </View>
-      <View>
-        <Text style={styles.body} numberOfLines={2} ellipsizeMode="tail">
-          {body}
-        </Text>
-        {createdAt ? (
-          <View style={styles.metaRow}>
-            <Text style={styles.meta}>{new Date(createdAt).toLocaleString()}</Text>
-            <Text
-              style={[
-                styles.badge,
-                styles.recentBadge,
-                {
-                  backgroundColor: riskStyles.background,
-                  color: riskStyles.text,
-                  borderColor: riskStyles.accent,
-                },
-              ]}
-            >
-              {badgeText}
+    <TouchableOpacity style={[styles.card, { backgroundColor: theme.colors.surface }]} onPress={handlePress} activeOpacity={0.85}>
+      <View style={styles.headerRow}>
+        <View style={styles.headerRowLeft}>
+          <View style={[styles.iconCircle, { backgroundColor: theme.colors.surfaceAlt }]}>
+            <Ionicons name="call" size={24} color={theme.colors.accent} />
+          </View>
+          <View style={styles.headerText}>
+            <Text style={[styles.cardTitle, { color: theme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">
+              {title}
             </Text>
+            {subtitle ? <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>{subtitle}</Text> : null}
+          </View>
+        </View>
+        {badgeText ? (
+          <View
+            style={[
+              styles.topBadge,
+              {
+                backgroundColor: riskStyles.background,
+              },
+            ]}
+          >
+            <Text style={[styles.badgeText, { color: riskStyles.text }]}>{badgeText}</Text>
           </View>
         ) : null}
+      </View>
+      <View style={[styles.transcriptBlock, { backgroundColor: theme.colors.surfaceAlt }]}>
+        <Text style={[styles.body, { color: theme.colors.text }]} numberOfLines={2} ellipsizeMode="tail">
+          {body}
+        </Text>
+      </View>
+      <View style={styles.footerRow}>
+        <Text style={[styles.footerText, { color: theme.colors.accent }]}>Review Call Record</Text>
+        <Ionicons name="chevron-forward" size={18} color={theme.colors.accent} style={styles.footerIcon} />
       </View>
     </TouchableOpacity>
   );
@@ -68,60 +87,80 @@ export default function RecentCallCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#121a26',
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#202c3c',
+    borderRadius: 24,
+    padding: 24,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
+    marginBottom: 16,
   },
-  recentCard: {
-    borderColor: '#202c3c',
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 16,
+    paddingRight: 90,
+    position: 'relative',
   },
-  header: {
+  headerRowLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 6,
+    flex: 1,
   },
   iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 14,
-    backgroundColor: '#1b2634',
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
+  },
+  headerText: {
+    flex: 1,
+    marginRight: 12,
   },
   cardTitle: {
-    color: '#f5f7fb',
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 20,
+  },
+  subtitle: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  topBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    position: 'absolute',
+    right: 0,
+    top: 0,
+  },
+  badgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  transcriptBlock: {
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 14,
   },
   body: {
-    color: '#d9e0f3',
-    fontSize: 13,
-    lineHeight: 20,
-    marginBottom: 10,
+    fontStyle: 'italic',
+    fontSize: 16,
+    lineHeight: 22,
   },
-  metaRow: {
+  footerRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  meta: {
-    color: '#7f90ab',
-    fontSize: 12,
-  },
-  badge: {
-    fontSize: 11,
+  footerText: {
+    fontSize: 14,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    letterSpacing: 0.4,
   },
-  recentBadge: {
-    alignSelf: 'flex-start',
+  footerIcon: {
+    marginLeft: 6,
+    opacity: 0.3,
   },
 });
