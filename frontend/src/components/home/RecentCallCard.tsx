@@ -16,6 +16,7 @@ type RecentCallCardProps = {
   emptyText?: string;
   maxLength?: number;
   onPress: () => void;
+  hideBadge?: boolean;
 };
 
 export default function RecentCallCard({
@@ -28,6 +29,7 @@ export default function RecentCallCard({
   emptyText = 'No calls recorded yet',
   maxLength = 90,
   onPress,
+  hideBadge = false,
 }: RecentCallCardProps) {
   const { theme } = useTheme();
   const formattedCreatedAt = createdAt ? formatTimestamp(createdAt) : undefined;
@@ -45,21 +47,26 @@ export default function RecentCallCard({
     onPress();
   };
 
+  const headerRowStyles = [styles.headerRow, hideBadge && styles.headerRowNoBadge];
   return (
     <TouchableOpacity style={[styles.card, { backgroundColor: theme.colors.surface }]} onPress={handlePress} activeOpacity={0.85}>
-      <View style={styles.headerRow}>
+      <View style={headerRowStyles}>
         <View style={styles.headerRowLeft}>
           <View style={[styles.iconCircle, { backgroundColor: theme.colors.surfaceAlt }]}>
             <Ionicons name="call" size={24} color={theme.colors.accent} />
           </View>
           <View style={styles.headerText}>
-            <Text style={[styles.cardTitle, { color: theme.colors.text }]} numberOfLines={1} ellipsizeMode="tail">
+            <Text
+              style={[styles.cardTitle, { color: theme.colors.text }]}
+              numberOfLines={hideBadge ? 2 : 1}
+              ellipsizeMode="tail"
+            >
               {title}
             </Text>
             {subtitle ? <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>{subtitle}</Text> : null}
           </View>
         </View>
-        {badgeText ? (
+        {!hideBadge && badgeText ? (
           <View
             style={[
               styles.topBadge,
@@ -100,6 +107,9 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingRight: 90,
     position: 'relative',
+  },
+  headerRowNoBadge: {
+    paddingRight: 0,
   },
   headerRowLeft: {
     flexDirection: 'row',

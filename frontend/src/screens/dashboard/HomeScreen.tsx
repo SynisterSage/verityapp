@@ -9,6 +9,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Pressable,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -25,7 +26,6 @@ import RecentCallCard from '../../components/home/RecentCallCard';
 import StatTile from '../../components/home/StatTile';
 import ActivityRow from '../../components/home/ActivityRow';
 import NeedAssistanceCard from '../../components/home/NeedAssistanceCard';
-import EmptyState from '../../components/common/EmptyState';
 import DashboardHeader from '../../components/common/DashboardHeader';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import { withOpacity } from '../../utils/color';
@@ -324,7 +324,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
   };
 
-  const heroTitle = formatPhoneNumber(recentCall?.caller_number, 'Recent Call');
+  const hasHeroCall = Boolean(recentCall?.caller_number);
+  const heroTitle = hasHeroCall
+    ? formatPhoneNumber(recentCall?.caller_number, 'Recent Call')
+    : hasTwilioNumber
+    ? 'No calls yet'
+    : 'Add a Verity Protect number';
   const heroTranscript = recentCall?.transcript ?? (loading ? 'Loading…' : null);
   const heroFraudLevel =
     recentCall?.feedback_status === 'marked_fraud'
@@ -333,11 +338,16 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       ? 'low'
       : recentCall?.fraud_risk_level;
   const heroBadgeLabel =
-    recentCall?.feedback_status === 'marked_fraud'
+    hasHeroCall && recentCall?.feedback_status === 'marked_fraud'
       ? 'Fraud'
-      : recentCall?.feedback_status === 'marked_safe'
+      : hasHeroCall && recentCall?.feedback_status === 'marked_safe'
       ? 'Safe'
       : undefined;
+  const heroSubtitleLabel = hasHeroCall
+    ? undefined
+    : hasTwilioNumber
+    ? 'Calls and alerts will show up here once they start.'
+    : 'Add a Verity Protect number to start recording calls.';
 
   const bottomGap = Math.max(insets.bottom, 0) + 20;
 
@@ -406,8 +416,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               createdAt={recentCall?.created_at}
               fraudLevel={heroFraudLevel}
               badgeLabel={heroBadgeLabel}
+              hideBadge={!hasHeroCall}
+              subtitleLabel={heroSubtitleLabel}
               emptyText={
-                hasTwilioNumber ? 'No calls recorded yet.' : 'Add a SafeCall number to start recording calls.'
+                hasTwilioNumber
+                  ? 'No calls recorded yet.'
+                  : 'Add a Verity Protect number to start recording calls.'
               }
               onPress={() =>
                 navigation.navigate('CallsTab', {
@@ -470,21 +484,63 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               </View>
             ) : recentActivity.length === 0 ? (
               <View style={styles.emptyStateWrap}>
-                {hasTwilioNumber ? (
-                  <EmptyState
-                    icon="pulse-outline"
-                    title="No activity yet"
-                    body="Calls and alerts will show up here once they start."
-                  />
-                ) : (
-                  <EmptyState
-                    icon="call-outline"
-                    title="Connect a SafeCall number"
-                    body="Add your virtual number to start receiving and reviewing calls."
-                    ctaLabel="Set up number"
-                    onPress={() => navigation.navigate('SettingsTab')}
-                  />
-                )}
+                <View
+                  style={[
+                    styles.homeEmptyCard,
+                    {
+                      backgroundColor: theme.colors.surface,
+                      borderColor: 'rgba(255,255,255,0.08)',
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.homeEmptyIcon,
+                      { backgroundColor: theme.colors.surfaceAlt },
+                    ]}
+                  >
+                    <Ionicons
+                      name={hasTwilioNumber ? 'pulse-outline' : 'call-outline'}
+                      size={24}
+                      color={theme.colors.accent}
+                    />
+                  </View>
+                  <Text
+                    style={[styles.homeEmptyTitle, { color: theme.colors.text }]}
+                  >
+                    {hasTwilioNumber ? 'No activity yet' : 'Connect a SafeCall number'}
+                  </Text>
+                  <Text
+                    style={[styles.homeEmptyBody, { color: theme.colors.textMuted }]}
+                  >
+                    {hasTwilioNumber
+                      ? 'Calls and alerts will show up here once they start.'
+                      : 'Add your virtual number to start receiving and reviewing calls.'}
+                  </Text>
+                  {!hasTwilioNumber && (
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.homeEmptyCta,
+                        {
+                          borderColor: 'rgba(255,255,255,0.08)',
+                          backgroundColor: pressed
+                            ? withOpacity(theme.colors.accent, 0.15)
+                            : 'transparent',
+                        },
+                      ]}
+                      onPress={() => {
+                        triggerLightHaptic();
+                        navigation.navigate('SettingsTab');
+                      }}
+                    >
+                      <Text
+                        style={[styles.homeEmptyCtaText, { color: theme.colors.accent }]}
+                      >
+                        Set up number
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
               </View>
             ) : (
               <View style={styles.activityList}>
@@ -598,8 +654,53 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   emptyStateWrap: {
+    alignItems: 'stretch',
+    paddingHorizontal: 0,
+    marginTop: 8,
+  },
+  homeEmptyCard: {
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStyle: 'dashed',
+    padding: 24,
     alignItems: 'center',
-    paddingHorizontal: 16,
+    justifyContent: 'center',
+    marginBottom: 12,
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  homeEmptyIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  homeEmptyTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  homeEmptyBody: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  homeEmptyCta: {
+    marginTop: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 28,
+    borderRadius: 20,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+  },
+  homeEmptyCtaText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   skeletonOverlay: {
     position: 'absolute',
