@@ -497,7 +497,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b111b',
+    backgroundColor: '#0f141d',
     paddingHorizontal: 24,
   },
   title: {

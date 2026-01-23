@@ -69,7 +69,7 @@ const SAFETY_ACTIONS: Array<{
 }> = [
   {
     key: 'logout',
-    label: 'Log out',
+    label: 'Sign out',
     description: 'Sign out of this device.',
     icon: 'log-out-outline',
   },
@@ -308,7 +308,7 @@ export default function AccountScreen() {
           contentContainerStyle={[
             styles.body,
             {
-              paddingBottom: Math.max(insets.bottom, 32) + 12,
+              paddingBottom: Math.max(insets.bottom, 32) + 42,
               paddingTop: Math.max(insets.top, 16),
             },
           ]}
@@ -399,11 +399,12 @@ export default function AccountScreen() {
           </View>
 
           <Text style={styles.sectionLabel}>Safety controls</Text>
-          <View style={styles.card}>
+          <View style={styles.safetyControls}>
             {SAFETY_ACTIONS.map((action) => {
               const isWorking =
                 action.key === 'logout' ? isSigningOut : action.key === 'delete' ? isPinVerifying : false;
               const disabled = action.key === 'logout' ? isSigningOut : isPinVerifying;
+              const iconColor = action.destructive ? '#f87171' : '#8aa0c6';
               return (
                 <TouchableOpacity
                   key={action.key}
@@ -423,14 +424,14 @@ export default function AccountScreen() {
                 >
                   <View
                     style={[
-                    styles.iconBox,
-                    action.destructive ? styles.iconBoxDestructive : styles.iconBoxAlt,
-                  ]}
-                >
+                      styles.iconBox,
+                      action.destructive ? styles.iconBoxDestructive : styles.iconBoxAlt,
+                    ]}
+                  >
                     <Ionicons
                       name={action.icon as any}
                       size={22}
-                      color={action.destructive ? '#fff' : '#2d6df6'}
+                      color={iconColor}
                     />
                   </View>
                   <View style={styles.rowText}>
@@ -514,7 +515,7 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   outer: {
     flex: 1,
-    backgroundColor: '#0b111b',
+    backgroundColor: '#0f141d',
   },
   screen: {
     flex: 1,
@@ -547,13 +548,25 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 10,
   },
+  safetyControls: {
+    gap: 12,
+  },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    minHeight: 64,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     gap: 14,
-    borderRadius: 16,
-    backgroundColor: '#0f1724',
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#121a26',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
   },
   actionRowWorking: {
     opacity: 0.8,
@@ -567,10 +580,10 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#fff',
+    color: '#f5f7fb',
   },
   rowDescription: {
-    color: '#94a3b8',
+    color: '#8aa0c6',
     fontSize: 13,
     marginTop: 2,
     fontWeight: '600',
@@ -584,7 +597,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a2333',
   },
   iconBoxAlt: {
-    backgroundColor: '#0f1724',
+    backgroundColor: '#242c3d',
   },
   iconBoxDestructive: {
     backgroundColor: '#3b0d14',
@@ -608,7 +621,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     justifyContent: 'center',
     color: '#f5f7fb',
-    backgroundColor: '#0b111b',
+    backgroundColor: '#0f141d',
   },
   inputDisabled: {
     opacity: 0.6,
@@ -716,14 +729,14 @@ const styles = StyleSheet.create({
     borderColor: '#1b2534',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#101626',
+    backgroundColor: '#0f141d',
   },
   copyButtonPressed: {
-    opacity: 0.8,
+    opacity: 1.8,
   },
   copyButtonDisabled: {
     borderColor: '#111826',
-    backgroundColor: '#0b111c',
+    backgroundColor: 'rgb(3, 4, 7)',
   },
   destructiveText: {
     color: '#ef4444',

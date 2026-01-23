@@ -618,7 +618,7 @@ export default function CallDetailScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b111b',
+    backgroundColor: '#0f141d',
     marginBottom: 30,
   },
   header: {

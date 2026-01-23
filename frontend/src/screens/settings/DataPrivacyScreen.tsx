@@ -397,14 +397,13 @@ export default function DataPrivacyScreen() {
                   <View
                     style={[
                       styles.iconBox,
-                      action.destructive && styles.iconBoxDestructive,
-                      !action.destructive && styles.iconBoxAlt,
+                      action.destructive ? styles.iconBoxDestructive : styles.iconBoxAlt,
                     ]}
                   >
                     <Ionicons
                       name={action.icon as any}
                       size={22}
-                      color={action.destructive ? '#fff' : action.tint}
+                      color={action.destructive ? '#f87171' : '#8aa0c6'}
                     />
                   </View>
                   <View style={styles.rowText}>
@@ -499,7 +498,7 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
-    backgroundColor: '#0b111b',
+    backgroundColor: '#0f141d',
   },
   content: {
     paddingHorizontal: 24,

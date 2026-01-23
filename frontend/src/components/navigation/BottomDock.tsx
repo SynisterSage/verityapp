@@ -30,6 +30,7 @@ export default function BottomDock({
   if (nestedState && typeof nestedState.index === 'number' && nestedState.index > 0) {
     return null;
   }
+
   const scaleValuesRef = useRef<Animated.Value[]>([]);
   if (scaleValuesRef.current.length !== state.routes.length) {
     scaleValuesRef.current = state.routes.map(() => new Animated.Value(1));

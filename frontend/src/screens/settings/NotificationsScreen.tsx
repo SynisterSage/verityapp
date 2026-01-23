@@ -263,7 +263,7 @@ function getLevelLabel(value: number) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b111b',
+    backgroundColor: '#0f141d',
   },
   content: {
     paddingHorizontal: 28,

@@ -1,16 +1,20 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { useEffect } from 'react';
+import { ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import DashboardHeader from '../../components/common/DashboardHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import type { RouteProp } from '@react-navigation/native';
 import type { SettingsStackParamList } from '../../navigation/types';
-type SettingsItem = {
+type SettingsRowItem = {
   label: string;
+  subtitle?: string;
   icon: keyof typeof Ionicons.glyphMap;
   onPress?: () => void;
+  destructive?: boolean;
 };
 
 export default function SettingsScreen({
@@ -23,65 +27,84 @@ export default function SettingsScreen({
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const { canManageProfile } = useProfile();
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
-  const accountItems: SettingsItem[] = [];
-  if (canManageProfile) {
-    accountItems.push({
-      label: 'Account',
-      icon: 'person-outline',
-      onPress: () => navigation.navigate('Account'),
+  const accountRows: SettingsRowItem[] = useMemo(() => {
+    const rows: SettingsRowItem[] = [];
+    if (canManageProfile) {
+      rows.push({
+        label: 'Account',
+        subtitle: 'Profile & safety options',
+        icon: 'person-outline',
+        onPress: () => navigation.navigate('Account'),
+      });
+      rows.push({
+        label: 'Members',
+        subtitle: 'Family caretakers & guests',
+        icon: 'people-outline',
+        onPress: () => navigation.navigate('Members'),
+      });
+    }
+    rows.push({
+      label: 'Notifications',
+      subtitle: 'Alerts & daily reports',
+      icon: 'notifications-outline',
+      onPress: () => navigation.navigate('Notifications'),
     });
-    accountItems.push({
-      label: 'Members',
-      icon: 'people-outline',
-      onPress: () => navigation.navigate('Members'),
-    });
-  }
-  accountItems.push({
-    label: 'Notifications',
-    icon: 'notifications-outline',
-    onPress: () => navigation.navigate('Notifications'),
-  });
-  if (canManageProfile) {
-    accountItems.push({
-      label: 'Security',
-      icon: 'shield-checkmark-outline',
-      onPress: () => navigation.navigate('Security'),
-    });
-  }
+    if (canManageProfile) {
+      rows.push({
+        label: 'Security',
+        subtitle: 'Sign-in & safety PIN',
+        icon: 'shield-checkmark-outline',
+        onPress: () => navigation.navigate('Security'),
+      });
+    }
+    return rows;
+  }, [canManageProfile, navigation]);
 
-  const safetyItems: SettingsItem[] = [
-    {
-      label: 'Safe Phrases',
-      icon: 'chatbubble-ellipses-outline',
-      onPress: () => navigation.navigate('SafePhrases'),
-    },
-    {
-      label: 'Trusted Contacts',
-      icon: 'people-outline',
-      onPress: () => navigation.navigate('TrustedContacts'),
-    },
-    {
-      label: 'Blocked Numbers',
-      icon: 'ban-outline',
-      onPress: () => navigation.navigate('Blocklist'),
-    },
-  ];
-  if (canManageProfile) {
-    safetyItems.push({
-      label: 'Automation',
-      icon: 'flash-outline',
-      onPress: () => navigation.navigate('Automation'),
-    });
-  }
+  const safetyRows: SettingsRowItem[] = useMemo(() => {
+    const rows: SettingsRowItem[] = [
+      {
+        label: 'Safe Phrases',
+        subtitle: 'Approved conversation topics',
+        icon: 'chatbubble-ellipses-outline',
+        onPress: () => navigation.navigate('SafePhrases'),
+      },
+      {
+        label: 'Trusted Contacts',
+        subtitle: 'Bypass the screening PIN',
+        icon: 'people-outline',
+        onPress: () => navigation.navigate('TrustedContacts'),
+      },
+      {
+        label: 'Blocked Numbers',
+        subtitle: 'Automatic spam rejection',
+        icon: 'ban-outline',
+        onPress: () => navigation.navigate('Blocklist'),
+      },
+    ];
+    if (canManageProfile) {
+      rows.push({
+        label: 'Automation',
+        subtitle: 'Smart AI screening rules',
+        icon: 'flash-outline',
+        onPress: () => navigation.navigate('Automation'),
+      });
+    }
+    return rows;
+  }, [canManageProfile, navigation]);
 
-  const privacyItems: SettingsItem[] = [
-    {
-      label: 'Data & Privacy',
-      icon: 'lock-closed-outline',
-      onPress: () => navigation.navigate('DataPrivacy'),
-    },
-  ];
+  const privacyRows: SettingsRowItem[] = useMemo(
+    () => [
+      {
+        label: 'Data & Privacy',
+        subtitle: 'Your information, protected',
+        icon: 'lock-closed-outline',
+        onPress: () => navigation.navigate('DataPrivacy'),
+      },
+    ],
+    [navigation]
+  );
 
   useEffect(() => {
     if (!route.params?.initialScreen) {
@@ -94,154 +117,252 @@ export default function SettingsScreen({
 
   const bottomGap = Math.max(insets.bottom, 0);
 
+  const handleLogout = async () => {
+    setIsSigningOut(true);
+    try {
+      await signOut();
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
+  const createRowHandler = useCallback(
+    (row: SettingsRowItem) => {
+      return () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+        row.onPress?.();
+      };
+    },
+    []
+  );
+
+  const sections = useMemo(
+    () => [
+      { title: 'Account', rows: accountRows },
+      { title: 'Safety intelligence', rows: safetyRows },
+      { title: 'Privacy', rows: privacyRows },
+    ],
+    [accountRows, safetyRows, privacyRows]
+  );
+
+  const signOutRow = useMemo<SettingsRowItem>(
+    () => ({
+      label: 'Sign out',
+      subtitle: 'Log out of this device',
+      icon: 'log-out-outline',
+      onPress: handleLogout,
+      destructive: true,
+    }),
+    [handleLogout]
+  );
+  const signOutHandler = createRowHandler(signOutRow);
+
+  const renderSection = (section: { title: string; rows: SettingsRowItem[] }) => (
+    <View key={section.title} style={styles.section}>
+      <Text style={styles.sectionTitle}>{section.title}</Text>
+      <View style={styles.card}>
+        {section.rows.map((row, index) => (
+          <View key={row.label} style={styles.rowWrapper}>
+            <SettingRow
+              item={row}
+              isLast={index === section.rows.length - 1}
+              onPress={createRowHandler(row)}
+            />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView
       style={[
         styles.container,
         {
           paddingTop: Math.max(28, insets.top + 12),
-          paddingBottom: bottomGap,
+          paddingBottom: Math.max(0, insets.bottom +0),
         },
       ]}
       edges={['bottom']}
     >
-      <DashboardHeader title="Settings" subtitle="Manage your preferences" align="left" />
+
+        <DashboardHeader title="Settings" subtitle="Manage your preferences" align="left" />
+
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: bottomGap + 120 }]}
+        style={styles.scrollView}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: bottomGap + 100 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.section, styles.sectionFirst]}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <View style={styles.card}>
-          {accountItems.map((item, index) => (
-            <TouchableOpacity
-              key={item.label}
-              style={[styles.row, index === accountItems.length - 1 && styles.rowLast]}
-              onPress={item.onPress}
-              activeOpacity={0.7}
-            >
-              <View style={styles.rowLeft}>
-                <Ionicons name={item.icon} size={20} color="#8ab4ff" />
-                <Text style={styles.rowLabel}>{item.label}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#5d6b85" />
-            </TouchableOpacity>
-          ))}
+        {sections.map(renderSection)}
+        <View style={styles.section}>
+          <View style={[styles.card, styles.signOutCard]}>
+            <SettingRow item={signOutRow} isLast onPress={signOutHandler} isWorking={isSigningOut} />
+          </View>
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Safety Tools</Text>
-        <View style={styles.card}>
-          {safetyItems.map((item, index) => (
-            <TouchableOpacity
-              key={item.label}
-              style={[styles.row, index === safetyItems.length - 1 && styles.rowLast]}
-              onPress={item.onPress}
-              activeOpacity={0.7}
-            >
-              <View style={styles.rowLeft}>
-                <Ionicons name={item.icon} size={20} color="#8ab4ff" />
-                <Text style={styles.rowLabel}>{item.label}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#5d6b85" />
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Privacy</Text>
-        <View style={styles.card}>
-          {privacyItems.map((item, index) => (
-            <TouchableOpacity
-              key={item.label}
-              style={[styles.row, index === privacyItems.length - 1 && styles.rowLast]}
-              onPress={item.onPress}
-              activeOpacity={0.7}
-            >
-              <View style={styles.rowLeft}>
-                <Ionicons name={item.icon} size={20} color="#8ab4ff" />
-                <Text style={styles.rowLabel}>{item.label}</Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#5d6b85" />
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.signOut} onPress={signOut} activeOpacity={0.8}>
-        <Ionicons name="log-out-outline" size={18} color="#f2d6d6" />
-        <Text style={styles.signOutText}>Sign out</Text>
-      </TouchableOpacity>
+        <Text style={styles.footerText}>Verity Protect. All rights reserved.</Text>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+type SettingRowProps = {
+  item: SettingsRowItem;
+  isLast?: boolean;
+  onPress?: () => void;
+  isWorking?: boolean;
+};
+
+function SettingRow({ item, isLast = false, onPress, isWorking = false }: SettingRowProps) {
+  const iconColor = item.destructive ? '#f87171' : '#8aa0c6';
+  return (
+    <>
+      <Pressable
+        style={styles.row}
+        onPress={onPress}
+        android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
+      >
+        {({ pressed }) => (
+          <>
+            <View style={[styles.rowHighlight, pressed && styles.rowHighlightActive]} />
+            <View style={styles.rowContent}>
+              <View
+                style={[
+                  styles.iconBox,
+                  item.destructive ? styles.iconBoxDestructive : styles.iconBoxAlt,
+                ]}
+              >
+                <Ionicons name={item.icon} size={20} color={iconColor} />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={[styles.rowTitle, item.destructive && styles.rowTitleDestructive]}>
+                  {isWorking ? 'Working…' : item.label}
+                </Text>
+                {item.subtitle ? (
+                  <Text style={styles.rowSubtitle}>{item.subtitle}</Text>
+                ) : null}
+              </View>
+              {isWorking ? (
+                <ActivityIndicator color="#94a3b8" />
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color="#5d6b85" />
+              )}
+            </View>
+          </>
+        )}
+      </Pressable>
+      {!isLast && <View style={styles.divider} />}
+    </>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0b111b',
+    backgroundColor: '#0f141d',
     paddingHorizontal: 24,
   },
   content: {
     paddingTop: 24,
   },
-  section: {
-    marginTop: 28,
+  scrollView: {
+    flex: 1,
   },
-  sectionFirst: {
-    marginTop: 0,
+  section: {
+    marginTop: 6,
+    marginBottom: 24,
   },
   sectionTitle: {
-    color: '#98a7c2',
+    color: '#8aa0c6',
+    fontSize: 12,
     fontWeight: '600',
-    marginBottom: 4,
+    letterSpacing: 0.4,
+    marginBottom: 12,
+    textTransform: 'uppercase',
   },
   card: {
     backgroundColor: '#121a26',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#202c3c',
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
   },
+  rowWrapper: {
+    backgroundColor: '#121a26',
+  },
   row: {
-    paddingVertical: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 6,
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1b2534',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  rowLast: {
-    borderBottomWidth: 0,
-  },
-  rowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  rowLabel: {
-    color: '#e4ebf7',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  signOut: {
-    marginTop: 28,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#3a2a2a',
-    backgroundColor: '#1a1214',
     paddingVertical: 14,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
+    position: 'relative',
   },
-  signOutText: {
-    color: '#f2d6d6',
-    fontWeight: '600',
+  rowContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rowHighlight: {
+    position: 'absolute',
+    top: -4,
+    bottom: -4,
+    left: -24,
+    right: -24,
+    backgroundColor: 'transparent',
+  },
+  rowHighlightActive: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  rowText: {
+    flex: 1,
+  },
+  rowTitle: {
+    color: '#f5f7fb',
+    fontSize: 17,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    lineHeight: 20,
+  },
+  rowTitleDestructive: {
+    color: '#f87171',
+  },
+  rowSubtitle: {
+    color: 'rgba(138,168,198,0.6)',
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  iconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+    backgroundColor: '#242c3d',
+  },
+  iconBoxAlt: {
+    backgroundColor: '#242c3d',
+  },
+  iconBoxDestructive: {
+    backgroundColor: 'rgba(248,113,113,0.1)',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    marginLeft: 68,
+    marginVertical: 4,
+  },
+  signOutCard: {
+    marginTop: 0,
+  },
+  footerText: {
+    marginTop: 32,
+    textAlign: 'center',
+    color: 'rgba(255,255,255,0.32)',
+    letterSpacing: 0.3,
+    fontSize: 12,
   },
 });
