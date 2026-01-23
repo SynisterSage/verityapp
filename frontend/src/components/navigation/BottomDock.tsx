@@ -147,7 +147,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   tabContentActive: {
-    backgroundColor: 'rgba(0,0,0,0.35)',
     shadowColor: '#000',
   shadowOpacity: 0.45,
   shadowRadius: 10,

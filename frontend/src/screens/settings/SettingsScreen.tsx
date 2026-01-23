@@ -92,15 +92,25 @@ export default function SettingsScreen({
     navigation.navigate(initialScreen);
   }, [route.params?.initialScreen, navigation]);
 
+  const bottomGap = Math.max(insets.bottom, 0);
+
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
-      edges={[]}
+      style={[
+        styles.container,
+        {
+          paddingTop: Math.max(28, insets.top + 12),
+          paddingBottom: bottomGap,
+        },
+      ]}
+      edges={['bottom']}
     >
       <DashboardHeader title="Settings" subtitle="Manage your preferences" align="left" />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        
-      <View style={styles.section}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: bottomGap + 120 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={[styles.section, styles.sectionFirst]}>
         <Text style={styles.sectionTitle}>Account</Text>
         <View style={styles.card}>
           {accountItems.map((item, index) => (
@@ -165,7 +175,6 @@ export default function SettingsScreen({
         <Text style={styles.signOutText}>Sign out</Text>
       </TouchableOpacity>
       </ScrollView>
-      <View style={styles.bottomMask} pointerEvents="none" />
     </SafeAreaView>
   );
 }
@@ -174,30 +183,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0b111b',
+    paddingHorizontal: 24,
   },
   content: {
-    paddingHorizontal: 24,
-    paddingBottom: 120,
-  },
-  headerWrap: {
-    paddingHorizontal: 24,
-    marginBottom: 8,
-  },
-  bottomMask: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 120,
-    backgroundColor: '#0b111b',
+    paddingTop: 24,
   },
   section: {
-    marginTop: 24,
+    marginTop: 28,
+  },
+  sectionFirst: {
+    marginTop: 0,
   },
   sectionTitle: {
     color: '#98a7c2',
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 4,
   },
   card: {
     backgroundColor: '#121a26',

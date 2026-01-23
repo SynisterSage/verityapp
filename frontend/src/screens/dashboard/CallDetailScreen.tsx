@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import { InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av/build/Audio.types';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -177,9 +178,9 @@ export default function CallDetailScreen({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
         staysActiveInBackground: false,
-        interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
+        interruptionModeIOS: InterruptionModeIOS.DoNotMix,
         shouldDuckAndroid: true,
-        interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+        interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
       }).catch((error) => {
         console.warn('Failed to configure audio mode', error);
       });
