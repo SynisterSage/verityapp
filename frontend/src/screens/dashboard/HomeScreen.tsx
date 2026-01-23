@@ -329,7 +329,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     ? formatPhoneNumber(recentCall?.caller_number, 'Recent Call')
     : hasTwilioNumber
     ? 'No calls yet'
-    : 'Add a Verity Protect number';
+    : 'Missing #';
   const heroTranscript = recentCall?.transcript ?? (loading ? 'Loading…' : null);
   const heroFraudLevel =
     recentCall?.feedback_status === 'marked_fraud'
@@ -347,7 +347,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     ? undefined
     : hasTwilioNumber
     ? 'Calls and alerts will show up here once they start.'
-    : 'Add a Verity Protect number to start recording calls.';
+    : 'Managed in settings';
 
   const bottomGap = Math.max(insets.bottom, 0) + 20;
 
@@ -704,7 +704,7 @@ const styles = StyleSheet.create({
   },
   skeletonOverlay: {
     position: 'absolute',
-    top: 0,
+    top: 20,
     left: 0,
     right: 0,
   },
