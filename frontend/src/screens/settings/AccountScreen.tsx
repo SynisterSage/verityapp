@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   pinModal: {
-    backgroundColor: '#0f1724',
+    backgroundColor: '#0f141d',
     borderRadius: 24,
     borderWidth: 1,
     borderColor: '#1b2534',

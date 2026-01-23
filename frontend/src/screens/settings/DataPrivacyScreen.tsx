@@ -379,7 +379,7 @@ export default function DataPrivacyScreen() {
           </View>
 
           <Text style={styles.sectionLabel}>Manage data</Text>
-          <View style={styles.card}>
+          <View style={styles.manageControls}>
             {MANAGE_ACTIONS.map((action) => {
               const isWorking = manageAction === action.key;
               const disabled = !canManageProfile || Boolean(manageAction);
@@ -520,6 +520,9 @@ const styles = StyleSheet.create({
     padding: 20,
     gap: 18,
   },
+  manageControls: {
+    gap: 12,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -535,7 +538,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconBoxAlt: {
-    backgroundColor: '#0f1724',
+    backgroundColor: '#242c3d',
   },
   iconBoxDestructive: {
     backgroundColor: '#3b0d14',
@@ -549,7 +552,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   rowDescription: {
-    color: '#94a3b8',
+    color: '#8aa0c6',
     fontSize: 13,
     marginTop: 2,
     fontWeight: '600',
@@ -638,10 +641,19 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    minHeight: 64,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     gap: 14,
-    borderRadius: 16,
-    backgroundColor: '#0f1724',
+    borderRadius: 28,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#121a26',
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 10,
   },
   actionRowDisabled: {
     opacity: 0.55,
@@ -670,7 +682,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   pinModal: {
-    backgroundColor: '#0f1724',
+    backgroundColor: '#0f141d',
     borderRadius: 24,
     borderWidth: 1,
     borderColor: '#1b2534',

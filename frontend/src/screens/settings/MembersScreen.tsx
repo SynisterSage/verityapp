@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
     color: '#8aa0c6',
   },
   sectionCard: {
-    backgroundColor: '#0f1724',
+    backgroundColor: '#121a26',
     borderRadius: 28,
     borderWidth: 1,
     borderColor: '#1f2937',
@@ -856,7 +856,7 @@ const styles = StyleSheet.create({
     borderColor: '#1f2735',
     paddingVertical: 16,
     paddingHorizontal: 18,
-    backgroundColor: '#0f1724',
+    backgroundColor: '#0f141d',
     marginBottom: 2,
   },
   memberRow: {
@@ -916,7 +916,7 @@ const styles = StyleSheet.create({
   memberMenu: {
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#0f1523',
+    backgroundColor: '#0f141d',
     borderRadius: 14,
     borderWidth: 1,
     borderColor: '#1f2735',
@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2d6df6',
   },
   rolePillInactive: {
-    backgroundColor: '#192340',
+    backgroundColor: '#0f1724',
   },
   roleLabel: {
     fontWeight: '700',
@@ -1058,7 +1058,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#0f1724',
+    backgroundColor: '#0f141d',
     borderWidth: 1,
     borderColor: '#1b2534',
     borderRadius: 24,
@@ -1105,11 +1105,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
     borderWidth: 1,
     borderColor: '#1f2735',
+    backgroundColor: '#0f141d',
     borderRadius: 16,
     paddingVertical: 12,
     paddingHorizontal: 16,
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
   },
   enterCodeText: {
