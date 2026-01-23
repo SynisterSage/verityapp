@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 10,
-    marginTop: 10,
+    marginTop: 4,
     shadowColor: '#000',
     shadowOpacity: 0.3,
     shadowRadius: 24,
