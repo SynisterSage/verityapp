@@ -28,23 +28,25 @@ export default function EmptyState({ icon, title, body, ctaLabel, onPress }: Emp
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#0b111b',
-    borderRadius: 16,
+    backgroundColor: '#121a26',
+    borderRadius: 28,
     borderWidth: 1,
-    borderColor: '#202c3c',
-    paddingVertical: 22,
-    paddingHorizontal: 20,
+    borderColor: '#1f2937',
+    borderStyle: 'dashed',
+    paddingVertical: 24,
+    paddingHorizontal: 24,
     alignItems: 'center',
+    marginVertical: 16,
     gap: 8,
   },
   iconCircle: {
     width: 40,
     height: 40,
-    borderRadius: 14,
-    backgroundColor: '#1b2634',
+    borderRadius: 20,
+    backgroundColor: '#0f1b2d',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   title: {
     color: '#f5f7fb',

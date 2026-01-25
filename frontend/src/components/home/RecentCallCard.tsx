@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../context/ThemeContext';
 import { getRiskStyles } from '../../utils/risk';
 import { formatTimestamp } from '../../utils/formatTimestamp';
+import { withOpacity } from '../../utils/color';
 
 type RecentCallCardProps = {
   title?: string;
@@ -34,6 +35,9 @@ export default function RecentCallCard({
   const { theme } = useTheme();
   const formattedCreatedAt = createdAt ? formatTimestamp(createdAt) : undefined;
   const riskStyles = getRiskStyles(fraudLevel);
+  const statusAccent = theme.colors.danger;
+  const badgeBackground = withOpacity(statusAccent, 0.25);
+  const badgeTextColor = statusAccent;
   const badgeText = (badgeLabel ?? fraudLevel ?? 'unknown').toUpperCase();
   const body = transcript
     ? transcript.length > maxLength
@@ -67,16 +71,16 @@ export default function RecentCallCard({
           </View>
         </View>
         {!hideBadge && badgeText ? (
-          <View
-            style={[
-              styles.topBadge,
-              {
-                backgroundColor: riskStyles.background,
-              },
-            ]}
-          >
-            <Text style={[styles.badgeText, { color: riskStyles.text }]}>{badgeText}</Text>
-          </View>
+        <View
+          style={[
+            styles.topBadge,
+            {
+              backgroundColor: badgeBackground,
+            },
+          ]}
+        >
+          <Text style={[styles.badgeText, { color: badgeTextColor }]}>{badgeText}</Text>
+        </View>
         ) : null}
       </View>
       <View style={[styles.transcriptBlock, { backgroundColor: theme.colors.surfaceAlt }]}>

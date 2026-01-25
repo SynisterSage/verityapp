@@ -363,7 +363,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     >
       <View style={{}}>
         <DashboardHeader
-            title="SafeCall"
+            title="Welcome Back"
             subtitle={activeProfile?.first_name ?? email}
             right={
               <TouchableOpacity
