@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
-    "scheme": "safecall",
+    "name": "Verity Protect",
+    "slug": "Verity-Protect",
+    "scheme": "verity-protect",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,9 +15,9 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.lexferguson.safecall.dev",
+      "bundleIdentifier": "com.lexferguson.verityprotect.com",
       "infoPlist": {
-        "NSContactsUsageDescription": "SafeCall uses your contacts to let trusted callers skip the passcode."
+        "NSContactsUsageDescription": "Verity Protect uses your contacts to let trusted callers skip the passcode."
       }
     },
     "android": {

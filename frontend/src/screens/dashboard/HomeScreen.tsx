@@ -387,14 +387,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           contentContainerStyle={[styles.content, { paddingBottom: bottomGap + 40 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => loadStats(true)}
-              tintColor={theme.colors.accent}
-              colors={[theme.colors.accent]}
-              progressBackgroundColor={theme.colors.surfaceAlt}
-            />
-          }
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadStats(true)}
+            tintColor={theme.colors.accent}
+            colors={[theme.colors.accent]}
+            progressBackgroundColor={theme.colors.accent}
+            style={{ backgroundColor: theme.colors.accent }}
+          />
+        }
         >
         {showSkeleton ? (
           <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>

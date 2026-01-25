@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>frontend</string>
+    <string>Verity Protect</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -27,8 +27,8 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>safecall</string>
-          <string>com.lexferguson.safecall.dev</string>
+          <string>verity-protect</string>
+          <string>com.lexferguson.verityprotect.com</string>
         </array>
       </dict>
     </array>
@@ -46,7 +46,7 @@
       <true/>
     </dict>
     <key>NSContactsUsageDescription</key>
-    <string>SafeCall uses your contacts to let trusted callers skip the passcode.</string>
+    <string>Verity Protect uses your contacts to let trusted callers skip the passcode.</string>
     <key>NSFaceIDUsageDescription</key>
     <string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
     <key>NSMicrophoneUsageDescription</key>

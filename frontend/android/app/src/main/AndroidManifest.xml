@@ -28,6 +28,7 @@
         <category android:name="android.intent.category.DEFAULT"/>
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="safecall"/>
+        <data android:scheme="verity-protect"/>
       </intent-filter>
     </activity>
   </application>

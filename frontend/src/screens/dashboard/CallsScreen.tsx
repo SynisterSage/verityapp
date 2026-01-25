@@ -155,10 +155,13 @@ export default function CallsScreen({
   const showSkeleton = loading && calls.length === 0 && !error;
   const contentOpacity = showSkeleton ? 0 : 1;
 
+  const bottomGap = Math.max(insets.bottom, 0) + 20;
+
+
   return (
     <SafeAreaView
-      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12) }]}
-      edges={[]}
+      style={[styles.container, { paddingTop: Math.max(28, insets.top + 12), paddingBottom: bottomGap }]}
+      edges={['bottom']}
     >
       <DashboardHeader title="Recent Calls" subtitle="See who you've talked to" />
       <View style={styles.listWrapper}>
