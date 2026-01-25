@@ -53,7 +53,7 @@ type CallSection = SectionBase<CallRow> & {
 const formatSectionTitle = (title: string) => {
   if (title === 'Today') return 'Today';
   if (title === 'Yesterday') return 'Yesterday';
-  if (title === 'Handled') return 'Handled';
+  if (title === 'Archived') return 'Archived';
   return 'Earlier';
 };
 
@@ -221,6 +221,7 @@ export default function CallsScreen({
   const [isTrayMounted, setIsTrayMounted] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
   const [trayProcessing, setTrayProcessing] = useState(false);
+  const [activeTrayAction, setActiveTrayAction] = useState<'archive' | 'unarchive' | 'delete' | null>(null);
 
   const loadCalls = useCallback(async (silent = false) => {
     setError(null);
@@ -309,13 +310,15 @@ export default function CallsScreen({
     });
   }, [trayAnim]);
 
-  const archiveCall = useCallback(async () => {
+  const toggleArchiveCall = useCallback(async () => {
     if (!trayCall) return;
     setTrayProcessing(true);
+    const isArchived = (trayCall.feedback_status ?? '').toLowerCase() === 'archived';
+    setActiveTrayAction(isArchived ? 'unarchive' : 'archive');
     try {
       await authorizedFetch(`/calls/${trayCall.id}/feedback`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: 'archived' }),
+        body: JSON.stringify({ status: isArchived ? 'reviewed' : 'archived' }),
       });
       await loadCalls();
       hideTray();
@@ -323,12 +326,14 @@ export default function CallsScreen({
       Alert.alert('Archive failed', 'We could not archive the call. Please try again.');
     } finally {
       setTrayProcessing(false);
+      setActiveTrayAction(null);
     }
   }, [trayCall, hideTray, loadCalls]);
 
   const deleteCall = useCallback(async () => {
     if (!trayCall) return;
     setTrayProcessing(true);
+    setActiveTrayAction('delete');
     try {
       await authorizedFetch(`/calls/${trayCall.id}`, { method: 'DELETE' });
       await loadCalls();
@@ -337,6 +342,7 @@ export default function CallsScreen({
       Alert.alert('Delete failed', 'We could not delete the call. Please try again.');
     } finally {
       setTrayProcessing(false);
+      setActiveTrayAction(null);
     }
   }, [trayCall, hideTray, loadCalls]);
 
@@ -361,13 +367,13 @@ const sections = useMemo<CallSection[]>(() => {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const buckets: Record<string, CallRow[]> = { Today: [], Yesterday: [], Older: [] };
-  const handled: CallRow[] = [];
-  const handledStatuses = new Set(['marked_safe', 'marked_fraud', 'archived']);
+  const archived: CallRow[] = [];
+  const archivedStatuses = new Set(['archived']);
 
   sortedCalls.forEach((call) => {
     const feedback = (call.feedback_status ?? '').toLowerCase();
-    if (handledStatuses.has(feedback)) {
-      handled.push(call);
+    if (archivedStatuses.has(feedback)) {
+      archived.push(call);
       return;
     }
     const created = new Date(call.created_at);
@@ -390,8 +396,8 @@ const sections = useMemo<CallSection[]>(() => {
     .filter((bucket) => bucket.data.length > 0)
     .map(({ title, data }) => ({ title, data }));
 
-  if (handled.length > 0) {
-    sections.push({ title: 'Handled', data: handled });
+  if (archived.length > 0) {
+    sections.push({ title: 'Archived', data: archived });
   }
 
   return sections;
@@ -439,7 +445,7 @@ const sections = useMemo<CallSection[]>(() => {
       const feedback = (item.feedback_status ?? '').toLowerCase();
       const isMuted =
         feedback === 'marked_safe' || feedback === 'marked_fraud' || feedback === 'archived';
-      const shouldShowDate = section.title === 'Older' || section.title === 'Handled';
+    const shouldShowDate = section.title === 'Older' || section.title === 'Archived';
       const time = formatTime(item.created_at);
       const dateLabel = shouldShowDate ? formatDateLabel(item.created_at) : '';
       const timeLabel = dateLabel ? `${time} · ${dateLabel}` : time;
@@ -487,6 +493,16 @@ const sections = useMemo<CallSection[]>(() => {
     outputRange: [0, 0.45],
     extrapolate: 'clamp',
   });
+  const isTrayArchived = (trayCall?.feedback_status ?? '').toLowerCase() === 'archived';
+  const primaryActionLabel = isTrayArchived
+    ? trayProcessing && activeTrayAction === 'unarchive'
+      ? 'Working…'
+      : 'Unarchive this call'
+    : trayProcessing && activeTrayAction === 'archive'
+    ? 'Working…'
+    : 'Archive this call';
+  const deleteActionLabel =
+    trayProcessing && activeTrayAction === 'delete' ? 'Working…' : 'Delete this call';
 
   return (
     <SafeAreaView
@@ -591,11 +607,15 @@ const sections = useMemo<CallSection[]>(() => {
                   pressed && styles.trayActionPressed,
                   trayProcessing && styles.trayActionDisabled,
                 ]}
-                onPress={archiveCall}
+                onPress={toggleArchiveCall}
                 disabled={trayProcessing}
               >
-                <Text style={styles.trayActionText}>Archive this call</Text>
-                <Text style={styles.trayActionHint}>Keeps it in the handled section but hides it from the feed.</Text>
+                <Text style={styles.trayActionText}>{primaryActionLabel}</Text>
+                <Text style={styles.trayActionHint}>
+                  {isTrayArchived
+                    ? 'Restores it to the main feed.'
+                    : 'Keeps it in the handled section but hides it from the feed.'}
+                </Text>
               </Pressable>
               <Pressable
                 style={({ pressed }) => [
@@ -607,7 +627,7 @@ const sections = useMemo<CallSection[]>(() => {
                 onPress={deleteCall}
                 disabled={trayProcessing}
               >
-                <Text style={[styles.trayActionText, styles.trayDangerText]}>Delete this call</Text>
+                <Text style={[styles.trayActionText, styles.trayDangerText]}>{deleteActionLabel}</Text>
                 <Text style={styles.trayActionHint}>Removes the call permanently.</Text>
               </Pressable>
               <Pressable
@@ -751,7 +771,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   emptyStateWrap: {
-    marginTop: 8,
+    marginTop: 100,
     alignItems: 'stretch',
     paddingHorizontal: 0,
   },
