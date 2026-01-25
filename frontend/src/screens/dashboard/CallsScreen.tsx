@@ -217,6 +217,7 @@ export default function CallsScreen({
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const listRef = useRef<SectionList<CallRow, CallSection> | null>(null);
   const initialCallIdRef = useRef<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const [trayCall, setTrayCall] = useState<CallRow | null>(null);
   const [isTrayMounted, setIsTrayMounted] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
@@ -228,6 +229,7 @@ export default function CallsScreen({
     if (!session || !activeProfile) {
       setCalls([]);
       setLoading(false);
+      setRefreshing(false);
       return;
     }
     if (!silent) {
@@ -246,6 +248,7 @@ export default function CallsScreen({
       setCalls(data ?? []);
     }
     setLoading(false);
+    setRefreshing(false);
   }, [session, activeProfile]);
 
   useEffect(() => {
@@ -284,6 +287,11 @@ export default function CallsScreen({
       loadCalls(true);
     });
     return unsubscribe;
+  }, [loadCalls]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadCalls(true);
   }, [loadCalls]);
 
   const showTray = useCallback((call: CallRow) => {
@@ -483,6 +491,8 @@ const sections = useMemo<CallSection[]>(() => {
   const headerCount = filteredCalls.length;
 
   const bottomGap = Math.max(insets.bottom, 0) + 20;
+  const refreshAccent = theme.colors.accent;
+  const refreshAccentPortion = withOpacity(refreshAccent, 0.18);
   const trayTranslateY = trayAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [300, 0],
@@ -524,25 +534,25 @@ const sections = useMemo<CallSection[]>(() => {
       <View style={styles.filterBar}>
         <CallFilter value={filter} onChange={setFilter} />
       </View>
-      <SectionList<CallRow, CallSection>
-        ref={listRef}
-        sections={sections}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCallItem}
-        renderSectionHeader={renderSectionHeader}
+        <SectionList<CallRow, CallSection>
+          ref={listRef}
+          sections={sections}
+          keyExtractor={(item) => item.id}
+          renderItem={renderCallItem}
+          renderSectionHeader={renderSectionHeader}
         showsVerticalScrollIndicator={false}
         stickySectionHeadersEnabled={false}
         style={styles.list}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={() => loadCalls(true)}
-            tintColor={theme.colors.accent}
-            colors={[theme.colors.accent]}
-            progressBackgroundColor={theme.colors.accent}
-            style={{ backgroundColor: theme.colors.accent }}
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={refreshAccent}
+            colors={[refreshAccent]}
+            progressBackgroundColor={refreshAccent}
+            style={{ backgroundColor: refreshAccentPortion }}
           />
-        }
+          }
         contentContainerStyle={[
           styles.content,
           {
