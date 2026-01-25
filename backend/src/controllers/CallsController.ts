@@ -22,7 +22,30 @@ async function getAuthenticatedUserId(req: Request) {
 
 const allowedStatuses = new Set(['marked_safe', 'marked_fraud', 'reviewed', 'archived']);
 
-async function authorizeCallAccess(callId: string, userId: string) {
+type AuthorizedCallRow = {
+  profile_id: string | null;
+  caller_number: string | null;
+  caller_hash: string | null;
+};
+
+type AuthorizedProfileRow = {
+  caretaker_id?: string | null;
+  auto_mark_enabled?: boolean | null;
+  auto_block_on_fraud?: boolean | null;
+  auto_trust_on_safe?: boolean | null;
+};
+
+type CallAccessSuccess = {
+  callRow: AuthorizedCallRow;
+  profileRow: AuthorizedProfileRow;
+};
+
+type CallAccessFailure = {
+  status: number;
+  message: string;
+};
+
+async function authorizeCallAccess(callId: string, userId: string): Promise<CallAccessSuccess | CallAccessFailure> {
   const { data: callRow, error: callError } = await supabaseAdmin
     .from('calls')
     .select('profile_id, caller_number, caller_hash')
