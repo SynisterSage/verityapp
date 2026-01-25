@@ -16,12 +16,12 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { authorizedFetch } from '../../services/backend';
 import { supabase } from '../../services/supabase';
-import * as Haptics from 'expo-haptics';
 
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
@@ -44,6 +44,7 @@ type CallRow = {
   fraud_score: number | null;
   caller_number: string | null;
   feedback_status?: string | null;
+  feedback_at?: string | null;
 };
 
 type CallSection = SectionBase<CallRow> & {
@@ -53,9 +54,12 @@ type CallSection = SectionBase<CallRow> & {
 const formatSectionTitle = (title: string) => {
   if (title === 'Today') return 'Today';
   if (title === 'Yesterday') return 'Yesterday';
+  if (title === 'Handled') return 'Handled';
   if (title === 'Archived') return 'Archived';
   return 'Earlier';
 };
+
+const handledStatuses = new Set(['marked_safe', 'marked_fraud']);
 
 const isSameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
@@ -67,15 +71,18 @@ const determineStatus = (call: CallRow, theme: AppTheme) => {
   const level = (call.fraud_risk_level ?? '').toLowerCase();
   const severity = getRiskSeverity(call.fraud_risk_level);
   const severityStyles = getRiskStyles(call.fraud_risk_level);
+  const handledColor = theme.colors.textDim;
 
-  if (feedback === 'marked_safe' || level === 'safe') {
-    return { label: 'Safe', color: theme.colors.success, group: 'verified' as const };
-  }
-  if (feedback === 'marked_fraud') {
-    return { label: 'Fraud', color: theme.colors.danger, group: 'risk' as const };
+  if (handledStatuses.has(feedback)) {
+    const label = feedback === 'marked_fraud' ? 'Fraud' : 'Safe';
+    const group = feedback === 'marked_fraud' ? 'risk' : 'verified';
+    return { label, color: handledColor, group };
   }
   if (feedback === 'archived') {
-    return { label: 'Archived', color: theme.colors.textMuted, group: 'all' as const };
+    return { label: 'Archived', color: handledColor, group: 'all' as const };
+  }
+  if (level === 'safe') {
+    return { label: 'Safe', color: theme.colors.success, group: 'verified' as const };
   }
   if (feedback === 'blocked' || level === 'blocked') {
     return { label: 'Blocked', color: theme.colors.danger, group: 'risk' as const };
@@ -122,6 +129,7 @@ type CallRecordItemProps = {
   onPress: () => void;
   isMuted?: boolean;
   onLongPress?: () => void;
+  variant?: 'default' | 'handled' | 'archived';
 };
 
 function CallRecordItem({
@@ -133,6 +141,7 @@ function CallRecordItem({
   onPress,
   isMuted = false,
   onLongPress,
+  variant = 'default',
 }: CallRecordItemProps) {
   const handlePress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -143,18 +152,22 @@ function CallRecordItem({
       onPress={handlePress}
       onLongPress={onLongPress}
       delayLongPress={400}
-      style={({ pressed }) => [
-        styles.callItem,
-        isMuted && styles.callItemMuted,
-        pressed && styles.callItemPressed,
-      ]}
-    >
+    style={({ pressed }) => [
+      styles.callItem,
+      isMuted && styles.callItemMuted,
+      variant === 'handled' && styles.callItemHandled,
+      variant === 'archived' && styles.callItemArchived,
+      pressed && styles.callItemPressed,
+    ]}
+  >
       <View style={styles.callRow}>
         <View style={[styles.callIcon, { borderColor: 'transparent' }]}>
           <View
             style={[
               styles.callIconStack,
               { backgroundColor: withOpacity(statusColor, 0.18) },
+              variant === 'handled' && styles.callIconStackHandled,
+              variant === 'archived' && styles.callIconStackArchived,
               isMuted && styles.callIconStackMuted,
             ]}
           >
@@ -181,6 +194,8 @@ function CallRecordItem({
           style={[
             styles.statusPill,
             { backgroundColor: withOpacity(statusColor, 0.15) },
+            variant === 'handled' && styles.statusPillHandled,
+            variant === 'archived' && styles.statusPillArchived,
             isMuted && styles.statusPillMuted,
           ]}
         >
@@ -237,7 +252,7 @@ export default function CallsScreen({
     }
     const { data, error: fetchError } = await supabase
       .from('calls')
-      .select('id, created_at, transcript, fraud_risk_level, fraud_score, caller_number, feedback_status')
+      .select('id, created_at, transcript, fraud_risk_level, fraud_score, caller_number, feedback_status, feedback_at')
       .eq('profile_id', activeProfile.id)
       .order('created_at', { ascending: false })
       .limit(25);
@@ -307,6 +322,7 @@ export default function CallsScreen({
   }, [trayAnim]);
 
   const hideTray = useCallback(() => {
+    void Haptics.selectionAsync();
     Animated.timing(trayAnim, {
       toValue: 0,
       duration: 200,
@@ -317,6 +333,23 @@ export default function CallsScreen({
       setTrayCall(null);
     });
   }, [trayAnim]);
+
+  const canOpenTray = useCallback((call: CallRow) => {
+    const feedback = (call.feedback_status ?? '').toLowerCase();
+    return handledStatuses.has(feedback) || feedback === 'archived';
+  }, []);
+
+  const handleTrayLongPress = useCallback(
+    (call: CallRow) => {
+      const feedback = (call.feedback_status ?? '').toLowerCase();
+      if (!handledStatuses.has(feedback) && feedback !== 'archived') {
+        return;
+      }
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      showTray(call);
+    },
+    [showTray]
+  );
 
   const toggleArchiveCall = useCallback(async () => {
     if (!trayCall) return;
@@ -329,6 +362,7 @@ export default function CallsScreen({
         body: JSON.stringify({ status: isArchived ? 'reviewed' : 'archived' }),
       });
       await loadCalls();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       hideTray();
     } catch (err) {
       Alert.alert('Archive failed', 'We could not archive the call. Please try again.');
@@ -345,6 +379,7 @@ export default function CallsScreen({
     try {
       await authorizedFetch(`/calls/${trayCall.id}`, { method: 'DELETE' });
       await loadCalls();
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       hideTray();
     } catch (err) {
       Alert.alert('Delete failed', 'We could not delete the call. Please try again.');
@@ -375,6 +410,7 @@ const sections = useMemo<CallSection[]>(() => {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const buckets: Record<string, CallRow[]> = { Today: [], Yesterday: [], Older: [] };
+  const handled: CallRow[] = [];
   const archived: CallRow[] = [];
   const archivedStatuses = new Set(['archived']);
 
@@ -382,6 +418,10 @@ const sections = useMemo<CallSection[]>(() => {
     const feedback = (call.feedback_status ?? '').toLowerCase();
     if (archivedStatuses.has(feedback)) {
       archived.push(call);
+      return;
+    }
+    if (handledStatuses.has(feedback)) {
+      handled.push(call);
       return;
     }
     const created = new Date(call.created_at);
@@ -403,6 +443,10 @@ const sections = useMemo<CallSection[]>(() => {
   const sections = orderedBuckets
     .filter((bucket) => bucket.data.length > 0)
     .map(({ title, data }) => ({ title, data }));
+
+  if (handled.length > 0) {
+    sections.push({ title: 'Handled', data: handled });
+  }
 
   if (archived.length > 0) {
     sections.push({ title: 'Archived', data: archived });
@@ -453,9 +497,12 @@ const sections = useMemo<CallSection[]>(() => {
       const feedback = (item.feedback_status ?? '').toLowerCase();
       const isMuted =
         feedback === 'marked_safe' || feedback === 'marked_fraud' || feedback === 'archived';
-    const shouldShowDate = section.title === 'Older' || section.title === 'Archived';
-      const time = formatTime(item.created_at);
-      const dateLabel = shouldShowDate ? formatDateLabel(item.created_at) : '';
+      const shouldShowDate =
+        section.title === 'Handled' || section.title === 'Older' || section.title === 'Archived';
+      const timestampSource =
+        section.title === 'Handled' ? item.feedback_at ?? item.created_at : item.created_at;
+      const time = formatTime(timestampSource);
+      const dateLabel = shouldShowDate ? formatDateLabel(timestampSource) : '';
       const timeLabel = dateLabel ? `${time} · ${dateLabel}` : time;
       return (
         <CallRecordItem
@@ -465,12 +512,12 @@ const sections = useMemo<CallSection[]>(() => {
           statusColor={status.color}
           hasTranscript={Boolean(item.transcript)}
           onPress={() => handleCallPress(item)}
-          onLongPress={() => showTray(item)}
+          onLongPress={canOpenTray(item) ? () => handleTrayLongPress(item) : undefined}
           isMuted={isMuted}
         />
       );
     },
-    [handleCallPress, theme, showTray]
+    [handleCallPress, theme, handleTrayLongPress]
   );
 
   const renderSectionHeader = ({ section }: { section: CallSection }) => (
@@ -624,7 +671,7 @@ const sections = useMemo<CallSection[]>(() => {
                 <Text style={styles.trayActionHint}>
                   {isTrayArchived
                     ? 'Restores it to the main feed.'
-                    : 'Keeps it in the handled section but hides it from the feed.'}
+                    : 'Moves it to archived section.'}
                 </Text>
               </Pressable>
               <Pressable
@@ -699,6 +746,14 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     shadowOffset: { width: 0, height: 8 },
   },
+  callItemHandled: {
+    backgroundColor: '#1f2637',
+    borderColor: '#2c3448',
+  },
+  callItemArchived: {
+    backgroundColor: '#181d29',
+    borderColor: '#1f2335',
+  },
   callItemPressed: {
     transform: [{ scale: 0.98 }],
   },
@@ -726,6 +781,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  callIconStackHandled: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+  },
+  callIconStackArchived: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
   callIconStackMuted: {
     opacity: 0.55,
@@ -768,6 +829,12 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 14,
+  },
+  statusPillHandled: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  statusPillArchived: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   statusPillMuted: {
     opacity: 0.45,
@@ -839,19 +906,19 @@ const styles = StyleSheet.create({
     color: '#f5f7fb',
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 6,
   },
   traySubtitle: {
     color: '#8aa0c6',
     fontSize: 14,
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 2,
   },
   trayDetail: {
     color: '#6f7a94',
     fontSize: 12,
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 18,
   },
   trayAction: {

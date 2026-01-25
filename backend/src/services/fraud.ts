@@ -58,6 +58,8 @@ export type FraudNotes = {
   actionBoost: number;
   techSupportHits: number;
   investmentHits: number;
+  medicalHits: number;
+  deviceHits: number;
 };
 
 export type FraudAnalysis = {
@@ -207,6 +209,16 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'license', weight: 14, category: 'government' },
   { phrase: 'penalty', weight: 14, category: 'government' },
 
+  // Authority & legal
+  { phrase: 'warrant notice', weight: 36, category: 'authority' },
+  { phrase: 'warrant check', weight: 32, category: 'authority' },
+  { phrase: 'court summons', weight: 34, category: 'authority' },
+  { phrase: 'legal order', weight: 26, category: 'authority' },
+  { phrase: 'police warrant', weight: 32, category: 'authority' },
+  { phrase: 'judge office', weight: 24, category: 'authority' },
+  { phrase: 'debt collection agent', weight: 28, category: 'authority' },
+  { phrase: 'immigration officer', weight: 26, category: 'authority' },
+
   // Tech support
   { phrase: 'microsoft', weight: 20, category: 'tech' },
   { phrase: 'apple', weight: 20, category: 'tech' },
@@ -230,6 +242,27 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'remote session', weight: 26, category: 'tech' },
   { phrase: 'remote access code', weight: 30, category: 'tech' },
   { phrase: 'connect to your computer', weight: 30, category: 'tech' },
+  { phrase: 'laptop security scan', weight: 26, category: 'tech' },
+  { phrase: 'laptop update', weight: 24, category: 'tech' },
+  { phrase: 'install antivirus', weight: 28, category: 'tech' },
+  { phrase: 'security patch', weight: 24, category: 'tech' },
+  { phrase: 'system scan', weight: 24, category: 'tech' },
+  { phrase: 'screen share', weight: 24, category: 'tech' },
+  { phrase: 'teamviewer code', weight: 24, category: 'tech' },
+  { phrase: 'logmein code', weight: 24, category: 'tech' },
+  { phrase: 'remote technician', weight: 24, category: 'tech' },
+
+  // Medical & healthcare
+  { phrase: 'doctor calling', weight: 28, category: 'medical' },
+  { phrase: 'nurse calling', weight: 24, category: 'medical' },
+  { phrase: 'urgent surgery', weight: 30, category: 'medical' },
+  { phrase: 'medical bill', weight: 24, category: 'medical' },
+  { phrase: 'insurance verification', weight: 24, category: 'medical' },
+  { phrase: 'medicare representative', weight: 24, category: 'medical' },
+  { phrase: 'clinic warning', weight: 22, category: 'medical' },
+  { phrase: 'medication refill', weight: 20, category: 'medical' },
+  { phrase: 'healthcare compliance', weight: 20, category: 'medical' },
+  { phrase: 'hospital administrator', weight: 22, category: 'medical' },
 
   // Prize/lottery
   { phrase: 'congratulations', weight: 20, category: 'prize' },
@@ -350,6 +383,10 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'expire', weight: 14, category: 'urgency' },
   { phrase: 'deadline', weight: 14, category: 'urgency' },
   { phrase: "don't wait", weight: 14, category: 'urgency' },
+  { phrase: 'call me back immediately', weight: 20, category: 'family' },
+  { phrase: 'press 1', weight: 18, category: 'family' },
+  { phrase: 'transfer the money', weight: 30, category: 'family' },
+  { phrase: 'urgent wire', weight: 28, category: 'family' },
 
   // Impersonation & account takeover
   { phrase: 'fraud department', weight: 22, category: 'impersonation' },
@@ -404,6 +441,16 @@ const COMBO_RULES = [
   { all: ['crypto', 'fraud department'], add: 14 },
   { all: ['package', 'money'], add: 16 },
   { all: ['identity', 'confirm'], add: 10 },
+  { all: ['warrant notice', 'pay now'], add: 18 },
+  { all: ['court summons', 'urgent wire'], add: 16 },
+  { all: ['laptop security scan', 'remote access'], add: 16 },
+  { all: ['install antivirus', 'remote technician'], add: 14 },
+  { all: ['doctor calling', 'verify identity'], add: 16 },
+  { all: ['urgent surgery', 'call me back immediately'], add: 14 },
+  { all: ['press 1', 'gift card'], add: 12 },
+  { all: ['legal order', 'transfer the money'], add: 18 },
+  { all: ['laptop update', 'screen share'], add: 12 },
+  { all: ['nurse calling', 'medical bill'], add: 12 },
   { all: ['stock broker', 'verify identity'], add: 18 },
   { all: ['trading account', 'urgent'], add: 14 },
   { all: ['investment opportunity', 'transfer shares'], add: 16 },
@@ -447,6 +494,11 @@ const THREAT_TERMS = [
   'levy',
   'disconnection',
   'service interruption',
+  'warrant notice',
+  'court summons',
+  'police warrant',
+  'legal order',
+  'debt collection agent',
 ];
 
 const AUTHORITY_TERMS = [
@@ -463,6 +515,13 @@ const AUTHORITY_TERMS = [
   'police department',
   'legal department',
   'sheriff office',
+  'warrant notice',
+  'court summons',
+  'police warrant',
+  'legal order',
+  'judge office',
+  'immigration officer',
+  'debt collection agent',
 ];
 
 const REMOTE_ACCESS_TERMS = [
@@ -477,6 +536,13 @@ const REMOTE_ACCESS_TERMS = [
   'connect to your computer',
   'remote session',
   'access your device',
+  'laptop security scan',
+  'install antivirus',
+  'security patch',
+  'system scan',
+  'teamviewer code',
+  'logmein code',
+  'remote technician',
 ];
 
 const GIFT_CARD_TERMS = [
@@ -783,6 +849,35 @@ const INVESTMENT_TERMS = [
   'settlement department',
   'commission refund',
   'verify trading account',
+];
+
+const MEDICAL_TERMS = [
+  'doctor calling',
+  'nurse calling',
+  'urgent surgery',
+  'medical bill',
+  'insurance verification',
+  'medicare representative',
+  'clinic warning',
+  'medication refill',
+  'healthcare compliance',
+  'hospital administrator',
+  'medical emergency',
+];
+
+const DEVICE_TERMS = [
+  'laptop security scan',
+  'laptop update',
+  'security patch',
+  'system scan',
+  'install antivirus',
+  'screen share',
+  'teamviewer code',
+  'logmein code',
+  'remote technician',
+  'fix your laptop',
+  'macbook support',
+  'desktop support',
 ];
 
 const IDENTITY_TERMS = [
