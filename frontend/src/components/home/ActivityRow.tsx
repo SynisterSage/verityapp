@@ -34,9 +34,8 @@ export default function ActivityRow({
 }: ActivityRowProps) {
   const { theme } = useTheme();
   const riskStyles = getRiskStyles(badgeLevel ?? badge);
-  const statusAccent = theme.colors.danger;
-  const badgeBackground = withOpacity(statusAccent, 0.25);
-  const badgeTextColor = statusAccent;
+  const badgeBackground = riskStyles.background;
+  const badgeTextColor = riskStyles.accent;
   const iconBg = withOpacity(riskStyles.accent, 0.12);
   const digitsOnly = label.replace(/\D/g, '');
   const shouldFormatPhone = digitsOnly.length >= 10 && !/[A-Za-z]/.test(label);

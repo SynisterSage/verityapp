@@ -20,6 +20,47 @@ async function getAuthenticatedUserId(req: Request) {
   return data.user.id;
 }
 
+const allowedStatuses = new Set(['marked_safe', 'marked_fraud', 'reviewed', 'archived']);
+
+async function authorizeCallAccess(callId: string, userId: string) {
+  const { data: callRow, error: callError } = await supabaseAdmin
+    .from('calls')
+    .select('profile_id, caller_number, caller_hash')
+    .eq('id', callId)
+    .single();
+
+  if (callError || !callRow?.profile_id) {
+    return { status: HTTP_STATUS_CODES.NotFound, message: 'Call not found' };
+  }
+
+  const { data: profileRow, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select(
+      'caretaker_id, auto_mark_enabled, auto_block_on_fraud, auto_trust_on_safe'
+    )
+    .eq('id', callRow.profile_id)
+    .maybeSingle();
+
+  if (profileError || !profileRow) {
+    return { status: HTTP_STATUS_CODES.Forbidden, message: 'Forbidden' };
+  }
+
+  const isCaretaker = profileRow.caretaker_id === userId;
+  if (!isCaretaker) {
+    const { data: memberRow } = await supabaseAdmin
+      .from('profile_members')
+      .select('id')
+      .eq('profile_id', callRow.profile_id)
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (!memberRow) {
+      return { status: HTTP_STATUS_CODES.Forbidden, message: 'Forbidden' };
+    }
+  }
+
+  return { callRow, profileRow };
+}
+
 /**
  * Return a signed URL for a call recording.
  * Note: This endpoint is unauthenticated; add auth before production use.
@@ -99,48 +140,16 @@ async function submitFeedback(req: Request, res: Response) {
   }
 
   const { status, notes } = req.body as { status?: string; notes?: string };
-  const allowedStatuses = new Set(['marked_safe', 'marked_fraud', 'reviewed']);
   if (!status || !allowedStatuses.has(status)) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid status' });
   }
 
-  const { data: callRow, error: callError } = await supabaseAdmin
-    .from('calls')
-    .select('profile_id, caller_number, caller_hash')
-    .eq('id', callId)
-    .single();
-
-  if (callError || !callRow?.profile_id) {
-    return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Call not found' });
+  const access = await authorizeCallAccess(callId, userId);
+  if ('status' in access) {
+    return res.status(access.status).json({ error: access.message });
   }
 
-  const { data: profileRow } = await supabaseAdmin
-    .from('profiles')
-    .select(
-      'caretaker_id, auto_mark_enabled, auto_block_on_fraud, auto_trust_on_safe'
-    )
-    .eq('id', callRow.profile_id)
-    .maybeSingle();
-
-  if (!profileRow) {
-    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
-  }
-
-  const isCaretaker = profileRow.caretaker_id === userId;
-  let isMember = false;
-  if (!isCaretaker) {
-    const { data: memberRow } = await supabaseAdmin
-      .from('profile_members')
-      .select('id')
-      .eq('profile_id', callRow.profile_id)
-      .eq('user_id', userId)
-      .maybeSingle();
-    isMember = !!memberRow;
-  }
-
-  if (!isCaretaker && !isMember) {
-    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
-  }
+  const { callRow, profileRow } = access;
 
   const { error: updateError } = await supabaseAdmin
     .from('calls')
@@ -157,16 +166,16 @@ async function submitFeedback(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to save feedback' });
   }
 
-  const autoMarkEnabled = profileRow?.auto_mark_enabled ?? false;
-  const autoBlockOnFraud = profileRow?.auto_block_on_fraud ?? true;
-  const autoTrustOnSafe = profileRow?.auto_trust_on_safe ?? false;
-  const shouldAutoBlock = autoMarkEnabled && autoBlockOnFraud;
-  const shouldAutoTrust = autoMarkEnabled && autoTrustOnSafe;
+  const automationEnabled = profileRow.auto_mark_enabled === true;
+  const automationBlockEnabled =
+    automationEnabled && (profileRow.auto_block_on_fraud ?? true);
+  const automationTrustEnabled =
+    automationEnabled && (profileRow.auto_trust_on_safe ?? false);
 
   if (
     status === 'marked_fraud' &&
-    shouldAutoBlock &&
-    callRow?.caller_hash &&
+    automationBlockEnabled &&
+    callRow.caller_hash &&
     callRow.profile_id
   ) {
     await removeTrustedContact(callRow.profile_id, callRow.caller_hash);
@@ -186,8 +195,8 @@ async function submitFeedback(req: Request, res: Response) {
 
   if (
     status === 'marked_safe' &&
-    shouldAutoTrust &&
-    callRow?.caller_hash &&
+    automationTrustEnabled &&
+    callRow.caller_hash &&
     callRow.caller_number &&
     callRow.profile_id
   ) {
@@ -224,7 +233,37 @@ async function submitFeedback(req: Request, res: Response) {
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
 }
 
+async function deleteCall(req: Request, res: Response) {
+  const { callId } = req.params;
+  if (!callId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing callId' });
+  }
+
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const access = await authorizeCallAccess(callId, userId);
+  if ('status' in access) {
+    return res.status(access.status).json({ error: access.message });
+  }
+
+  const { error: deleteError } = await supabaseAdmin
+    .from('calls')
+    .delete()
+    .eq('id', callId);
+
+  if (deleteError) {
+    logger.err(deleteError);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to delete call' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
+}
+
 export default {
   getRecordingUrl,
   submitFeedback,
+  deleteCall,
 };

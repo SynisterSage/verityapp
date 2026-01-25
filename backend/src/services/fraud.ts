@@ -57,6 +57,7 @@ export type FraudNotes = {
   commandSensitiveHits: number;
   actionBoost: number;
   techSupportHits: number;
+  investmentHits: number;
 };
 
 export type FraudAnalysis = {
@@ -135,6 +136,18 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'cash app', weight: 30, category: 'banking' },
   { phrase: 'venmo', weight: 30, category: 'banking' },
   { phrase: 'zelle support', weight: 34, category: 'banking' },
+  { phrase: 'stock broker', weight: 32, category: 'investment' },
+  { phrase: 'investment advisor', weight: 30, category: 'investment' },
+  { phrase: 'trading account', weight: 30, category: 'investment' },
+  { phrase: 'brokerage account', weight: 30, category: 'investment' },
+  { phrase: 'trade confirmation', weight: 26, category: 'investment' },
+  { phrase: 'transfer shares', weight: 28, category: 'investment' },
+  { phrase: 'investment opportunity', weight: 28, category: 'investment' },
+  { phrase: 'portfolio review', weight: 24, category: 'investment' },
+  { phrase: 'trading platform', weight: 26, category: 'investment' },
+  { phrase: 'commission refund', weight: 22, category: 'investment' },
+  { phrase: 'verify trading account', weight: 28, category: 'investment' },
+  { phrase: 'settlement department', weight: 26, category: 'investment' },
 
   // Government & taxes
   { phrase: 'irs', weight: 32, category: 'government' },
@@ -391,6 +404,9 @@ const COMBO_RULES = [
   { all: ['crypto', 'fraud department'], add: 14 },
   { all: ['package', 'money'], add: 16 },
   { all: ['identity', 'confirm'], add: 10 },
+  { all: ['stock broker', 'verify identity'], add: 18 },
+  { all: ['trading account', 'urgent'], add: 14 },
+  { all: ['investment opportunity', 'transfer shares'], add: 16 },
 ];
 
 const URGENCY_TERMS = [
@@ -754,6 +770,21 @@ const COURIER_TERMS = [
   'pick up the card',
 ];
 
+const INVESTMENT_TERMS = [
+  'stock broker',
+  'investment advisor',
+  'trading account',
+  'brokerage account',
+  'investment opportunity',
+  'transfer shares',
+  'trade confirmation',
+  'portfolio review',
+  'trading platform',
+  'settlement department',
+  'commission refund',
+  'verify trading account',
+];
+
 const IDENTITY_TERMS = [
   'verify your identity',
   'confirm your information',
@@ -897,6 +928,12 @@ const HARD_BLOCK_PATTERNS = [
   /\bsuspicious\s+activity\b/i,
   /\baccount\s+compromised\b/i,
   /\b(remote\s+access|remote\s+session|teamviewer|anydesk|logmein)\b/i,
+  /\bstock\s+broker\b/i,
+  /\binvestment\s+advisor\b/i,
+  /\btrading\s+account\b/i,
+  /\bbrokerage\s+account\b/i,
+  /\binvestment\s+opportunity\b/i,
+  /\btransfer\s+shares\b/i,
 ];
 
 const MONEY_AMOUNT_PATTERNS = [
@@ -986,6 +1023,18 @@ const CRITICAL_KEYWORDS = new Set([
   'give me your money',
   'send me your money',
   'payment',
+  'stock broker',
+  'investment advisor',
+  'trading account',
+  'brokerage account',
+  'investment opportunity',
+  'transfer shares',
+  'trade confirmation',
+  'portfolio review',
+  'trading platform',
+  'settlement department',
+  'commission refund',
+  'verify trading account',
 ]);
 
 const TAX_SCAM_TERMS = [
@@ -1224,6 +1273,7 @@ function heuristicBoosts(text: string) {
     0
   );
   const carrierHits = countPhraseHits(text, CARRIER_TERMS);
+  const investmentHits = countPhraseHits(text, INVESTMENT_TERMS);
 
   let boost = 0;
   if (urgencyHits >= 2) boost += 10;
@@ -1264,6 +1314,10 @@ function heuristicBoosts(text: string) {
   const actionBoost = Math.min(12, commandSensitiveHits * 6);
   boost += actionBoost;
   if (techSupportHits >= 1) boost += Math.min(40, techSupportHits * 20);
+  if (investmentHits >= 1) boost += 18;
+  if (investmentHits >= 2) boost += 6;
+  if (investmentHits >= 1 && urgencyHits >= 1) boost += 8;
+  if (investmentHits >= 1 && paymentAppHits >= 1) boost += 10;
 
   if (secrecyHits >= 1 && paymentAppHits >= 1) boost += 12;
   if (urgencyHits >= 1 && paymentAppHits >= 1) boost += 8;
@@ -1288,6 +1342,7 @@ function heuristicBoosts(text: string) {
   if (brandHits >= 1 && linkHits >= 1) boost += 10;
   if (carrierHits >= 1 && accountAccessHits >= 1) boost += 18;
   if (linkPatternsHits >= 1 && authorityHits >= 1) boost += 14;
+  if (investmentHits >= 1 && commandSensitiveHits > 0) boost += 12;
 
   return {
     boost: Math.min(70, boost),
@@ -1324,6 +1379,7 @@ function heuristicBoosts(text: string) {
     taxScamHits,
     bankFraudHits,
     actionBoost,
+    investmentHits,
   };
 }
 
@@ -1397,16 +1453,17 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         callerCountry,
         callerRegion,
         highRiskCountryBoost,
-        timeOfDayBoost,
-        durationBoost,
-        repeatCallCount,
-        detectedLocale,
-        localeBoost,
-        regionMismatchBoost,
-        commandSensitiveHits: 0,
-        actionBoost: 0,
-        techSupportHits: 0,
-      },
+      timeOfDayBoost,
+      durationBoost,
+      repeatCallCount,
+      detectedLocale,
+      localeBoost,
+      regionMismatchBoost,
+      commandSensitiveHits: 0,
+      actionBoost: 0,
+      techSupportHits: 0,
+      investmentHits: 0,
+    },
     } satisfies FraudAnalysis;
   }
 
@@ -1451,6 +1508,7 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         commandSensitiveHits: heuristic.commandSensitiveHits,
         actionBoost: heuristic.actionBoost,
         techSupportHits: heuristic.techSupportHits,
+        investmentHits: heuristic.investmentHits,
       },
     } satisfies FraudAnalysis;
   }
@@ -1585,6 +1643,7 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
       commandSensitiveHits: heuristic.commandSensitiveHits,
       actionBoost: heuristic.actionBoost,
       techSupportHits,
+      investmentHits: heuristic.investmentHits,
     },
     override: hardBlockOverride || techSupportOverride,
   };

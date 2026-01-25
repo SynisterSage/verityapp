@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
+  Animated,
+  Easing,
+  Modal,
   SectionList,
   SectionBase,
   RefreshControl,
@@ -15,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
+import { authorizedFetch } from '../../services/backend';
 import { supabase } from '../../services/supabase';
 import * as Haptics from 'expo-haptics';
 
@@ -27,6 +32,7 @@ import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import { withOpacity } from '../../utils/color';
 import { useTheme } from '../../context/ThemeContext';
 import DashboardHeader from '../../components/common/DashboardHeader';
+import { getRiskStyles, getRiskSeverity } from '../../utils/risk';
 import type { AppTheme } from '../../theme/tokens';
 import type { CallsStackParamList } from '../../navigation/types';
 
@@ -47,6 +53,7 @@ type CallSection = SectionBase<CallRow> & {
 const formatSectionTitle = (title: string) => {
   if (title === 'Today') return 'Today';
   if (title === 'Yesterday') return 'Yesterday';
+  if (title === 'Handled') return 'Handled';
   return 'Earlier';
 };
 
@@ -58,18 +65,30 @@ const isSameDay = (a: Date, b: Date) =>
 const determineStatus = (call: CallRow, theme: AppTheme) => {
   const feedback = (call.feedback_status ?? '').toLowerCase();
   const level = (call.fraud_risk_level ?? '').toLowerCase();
+  const severity = getRiskSeverity(call.fraud_risk_level);
+  const severityStyles = getRiskStyles(call.fraud_risk_level);
 
   if (feedback === 'marked_safe' || level === 'safe') {
     return { label: 'Safe', color: theme.colors.success, group: 'verified' as const };
   }
-  if (feedback === 'marked_fraud' || level === 'fraud' || level === 'critical') {
-    return { label: 'Risk', color: theme.colors.danger, group: 'risk' as const };
+  if (feedback === 'marked_fraud') {
+    return { label: 'Fraud', color: theme.colors.danger, group: 'risk' as const };
+  }
+  if (feedback === 'archived') {
+    return { label: 'Archived', color: theme.colors.textMuted, group: 'all' as const };
   }
   if (feedback === 'blocked' || level === 'blocked') {
     return { label: 'Blocked', color: theme.colors.danger, group: 'risk' as const };
   }
   if (level === 'warning') {
     return { label: 'Warning', color: theme.colors.warning, group: 'risk' as const };
+  }
+  if (severity === 'critical' || severity === 'high' || severity === 'medium') {
+    const severityLabel = `${severity.charAt(0).toUpperCase()}${severity.slice(1)}`;
+    return { label: severityLabel, color: severityStyles.accent, group: 'risk' as const };
+  }
+  if (severity === 'low') {
+    return { label: 'Low', color: severityStyles.accent, group: 'all' as const };
   }
   return { label: 'Call', color: theme.colors.textMuted, group: 'all' as const };
 };
@@ -81,6 +100,19 @@ const formatTime = (value?: string | null) => {
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 };
 
+const formatDateLabel = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const showYear = now.getFullYear() !== date.getFullYear();
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(showYear ? { year: 'numeric' } : {}),
+  });
+};
+
 type CallRecordItemProps = {
   title: string;
   timeLabel: string;
@@ -88,6 +120,8 @@ type CallRecordItemProps = {
   statusColor: string;
   hasTranscript: boolean;
   onPress: () => void;
+  isMuted?: boolean;
+  onLongPress?: () => void;
 };
 
 function CallRecordItem({
@@ -97,6 +131,8 @@ function CallRecordItem({
   statusColor,
   hasTranscript,
   onPress,
+  isMuted = false,
+  onLongPress,
 }: CallRecordItemProps) {
   const handlePress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -105,8 +141,11 @@ function CallRecordItem({
   return (
     <Pressable
       onPress={handlePress}
+      onLongPress={onLongPress}
+      delayLongPress={400}
       style={({ pressed }) => [
         styles.callItem,
+        isMuted && styles.callItemMuted,
         pressed && styles.callItemPressed,
       ]}
     >
@@ -116,9 +155,15 @@ function CallRecordItem({
             style={[
               styles.callIconStack,
               { backgroundColor: withOpacity(statusColor, 0.18) },
+              isMuted && styles.callIconStackMuted,
             ]}
           >
-            <Ionicons name="call-outline" size={22} color={statusColor} />
+            <Ionicons
+              name="call-outline"
+              size={22}
+              color={statusColor}
+              style={isMuted ? styles.callIconMuted : undefined}
+            />
           </View>
           {hasTranscript && (
             <View style={[styles.transcriptBadge, { backgroundColor: statusColor }]}>
@@ -127,16 +172,27 @@ function CallRecordItem({
           )}
         </View>
         <View style={styles.callText}>
-          <Text style={styles.callTitle}>{title}</Text>
-          <Text style={styles.callTimestamp}>{timeLabel}</Text>
+          <Text style={[styles.callTitle, isMuted && styles.callTitleMuted]}>{title}</Text>
+          <Text style={[styles.callTimestamp, isMuted && styles.callTimestampMuted]}>
+            {timeLabel}
+          </Text>
         </View>
         <View
           style={[
             styles.statusPill,
             { backgroundColor: withOpacity(statusColor, 0.15) },
+            isMuted && styles.statusPillMuted,
           ]}
         >
-          <Text style={[styles.statusText, { color: statusColor }]}>{statusLabel}</Text>
+          <Text
+            style={[
+              styles.statusText,
+              { color: statusColor },
+              isMuted && styles.statusTextMuted,
+            ]}
+          >
+            {statusLabel}
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -161,6 +217,10 @@ export default function CallsScreen({
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const listRef = useRef<SectionList<CallRow, CallSection> | null>(null);
   const initialCallIdRef = useRef<string | null>(null);
+  const [trayCall, setTrayCall] = useState<CallRow | null>(null);
+  const [isTrayMounted, setIsTrayMounted] = useState(false);
+  const trayAnim = useRef(new Animated.Value(0)).current;
+  const [trayProcessing, setTrayProcessing] = useState(false);
 
   const loadCalls = useCallback(async (silent = false) => {
     setError(null);
@@ -225,6 +285,61 @@ export default function CallsScreen({
     return unsubscribe;
   }, [loadCalls]);
 
+  const showTray = useCallback((call: CallRow) => {
+    setTrayCall(call);
+    setIsTrayMounted(true);
+    trayAnim.setValue(0);
+    Animated.timing(trayAnim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [trayAnim]);
+
+  const hideTray = useCallback(() => {
+    Animated.timing(trayAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsTrayMounted(false);
+      setTrayCall(null);
+    });
+  }, [trayAnim]);
+
+  const archiveCall = useCallback(async () => {
+    if (!trayCall) return;
+    setTrayProcessing(true);
+    try {
+      await authorizedFetch(`/calls/${trayCall.id}/feedback`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'archived' }),
+      });
+      await loadCalls();
+      hideTray();
+    } catch (err) {
+      Alert.alert('Archive failed', 'We could not archive the call. Please try again.');
+    } finally {
+      setTrayProcessing(false);
+    }
+  }, [trayCall, hideTray, loadCalls]);
+
+  const deleteCall = useCallback(async () => {
+    if (!trayCall) return;
+    setTrayProcessing(true);
+    try {
+      await authorizedFetch(`/calls/${trayCall.id}`, { method: 'DELETE' });
+      await loadCalls();
+      hideTray();
+    } catch (err) {
+      Alert.alert('Delete failed', 'We could not delete the call. Please try again.');
+    } finally {
+      setTrayProcessing(false);
+    }
+  }, [trayCall, hideTray, loadCalls]);
+
   const filteredCalls = useMemo(() => {
     if (filter === 'all') {
       return calls;
@@ -246,8 +361,15 @@ const sections = useMemo<CallSection[]>(() => {
   const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
   const buckets: Record<string, CallRow[]> = { Today: [], Yesterday: [], Older: [] };
+  const handled: CallRow[] = [];
+  const handledStatuses = new Set(['marked_safe', 'marked_fraud', 'archived']);
 
   sortedCalls.forEach((call) => {
+    const feedback = (call.feedback_status ?? '').toLowerCase();
+    if (handledStatuses.has(feedback)) {
+      handled.push(call);
+      return;
+    }
     const created = new Date(call.created_at);
     if (isSameDay(created, today)) {
       buckets.Today.push(call);
@@ -258,11 +380,21 @@ const sections = useMemo<CallSection[]>(() => {
     }
   });
 
-  const groupSections = Object.entries(buckets)
-    .filter(([, data]) => data.length > 0)
-    .map(([title, data]) => ({ title, data }));
+  const orderedBuckets = [
+    { title: 'Today', data: buckets.Today },
+    { title: 'Yesterday', data: buckets.Yesterday },
+    { title: 'Older', data: buckets.Older },
+  ];
 
-  return groupSections;
+  const sections = orderedBuckets
+    .filter((bucket) => bucket.data.length > 0)
+    .map(({ title, data }) => ({ title, data }));
+
+  if (handled.length > 0) {
+    sections.push({ title: 'Handled', data: handled });
+  }
+
+  return sections;
 }, [sortedCalls]);
 
   useFocusEffect(
@@ -301,21 +433,30 @@ const sections = useMemo<CallSection[]>(() => {
   }, [navigation]);
 
   const renderCallItem = useCallback(
-    ({ item }: { item: CallRow }) => {
+    ({ item, section }: { item: CallRow; section: CallSection }) => {
       const status = determineStatus(item, theme);
       const title = formatPhoneNumber(item.caller_number, 'Unknown caller');
+      const feedback = (item.feedback_status ?? '').toLowerCase();
+      const isMuted =
+        feedback === 'marked_safe' || feedback === 'marked_fraud' || feedback === 'archived';
+      const shouldShowDate = section.title === 'Older' || section.title === 'Handled';
+      const time = formatTime(item.created_at);
+      const dateLabel = shouldShowDate ? formatDateLabel(item.created_at) : '';
+      const timeLabel = dateLabel ? `${time} · ${dateLabel}` : time;
       return (
         <CallRecordItem
           title={title}
-          timeLabel={formatTime(item.created_at)}
+          timeLabel={timeLabel}
           statusLabel={status.label}
           statusColor={status.color}
           hasTranscript={Boolean(item.transcript)}
           onPress={() => handleCallPress(item)}
+          onLongPress={() => showTray(item)}
+          isMuted={isMuted}
         />
       );
     },
-    [handleCallPress, theme]
+    [handleCallPress, theme, showTray]
   );
 
   const renderSectionHeader = ({ section }: { section: CallSection }) => (
@@ -336,6 +477,16 @@ const sections = useMemo<CallSection[]>(() => {
   const headerCount = filteredCalls.length;
 
   const bottomGap = Math.max(insets.bottom, 0) + 20;
+  const trayTranslateY = trayAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
+    extrapolate: 'clamp',
+  });
+  const trayBackdropOpacity = trayAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.45],
+    extrapolate: 'clamp',
+  });
 
   return (
     <SafeAreaView
@@ -350,7 +501,7 @@ const sections = useMemo<CallSection[]>(() => {
       edges={['bottom']}
     >
       <DashboardHeader
-        title="Recent calls"
+        title="Recent Calls"
         subtitle={`${headerCount} calls logged`}
         align="left"
       />
@@ -402,6 +553,78 @@ const sections = useMemo<CallSection[]>(() => {
           )
         }
       />
+      <Modal
+        visible={isTrayMounted && Boolean(trayCall)}
+        transparent
+        animationType="none"
+        onRequestClose={hideTray}
+      >
+        <View style={styles.trayOverlay} pointerEvents="box-none">
+          <Animated.View
+            style={[
+              styles.trayBackdrop,
+              { opacity: trayBackdropOpacity, position: 'absolute', width: '100%', height: '100%' },
+            ]}
+          />
+          <Pressable style={StyleSheet.absoluteFill} onPress={hideTray} />
+          {trayCall && (
+            <Animated.View
+              style={[
+                styles.tray,
+                {
+                  transform: [{ translateY: trayTranslateY }],
+                },
+              ]}
+            >
+              <View style={styles.trayHandle} />
+              <Text style={styles.trayTitle}>Call options</Text>
+              <Text style={styles.traySubtitle}>
+                {formatPhoneNumber(trayCall.caller_number, 'Recent call')}
+              </Text>
+              <Text style={styles.trayDetail}>
+                {formatTime(trayCall.created_at)}
+                {formatDateLabel(trayCall.created_at) ? ` · ${formatDateLabel(trayCall.created_at)}` : ''}
+              </Text>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.trayAction,
+                  pressed && styles.trayActionPressed,
+                  trayProcessing && styles.trayActionDisabled,
+                ]}
+                onPress={archiveCall}
+                disabled={trayProcessing}
+              >
+                <Text style={styles.trayActionText}>Archive this call</Text>
+                <Text style={styles.trayActionHint}>Keeps it in the handled section but hides it from the feed.</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.trayAction,
+                  styles.trayDanger,
+                  pressed && styles.trayActionPressed,
+                  trayProcessing && styles.trayActionDisabled,
+                ]}
+                onPress={deleteCall}
+                disabled={trayProcessing}
+              >
+                <Text style={[styles.trayActionText, styles.trayDangerText]}>Delete this call</Text>
+                <Text style={styles.trayActionHint}>Removes the call permanently.</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.trayAction,
+                  styles.trayCancel,
+                  pressed && styles.trayActionPressed,
+                ]}
+                onPress={hideTray}
+                disabled={trayProcessing}
+              >
+                <Text style={styles.trayCancelText}>Cancel</Text>
+              </Pressable>
+            </Animated.View>
+          )}
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -449,6 +672,12 @@ const styles = StyleSheet.create({
   callItemPressed: {
     transform: [{ scale: 0.98 }],
   },
+  callItemMuted: {
+    opacity: 0.7,
+    backgroundColor: '#111b27',
+    borderColor: 'rgba(255,255,255,0.15)',
+    shadowOpacity: 0.1,
+  },
   callRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -467,6 +696,12 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  callIconStackMuted: {
+    opacity: 0.55,
+  },
+  callIconMuted: {
+    opacity: 0.6,
   },
   transcriptBadge: {
     position: 'absolute',
@@ -488,20 +723,32 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  callTitleMuted: {
+    color: '#b0b5c8',
+  },
   callTimestamp: {
     color: '#8aa0c6',
     marginTop: 4,
     fontSize: 14,
+  },
+  callTimestampMuted: {
+    color: '#6f7a94',
   },
   statusPill: {
     borderRadius: 999,
     paddingVertical: 6,
     paddingHorizontal: 14,
   },
+  statusPillMuted: {
+    opacity: 0.45,
+  },
   statusText: {
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.3,
+  },
+  statusTextMuted: {
+    opacity: 0.6,
   },
   emptyStateWrap: {
     marginTop: 8,
@@ -522,5 +769,99 @@ const styles = StyleSheet.create({
   footer: {
     marginTop: 24,
     paddingBottom: 60,
+  },
+  trayOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'flex-end',
+    zIndex: 999,
+    elevation: 999,
+  },
+  trayBackdrop: {
+    backgroundColor: '#02050b',
+  },
+  tray: {
+    position: 'absolute',
+    left: -12,
+    right: -12,
+    bottom: 0,
+    borderRadius: 30,
+    backgroundColor: '#0c1118',
+    paddingVertical: 24,
+    paddingHorizontal: 26,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.08)',
+    shadowColor: '#000',
+    shadowOpacity: 0.4,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    zIndex: 1000,
+    elevation: 30,
+  },
+  trayHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    alignSelf: 'center',
+    marginBottom: 12,
+  },
+  trayTitle: {
+    color: '#f5f7fb',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  traySubtitle: {
+    color: '#8aa0c6',
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  trayDetail: {
+    color: '#6f7a94',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 18,
+  },
+  trayAction: {
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    marginBottom: 12,
+  },
+  trayActionPressed: {
+    opacity: 0.8,
+  },
+  trayActionDisabled: {
+    opacity: 0.6,
+  },
+  trayActionText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  trayActionHint: {
+    color: '#8aa0c6',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  trayDanger: {
+    backgroundColor: 'rgba(239,68,68,0.08)',
+  },
+  trayDangerText: {
+    color: '#f87171',
+  },
+  trayCancel: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  trayCancelText: {
+    color: '#f5f7fb',
+    fontSize: 15,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

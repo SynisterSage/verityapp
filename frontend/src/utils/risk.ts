@@ -25,9 +25,9 @@ const RISK_PALETTE: RiskPalette = {
     accent: warning,
   },
   medium: {
-    text: '#fffce7',
-    background: withOpacity(accent, 0.18),
-    accent,
+    text: '#1f1b0d',
+    background: withOpacity(warning, 0.25),
+    accent: warning,
   },
   low: {
     text: '#dff9ec',
@@ -64,4 +64,8 @@ function normalizeLevel(level?: string | null): RiskSeverity {
 export function getRiskStyles(level?: string | null) {
   const severity = normalizeLevel(level);
   return RISK_PALETTE[severity];
+}
+
+export function getRiskSeverity(level?: string | null) {
+  return normalizeLevel(level);
 }

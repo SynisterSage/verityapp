@@ -365,20 +365,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         <DashboardHeader
             title="Welcome Back"
             subtitle={activeProfile?.first_name ?? email}
-            right={
-              <TouchableOpacity
-                style={styles.headerAction}
-                onPress={() =>
-                  navigation.navigate('SettingsTab', {
-                    screen: 'Settings',
-                    params: { initialScreen: 'Security' },
-                  })
-                }
-                activeOpacity={0.8}
-              >
-                <Ionicons name="shield-checkmark" size={20} color="#f5f7fb" />
-              </TouchableOpacity>
-            }
           />
       </View>
 
@@ -588,16 +574,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0f141d',
     paddingHorizontal: 24,
-  },
-  headerAction: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    backgroundColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   content: {
     paddingTop: 12,
