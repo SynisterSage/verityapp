@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -26,6 +26,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const inputBorderColor = (field: 'email' | 'password' | 'confirm') =>
     focusField === field ? theme.colors.accent : theme.colors.border;
   const isLengthValid = password.length >= 8;
@@ -42,6 +43,14 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
 
   const handleSubmit = async () => {
     setAlert(null);
+
+    if (!acceptedLegal) {
+      setAlert({
+        message: 'Please agree to the terms of service and privacy policy before creating an account.',
+        type: 'warning',
+      });
+      return;
+    }
 
     if (password !== confirmPassword) {
       setAlert({ message: 'Passwords must match.', type: 'warning' });
@@ -62,6 +71,8 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
 
     setIsSubmitting(true);
     const result = await signUp(email.trim(), password);
+    setIsSubmitting(false);
+
     if (result.error) {
       setAlert({ message: result.error, type: 'danger' });
       return;
@@ -70,7 +81,6 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
       navigation.navigate('ConfirmEmail', { email: email.trim() });
       return;
     }
-    setIsSubmitting(false);
   };
 
   const renderEye = (visible: boolean) => (
@@ -96,7 +106,8 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
     alert?.type === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(225, 29, 72, 0.08)';
 
   const alertSpacing = alert ? 40 : 24;
-  const scrollPaddingBottom = Math.max(insets.bottom, 32) + 220 + alertSpacing;
+  const scrollPaddingBottom = Math.max(insets.bottom, 32) + 80 + alertSpacing;
+  const bottomBuffer = scrollPaddingBottom + 64;
 
   return (
     <SafeAreaView
@@ -110,12 +121,12 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
       ]}
       edges={['bottom']}
     >
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: scrollPaddingBottom },
-        ]}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: bottomBuffer },
+          ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -216,26 +227,54 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
               {renderEye(showConfirm)}
             </Pressable>
           </View>
-          <View style={styles.criteriaList}>
-            {passwordCriteria.map((item) => (
-              <View key={item.label} style={styles.criteriaRow}>
-                <Ionicons
-                  name={item.met ? 'checkmark-circle' : 'ellipse-outline'}
-                  size={16}
-                  color={item.met ? theme.colors.success : theme.colors.textDim}
-                  style={styles.criteriaIcon}
-                />
-                <Text
-                  style={[
-                    styles.criteriaText,
-                    { color: item.met ? theme.colors.text : theme.colors.textDim },
-                  ]}
-                >
-                  {item.label}
-                </Text>
-              </View>
-            ))}
-          </View>
+        <View style={styles.criteriaList}>
+          {passwordCriteria.map((item) => (
+            <View key={item.label} style={styles.criteriaRow}>
+              <Ionicons
+                name={item.met ? 'checkmark-circle' : 'ellipse-outline'}
+                size={16}
+                color={item.met ? theme.colors.success : theme.colors.textDim}
+                style={styles.criteriaIcon}
+              />
+              <Text
+                style={[
+                  styles.criteriaText,
+                  { color: item.met ? theme.colors.text : theme.colors.textDim },
+                ]}
+              >
+                {item.label}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <View style={styles.checkboxRow}>
+          <Pressable
+            style={styles.checkbox}
+            onPress={() => setAcceptedLegal((prev) => !prev)}
+          >
+            <Ionicons
+              name={acceptedLegal ? 'checkmark-circle' : 'ellipse-outline'}
+              size={20}
+              color={acceptedLegal ? theme.colors.accent : theme.colors.textDim}
+            />
+            <Text style={[styles.checkboxText, { color: theme.colors.text }]}>
+              I agree to the{' '}
+              <Text
+                style={[styles.linkText, { color: theme.colors.accent }]}
+                onPress={() => Linking.openURL('https://verityprotect.com/terms')}
+              >
+                Terms of Service
+              </Text>{' '}
+              and{' '}
+              <Text
+                style={[styles.linkText, { color: theme.colors.accent }]}
+                onPress={() => Linking.openURL('https://verityprotect.com/privacy')}
+              >
+                Privacy Policy
+              </Text>
+            </Text>
+          </Pressable>
+        </View>
         </View>
 
           {alert ? (
@@ -259,6 +298,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         primaryLabel={isSubmitting ? 'Creating…' : 'Create Account'}
         onPrimaryPress={handleSubmit}
         primaryLoading={isSubmitting}
+        primaryDisabled={!acceptedLegal}
         secondaryLabel="Continue with Google"
         onSecondaryPress={signInWithGoogle}
         helperPrefix="Already have an account?"
@@ -284,7 +324,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
+    minHeight: '100%',
     justifyContent: 'flex-start',
     paddingHorizontal: 24,
   },
@@ -354,8 +395,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 10,
-    marginBottom: 24,
-    marginTop: 14,
+    marginBottom: 0,
+    marginTop: 8,
     backgroundColor: 'rgba(225, 29, 72, 0.08)',
   },
   loginErrorText: {
@@ -373,5 +414,25 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#2d6df6',
+  },
+  checkboxRow: {
+    marginTop: 4,
+    marginBottom: -10,
+    left: 2,
+  },
+  checkbox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  checkboxText: {
+    fontSize: 12,
+    letterSpacing: 0.2,
+    lineHeight: 20,
+    right: 1,
+  },
+  linkText: {
+    textDecorationLine: 'underline',
   },
 });

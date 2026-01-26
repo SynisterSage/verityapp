@@ -136,7 +136,7 @@ home: [
         contentContainerStyle={[
           styles.content,
           {
-            paddingBottom: Math.max(insets.bottom, 32) + 220,
+            paddingBottom: Math.max(insets.bottom, 32) + 100,
           },
         ]}
         showsVerticalScrollIndicator={false}

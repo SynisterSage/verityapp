@@ -15,12 +15,14 @@ import { useAuth } from '../../context/AuthContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 
 export default function SignInScreen({ navigation }: { navigation: any }) {
-  const { signIn, signInWithGoogle } = useAuth();
+  const { signIn, signInWithGoogle, sendPasswordReset } = useAuth();
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetMessage, setResetMessage] = useState<null | { text: string; type: 'error' | 'info' }>(null);
   const [focusField, setFocusField] = useState<'email' | 'password' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const insets = useSafeAreaInsets();
@@ -32,6 +34,24 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
       setLoginError(message);
     }
     setIsSubmitting(false);
+  };
+
+  const handlePasswordReset = async () => {
+    if (!email.trim()) {
+      setResetMessage({ text: 'Enter your email to reset the password.', type: 'error' });
+      return;
+    }
+    setIsResetting(true);
+    const error = await sendPasswordReset(email.trim());
+    if (error) {
+      setResetMessage({ text: error, type: 'error' });
+    } else {
+      setResetMessage({
+        text: `We just sent password reset instructions to ${email.trim()}.`,
+        type: 'info',
+      });
+    }
+    setIsResetting(false);
   };
 
   const inputBorderColor = (field: 'email' | 'password') =>
@@ -132,14 +152,48 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
             </View>
           </View>
 
-        <TouchableOpacity style={[styles.forgotButton, { alignSelf: 'flex-end' }]} onPress={() => {}}>
-          <Text style={[styles.forgotText, { color: theme.colors.accent }]}>Forgot Password?</Text>
+        <TouchableOpacity
+          style={[styles.forgotButton, { alignSelf: 'flex-end' }]}
+          onPress={handlePasswordReset}
+        >
+          <Text style={[styles.forgotText, { color: theme.colors.accent, opacity: isResetting ? 0.6 : 1 }]}>
+            {isResetting ? 'Sending reset link…' : 'Forgot Password?'}
+          </Text>
         </TouchableOpacity>
+        {resetMessage ? (
+          <View
+            style={[
+              styles.resetMessage,
+              {
+                borderColor:
+                  resetMessage.type === 'error' ? theme.colors.danger : theme.colors.success,
+                backgroundColor:
+                  resetMessage.type === 'error'
+                    ? 'rgba(225, 29, 72, 0.08)'
+                    : 'rgba(16, 185, 129, 0.08)',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.resetMessageText,
+                {
+                  color: resetMessage.type === 'error' ? theme.colors.danger : theme.colors.success,
+                },
+              ]}
+            >
+              {resetMessage.text}
+            </Text>
+          </View>
+        ) : null}
         {loginError ? (
           <View
             style={[
               styles.loginError,
-              { borderColor: theme.colors.danger, marginTop: styles.loginError.marginTop },
+              {
+                borderColor: theme.colors.danger,
+                backgroundColor: 'rgba(225, 29, 72, 0.08)',
+              },
             ]}
           >
             <Text style={[styles.loginErrorText, { color: theme.colors.danger }]}>{loginError}</Text>
@@ -229,6 +283,16 @@ const styles = StyleSheet.create({
   forgotText: {
     fontSize: 15,
     fontWeight: '700',
+  },
+  resetMessage: {
+    fontSize: 12,
+    marginTop: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  resetMessageText: {
+    fontSize: 12,
   },
   error: {
     fontSize: 12,

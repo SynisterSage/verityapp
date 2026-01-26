@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+
 import { useTheme } from '../../context/ThemeContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
+import { supabase } from '../../services/supabase';
 import type { AppTheme } from '../../theme/tokens';
 import type { RootStackParamList } from '../../navigation/types';
 import type { RouteProp, NavigationProp } from '@react-navigation/native';
@@ -21,44 +23,104 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const styles = useMemo(() => createConfirmEmailStyles(theme), [theme]);
+  const topInset = Math.max(insets.top + theme.spacing.md, theme.spacing.xl);
+  const bottomInset = Math.max(insets.bottom, theme.spacing.lg);
+  const footerBuffer = bottomInset + theme.spacing.xxl + theme.spacing.xxl + 80;
+  const [resendState, setResendState] = useState<null | { type: 'success' | 'error'; message: string }>(null);
+  const [isResending, setIsResending] = useState(false);
+
+  const handleResendEmail = useCallback(async () => {
+    setIsResending(true);
+    setResendState(null);
+    const { error } = await supabase.auth.resend({
+      email,
+      type: 'signup',
+      options: {
+        emailRedirectTo: 'exp://192.168.1.174:8081/--/auth/callback',
+      },
+    });
+    if (error) {
+      setResendState({ type: 'error', message: error.message });
+    } else {
+      setResendState({
+        type: 'success',
+        message: `We just sent another confirmation link to ${email}.`,
+      });
+    }
+    setIsResending(false);
+  }, [email]);
 
   return (
     <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
         <ScrollView
+          style={styles.scrollView}
           contentContainerStyle={[
             styles.content,
-            { paddingBottom: Math.max(insets.bottom, 32) + 120 },
+            {
+              paddingTop: topInset,
+              paddingBottom: footerBuffer,
+            },
           ]}
           showsVerticalScrollIndicator={false}
         >
-          <Ionicons
-            name="mail-open-outline"
-            size={48}
-            color={theme.colors.accent}
-            style={styles.icon}
-          />
-          <Text style={styles.title}>Confirm your email</Text>
-          <Text style={styles.subtitle}>
-            We just sent a confirmation link to the email below. Open it to finish creating your
-            account.
-          </Text>
-          <Text style={styles.email}>{email}</Text>
-          <Text style={styles.body}>
-            When you tap the link, Supabase will redirect back to this app via your configured
-            deep link (e.g. <Text style={styles.inlineCode}>verity-protect://auth/callback</Text>).
-            If the app does not open automatically, return here and tap “Continue to sign in.”
-          </Text>
-          <Text style={styles.body}>
-            If you don’t see the message, check your spam folder or resend the verification from
-            Supabase—some delays can happen.
-          </Text>
+          <View style={styles.header}>
+            <View style={styles.badge}>
+              <Ionicons name="mail-open-outline" size={60} color={theme.colors.surface} />
+            </View>
+            <Text style={styles.title}>Almost there</Text>
+            <Text style={styles.subtitle}>An email is on its way to:</Text>
+            <Text style={styles.email}>{email}</Text>
+          </View>
+          <View style={styles.stepCard}>
+            <Text style={styles.stepTitle}>Next steps</Text>
+            <View style={styles.stepRow}>
+              <Text style={styles.stepBullet}>•</Text>
+              <Text style={styles.stepText}>Open your inbox and find the message we just sent.</Text>
+            </View>
+            <View style={styles.stepRow}>
+              <Text style={styles.stepBullet}>•</Text>
+              <Text style={styles.stepText}>Tap the “Confirm email” link—this will bring you back here.</Text>
+            </View>
+            <View style={styles.stepRow}>
+              <Text style={styles.stepBullet}>•</Text>
+              <Text style={styles.stepText}>When you see this page again, tap “Continue to sign in.”</Text>
+            </View>
+          </View>
+          <View style={styles.helpCard}>
+            <Text style={styles.helpTitle}>Need a hand?</Text>
+            <Text style={styles.helpText}>
+              Confirmation emails usually appear within a minute. Keep this screen open while you check your inbox and spam folder.
+            </Text>
+            <Text style={styles.helpText}>
+              Still nothing? Tap “Resend email” and we’ll send a fresh link right away.
+            </Text>
+            <Pressable
+              style={({ pressed }) => [
+                styles.resendButton,
+                pressed && styles.resendButtonPressed,
+                isResending && styles.resendButtonLoading,
+              ]}
+              onPress={handleResendEmail}
+              disabled={isResending}
+            >
+              <Text style={styles.resendButtonText}>{isResending ? 'Resending…' : 'Resend email'}</Text>
+            </Pressable>
+            {resendState ? (
+              <Text
+                style={[
+                  styles.resendFeedback,
+                  resendState.type === 'error' ? styles.feedbackError : styles.feedbackSuccess,
+                ]}
+              >
+                {resendState.message}
+              </Text>
+            ) : null}
+          </View>
         </ScrollView>
         <ActionFooter
           primaryLabel="Continue to sign in"
           onPrimaryPress={() => navigation.navigate('SignIn')}
-          secondaryLabel="Back to sign in"
-          onSecondaryPress={() => navigation.navigate('SignIn')}
         />
       </SafeAreaView>
     </View>
@@ -76,14 +138,25 @@ const createConfirmEmailStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.bg,
     },
     content: {
-      flex: 1,
-      paddingTop: 48,
+      flexGrow: 1,
+      minHeight: '100%',
       paddingHorizontal: theme.spacing.lg,
       gap: theme.spacing.md,
       alignItems: 'center',
     },
-    icon: {
-      marginBottom: theme.spacing.sm,
+    header: {
+      width: '100%',
+      alignItems: 'center',
+      gap: theme.spacing.sm,
+    },
+    badge: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: theme.spacing.md,
     },
     title: {
       fontSize: 28,
@@ -93,22 +166,97 @@ const createConfirmEmailStyles = (theme: AppTheme) =>
     },
     subtitle: {
       fontSize: 16,
-      color: theme.colors.textMuted,
+      color: theme.colors.textDim,
       textAlign: 'center',
     },
     email: {
-      marginTop: theme.spacing.sm,
+      marginTop: 0,
       color: theme.colors.text,
       fontWeight: '600',
       fontSize: 16,
     },
-    body: {
+    stepCard: {
+      width: '100%',
+      backgroundColor: theme.colors.surfaceAlt,
+      borderRadius: theme.radii.md,
+      padding: theme.spacing.md,
+      gap: theme.spacing.sm,
+    },
+    stepTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    stepRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: theme.spacing.sm,
+    },
+    stepBullet: {
+      color: theme.colors.accent,
+      fontSize: 18,
+      lineHeight: 24,
+    },
+    stepText: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.colors.text,
+      lineHeight: 20,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    helpCard: {
+      width: '100%',
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.radii.md,
+      padding: theme.spacing.md,
+      gap: theme.spacing.sm,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: theme.spacing.xxl,
+    },
+    helpTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    helpText: {
       fontSize: 14,
       color: theme.colors.textDim,
+      lineHeight: 20,
+    },
+    resendButton: {
+      marginTop: theme.spacing.sm,
+      paddingVertical: theme.spacing.sm,
+      borderRadius: theme.radii.md,
+      borderWidth: 1,
+      borderColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+    },
+    resendButtonPressed: {
+      opacity: 0.8,
+    },
+    resendButtonLoading: {
+      opacity: 0.6,
+    },
+    resendButtonText: {
+      color: theme.colors.accent,
+      fontWeight: '600',
+      fontSize: 16,
+    },
+    resendFeedback: {
+      marginTop: theme.spacing.xs,
+      fontSize: 14,
+      fontWeight: '500',
       textAlign: 'center',
     },
-    inlineCode: {
-      fontWeight: '600',
-      color: theme.colors.text,
+    feedbackError: {
+      color: theme.colors.danger,
+    },
+    feedbackSuccess: {
+      color: theme.colors.success,
     },
   });

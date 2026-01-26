@@ -17,6 +17,7 @@ type AuthContextValue = {
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (email: string, password: string) => Promise<SignUpResult>;
+  sendPasswordReset: (email: string) => Promise<string | null>;
   signInWithGoogle: () => Promise<string | null>;
   signOut: () => Promise<void>;
 };
@@ -104,6 +105,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           error: error ? error.message : null,
           needsConfirmation: !error && !data?.session,
         };
+      },
+      sendPasswordReset: async (email) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: 'exp://192.168.1.174:8081/--/auth/callback',
+        });
+        return error ? error.message : null;
       },
       signInWithGoogle: async () => {
         const redirectTo = 'exp://192.168.1.174:8081/--/auth/callback';
