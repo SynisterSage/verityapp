@@ -9,9 +9,16 @@ type ActionFooterProps = {
   onPrimaryPress: () => void;
   primaryLoading?: boolean;
   primaryDisabled?: boolean;
+  primaryIcon?: ReactNode;
+  primaryBackgroundColor?: string;
+  primaryTextColor?: string;
   secondaryLabel?: string;
   onSecondaryPress?: () => void;
   secondaryIcon?: ReactNode;
+  secondaryBackgroundColor?: string;
+  secondaryTextColor?: string;
+  secondaryDisabled?: boolean;
+  secondaryLoading?: boolean;
   helperPrefix?: string;
   helperActionLabel?: string;
   onHelperPress?: () => void;
@@ -23,9 +30,16 @@ export default function ActionFooter({
   onPrimaryPress,
   primaryLoading,
   primaryDisabled,
+  primaryIcon,
+  primaryBackgroundColor,
+  primaryTextColor,
   secondaryLabel,
   onSecondaryPress,
   secondaryIcon,
+  secondaryBackgroundColor,
+  secondaryTextColor,
+  secondaryDisabled,
+  secondaryLoading,
   helperPrefix,
   helperActionLabel,
   onHelperPress,
@@ -54,14 +68,23 @@ export default function ActionFooter({
           style={[
             styles.primaryButton,
             {
-              backgroundColor: theme.colors.accent,
+              backgroundColor: primaryBackgroundColor ?? theme.colors.accent,
               opacity: primaryDisabled || primaryLoading ? 0.5 : 1,
             },
           ]}
           onPress={onPrimaryPress}
           disabled={primaryDisabled || primaryLoading}
         >
-          <Text style={[styles.primaryButtonText, { fontFamily: theme.typography.fontFamily }]}>
+          {primaryIcon ? <View style={styles.primaryIcon}>{primaryIcon}</View> : null}
+          <Text
+            style={[
+              styles.primaryButtonText,
+              {
+                fontFamily: theme.typography.fontFamily,
+                color: primaryTextColor ?? '#fff',
+              },
+            ]}
+          >
             {primaryLoading ? 'Working…' : primaryLabel}
           </Text>
         </TouchableOpacity>
@@ -74,19 +97,24 @@ export default function ActionFooter({
             styles.secondaryButton,
             {
               borderColor: theme.colors.border,
-              backgroundColor: theme.colors.surfaceAlt,
+              backgroundColor: secondaryBackgroundColor ?? theme.colors.surfaceAlt,
+              opacity: secondaryDisabled || secondaryLoading ? 0.5 : 1,
             },
           ]}
           onPress={onSecondaryPress}
+          disabled={secondaryDisabled || secondaryLoading}
         >
           {secondaryIcon ? <View style={styles.secondaryIcon}>{secondaryIcon}</View> : null}
           <Text
             style={[
               styles.secondaryButtonText,
-              { fontFamily: theme.typography.fontFamily, color: theme.colors.text },
+              {
+                fontFamily: theme.typography.fontFamily,
+                color: secondaryTextColor ?? theme.colors.text,
+              },
             ]}
           >
-            {secondaryLabel}
+            {secondaryLoading ? 'Working…' : secondaryLabel}
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -136,11 +164,15 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   primaryButton: {
-    height: 60,
+    height: 64,
     borderRadius: 24,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
+    flexDirection: 'row',
+  },
+  primaryIcon: {
+    marginRight: 8,
   },
   primaryButtonText: {
     color: '#fff',
@@ -151,7 +183,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 60,
+    height: 64,
     borderRadius: 24,
     borderWidth: 1,
     marginBottom: 12,

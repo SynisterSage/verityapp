@@ -14,12 +14,17 @@ import { InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av/build/Audi
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import ActionFooter from '../../components/onboarding/ActionFooter';
+import * as Haptics from 'expo-haptics';
+import { tokens } from '../../theme/tokens';
+import { withOpacity } from '../../utils/color';
 
 import { supabase } from '../../services/supabase';
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import { emitCallUpdated } from '../../utils/callEvents';
 import { getRiskStyles } from '../../utils/risk';
+import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 
 type FraudNotes = {
   safePhraseMatches?: string[];
@@ -114,6 +119,20 @@ function highlightTranscript(text: string, fraudKeywords: string[], safeKeywords
   return segments;
 }
 
+const formatDateLabel = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const formatTimeLabel = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+};
+
 export default function CallDetailScreen({
   route,
 }: {
@@ -130,8 +149,11 @@ export default function CallDetailScreen({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingAudio, setIsLoadingAudio] = useState(false);
   const [recordingStatus, setRecordingStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [isMarkingSafe, setIsMarkingSafe] = useState(false);
+  const [isMarkingFraud, setIsMarkingFraud] = useState(false);
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const riskBarAnim = useRef(new Animated.Value(0)).current;
+  const transcriptAnim = useRef(new Animated.Value(0)).current;
   const [audioModeConfigured, setAudioModeConfigured] = useState(false);
 
   const fetchRecordingLink = useCallback(async () => {
@@ -316,6 +338,12 @@ export default function CallDetailScreen({
     if (!canProceed) {
       return;
     }
+    const isSafe = status === 'marked_safe';
+    if (isSafe) {
+      setIsMarkingSafe(true);
+    } else {
+      setIsMarkingFraud(true);
+    }
     try {
       await authorizedFetch(`/calls/${callId}/feedback`, {
         method: 'PATCH',
@@ -358,6 +386,37 @@ export default function CallDetailScreen({
     } catch (err) {
       Alert.alert('Error', 'Failed to save feedback');
     }
+    finally {
+      if (isSafe) {
+        setIsMarkingSafe(false);
+      } else {
+        setIsMarkingFraud(false);
+      }
+    }
+  };
+
+  const handleMarkFraud = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    markFeedback('marked_fraud');
+  };
+
+  const handleMarkSafe = () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    markFeedback('marked_safe');
+  };
+
+  const handleBackPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    navigation.goBack();
+  };
+
+  const handleRecordingPress = () => {
+    Haptics.selectionAsync();
+    if (recordingStatus === 'error') {
+      retryUrl();
+    } else {
+      playOrPause();
+    }
   };
 
   const safePhraseMatches = useMemo(() => {
@@ -382,12 +441,30 @@ export default function CallDetailScreen({
     () => getRiskStyles(callRow?.fraud_risk_level ?? 'unknown'),
     [callRow?.fraud_risk_level]
   );
+  const safeRiskStyle = useMemo(() => getRiskStyles('low'), []);
+  const safeButtonStyle = useMemo(
+    () => ({
+      accent: '#7dd9b0',
+      background: withOpacity(tokens.colors.dark.success, 0.14),
+    }),
+    []
+  );
+  const fraudButtonStyle = useMemo(() => getRiskStyles('critical'), []);
+  const fraudHighlightColor = useMemo(
+    () => withOpacity(fraudRiskStyle.accent, 0.35),
+    [fraudRiskStyle.accent]
+  );
+  const safeHighlightColor = useMemo(
+    () => withOpacity(safeRiskStyle.accent, 0.3),
+    [safeRiskStyle.accent]
+  );
   useEffect(() => {
     if (!callRow) {
       return;
     }
     highlightAnim.setValue(0);
     riskBarAnim.setValue(0);
+    transcriptAnim.setValue(0);
     Animated.timing(highlightAnim, {
       toValue: 1,
       duration: 450,
@@ -398,7 +475,13 @@ export default function CallDetailScreen({
       duration: 700,
       useNativeDriver: false,
     }).start();
-  }, [callRow, highlightAnim, riskBarAnim]);
+    Animated.timing(transcriptAnim, {
+      toValue: 1,
+      duration: 550,
+      delay: 50,
+      useNativeDriver: true,
+    }).start();
+  }, [callRow, highlightAnim, riskBarAnim, transcriptAnim]);
   const riskBarWidth = riskBarAnim.interpolate({
     inputRange: [0, 100],
     outputRange: ['0%', '100%'],
@@ -406,12 +489,44 @@ export default function CallDetailScreen({
   });
   const highlightBackground = highlightAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255, 182, 193, 0)', 'rgba(255, 182, 193, 0.28)'],
+    outputRange: ['rgba(0, 0, 0, 0)', fraudHighlightColor],
   });
   const safeHighlightBackground = highlightAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(71, 214, 165, 0)', 'rgba(71, 214, 165, 0.2)'],
+    outputRange: ['rgba(0, 0, 0, 0)', safeHighlightColor],
   });
+  const transcriptAnimationStyle = useMemo(
+    () => ({
+      opacity: transcriptAnim,
+      transform: [
+        {
+          translateY: transcriptAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [12, 0],
+          }),
+        },
+      ],
+    }),
+    [transcriptAnim]
+  );
+  const riskStyles = useMemo(
+    () => getRiskStyles(callRow?.fraud_risk_level ?? 'unknown'),
+    [callRow?.fraud_risk_level]
+  );
+  const riskAccent = riskStyles.accent;
+  const intelligenceTitle = useMemo(() => {
+    const score = callRow?.fraud_score ?? 0;
+    if (score <= 10) {
+      return { title: 'Call verified', subtitle: 'Automatic screening, no concerns' };
+    }
+    if (score <= 35) {
+      return { title: 'Low risk', subtitle: 'Proceed with caution, monitor patterns' };
+    }
+    if (score <= 70) {
+      return { title: 'Elevated risk', subtitle: 'Behaviors resemble known scams' };
+    }
+    return { title: 'Fraud detected', subtitle: 'High probability of malicious intent' };
+  }, [callRow?.fraud_score]);
 
   if (!callRow) {
     return (
@@ -442,175 +557,229 @@ export default function CallDetailScreen({
     );
   }
 
+
   const baseTopPadding = Math.max(16, insets.top + 4);
   const containerPaddingTop = isCompactModal ? Math.max(12, insets.top + 2) : baseTopPadding;
-  const contentPaddingTop = isCompactModal ? 4 : 16;
+  const contentPaddingBottom = Math.max(insets.bottom + 88, 240);
+  const heroNumber = callRow?.caller_number
+    ? formatPhoneNumber(callRow.caller_number, 'Unknown caller')
+    : 'Unknown caller';
+  const heroDate = formatDateLabel(callRow?.created_at);
+  const heroTime = formatTimeLabel(callRow?.created_at);
+  const heroMeta = [heroDate, heroTime].filter(Boolean).join(' • ');
+  const riskScoreDisplay =
+    callRow?.fraud_score != null ? `${Math.round(callRow.fraud_score)}%` : '—';
+  const riskLevelLabel = (callRow?.fraud_risk_level ?? 'Unknown').toUpperCase();
+  const keywordTags = callRow?.fraud_keywords?.slice(0, 4) ?? [];
+  const recordingLabel =
+    recordingStatus === 'ready' ? 'Ready' : recordingStatus === 'loading' ? 'Loading' : 'Unavailable';
+  const playDisabled = recordingStatus === 'error' || recordingStatus === 'loading';
+  const footerDisabledSafe = callRow.feedback_status === 'marked_safe';
+  const footerDisabledFraud = callRow.feedback_status === 'marked_fraud';
+  const disabledButtonBackground = '#111627';
+  const disabledButtonText = '#8ea1c7';
+  const primaryBackgroundColor = footerDisabledFraud
+    ? disabledButtonBackground
+    : fraudButtonStyle.background;
+  const primaryTextColor = footerDisabledFraud ? disabledButtonText : fraudButtonStyle.accent;
+  const secondaryBackgroundColor = footerDisabledSafe
+    ? disabledButtonBackground
+    : safeButtonStyle.background;
+  const secondaryTextColor = footerDisabledSafe ? disabledButtonText : safeButtonStyle.accent;
 
   return (
-    <SafeAreaView
-      style={[styles.container, { paddingTop: containerPaddingTop }]}
-      edges={[]}
-    >
+    <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]} edges={[]}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
           <Ionicons name="chevron-back" size={22} color="#e4ebf7" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Call Detail</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Call Details</Text>
+        </View>
       </View>
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: contentPaddingTop }]}
+        contentContainerStyle={[styles.content, { paddingBottom: contentPaddingBottom }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.caller}>{callRow.caller_number ?? 'Unknown caller'}</Text>
-        <Text style={styles.meta}>{new Date(callRow.created_at).toLocaleString()}</Text>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Transcript</Text>
-          {callRow.transcript ? (
-            <Text style={styles.body}>
-              {highlightedTranscript.map((segment, index) =>
-                segment.type ? (
-                  <AnimatedText
-                    key={`segment-${index}`}
-                    style={[
-                      styles.transcriptHighlightText,
-                      segment.type === 'safe' && styles.transcriptSafeHighlightText,
-                      {
-                        backgroundColor:
-                          segment.type === 'safe' ? safeHighlightBackground : highlightBackground,
-                      },
-                    ]}
-                  >
-                    {segment.text}
-                  </AnimatedText>
-                ) : (
-                  <Text key={`segment-${index}`}>{segment.text}</Text>
-                )
-              )}
-            </Text>
-          ) : (
-            <Text style={styles.body}>No transcript</Text>
-          )}
+        <View style={styles.heroBlock}>
+          <Text style={styles.heroNumber}>{heroNumber}</Text>
+          {heroMeta ? (
+            <View style={styles.heroMeta}>
+              <Ionicons name="time-outline" size={12} color="#8aa0c6" />
+              <Text style={styles.heroMetaText}>{heroMeta}</Text>
+            </View>
+          ) : null}
+        </View>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Transcript</Text>
+          <View style={styles.card}>
+            <Animated.View style={[styles.cardContent, transcriptAnimationStyle]}>
+              {callRow?.transcript ? (
+                <Text style={styles.cardBody}>
+                  {highlightedTranscript.map((segment, index) =>
+                    segment.type ? (
+                      <AnimatedText
+                        key={`segment-${index}`}
+                        style={[
+                          styles.cardBody,
+                          segment.type === 'fraud' && styles.keywordHighlight,
+                          segment.type === 'safe' && styles.safeKeywordHighlight,
+                          segment.type === 'fraud'
+                            ? {
+                                backgroundColor: highlightBackground,
+                                color: fraudRiskStyle.accent,
+                              }
+                            : {
+                                backgroundColor: safeHighlightBackground,
+                                color: safeRiskStyle.accent,
+                              },
+                        ]}
+                      >
+                        {segment.text}
+                      </AnimatedText>
+                  ) : (
+                    <Text key={`segment-${index}`} style={styles.cardBody}>
+                      {segment.text}
+                    </Text>
+                  )
+                )}
+              </Text>
+            ) : (
+              <Text style={styles.cardBody}>No transcript available.</Text>
+            )}
+            </Animated.View>
+          </View>
         </View>
 
-        <View style={[styles.card, styles.fraudCard]}>
-          <Text style={styles.sectionTitle}>Fraud</Text>
-          <View style={styles.riskRow}>
-            <Text style={[styles.scoreText, { color: fraudRiskStyle.text }]}>Score: {callRow.fraud_score ?? '—'}</Text>
-            <View
-              style={[
-                styles.badge,
-                {
-                  borderColor: fraudRiskStyle.accent,
-                  backgroundColor: fraudRiskStyle.background,
-                },
-              ]}
-            >
-              <Text style={[styles.badgeText, { color: fraudRiskStyle.text }]}> 
-                {callRow.fraud_risk_level?.toUpperCase() ?? 'UNKNOWN'}
-              </Text>
-            </View>
-          </View>
-          {isSafeCall ? (
-            <>
-              <Text style={styles.safeCaption}>Safe call</Text>
-              <Text style={styles.safeNote}>No suspicious behavior detected.</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.body}>
-                Keywords:{' '}
-                {callRow.fraud_keywords && callRow.fraud_keywords.length > 0
-                  ? callRow.fraud_keywords.join(', ')
-                  : '—'}
-              </Text>
-              <View style={styles.riskBar}>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Intelligence</Text>
+          <View style={[styles.card, styles.intelCard]}>
+            <View style={styles.cardContent}>
+              <View style={styles.intelHeader}>
+                <View
+                  style={[
+                    styles.iconBox,
+                    { backgroundColor: withOpacity(riskAccent, 0.25) },
+                  ]}
+                > 
+                  <Ionicons name="shield-checkmark-outline" size={22} color={riskAccent} />
+                </View>
+                <View style={styles.intelText}>
+                  <Text style={styles.intelTitle}>{intelligenceTitle.title}</Text>
+                  <Text style={styles.intelSubtitle}>{intelligenceTitle.subtitle}</Text>
+                </View>
+                <View
+                  style={[
+                    styles.badge,
+                    {
+                      borderColor: withOpacity(riskAccent, 0.5),
+                      backgroundColor: withOpacity(riskAccent, 0.16),
+                    },
+                  ]}
+                > 
+                  <Text
+                    style={[
+                      styles.badgeText,
+                      { color: riskAccent },
+                    ]}
+                  >
+                    {riskLevelLabel}
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.scoreRow}>
+                <Text style={styles.scoreLabel}>Risk score</Text>
+                <Text style={[styles.scoreNumber, { color: riskAccent }]}>{riskScoreDisplay}</Text>
+              </View>
+              <View style={styles.progressTrack}>
                 <Animated.View
                   style={[
-                    styles.riskFill,
+                    styles.progressFill,
                     {
                       width: riskBarWidth,
-                      backgroundColor: fraudRiskStyle.accent,
+                      backgroundColor: riskAccent,
+                      shadowColor: riskAccent,
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowRadius: riskScoreDisplay === '100%' ? 12 : 0,
+                      shadowOpacity: riskScoreDisplay === '100%' ? 0.45 : 0,
                     },
                   ]}
                 />
               </View>
-            </>
-          )}
-          {safePhraseMatches.length > 0 && (
-            <View style={styles.safePhraseBlock}>
-              <Text style={styles.safePhraseLabel}>Trusted phrase{safePhraseMatches.length > 1 ? 's' : ''}</Text>
-              <Text style={styles.safePhraseText}>{safePhraseMatches.join(', ')}</Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.recordingHeader}>
-            <Text style={styles.sectionTitle}>Recording</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {recordingStatus === 'loading'
-                  ? 'Loading'
-                  : recordingStatus === 'error'
-                  ? 'Unavailable'
-                  : isPlaying
-                  ? 'Playing'
-                  : 'Ready'}
-              </Text>
+              <View style={styles.keywordRow}>
+                {keywordTags.length === 0 ? (
+                  <Text style={styles.keywordFallback}>No keywords detected.</Text>
+                ) : (
+                  keywordTags.map((keyword) => (
+                    <View key={keyword} style={styles.keywordPill}>
+                      <Text style={styles.keywordText}>{keyword}</Text>
+                    </View>
+                  ))
+                )}
+              </View>
             </View>
           </View>
-          <TouchableOpacity
-            style={[styles.playButton, recordingStatus === 'error' && styles.playButtonError]}
-            onPress={recordingStatus === 'error' ? retryUrl : playOrPause}
-            disabled={isLoadingAudio || recordingStatus === 'loading'}
-          >
-            {isLoadingAudio || recordingStatus === 'loading' ? (
-              <ActivityIndicator color="#f5f7fb" />
-            ) : (
-              <Text style={styles.playText}>
-                {recordingStatus === 'error' ? 'Retry' : isPlaying ? 'Pause' : 'Play'}
-              </Text>
-            )}
-          </TouchableOpacity>
-          {recordingStatus === 'error' ? (
-            <Text style={styles.hint}>Recording link not ready yet. Tap retry.</Text>
-          ) : null}
         </View>
 
-        {canManageProfile && (
-          <View style={styles.actions}>
-            <TouchableOpacity
-              style={[
-                styles.secondaryButton,
-                callRow.feedback_status === 'marked_safe' && styles.buttonDisabled,
-              ]}
-              onPress={() => markFeedback('marked_safe')}
-              activeOpacity={0.85}
-              disabled={callRow.feedback_status === 'marked_safe'}
-            >
-              <Ionicons name="checkmark-circle-outline" size={18} color="#cfe0ff" />
-              <Text style={styles.secondaryText}>
-                {callRow.feedback_status === 'marked_safe' ? 'Marked Safe' : 'Mark Safe'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.dangerButton,
-                callRow.feedback_status === 'marked_fraud' && styles.buttonDisabled,
-              ]}
-              onPress={() => markFeedback('marked_fraud')}
-              activeOpacity={0.85}
-              disabled={callRow.feedback_status === 'marked_fraud'}
-            >
-              <Ionicons name="warning-outline" size={18} color="#ffe3e3" />
-              <Text style={styles.dangerText}>
-                {callRow.feedback_status === 'marked_fraud' ? 'Marked Fraud' : 'Mark Fraud'}
-              </Text>
-            </TouchableOpacity>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Recording</Text>
+          <View style={styles.card}>
+            <View style={styles.cardContent}>
+              <View style={styles.recordingHeader}>
+                <View style={[styles.iconBox, { backgroundColor: 'rgba(76, 125, 255, 0.2)' }]}> 
+                  <Ionicons name="pulse-outline" size={20} color="#4c7dff" />
+                </View>
+                <View style={styles.intelText}>
+                  <Text style={styles.recordingTitle}>Call capture</Text>
+                </View>
+                <View style={[styles.recordingBadge, recordingStatus === 'ready' && styles.recordingBadgeReady]}>
+                  <Text style={[styles.badgeText, styles.recordingBadgeText]}>{recordingLabel}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.playButton,
+                  isPlaying ? styles.playButtonActive : styles.playButtonIdle,
+                  playDisabled && styles.playButtonDisabled,
+                ]}
+                onPress={handleRecordingPress}
+                disabled={isLoadingAudio || recordingStatus === 'loading'}
+              >
+                {isLoadingAudio || recordingStatus === 'loading' ? (
+                  <ActivityIndicator color="#f5f7fb" />
+                ) : (
+                  <Text style={styles.playButtonText}>
+                    {isPlaying ? 'Playing…' : 'Listen to message'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+              {recordingStatus === 'error' && (
+                <Text style={styles.hint}>Recording link not ready yet. Tap retry.</Text>
+              )}
+            </View>
           </View>
-        )}
+        </View>
       </ScrollView>
+      {canManageProfile && (
+      <ActionFooter
+        primaryLabel={footerDisabledFraud ? 'Marked fraud' : 'Mark fraud'}
+        onPrimaryPress={handleMarkFraud}
+        primaryDisabled={footerDisabledFraud}
+        primaryLoading={isMarkingFraud}
+        primaryIcon={<Ionicons name="ban-outline" size={20} color={primaryTextColor} />}
+        primaryBackgroundColor={primaryBackgroundColor}
+        primaryTextColor={primaryTextColor}
+        secondaryLabel={footerDisabledSafe ? 'Marked safe' : 'Mark safe'}
+        onSecondaryPress={handleMarkSafe}
+        secondaryIcon={
+          <Ionicons name="checkmark-circle-outline" size={20} color={secondaryTextColor} />
+        }
+        secondaryBackgroundColor={secondaryBackgroundColor}
+        secondaryTextColor={secondaryTextColor}
+        secondaryDisabled={footerDisabledSafe}
+        secondaryLoading={isMarkingSafe}
+      />
+    )}
     </SafeAreaView>
   );
 }
@@ -619,14 +788,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0f141d',
-    marginBottom: 30,
   },
   header: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingTop: 0,
-    paddingBottom: 2,
+    paddingBottom: 22,
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
   backButton: {
     width: 36,
@@ -640,177 +809,204 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: '#f5f7fb',
-    fontSize: 28,
-    fontWeight: '700',
-    marginLeft: 12,
+    fontSize: 20,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  heroNumber: {
+    color: '#f5f7fb',
+    fontSize: 26,
+    fontWeight: '600',
+  },
+  heroMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  heroMetaText: {
+    color: '#8aa0c6',
+    marginLeft: 6,
+    letterSpacing: 0.1,
+    fontSize: 12,
   },
   content: {
     paddingHorizontal: 24,
-    paddingTop: 0,
-    paddingBottom: 120,
+    paddingTop: 8,
   },
-  caller: {
-    color: '#cbd6ea',
-    marginTop: 4,
-    fontSize: 15,
+  heroBlock: {
+    paddingTop: 12,
+    paddingBottom: 18,
   },
-  meta: {
+  section: {
+    marginBottom: 24,
+  },
+  sectionLabel: {
     color: '#8aa0c6',
-    marginTop: 6,
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+    marginBottom: 10,
   },
   card: {
-    marginTop: 16,
+    position: 'relative',
     backgroundColor: '#121a26',
-    borderRadius: 14,
-    padding: 16,
+    borderRadius: 32,
+    padding: 24,
     borderWidth: 1,
-    borderColor: '#202c3c',
+    borderColor: '#1f2332',
+    overflow: 'hidden',
   },
-  fraudCard: {
-    borderColor: '#1f293a',
+  intelCard: {
+    borderColor: '#1f2332',
   },
-  riskRow: {
+  cardContent: {
+    marginLeft: 0,
+  },
+  cardBody: {
+    color: '#f5f7fb',
+    fontSize: 17,
+    lineHeight: 26,
+  },
+  keywordHighlight: {
+    fontWeight: '700',
+  },
+  safeKeywordHighlight: {
+    fontWeight: '700',
+  },
+  intelHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 16,
   },
-  scoreText: {
-    fontWeight: '600',
+  iconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  sectionTitle: {
+  intelText: {
+    flex: 1,
+  },
+  intelTitle: {
     color: '#f5f7fb',
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  intelSubtitle: {
+    color: '#8aa0c6',
+    fontSize: 12,
+    letterSpacing: 0.2,
+  },
+  badge: {
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  badgeText: {
+    fontSize: 12,
     fontWeight: '600',
+  },
+  recordingBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: '#121a26',
+  },
+  recordingBadgeReady: {
+    backgroundColor: '#18213b',
+  },
+  recordingBadgeText: {
+    color: '#4c7dff',
+  },
+  scoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  scoreLabel: {
+    color: '#8aa0c6',
+    fontSize: 12,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  scoreNumber: {
+    color: '#e11d48',
+    fontSize: 28,
+    fontWeight: '700',
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 999,
+    backgroundColor: '#1b2232',
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  keywordRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  keywordPill: {
+    backgroundColor: '#1f2238',
+    borderRadius: 999,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    marginRight: 8,
     marginBottom: 8,
   },
-  body: {
-    color: '#d2daea',
-    lineHeight: 20,
-  },
-  transcriptHighlightText: {
-    color: '#ffaeb2',
-    borderRadius: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 0,
-    lineHeight: 20,
-    marginHorizontal: 0,
-  },
-  transcriptSafeHighlightText: {
-    color: '#a5f0e9',
-  },
-  safeCaption: {
-    color: '#8ab4ff',
+  keywordText: {
+    color: '#cbd6ea',
     fontSize: 12,
-    fontWeight: '500',
-    marginBottom: 6,
   },
-  safeNote: {
-    color: '#9fb0c9',
+  keywordFallback: {
+    color: '#8aa0c6',
     fontSize: 12,
-    marginBottom: 10,
-  },
-  safePhraseBlock: {
-    borderTopWidth: 1,
-    borderTopColor: '#1b2331',
-    marginTop: 12,
-    paddingTop: 10,
-  },
-  safePhraseLabel: {
-    color: '#98a7c2',
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
-    marginBottom: 2,
-  },
-  safePhraseText: {
-    color: '#71d6a5',
-    fontSize: 14,
-    fontWeight: '700',
   },
   recordingHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  recordingTitle: {
+    color: '#f5f7fb',
+    fontSize: 18,
+    fontWeight: '600',
   },
   playButton: {
-    backgroundColor: '#2d6df6',
-    paddingVertical: 12,
-    borderRadius: 12,
+    height: 52,
+    borderRadius: 999,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  playButtonError: {
-    backgroundColor: '#8c3b3b',
+  playButtonIdle: {
+    backgroundColor: '#4c7dff',
   },
-  playText: {
+  playButtonActive: {
+    backgroundColor: '#203055',
+  },
+  playButtonDisabled: {
+    opacity: 0.6,
+  },
+  playButtonText: {
     color: '#f5f7fb',
+    fontSize: 16,
     fontWeight: '600',
   },
   hint: {
     color: '#8aa0c6',
     marginTop: 10,
-  },
-  badge: {
-    backgroundColor: '#20304a',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeText: {
-    color: '#8ab4ff',
-    fontSize: 12,
-  },
-  actions: {
-    marginTop: 20,
-    flexDirection: 'row',
-    gap: 12,
-  },
-  secondaryButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#2b3c57',
-    backgroundColor: '#111b2b',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  dangerButton: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#553a3a',
-    backgroundColor: '#3a1e22',
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  riskBar: {
-    marginTop: 12,
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: '#1d2737',
-    overflow: 'hidden',
-  },
-  riskFill: {
-    height: '100%',
-    borderRadius: 999,
-  },
-  secondaryText: {
-    color: '#d7e3f7',
-    fontWeight: '600',
-  },
-  dangerText: {
-    color: '#ffe3e3',
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
   },
   skeletonWrapper: {
     paddingHorizontal: 24,

@@ -144,6 +144,19 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'brokerage account', weight: 30, category: 'investment' },
   { phrase: 'trade confirmation', weight: 26, category: 'investment' },
   { phrase: 'transfer shares', weight: 28, category: 'investment' },
+  { phrase: 'margin call', weight: 34, category: 'investment' },
+  { phrase: 'stock options', weight: 32, category: 'investment' },
+  { phrase: 'option trading', weight: 30, category: 'investment' },
+  { phrase: 'call options', weight: 28, category: 'investment' },
+  { phrase: 'put options', weight: 28, category: 'investment' },
+  { phrase: 'options exercise', weight: 30, category: 'investment' },
+  { phrase: 'option assignment', weight: 30, category: 'investment' },
+  { phrase: 'stock option grant', weight: 26, category: 'investment' },
+  { phrase: 'online brokerage', weight: 24, category: 'investment' },
+  { phrase: 'brokerage platform', weight: 26, category: 'investment' },
+  { phrase: 'brokerage verification', weight: 26, category: 'investment' },
+  { phrase: 'portfolio manager', weight: 26, category: 'investment' },
+  { phrase: 'trading desk', weight: 24, category: 'investment' },
   { phrase: 'investment opportunity', weight: 28, category: 'investment' },
   { phrase: 'portfolio review', weight: 24, category: 'investment' },
   { phrase: 'trading platform', weight: 26, category: 'investment' },
@@ -208,6 +221,10 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'audit', weight: 14, category: 'government' },
   { phrase: 'license', weight: 14, category: 'government' },
   { phrase: 'penalty', weight: 14, category: 'government' },
+  { phrase: 'utility shut-off notice', weight: 30, category: 'authority' },
+  { phrase: 'marshal office', weight: 26, category: 'authority' },
+  { phrase: 'police bail warning', weight: 30, category: 'authority' },
+  { phrase: 'immigration hold notice', weight: 28, category: 'authority' },
 
   // Authority & legal
   { phrase: 'warrant notice', weight: 36, category: 'authority' },
@@ -251,6 +268,10 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'teamviewer code', weight: 24, category: 'tech' },
   { phrase: 'logmein code', weight: 24, category: 'tech' },
   { phrase: 'remote technician', weight: 24, category: 'tech' },
+  { phrase: 'security breach notice', weight: 26, category: 'tech' },
+  { phrase: 'device quarantine notice', weight: 26, category: 'tech' },
+  { phrase: 'account disabled', weight: 24, category: 'tech' },
+  { phrase: 'cyber security breach', weight: 26, category: 'tech' },
 
   // Medical & healthcare
   { phrase: 'doctor calling', weight: 28, category: 'medical' },
@@ -441,6 +462,15 @@ const COMBO_RULES = [
   { all: ['crypto', 'fraud department'], add: 14 },
   { all: ['package', 'money'], add: 16 },
   { all: ['identity', 'confirm'], add: 10 },
+  { all: ['margin call', 'urgent wire'], add: 18 },
+  { all: ['stock options', 'brokerage verification'], add: 16 },
+  { all: ['option trading', 'call options'], add: 10 },
+  { all: ['put options', 'options exercise'], add: 12 },
+  { all: ['online brokerage', 'transfer shares'], add: 14 },
+  { all: ['utility shut-off notice', 'pay now'], add: 18 },
+  { all: ['security breach notice', 'screen share'], add: 12 },
+  { all: ['organ transplant delay', 'medical debt collection'], add: 14 },
+  { all: ['police bail warning', 'transfer the money'], add: 16 },
   { all: ['warrant notice', 'pay now'], add: 18 },
   { all: ['court summons', 'urgent wire'], add: 16 },
   { all: ['laptop security scan', 'remote access'], add: 16 },
@@ -499,6 +529,9 @@ const THREAT_TERMS = [
   'police warrant',
   'legal order',
   'debt collection agent',
+  'utility shut-off notice',
+  'police bail warning',
+  'immigration hold notice',
 ];
 
 const AUTHORITY_TERMS = [
@@ -522,6 +555,10 @@ const AUTHORITY_TERMS = [
   'judge office',
   'immigration officer',
   'debt collection agent',
+  'utility shut-off notice',
+  'marshal office',
+  'police bail warning',
+  'immigration hold notice',
 ];
 
 const REMOTE_ACCESS_TERMS = [
@@ -543,6 +580,10 @@ const REMOTE_ACCESS_TERMS = [
   'teamviewer code',
   'logmein code',
   'remote technician',
+  'security breach notice',
+  'device quarantine notice',
+  'account disabled',
+  'cyber security breach',
 ];
 
 const GIFT_CARD_TERMS = [
@@ -863,6 +904,10 @@ const MEDICAL_TERMS = [
   'healthcare compliance',
   'hospital administrator',
   'medical emergency',
+  'organ transplant delay',
+  'medical debt collection',
+  'insurance audit',
+  'pharmacy pin',
 ];
 
 const DEVICE_TERMS = [
@@ -999,6 +1044,25 @@ const HARD_BLOCK_TERMS = [
   'anydesk',
   'remote access code',
   'remote session',
+  'warrant notice',
+  'court summons',
+  'police warrant',
+  'legal order',
+  'pretend warrant',
+  'doctor calling',
+  'urgent surgery',
+  'laptop security scan',
+  'install antivirus',
+  'remote technician',
+  'transfer the money',
+  'call me back immediately',
+  'margin call',
+  'stock options',
+  'utility shut-off notice',
+  'police bail warning',
+  'immigration hold notice',
+  'security breach notice',
+  'account disabled',
 ];
 
 const PAYMENT_REQUEST_PATTERNS = [
@@ -1029,6 +1093,21 @@ const HARD_BLOCK_PATTERNS = [
   /\bbrokerage\s+account\b/i,
   /\binvestment\s+opportunity\b/i,
   /\btransfer\s+shares\b/i,
+  /\bstock\s+options\b/i,
+  /\bmargin\s+call\b/i,
+  /\bwarrant\s+(notice|check)\b/i,
+  /\bcourt\s+sum(mons?)?\b/i,
+  /\bpolice\s+warrant\b/i,
+  /\blegal\s+order\b/i,
+  /\bdoctor\s+calling\b/i,
+  /\burgent\s+surgery\b/i,
+  /\blaptop\s+security\s+scan\b/i,
+  /\bremote\s+technician\b/i,
+  /\btransfer\s+the\s+money\b/i,
+  /\bcall\s+me\s+back\s+immediately\b/i,
+  /\butility\s+shut-off\b/i,
+  /\bsecurity\s+breach\b/i,
+  /\baccount\s+disabled\b/i,
 ];
 
 const MONEY_AMOUNT_PATTERNS = [
@@ -1369,6 +1448,8 @@ function heuristicBoosts(text: string) {
   );
   const carrierHits = countPhraseHits(text, CARRIER_TERMS);
   const investmentHits = countPhraseHits(text, INVESTMENT_TERMS);
+  const medicalHits = countPhraseHits(text, MEDICAL_TERMS);
+  const deviceHits = countPhraseHits(text, DEVICE_TERMS);
 
   let boost = 0;
   if (urgencyHits >= 2) boost += 10;
@@ -1413,6 +1494,15 @@ function heuristicBoosts(text: string) {
   if (investmentHits >= 2) boost += 6;
   if (investmentHits >= 1 && urgencyHits >= 1) boost += 8;
   if (investmentHits >= 1 && paymentAppHits >= 1) boost += 10;
+  if (medicalHits >= 1) boost += 14;
+  if (medicalHits >= 2) boost += 6;
+  if (medicalHits >= 1 && authorityHits >= 1) boost += 10;
+  if (medicalHits >= 1 && urgencyHits >= 1) boost += 6;
+  if (medicalHits >= 1 && paymentAppHits >= 1) boost += 8;
+  if (deviceHits >= 1) boost += 18;
+  if (deviceHits >= 2) boost += 6;
+  if (deviceHits >= 1 && remoteAccessHits >= 1) boost += 12;
+  if (deviceHits >= 1 && commandSensitiveHits > 0) boost += 8;
 
   if (secrecyHits >= 1 && paymentAppHits >= 1) boost += 12;
   if (urgencyHits >= 1 && paymentAppHits >= 1) boost += 8;
@@ -1438,6 +1528,7 @@ function heuristicBoosts(text: string) {
   if (carrierHits >= 1 && accountAccessHits >= 1) boost += 18;
   if (linkPatternsHits >= 1 && authorityHits >= 1) boost += 14;
   if (investmentHits >= 1 && commandSensitiveHits > 0) boost += 12;
+  if (medicalHits >= 1 && codeRequestHits >= 1) boost += 10;
 
   return {
     boost: Math.min(70, boost),
@@ -1475,6 +1566,8 @@ function heuristicBoosts(text: string) {
     bankFraudHits,
     actionBoost,
     investmentHits,
+    medicalHits,
+    deviceHits,
   };
 }
 
@@ -1548,17 +1641,19 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         callerCountry,
         callerRegion,
         highRiskCountryBoost,
-      timeOfDayBoost,
-      durationBoost,
-      repeatCallCount,
-      detectedLocale,
-      localeBoost,
-      regionMismatchBoost,
-      commandSensitiveHits: 0,
-      actionBoost: 0,
-      techSupportHits: 0,
-      investmentHits: 0,
-    },
+        timeOfDayBoost,
+        durationBoost,
+        repeatCallCount,
+        detectedLocale,
+        localeBoost,
+        regionMismatchBoost,
+        commandSensitiveHits: 0,
+        actionBoost: 0,
+        techSupportHits: 0,
+        investmentHits: 0,
+        medicalHits: 0,
+        deviceHits: 0,
+      },
     } satisfies FraudAnalysis;
   }
 
@@ -1604,6 +1699,8 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         actionBoost: heuristic.actionBoost,
         techSupportHits: heuristic.techSupportHits,
         investmentHits: heuristic.investmentHits,
+        medicalHits: heuristic.medicalHits,
+        deviceHits: heuristic.deviceHits,
       },
     } satisfies FraudAnalysis;
   }
@@ -1703,43 +1800,45 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
     score: finalScore,
     riskLevel: scoreToRiskLevel(finalScore),
     matchedKeywords: matches.map((kw) => kw.phrase),
-    notes: {
-      matchCount: matches.length,
-      weightSum,
-      comboBoost: boost,
-      negatedMatches: negated,
-      urgencyHits: heuristic.urgencyHits,
-      secrecyHits: heuristic.secrecyHits,
-      impersonationHits: heuristic.impersonationHits,
-      paymentAppHits: heuristic.paymentAppHits,
-      codeRequestHits: heuristic.codeRequestHits,
-      explicitScamHits: heuristic.explicitScamHits,
-      paymentRequestHits: heuristic.paymentRequestHits,
-      hardBlockHits: heuristic.hardBlockHits,
-      threatHits: heuristic.threatHits,
-      accountAccessHits: heuristic.accountAccessHits,
-      moneyAmountHits: heuristic.moneyAmountHits,
-      taxScamHits: heuristic.taxScamHits,
-      bankFraudHits: heuristic.bankFraudHits,
-      piiHarvestHits: heuristic.piiHarvestHits,
-      criticalKeywordHits,
-      safePhraseMatches: [],
-      safePhraseDampening: 0,
-      repeatCallerBoost: 0,
-      callerCountry,
-      callerRegion,
-      highRiskCountryBoost,
-      timeOfDayBoost,
-      durationBoost,
-      repeatCallCount,
-      detectedLocale,
-      localeBoost,
-      regionMismatchBoost,
-      commandSensitiveHits: heuristic.commandSensitiveHits,
-      actionBoost: heuristic.actionBoost,
-      techSupportHits,
-      investmentHits: heuristic.investmentHits,
-    },
+      notes: {
+        matchCount: matches.length,
+        weightSum,
+        comboBoost: boost,
+        negatedMatches: negated,
+        urgencyHits: heuristic.urgencyHits,
+        secrecyHits: heuristic.secrecyHits,
+        impersonationHits: heuristic.impersonationHits,
+        paymentAppHits: heuristic.paymentAppHits,
+        codeRequestHits: heuristic.codeRequestHits,
+        explicitScamHits: heuristic.explicitScamHits,
+        paymentRequestHits: heuristic.paymentRequestHits,
+        hardBlockHits: heuristic.hardBlockHits,
+        threatHits: heuristic.threatHits,
+        accountAccessHits: heuristic.accountAccessHits,
+        moneyAmountHits: heuristic.moneyAmountHits,
+        taxScamHits: heuristic.taxScamHits,
+        bankFraudHits: heuristic.bankFraudHits,
+        piiHarvestHits: heuristic.piiHarvestHits,
+        criticalKeywordHits,
+        safePhraseMatches: [],
+        safePhraseDampening: 0,
+        repeatCallerBoost: 0,
+        callerCountry,
+        callerRegion,
+        highRiskCountryBoost,
+        timeOfDayBoost,
+        durationBoost,
+        repeatCallCount,
+        detectedLocale,
+        localeBoost,
+        regionMismatchBoost,
+        commandSensitiveHits: heuristic.commandSensitiveHits,
+        actionBoost: heuristic.actionBoost,
+        techSupportHits,
+        investmentHits: heuristic.investmentHits,
+        medicalHits: heuristic.medicalHits,
+        deviceHits: heuristic.deviceHits,
+      },
     override: hardBlockOverride || techSupportOverride,
   };
 }
