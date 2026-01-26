@@ -1,6 +1,8 @@
-import { ReactNode } from 'react';
+import { ReactNode, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
 
 type DashboardHeaderProps = {
   title: string;
@@ -10,24 +12,44 @@ type DashboardHeaderProps = {
 };
 
 export default function DashboardHeader({ title, subtitle, right, align = 'left' }: DashboardHeaderProps) {
+  const { theme } = useTheme();
+  const gradientColors = useMemo(
+    () =>
+      [
+        withOpacity(theme.colors.bg, 0.92),
+        withOpacity(theme.colors.bg, 0.18),
+        withOpacity(theme.colors.bg, 0),
+      ] as const,
+    [theme.colors.bg]
+  );
   return (
     <View style={styles.wrapper}>
       <View style={styles.header}>
         <View style={[styles.textStack, align === 'center' ? styles.centerText : styles.alignLeft]}>
-          <Text style={[styles.title, align === 'center' ? styles.titleCenter : styles.titleLeft]}>{title}</Text>
+          <Text
+            style={[
+              styles.title,
+              { color: theme.colors.text },
+              align === 'center' ? styles.titleCenter : styles.titleLeft,
+            ]}
+          >
+            {title}
+          </Text>
           {subtitle ? (
-            <Text style={[styles.subtitle, align === 'center' ? styles.subtitleCenter : styles.subtitleLeft]}>
+            <Text
+              style={[
+                styles.subtitle,
+                { color: theme.colors.textMuted },
+                align === 'center' ? styles.subtitleCenter : styles.subtitleLeft,
+              ]}
+            >
               {subtitle}
             </Text>
           ) : null}
         </View>
         {right ? <View style={styles.right}>{right}</View> : <View style={styles.spacer} />}
       </View>
-      <LinearGradient
-        colors={['#0f141d', '#0f141d', 'rgba(15,20,29,0)']}
-        style={styles.gradient}
-        pointerEvents="none"
-      />
+      <LinearGradient colors={gradientColors} style={styles.gradient} pointerEvents="none" />
     </View>
   );
 }
@@ -42,9 +64,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: -24,
     right: -24,
-    top: '60%',
+    top: '100%',
     height: 60,
-    zIndex: 1,
+    zIndex: 2,
   },
   header: {
     zIndex: 3,

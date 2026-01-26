@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
+import { useTheme } from '../../context/ThemeContext';
 
 const ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap; }> = {
   HomeTab: { active: 'home', inactive: 'home-outline' },
@@ -24,6 +25,7 @@ export default function BottomDock({
   dockHeight,
   containerStyle,
 }: BottomDockProps) {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 16);
   const focusedRoute = state.routes[state.index];
@@ -46,6 +48,11 @@ export default function BottomDock({
       }).start();
     });
   }, [state.index, state.routes.length]);
+  const containerBackground = theme.colors.surface;
+  const borderColor = theme.colors.border;
+  const labelColor = theme.colors.textMuted;
+  const labelActiveColor = theme.colors.text;
+
   return (
     <View
       style={[
@@ -53,6 +60,8 @@ export default function BottomDock({
         {
           height: 96 + bottomPadding,
           paddingBottom: bottomPadding,
+          backgroundColor: containerBackground,
+          borderTopColor: borderColor,
         },
         containerStyle,
       ]}
@@ -85,20 +94,23 @@ export default function BottomDock({
               onPress={onPress}
               activeOpacity={0.75}
             >
-              <View style={[styles.tabContent, focused && styles.tabContentActive]}>
+              <View style={styles.tabContent}>
                 <Animated.View
                   style={[
                     styles.iconWrapper,
                     { transform: [{ scale: scaleValuesRef.current[index] }] },
                   ]}
                 >
-                  <Ionicons name={iconName} size={30} color={focused ? '#2d6df6' : '#51607a'} />
+                  <Ionicons name={iconName} size={30} color={focused ? theme.colors.accent : theme.colors.textDim} />
                 </Animated.View>
                 <Text
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
-                  style={[styles.label, focused && styles.labelActive]}
+                  style={[
+                    styles.label,
+                    focused ? { color: labelActiveColor } : { color: labelColor },
+                  ]}
                 >
                   {label}
                 </Text>
@@ -117,13 +129,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#0b111b',
-    borderTopWidth: 2,
-    borderTopColor: '#202c3c',
     paddingHorizontal: 0,
     paddingTop: 6,
     shadowColor: '#000',
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: -10 },
     zIndex: 20,
@@ -149,15 +158,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'transparent',
   },
-  tabContentActive: {
-    shadowColor: '#000',
-  shadowOpacity: 0.45,
-  shadowRadius: 10,
-  shadowOffset: { width: 0, height: 8 },
-
-  // Android elevation
-  elevation: 10,
-  },
 
   iconWrapper: {
     alignItems: 'center',
@@ -169,9 +169,5 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1.2,
     textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.6)',
-  },
-  labelActive: {
-    color: '#2d6df6',
   },
 });

@@ -131,7 +131,7 @@ export default function SafePhrasesScreen() {
           contentContainerStyle={[
             styles.content,
             {
-              paddingBottom: Math.max(insets.bottom, 32),
+              paddingBottom: Math.max(insets.bottom, 32) + 0,
               paddingTop: Math.max(insets.top, 12) + 0,
 
             },
@@ -159,7 +159,7 @@ export default function SafePhrasesScreen() {
           <View style={styles.inputRow}>
             <TextInput
               style={styles.input}
-              placeholder="e.g. Golf"
+              placeholder="e.g. Doctor Smith"
               placeholderTextColor="#8aa0c6"
               value={input}
               onChangeText={setInput}

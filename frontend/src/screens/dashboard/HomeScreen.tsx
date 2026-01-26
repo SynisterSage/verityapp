@@ -30,6 +30,7 @@ import DashboardHeader from '../../components/common/DashboardHeader';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import { withOpacity } from '../../utils/color';
 import { useTheme } from '../../context/ThemeContext';
+import type { AppTheme } from '../../theme/tokens';
 
 type CallRow = {
   id: string;
@@ -72,6 +73,16 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const { session } = useAuth();
   const { activeProfile } = useProfile();
   const { theme } = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const refreshControlProps = useMemo(
+    () => ({
+      tintColor: theme.colors.text,
+      colors: [theme.colors.text],
+      progressBackgroundColor: withOpacity(theme.colors.text, 0.16),
+      styleBackgroundColor: withOpacity(theme.colors.surface, 0.25),
+    }),
+    [theme]
+  );
   const [recentCall, setRecentCall] = useState<CallRow | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [alertsThisWeek, setAlertsThisWeek] = useState<number | null>(null);
@@ -372,14 +383,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           ref={scrollRef}
           contentContainerStyle={[styles.content, { paddingBottom: bottomGap + 40 }]}
           showsVerticalScrollIndicator={false}
-          refreshControl={
+        refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => loadStats(true)}
-            tintColor={theme.colors.accent}
-            colors={[theme.colors.accent]}
-            progressBackgroundColor={theme.colors.accent}
-            style={{ backgroundColor: theme.colors.accent }}
+            tintColor={refreshControlProps.tintColor}
+            colors={refreshControlProps.colors}
+            progressBackgroundColor={refreshControlProps.progressBackgroundColor}
+            style={{ backgroundColor: refreshControlProps.styleBackgroundColor }}
           />
         }
         >
@@ -471,35 +482,18 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               </View>
             ) : recentActivity.length === 0 ? (
               <View style={styles.emptyStateWrap}>
-                <View
-                  style={[
-                    styles.homeEmptyCard,
-                    {
-                      backgroundColor: theme.colors.surface,
-                      borderColor: 'rgba(255,255,255,0.08)',
-                    },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.homeEmptyIcon,
-                      { backgroundColor: theme.colors.surfaceAlt },
-                    ]}
-                  >
+                <View style={styles.homeEmptyCard}>
+                  <View style={styles.homeEmptyIcon}>
                     <Ionicons
                       name={hasTwilioNumber ? 'pulse-outline' : 'call-outline'}
                       size={24}
                       color={theme.colors.accent}
                     />
                   </View>
-                  <Text
-                    style={[styles.homeEmptyTitle, { color: theme.colors.text }]}
-                  >
+                  <Text style={styles.homeEmptyTitle}>
                     {hasTwilioNumber ? 'No activity yet' : 'Connect a SafeCall number'}
                   </Text>
-                  <Text
-                    style={[styles.homeEmptyBody, { color: theme.colors.textMuted }]}
-                  >
+                  <Text style={styles.homeEmptyBody}>
                     {hasTwilioNumber
                       ? 'Calls and alerts will show up here once they start.'
                       : 'Add your virtual number to start receiving and reviewing calls.'}
@@ -509,7 +503,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                       style={({ pressed }) => [
                         styles.homeEmptyCta,
                         {
-                          borderColor: 'rgba(255,255,255,0.08)',
                           backgroundColor: pressed
                             ? withOpacity(theme.colors.accent, 0.15)
                             : 'transparent',
@@ -520,11 +513,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                         navigation.navigate('SettingsTab');
                       }}
                     >
-                      <Text
-                        style={[styles.homeEmptyCtaText, { color: theme.colors.accent }]}
-                      >
-                        Set up number
-                      </Text>
+                    <Text style={styles.homeEmptyCtaText}>
+                      Set up number
+                    </Text>
                     </Pressable>
                   )}
                 </View>
@@ -569,150 +560,157 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-    paddingHorizontal: 24,
-  },
-  content: {
-    paddingTop: 12,
-  },
-  section: {
-    marginTop: 20,
-  },
-  sectionLabel: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    marginBottom: 12,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-  },
-  statColumn: {
-    width: '48%',
-    marginBottom: 12,
-  },
-  rightMargin: {
-    marginRight: 8,
-  },
-  activityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    color: '#98a7c2',
-    fontWeight: '600',
-    letterSpacing: 0.5,
-  },
-  viewAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  viewAllText: {
-    color: '#2d6df6',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  viewAllIcon: {
-    marginLeft: 4,
-  },
-  activityList: {
-    marginTop: 8,
-  },
-  activityItem: {
-    marginBottom: 12,
-  },
-  emptyStateWrap: {
-    alignItems: 'stretch',
-    paddingHorizontal: 0,
-    marginTop: 8,
-  },
-  homeEmptyCard: {
-    borderRadius: 28,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderStyle: 'dashed',
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    width: '100%',
-    alignSelf: 'stretch',
-  },
-  homeEmptyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  homeEmptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  homeEmptyBody: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  homeEmptyCta: {
-    marginTop: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 28,
-    borderRadius: 20,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-    alignItems: 'center',
-  },
-  homeEmptyCtaText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  skeletonOverlay: {
-    position: 'absolute',
-    top: 20,
-    left: 0,
-    right: 0,
-  },
-  skeletonCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#202c3c',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  skeletonLine: {
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: '#1c2636',
-    marginTop: 10,
-  },
-  skeletonLineShort: {
-    width: '50%',
-    marginTop: 2,
-  },
-  skeletonLineTiny: {
-    width: '35%',
-  },
-  skeletonPill: {
-    height: 12,
-    width: 54,
-    borderRadius: 999,
-    backgroundColor: '#1c2636',
-  },
-});
+const createStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      paddingHorizontal: 24,
+      backgroundColor: theme.colors.bg,
+    },
+    content: {
+      paddingTop: 12,
+    },
+    section: {
+      marginTop: 20,
+    },
+    sectionLabel: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+      marginBottom: 12,
+    },
+    statsGrid: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+    },
+    statColumn: {
+      width: '48%',
+      marginBottom: 12,
+    },
+    rightMargin: {
+      marginRight: 8,
+    },
+    activityHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    sectionTitle: {
+      color: theme.colors.textMuted,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+    },
+    viewAllButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    viewAllText: {
+      color: theme.colors.accent,
+      fontWeight: '600',
+      fontSize: 13,
+    },
+    viewAllIcon: {
+      marginLeft: 4,
+    },
+    activityList: {
+      marginTop: 8,
+    },
+    activityItem: {
+      marginBottom: 12,
+    },
+    emptyStateWrap: {
+      alignItems: 'stretch',
+      paddingHorizontal: 0,
+      marginTop: 8,
+    },
+    homeEmptyCard: {
+      borderRadius: 28,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderStyle: 'dashed',
+      padding: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+      width: '100%',
+      alignSelf: 'stretch',
+      backgroundColor: theme.colors.surface,
+      borderColor: withOpacity(theme.colors.text, 0.08),
+    },
+    homeEmptyIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.1),
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    homeEmptyTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      marginBottom: 4,
+      textAlign: 'center',
+      color: theme.colors.text,
+    },
+    homeEmptyBody: {
+      fontSize: 14,
+      textAlign: 'center',
+      color: theme.colors.textMuted,
+    },
+    homeEmptyCta: {
+      marginTop: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 28,
+      borderRadius: 20,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.1),
+      alignItems: 'center',
+    },
+    homeEmptyCtaText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.accent,
+    },
+    skeletonOverlay: {
+      position: 'absolute',
+      top: 20,
+      left: 0,
+      right: 0,
+    },
+    skeletonCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 18,
+      padding: 18,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    skeletonLine: {
+      height: 10,
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+      marginTop: 10,
+    },
+    skeletonLineShort: {
+      width: '50%',
+      marginTop: 2,
+    },
+    skeletonLineTiny: {
+      width: '35%',
+    },
+    skeletonPill: {
+      height: 12,
+      width: 54,
+      borderRadius: 999,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+    },
+  });

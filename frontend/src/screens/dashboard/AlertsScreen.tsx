@@ -23,12 +23,13 @@ import EmptyState from '../../components/common/EmptyState';
 import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { useProfile } from '../../context/ProfileContext';
+import { useTheme } from '../../context/ThemeContext';
 import { subscribeToCallUpdates } from '../../utils/callEvents';
 import DashboardHeader from '../../components/common/DashboardHeader';
-import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import { getRiskStyles } from '../../utils/risk';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
+import type { AppTheme } from '../../theme/tokens';
 type AlertRow = {
   id: string;
   alert_type: string;
@@ -77,6 +78,16 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const { theme } = useTheme();
+  const styles = useMemo(() => createAlertStyles(theme), [theme]);
+  const refreshControlProps = useMemo(
+    () => ({
+      tintColor: theme.colors.text,
+      colors: [theme.colors.text],
+      progressBackgroundColor: withOpacity(theme.colors.text, 0.16),
+      styleBackgroundColor: withOpacity(theme.colors.surface, 0.25),
+    }),
+    [theme]
+  );
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
@@ -603,8 +614,8 @@ const loadMemberNames = useCallback(async () => {
                 metaLabel={metaLabel}
                 actionLabel="View details"
                 iconName="shield-checkmark-outline"
-                iconColor="#34d399"
-                stripColor="#34d399"
+                iconColor={riskStyles.accent}
+                stripColor={riskStyles.accent}
                 muted={Boolean(alert.processed)}
                 scoreColor={riskStyles.accent}
                 onPress={alert.call_id ? handlePress : undefined}
@@ -672,11 +683,11 @@ const loadMemberNames = useCallback(async () => {
   const renderCircleSection = () => {
     if (!circleActivity.length) return null;
     return (
-      <View style={[styles.section, styles.circleSection, { backgroundColor: '#0f141d' }]}>
+      <View style={[styles.section, styles.circleSection]}>
         {renderSectionHeader('Circle activity')}
         <View style={styles.circleGroup}>
           {circleActivity.map((activity) => (
-            <View key={activity.id} style={[styles.circleCard, { backgroundColor: '#121a26' }]}> 
+            <View key={activity.id} style={styles.circleCard}>
               <View style={[styles.circleAccentStrip, { backgroundColor: theme.colors.accent }]} />
               <View style={styles.circleCardContent}>
                 <View style={styles.circleHeaderRow}>
@@ -918,9 +929,10 @@ const loadMemberNames = useCallback(async () => {
             <RefreshControl
               refreshing={loading}
               onRefresh={() => loadAlerts()}
-              tintColor={accent}
-              colors={[accent]}
-              progressBackgroundColor={accent}
+              tintColor={refreshControlProps.tintColor}
+              colors={refreshControlProps.colors}
+              progressBackgroundColor={refreshControlProps.progressBackgroundColor}
+              style={{ backgroundColor: refreshControlProps.styleBackgroundColor }}
             />
           }
         >
@@ -1007,260 +1019,263 @@ const loadMemberNames = useCallback(async () => {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-    paddingHorizontal: 24,
-  },
-  headerWrapper: {
-    marginBottom: 8,
-  },
-  bottomMask: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 120,
-    backgroundColor: '#0f141d',
-  },
-  listWrapper: {
-    flex: 1,
-    position: 'relative',
-    paddingTop: 0,
-  },
-  scrollContent: {
-    paddingBottom: 120,
-    paddingTop: 12,
-    paddingHorizontal: 0,
-  },
-  listEmptyContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
-  section: {
-    paddingHorizontal: 0,
-    paddingVertical: 20,
-    borderRadius: 24,
-    marginBottom: -20,
-    alignSelf: 'stretch',
-    width: '100%',
-    backgroundColor: '#0f141d',
-  },
-  sectionInner: {
-    paddingHorizontal: 20,
-  },
-  otherSection: {
-    borderWidth: 0,
-    backgroundColor: '#0f141d',
-  },
-  sectionLabel: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  sectionCards: {
-    marginTop: 12,
-  },
-  prioritySection: {
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  systemSection: {
-    borderWidth: 1,
-    borderColor: 'rgba(52,211,153,0.25)',
-  },
-  circleSection: {
-    borderWidth: 0,
-    borderColor: 'transparent',
-  },
-  trustedSection: {
-    borderWidth: 1,
-    borderColor: 'rgba(16,185,129,0.25)',
-  },
-  handledSection: {
-    borderWidth: 0,
-    backgroundColor: '#0f141d',
-  },
-  circleGroup: {
-    marginTop: 12,
-  },
-  circleCard: {
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-    position: 'relative',
-    paddingLeft: 20,
-    overflow: 'hidden',
-  },
-  circleAccentStrip: {
-    position: 'absolute',
-    left: 0,
-    top: 8,
-    bottom: 8,
-    width: 3,
-    borderRadius: 999,
-  },
-  circleHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 6,
-  },
-  circleIconWrapper: {
-    width: 32,
-    height: 32,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  circleHeaderSpacer: {
-    flex: 1,
-  },
-  circleTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    textTransform: 'uppercase',
-  },
-  circleDescription: {
-    fontSize: 13,
-    lineHeight: 20,
-  },
-  circleCardContent: {
-    flex: 1,
-  },
-  circleTimestamp: {
-    fontSize: 12,
-    letterSpacing: 0.2,
-    textTransform: 'uppercase',
-  },
-  emptyStateWrap: {
-    marginTop: -60,
-    alignItems: 'stretch',
-    paddingHorizontal: 0,
-  },
-  skeletonWrapper: {
-    marginBottom: 12,
-  },
-  skeletonCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 24,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#1f2a3a',
-  },
-  skeletonLine: {
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: '#1c2636',
-    marginTop: 10,
-  },
-  skeletonLineShort: {
-    width: '45%',
-    marginTop: 2,
-  },
-  skeletonLineTiny: {
-    width: '35%',
-  },
-  trayOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    zIndex: 999,
-    elevation: 999,
-  },
-  trayBackdrop: {
-    backgroundColor: '#02050b',
-  },
-  tray: {
-    position: 'absolute',
-    left: -12,
-    right: -12,
-    bottom: 0,
-    borderRadius: 30,
-    backgroundColor: '#0c1118',
-    paddingVertical: 24,
-    paddingHorizontal: 26,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-    zIndex: 1000,
-    elevation: 30,
-  },
-  trayHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  trayTitle: {
-    color: '#f5f7fb',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'left',
-    marginBottom: 6,
-  },
-  traySubtitle: {
-    color: '#8aa0c6',
-    fontSize: 14,
-    textAlign: 'left',
-    marginBottom: 2,
-  },
-  trayDetail: {
-    color: '#6f7a94',
-    fontSize: 12,
-    textAlign: 'left',
-    marginBottom: 18,
-  },
-  trayAction: {
-    borderRadius: 18,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    marginBottom: 12,
-  },
-  trayActionPressed: {
-    opacity: 0.8,
-  },
-  trayActionDisabled: {
-    opacity: 0.6,
-  },
-  trayActionText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  trayActionHint: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  trayDanger: {
-    backgroundColor: 'rgba(239,68,68,0.08)',
-  },
-  trayDangerText: {
-    color: '#f87171',
-  },
-  trayCancel: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  trayCancelText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
-});
+const createAlertStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      paddingHorizontal: 24,
+      backgroundColor: theme.colors.bg,
+    },
+    headerWrapper: {
+      marginBottom: 0,
+    },
+    bottomMask: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      height: 120,
+      backgroundColor: theme.colors.bg,
+    },
+    listWrapper: {
+      flex: 1,
+      position: 'relative',
+      paddingTop: 0,
+    },
+    scrollContent: {
+      paddingBottom: 120,
+      paddingTop: 12,
+      paddingHorizontal: 0,
+    },
+    listEmptyContent: {
+      flexGrow: 1,
+      justifyContent: 'center',
+    },
+    section: {
+      paddingHorizontal: 0,
+      paddingVertical: 20,
+      borderRadius: 24,
+      marginBottom: -20,
+      alignSelf: 'stretch',
+      width: '100%',
+      backgroundColor: theme.colors.bg,
+    },
+    sectionInner: {
+      paddingHorizontal: 20,
+    },
+    otherSection: {
+      borderWidth: 0,
+      backgroundColor: theme.colors.bg,
+    },
+    sectionLabel: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+      marginBottom: 8,
+    },
+    sectionCards: {
+      marginTop: 12,
+    },
+    prioritySection: {
+      borderWidth: 0,
+      borderColor: 'transparent',
+    },
+    systemSection: {
+      borderWidth: 1,
+      borderColor: 'rgba(52,211,153,0.25)',
+    },
+    circleSection: {
+      borderWidth: 0,
+      borderColor: 'transparent',
+    },
+    trustedSection: {
+      borderWidth: 1,
+      borderColor: 'rgba(16,185,129,0.25)',
+    },
+    handledSection: {
+      borderWidth: 0,
+      backgroundColor: theme.colors.bg,
+    },
+    circleGroup: {
+      marginTop: 12,
+    },
+    circleCard: {
+      borderRadius: 20,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.08),
+      position: 'relative',
+      paddingLeft: 20,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.surface,
+    },
+    circleAccentStrip: {
+      position: 'absolute',
+      left: 0,
+      top: 8,
+      bottom: 8,
+      width: 3,
+      borderRadius: 999,
+    },
+    circleHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 6,
+    },
+    circleIconWrapper: {
+      width: 32,
+      height: 32,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    circleHeaderSpacer: {
+      flex: 1,
+    },
+    circleTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      letterSpacing: 0.2,
+      textTransform: 'uppercase',
+    },
+    circleDescription: {
+      fontSize: 13,
+      lineHeight: 20,
+    },
+    circleCardContent: {
+      flex: 1,
+    },
+    circleTimestamp: {
+      fontSize: 12,
+      letterSpacing: 0.2,
+      textTransform: 'uppercase',
+    },
+    emptyStateWrap: {
+      marginTop: -60,
+      alignItems: 'stretch',
+      paddingHorizontal: 0,
+    },
+    skeletonWrapper: {
+      marginBottom: 12,
+    },
+    skeletonCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+    },
+    skeletonLine: {
+      height: 10,
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+      marginTop: 10,
+    },
+    skeletonLineShort: {
+      width: '45%',
+      marginTop: 2,
+    },
+    skeletonLineTiny: {
+      width: '35%',
+    },
+    trayOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      zIndex: 999,
+      elevation: 999,
+    },
+    trayBackdrop: {
+      backgroundColor: withOpacity(theme.colors.text, 0.2),
+    },
+    tray: {
+      position: 'absolute',
+      left: -12,
+      right: -12,
+      bottom: 0,
+      borderRadius: 30,
+      backgroundColor: theme.colors.surface,
+      paddingVertical: 24,
+      paddingHorizontal: 26,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.08),
+      shadowColor: '#000',
+      shadowOpacity: 0.4,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 12 },
+      zIndex: 1000,
+      elevation: 30,
+    },
+    trayHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: withOpacity(theme.colors.text, 0.3),
+      alignSelf: 'center',
+      marginBottom: 12,
+    },
+    trayTitle: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'left',
+      marginBottom: 6,
+    },
+    traySubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      textAlign: 'left',
+      marginBottom: 2,
+    },
+    trayDetail: {
+      color: theme.colors.textDim,
+      fontSize: 12,
+      textAlign: 'left',
+      marginBottom: 18,
+    },
+    trayAction: {
+      borderRadius: 18,
+      paddingVertical: 14,
+      paddingHorizontal: 18,
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+      marginBottom: 12,
+    },
+    trayActionPressed: {
+      opacity: 0.8,
+    },
+    trayActionDisabled: {
+      opacity: 0.6,
+    },
+    trayActionText: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    trayActionHint: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    trayDanger: {
+      backgroundColor: withOpacity(theme.colors.danger, 0.15),
+    },
+    trayDangerText: {
+      color: theme.colors.danger,
+    },
+    trayCancel: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+    },
+    trayCancelText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.textMuted,
+      textAlign: 'center',
+    },
+  });

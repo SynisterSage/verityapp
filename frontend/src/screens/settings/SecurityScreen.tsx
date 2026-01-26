@@ -138,7 +138,7 @@ export default function SecurityScreen() {
         contentContainerStyle={[
           styles.content,
           { paddingBottom: Math.max(insets.bottom, 32) + 20 },
-            { paddingTop: Math.max(insets.top, 12) + 0 },
+            { paddingTop: Math.max(insets.top, 160) + 0 },
         ]}
         showsVerticalScrollIndicator={false}
       >

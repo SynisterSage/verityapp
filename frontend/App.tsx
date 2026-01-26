@@ -1,8 +1,9 @@
 import 'react-native-gesture-handler';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   DefaultTheme,
+  DarkTheme,
   NavigationContainer,
   NavigationProp,
   useNavigation,
@@ -24,7 +25,7 @@ import * as Notifications from 'expo-notifications';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ProfileProvider, useProfile } from './src/context/ProfileContext';
-import { ThemeProvider } from './src/context/ThemeContext';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { authorizedFetch } from './src/services/backend';
 import SignInScreen from './src/screens/auth/SignInScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
@@ -70,17 +71,6 @@ const navigationRef = createNavigationContainerRef<RootStackParamList>();
 type PendingNotificationData = {
   callId?: string;
   alertId?: string;
-};
-
-const navTheme = {
-  ...DefaultTheme,
-  colors: {
-    ...DefaultTheme.colors,
-    background: '#0b111b',
-    card: '#0b111b',
-    border: '#0b111b',
-    text: '#f5f7fb',
-  },
 };
 
 const RootStack = createStackNavigator<RootStackParamList>();
@@ -349,6 +339,7 @@ function RootNavigator() {
 }
 
 function AppContent() {
+  const { mode, theme } = useTheme();
   const { session } = useAuth();
   const pendingNotificationRef = useRef<PendingNotificationData | null>(null);
   const notificationListenerRef = useRef<Notifications.Subscription | null>(null);
@@ -403,6 +394,23 @@ function AppContent() {
     resolvePendingNotification();
   }, [session, resolvePendingNotification]);
 
+    const navTheme = useMemo(() => {
+      const baseTheme = mode === 'dark' ? DarkTheme : DefaultTheme;
+    return {
+      ...baseTheme,
+      colors: {
+        ...baseTheme.colors,
+        background: theme.colors.bg,
+        card: theme.colors.surface,
+        border: theme.colors.border,
+        text: theme.colors.text,
+        primary: theme.colors.accent,
+      },
+    };
+  }, [theme]);
+
+    const statusBarStyle = mode === 'light' ? 'dark' : 'light';
+
   return (
     <ProfileProvider>
       <TwilioVoiceClientManager />
@@ -419,7 +427,7 @@ function AppContent() {
             }}
           >
             <RootNavigator />
-            <StatusBar style="light" />
+            <StatusBar style={statusBarStyle} />
           </NavigationContainer>
         </GestureHandlerRootView>
       </SafeAreaProvider>

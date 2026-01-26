@@ -16,12 +16,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import * as Haptics from 'expo-haptics';
-import { tokens } from '../../theme/tokens';
+import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 
 import { supabase } from '../../services/supabase';
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import { useTheme } from '../../context/ThemeContext';
 import { emitCallUpdated } from '../../utils/callEvents';
 import { getRiskStyles } from '../../utils/risk';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
@@ -143,6 +144,7 @@ export default function CallDetailScreen({
   const { callId, compact } = route.params;
   const isCompactModal = compact ?? false;
   const { activeProfile, canManageProfile } = useProfile();
+  const { theme, mode } = useTheme();
   const [callRow, setCallRow] = useState<CallRow | null>(null);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -155,6 +157,7 @@ export default function CallDetailScreen({
   const riskBarAnim = useRef(new Animated.Value(0)).current;
   const transcriptAnim = useRef(new Animated.Value(0)).current;
   const [audioModeConfigured, setAudioModeConfigured] = useState(false);
+  const styles = useMemo(() => createCallDetailStyles(theme), [theme]);
 
   const fetchRecordingLink = useCallback(async () => {
     const urlData = await authorizedFetch(`/calls/${callId}/recording-url`);
@@ -444,10 +447,10 @@ export default function CallDetailScreen({
   const safeRiskStyle = useMemo(() => getRiskStyles('low'), []);
   const safeButtonStyle = useMemo(
     () => ({
-      accent: '#7dd9b0',
-      background: withOpacity(tokens.colors.dark.success, 0.14),
+      accent: theme.colors.success,
+      background: withOpacity(theme.colors.success, 0.14),
     }),
-    []
+    [theme.colors.success]
   );
   const fraudButtonStyle = useMemo(() => getRiskStyles('critical'), []);
   const fraudHighlightColor = useMemo(
@@ -576,8 +579,8 @@ export default function CallDetailScreen({
   const playDisabled = recordingStatus === 'error' || recordingStatus === 'loading';
   const footerDisabledSafe = callRow.feedback_status === 'marked_safe';
   const footerDisabledFraud = callRow.feedback_status === 'marked_fraud';
-  const disabledButtonBackground = '#111627';
-  const disabledButtonText = '#8ea1c7';
+  const disabledButtonBackground = withOpacity(theme.colors.text, 0.05);
+  const disabledButtonText = theme.colors.textMuted;
   const primaryBackgroundColor = footerDisabledFraud
     ? disabledButtonBackground
     : fraudButtonStyle.background;
@@ -591,7 +594,7 @@ export default function CallDetailScreen({
     <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]} edges={[]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="chevron-back" size={22} color="#e4ebf7" />
+          <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Call Details</Text>
@@ -605,7 +608,7 @@ export default function CallDetailScreen({
           <Text style={styles.heroNumber}>{heroNumber}</Text>
           {heroMeta ? (
             <View style={styles.heroMeta}>
-              <Ionicons name="time-outline" size={12} color="#8aa0c6" />
+              <Ionicons name="time-outline" size={12} color={theme.colors.textMuted} />
               <Text style={styles.heroMetaText}>{heroMeta}</Text>
             </View>
           ) : null}
@@ -726,11 +729,13 @@ export default function CallDetailScreen({
           <View style={styles.card}>
             <View style={styles.cardContent}>
               <View style={styles.recordingHeader}>
-                <View style={[styles.iconBox, { backgroundColor: 'rgba(76, 125, 255, 0.2)' }]}> 
-                  <Ionicons name="pulse-outline" size={20} color="#4c7dff" />
+                  <View style={[styles.iconBox, { backgroundColor: withOpacity(theme.colors.accent, 0.2) }]}> 
+                  <Ionicons name="pulse-outline" size={20} color={theme.colors.accent} />
                 </View>
                 <View style={styles.intelText}>
-                  <Text style={styles.recordingTitle}>Call capture</Text>
+                  <Text style={[styles.recordingTitle, { color: mode === 'light' ? theme.colors.surface : theme.colors.text }]}>
+                    Call capture
+                  </Text>
                 </View>
                 <View style={[styles.recordingBadge, recordingStatus === 'ready' && styles.recordingBadgeReady]}>
                   <Text style={[styles.badgeText, styles.recordingBadgeText]}>{recordingLabel}</Text>
@@ -746,7 +751,7 @@ export default function CallDetailScreen({
                 disabled={isLoadingAudio || recordingStatus === 'loading'}
               >
                 {isLoadingAudio || recordingStatus === 'loading' ? (
-                  <ActivityIndicator color="#f5f7fb" />
+                  <ActivityIndicator color={theme.colors.text} />
                 ) : (
                   <Text style={styles.playButtonText}>
                     {isPlaying ? 'Playing…' : 'Listen to message'}
@@ -784,274 +789,278 @@ export default function CallDetailScreen({
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 0,
-    paddingBottom: 22,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#121a26',
-    borderWidth: 1,
-    borderColor: '#1f2a3a',
-  },
-  headerTitle: {
-    color: '#f5f7fb',
-    fontSize: 20,
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  headerContent: {
-    flex: 1,
-  },
-  heroNumber: {
-    color: '#f5f7fb',
-    fontSize: 26,
-    fontWeight: '600',
-  },
-  heroMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  heroMetaText: {
-    color: '#8aa0c6',
-    marginLeft: 6,
-    letterSpacing: 0.1,
-    fontSize: 12,
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-  },
-  heroBlock: {
-    paddingTop: 12,
-    paddingBottom: 18,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionLabel: {
-    color: '#8aa0c6',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    marginBottom: 10,
-  },
-  card: {
-    position: 'relative',
-    backgroundColor: '#121a26',
-    borderRadius: 32,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#1f2332',
-    overflow: 'hidden',
-  },
-  intelCard: {
-    borderColor: '#1f2332',
-  },
-  cardContent: {
-    marginLeft: 0,
-  },
-  cardBody: {
-    color: '#f5f7fb',
-    fontSize: 17,
-    lineHeight: 26,
-  },
-  keywordHighlight: {
-    fontWeight: '700',
-  },
-  safeKeywordHighlight: {
-    fontWeight: '700',
-  },
-  intelHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  intelText: {
-    flex: 1,
-  },
-  intelTitle: {
-    color: '#f5f7fb',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  intelSubtitle: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    letterSpacing: 0.2,
-  },
-  badge: {
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  recordingBadge: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    backgroundColor: '#121a26',
-  },
-  recordingBadgeReady: {
-    backgroundColor: '#18213b',
-  },
-  recordingBadgeText: {
-    color: '#4c7dff',
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  scoreLabel: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-  },
-  scoreNumber: {
-    color: '#e11d48',
-    fontSize: 28,
-    fontWeight: '700',
-  },
-  progressTrack: {
-    height: 6,
-    borderRadius: 999,
-    backgroundColor: '#1b2232',
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 999,
-  },
-  keywordRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  keywordPill: {
-    backgroundColor: '#1f2238',
-    borderRadius: 999,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  keywordText: {
-    color: '#cbd6ea',
-    fontSize: 12,
-  },
-  keywordFallback: {
-    color: '#8aa0c6',
-    fontSize: 12,
-  },
-  recordingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  recordingTitle: {
-    color: '#f5f7fb',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  playButton: {
-    height: 52,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  playButtonIdle: {
-    backgroundColor: '#4c7dff',
-  },
-  playButtonActive: {
-    backgroundColor: '#203055',
-  },
-  playButtonDisabled: {
-    opacity: 0.6,
-  },
-  playButtonText: {
-    color: '#f5f7fb',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  hint: {
-    color: '#8aa0c6',
-    marginTop: 10,
-  },
-  skeletonWrapper: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-    gap: 16,
-  },
-  skeletonHeader: {
-    gap: 8,
-  },
-  skeletonCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#202c3c',
-    gap: 8,
-  },
-  skeletonTitle: {
-    height: 16,
-    width: '50%',
-    borderRadius: 6,
-    backgroundColor: '#20293a',
-  },
-  skeletonLineWide: {
-    height: 14,
-    width: '70%',
-    borderRadius: 6,
-    backgroundColor: '#20293a',
-  },
-  skeletonLineFull: {
-    height: 12,
-    width: '100%',
-    borderRadius: 6,
-    backgroundColor: '#152034',
-  },
-  skeletonLineMedium: {
-    height: 12,
-    width: '60%',
-    borderRadius: 6,
-    backgroundColor: '#152034',
-  },
-  skeletonLineShort: {
-    height: 12,
-    width: '35%',
-    borderRadius: 6,
-    backgroundColor: '#152034',
-  },
-});
+const createCallDetailStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    header: {
+      paddingHorizontal: 24,
+      paddingTop: 0,
+      paddingBottom: 22,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    backButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.1),
+    },
+    headerTitle: {
+      color: theme.colors.text,
+      fontSize: 20,
+      fontWeight: '600',
+      letterSpacing: 0.3,
+    },
+    headerContent: {
+      flex: 1,
+    },
+    heroNumber: {
+      color: theme.colors.text,
+      fontSize: 26,
+      fontWeight: '600',
+    },
+    heroMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    heroMetaText: {
+      color: theme.colors.textMuted,
+      marginLeft: 6,
+      letterSpacing: 0.1,
+      fontSize: 12,
+    },
+    content: {
+      paddingHorizontal: 24,
+      paddingTop: 8,
+    },
+    heroBlock: {
+      paddingTop: 12,
+      paddingBottom: 18,
+    },
+    section: {
+      marginBottom: 24,
+    },
+    sectionLabel: {
+      color: theme.colors.textMuted,
+      fontSize: 10,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+      marginBottom: 10,
+    },
+    card: {
+      position: 'relative',
+      backgroundColor: theme.colors.surface,
+      borderRadius: 32,
+      padding: 24,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.08),
+      overflow: 'hidden',
+    },
+    intelCard: {
+      borderColor: withOpacity(theme.colors.text, 0.08),
+    },
+    cardContent: {
+      marginLeft: 0,
+    },
+    cardBody: {
+      color: theme.colors.text,
+      fontSize: 17,
+      lineHeight: 26,
+    },
+    keywordHighlight: {
+      fontWeight: '700',
+    },
+    safeKeywordHighlight: {
+      fontWeight: '700',
+    },
+    intelHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    iconBox: {
+      width: 44,
+      height: 44,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    intelText: {
+      flex: 1,
+    },
+    intelTitle: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    intelSubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      letterSpacing: 0.2,
+    },
+    badge: {
+      borderRadius: 999,
+      borderWidth: 1,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+    },
+    badgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    recordingBadge: {
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      backgroundColor: theme.colors.surface,
+    },
+    recordingBadgeReady: {
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+    },
+    recordingBadgeText: {
+      color: theme.colors.accent,
+    },
+    scoreRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    scoreLabel: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+    },
+    scoreNumber: {
+      color: theme.colors.danger,
+      fontSize: 28,
+      fontWeight: '700',
+    },
+    progressTrack: {
+      height: 6,
+      borderRadius: 999,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+      overflow: 'hidden',
+      marginBottom: 12,
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 999,
+    },
+    keywordRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    keywordPill: {
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+      borderRadius: 999,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    keywordText: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+    },
+    keywordFallback: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+    },
+    recordingHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    recordingTitle: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '600',
+    },
+    playButton: {
+      height: 52,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    playButtonIdle: {
+      backgroundColor: theme.colors.accent,
+    },
+    playButtonActive: {
+      backgroundColor: withOpacity(theme.colors.accent, 0.35),
+    },
+    playButtonDisabled: {
+      opacity: 0.6,
+    },
+    playButtonText: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    hint: {
+      color: theme.colors.textMuted,
+      marginTop: 10,
+    },
+    skeletonWrapper: {
+      paddingHorizontal: 24,
+      paddingTop: 16,
+      gap: 16,
+    },
+    skeletonHeader: {
+      gap: 8,
+    },
+    skeletonCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 14,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+      gap: 8,
+    },
+    skeletonTitle: {
+      height: 16,
+      width: '50%',
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.2),
+    },
+    skeletonLineWide: {
+      height: 14,
+      width: '70%',
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.2),
+    },
+    skeletonLineFull: {
+      height: 12,
+      width: '100%',
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.12),
+    },
+    skeletonLineMedium: {
+      height: 12,
+      width: '60%',
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.12),
+    },
+    skeletonLineShort: {
+      height: 12,
+      width: '35%',
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.12),
+    },
+  });

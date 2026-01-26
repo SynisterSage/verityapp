@@ -1,12 +1,14 @@
-import { ScrollView, StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View, Pressable, ActivityIndicator } from 'react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import DashboardHeader from '../../components/common/DashboardHeader';
+import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
+import { withOpacity } from '../../utils/color';
 import type { RouteProp } from '@react-navigation/native';
 import type { SettingsStackParamList } from '../../navigation/types';
 type SettingsRowItem = {
@@ -27,6 +29,7 @@ export default function SettingsScreen({
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const { canManageProfile } = useProfile();
+  const { theme, mode, setMode } = useTheme();
   const [isSigningOut, setIsSigningOut] = useState(false);
 
   const accountRows: SettingsRowItem[] = useMemo(() => {
@@ -145,6 +148,11 @@ export default function SettingsScreen({
     [accountRows, safetyRows, privacyRows]
   );
 
+  const isDarkMode = mode === 'dark';
+  const toggleThemeMode = useCallback(() => {
+    setMode(isDarkMode ? 'light' : 'dark');
+  }, [isDarkMode, setMode]);
+
   const signOutRow = useMemo<SettingsRowItem>(
     () => ({
       label: 'Sign out',
@@ -159,8 +167,8 @@ export default function SettingsScreen({
 
   const renderSection = (section: { title: string; rows: SettingsRowItem[] }) => (
     <View key={section.title} style={styles.section}>
-      <Text style={styles.sectionTitle}>{section.title}</Text>
-      <View style={styles.card}>
+      <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>{section.title}</Text>
+      <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
         {section.rows.map((row, index) => (
           <View key={row.label} style={styles.rowWrapper}>
             <SettingRow
@@ -180,14 +188,13 @@ export default function SettingsScreen({
         styles.container,
         {
           paddingTop: Math.max(28, insets.top + 12),
-          paddingBottom: Math.max(0, insets.bottom +0),
+          paddingBottom: Math.max(0, insets.bottom + 0),
+          backgroundColor: theme.colors.bg,
         },
       ]}
       edges={['bottom']}
     >
-
-        <DashboardHeader title="Settings" subtitle="Manage your preferences" align="left" />
-
+      <DashboardHeader title="Settings" subtitle="Manage your preferences" align="left" />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[
@@ -196,13 +203,37 @@ export default function SettingsScreen({
         ]}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Appearance</Text>
+          <View style={[styles.card, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+            <View style={styles.themeRow}>
+              <View style={styles.themeTextStack}>
+                <Text style={[styles.themeLabel, { color: theme.colors.text }]}>Dark mode</Text>
+                <Text style={[styles.themeSubLabel, { color: theme.colors.textMuted }]}>
+                  {isDarkMode ? 'Enabled' : 'Disabled'}
+                </Text>
+              </View>
+              <Switch
+                value={isDarkMode}
+                onValueChange={toggleThemeMode}
+                thumbColor={theme.colors.surface}
+                trackColor={{
+                  false: withOpacity(theme.colors.textMuted, 0.4),
+                  true: theme.colors.accent,
+                }}
+                ios_backgroundColor={withOpacity(theme.colors.textMuted, 0.35)}
+                accessibilityLabel="Toggle dark mode"
+              />
+            </View>
+          </View>
+        </View>
         {sections.map(renderSection)}
         <View style={styles.section}>
-          <View style={[styles.card, styles.signOutCard]}>
+          <View style={[styles.card, styles.signOutCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
             <SettingRow item={signOutRow} isLast onPress={signOutHandler} isWorking={isSigningOut} />
           </View>
         </View>
-        <Text style={styles.footerText}>Verity Protect. All rights reserved.</Text>
+        <Text style={[styles.footerText, { color: withOpacity(theme.colors.text, 0.5) }]}>Verity Protect. All rights reserved.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -216,44 +247,49 @@ type SettingRowProps = {
 };
 
 function SettingRow({ item, isLast = false, onPress, isWorking = false }: SettingRowProps) {
-  const iconColor = item.destructive ? '#f87171' : '#8aa0c6';
+  const { theme } = useTheme();
+  const iconColor = item.destructive ? theme.colors.danger : theme.colors.accent;
+  const iconBackground = item.destructive
+    ? withOpacity(theme.colors.danger, 0.15)
+    : theme.colors.surfaceAlt;
+  const highlightColor = withOpacity(theme.colors.text, 0.08);
+  const rippleColor = withOpacity(theme.colors.text, 0.08);
+  const dividerColor = withOpacity(theme.colors.text, 0.1);
+  const titleColor = item.destructive ? theme.colors.danger : theme.colors.text;
   return (
     <>
       <Pressable
         style={styles.row}
         onPress={onPress}
-        android_ripple={{ color: 'rgba(255,255,255,0.08)' }}
+        android_ripple={{ color: rippleColor }}
       >
         {({ pressed }) => (
           <>
-            <View style={[styles.rowHighlight, pressed && styles.rowHighlightActive]} />
+            <View style={[styles.rowHighlight, pressed && { backgroundColor: highlightColor }]} />
             <View style={styles.rowContent}>
-              <View
-                style={[
-                  styles.iconBox,
-                  item.destructive ? styles.iconBoxDestructive : styles.iconBoxAlt,
-                ]}
-              >
+              <View style={[styles.iconBox, { backgroundColor: iconBackground }]}>
                 <Ionicons name={item.icon} size={20} color={iconColor} />
               </View>
               <View style={styles.rowText}>
-                <Text style={[styles.rowTitle, item.destructive && styles.rowTitleDestructive]}>
+                <Text style={[styles.rowTitle, { color: titleColor }]}>
                   {isWorking ? 'Working…' : item.label}
                 </Text>
                 {item.subtitle ? (
-                  <Text style={styles.rowSubtitle}>{item.subtitle}</Text>
+                  <Text style={[styles.rowSubtitle, { color: theme.colors.textMuted }]}>
+                    {item.subtitle}
+                  </Text>
                 ) : null}
               </View>
               {isWorking ? (
-                <ActivityIndicator color="#94a3b8" />
+                <ActivityIndicator color={theme.colors.textMuted} />
               ) : (
-                <Ionicons name="chevron-forward" size={18} color="#5d6b85" />
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
               )}
             </View>
           </>
         )}
       </Pressable>
-      {!isLast && <View style={styles.divider} />}
+      {!isLast && <View style={[styles.divider, { backgroundColor: dividerColor }]} />}
     </>
   );
 }
@@ -261,7 +297,6 @@ function SettingRow({ item, isLast = false, onPress, isWorking = false }: Settin
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f141d',
     paddingHorizontal: 24,
   },
   content: {
@@ -275,7 +310,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   sectionTitle: {
-    color: '#8aa0c6',
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.4,
@@ -283,15 +317,28 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   card: {
-    backgroundColor: '#121a26',
     borderRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
   },
-  rowWrapper: {
-    backgroundColor: '#121a26',
+  themeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
+  themeTextStack: {
+    flex: 1,
+    marginRight: 12,
+  },
+  themeLabel: {
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  themeSubLabel: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  rowWrapper: {},
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -310,26 +357,17 @@ const styles = StyleSheet.create({
     bottom: -4,
     left: -24,
     right: -24,
-    backgroundColor: 'transparent',
-  },
-  rowHighlightActive: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   rowText: {
     flex: 1,
   },
   rowTitle: {
-    color: '#f5f7fb',
     fontSize: 17,
     fontWeight: '700',
     letterSpacing: -0.4,
     lineHeight: 20,
   },
-  rowTitleDestructive: {
-    color: '#f87171',
-  },
   rowSubtitle: {
-    color: 'rgba(138,168,198,0.6)',
     fontSize: 13,
     fontWeight: '500',
     marginTop: 4,
@@ -341,17 +379,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
-    backgroundColor: '#242c3d',
   },
-  iconBoxAlt: {
-    backgroundColor: '#242c3d',
-  },
-  iconBoxDestructive: {
-    backgroundColor: 'rgba(248,113,113,0.1)',
-  },
+  iconBoxAlt: {},
   divider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(255,255,255,0.08)',
     marginLeft: 68,
     marginVertical: 4,
   },
@@ -361,7 +392,6 @@ const styles = StyleSheet.create({
   footerText: {
     marginTop: 32,
     textAlign: 'center',
-    color: 'rgba(255,255,255,0.32)',
     letterSpacing: 0.3,
     fontSize: 12,
   },

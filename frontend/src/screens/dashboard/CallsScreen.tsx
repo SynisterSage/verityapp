@@ -120,6 +120,8 @@ const formatDateLabel = (value?: string | null) => {
   });
 };
 
+type CallStyles = ReturnType<typeof createCallStyles>;
+
 type CallRecordItemProps = {
   title: string;
   timeLabel: string;
@@ -130,6 +132,7 @@ type CallRecordItemProps = {
   isMuted?: boolean;
   onLongPress?: () => void;
   variant?: 'default' | 'handled' | 'archived';
+  styles: CallStyles;
 };
 
 function CallRecordItem({
@@ -142,6 +145,7 @@ function CallRecordItem({
   isMuted = false,
   onLongPress,
   variant = 'default',
+  styles,
 }: CallRecordItemProps) {
   const handlePress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -152,14 +156,14 @@ function CallRecordItem({
       onPress={handlePress}
       onLongPress={onLongPress}
       delayLongPress={400}
-    style={({ pressed }) => [
-      styles.callItem,
-      isMuted && styles.callItemMuted,
-      variant === 'handled' && styles.callItemHandled,
-      variant === 'archived' && styles.callItemArchived,
-      pressed && styles.callItemPressed,
-    ]}
-  >
+      style={({ pressed }) => [
+        styles.callItem,
+        isMuted && styles.callItemMuted,
+        variant === 'handled' && styles.callItemHandled,
+        variant === 'archived' && styles.callItemArchived,
+        pressed && styles.callItemPressed,
+      ]}
+    >
       <View style={styles.callRow}>
         <View style={[styles.callIcon, { borderColor: 'transparent' }]}>
           <View
@@ -225,6 +229,16 @@ export default function CallsScreen({
   const { session } = useAuth();
   const { activeProfile } = useProfile();
   const { theme } = useTheme();
+  const styles = useMemo(() => createCallStyles(theme), [theme]);
+  const refreshControlProps = useMemo(
+    () => ({
+      tintColor: theme.colors.text,
+      colors: [theme.colors.text],
+      progressBackgroundColor: withOpacity(theme.colors.text, 0.16),
+      styleBackgroundColor: withOpacity(theme.colors.surface, 0.25),
+    }),
+    [theme]
+  );
   const [calls, setCalls] = useState<CallRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -504,18 +518,19 @@ const sections = useMemo<CallSection[]>(() => {
       const time = formatTime(timestampSource);
       const dateLabel = shouldShowDate ? formatDateLabel(timestampSource) : '';
       const timeLabel = dateLabel ? `${time} · ${dateLabel}` : time;
-      return (
-        <CallRecordItem
-          title={title}
-          timeLabel={timeLabel}
-          statusLabel={status.label}
-          statusColor={status.color}
-          hasTranscript={Boolean(item.transcript)}
-          onPress={() => handleCallPress(item)}
-          onLongPress={canOpenTray(item) ? () => handleTrayLongPress(item) : undefined}
-          isMuted={isMuted}
-        />
-      );
+          return (
+            <CallRecordItem
+              title={title}
+              timeLabel={timeLabel}
+              statusLabel={status.label}
+              statusColor={status.color}
+              hasTranscript={Boolean(item.transcript)}
+              onPress={() => handleCallPress(item)}
+              onLongPress={canOpenTray(item) ? () => handleTrayLongPress(item) : undefined}
+              isMuted={isMuted}
+              styles={styles}
+            />
+          );
     },
     [handleCallPress, theme, handleTrayLongPress]
   );
@@ -594,10 +609,10 @@ const sections = useMemo<CallSection[]>(() => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={refreshAccent}
-            colors={[refreshAccent]}
-            progressBackgroundColor={refreshAccent}
-            style={{ backgroundColor: refreshAccentPortion }}
+            tintColor={refreshControlProps.tintColor}
+            colors={refreshControlProps.colors}
+            progressBackgroundColor={refreshControlProps.progressBackgroundColor}
+            style={{ backgroundColor: refreshControlProps.styleBackgroundColor }}
           />
           }
         contentContainerStyle={[
@@ -706,259 +721,260 @@ const sections = useMemo<CallSection[]>(() => {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  list: {
-    flex: 1,
-  },
-  content: {
-    paddingTop: 12,
-  },
-  filterBar: {
-    marginTop: 20,
-    marginBottom: 12,
-    width: '100%',
-  },
-  sectionHeader: {
-    marginTop: 20,
-    marginBottom: 12,
-  },
-  sectionHeaderText: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    marginBottom: 12,
-  },
-  callItem: {
-    backgroundColor: '#121a26',
-    borderRadius: 32,
-    padding: 20,
-    marginBottom: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#000',
-    shadowOpacity: 0.14,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  callItemHandled: {
-    backgroundColor: '#1f2637',
-    borderColor: '#2c3448',
-  },
-  callItemArchived: {
-    backgroundColor: '#181d29',
-    borderColor: '#1f2335',
-  },
-  callItemPressed: {
-    transform: [{ scale: 0.98 }],
-  },
-  callItemMuted: {
-    opacity: 0.7,
-    backgroundColor: '#111b27',
-    borderColor: 'rgba(255,255,255,0.15)',
-    shadowOpacity: 0.1,
-  },
-  callRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  callIcon: {
-    marginRight: 16,
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  callIconStack: {
-    width: 44,
-    height: 44,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  callIconStackHandled: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  callIconStackArchived: {
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  callIconStackMuted: {
-    opacity: 0.55,
-  },
-  callIconMuted: {
-    opacity: 0.6,
-  },
-  transcriptBadge: {
-    position: 'absolute',
-    right: -4,
-    bottom: -4,
-    width: 22,
-    height: 22,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#0f141d',
-  },
-  callText: {
-    flex: 1,
-  },
-  callTitle: {
-    color: '#f5f7fb',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  callTitleMuted: {
-    color: '#b0b5c8',
-  },
-  callTimestamp: {
-    color: '#8aa0c6',
-    marginTop: 4,
-    fontSize: 14,
-  },
-  callTimestampMuted: {
-    color: '#6f7a94',
-  },
-  statusPill: {
-    borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-  },
-  statusPillHandled: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  statusPillArchived: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  statusPillMuted: {
-    opacity: 0.45,
-  },
-  statusText: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  statusTextMuted: {
-    opacity: 0.6,
-  },
-  emptyStateWrap: {
-    marginTop: 100,
-    alignItems: 'stretch',
-    paddingHorizontal: 0,
-  },
-  skeletonList: {
-    marginTop: 24,
-  },
-  skeletonCard: {
-    height: 82,
-    borderRadius: 32,
-    backgroundColor: '#121a26',
-    marginBottom: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  footer: {
-    marginTop: 24,
-    paddingBottom: 60,
-  },
-  trayOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    zIndex: 999,
-    elevation: 999,
-  },
-  trayBackdrop: {
-    backgroundColor: '#02050b',
-  },
-  tray: {
-    position: 'absolute',
-    left: -12,
-    right: -12,
-    bottom: 0,
-    borderRadius: 30,
-    backgroundColor: '#0c1118',
-    paddingVertical: 24,
-    paddingHorizontal: 26,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-    shadowColor: '#000',
-    shadowOpacity: 0.4,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-    zIndex: 1000,
-    elevation: 30,
-  },
-  trayHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  trayTitle: {
-    color: '#f5f7fb',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'left',
-    marginBottom: 6,
-  },
-  traySubtitle: {
-    color: '#8aa0c6',
-    fontSize: 14,
-    textAlign: 'left',
-    marginBottom: 2,
-  },
-  trayDetail: {
-    color: '#6f7a94',
-    fontSize: 12,
-    textAlign: 'left',
-    marginBottom: 18,
-  },
-  trayAction: {
-    borderRadius: 18,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    marginBottom: 12,
-  },
-  trayActionPressed: {
-    opacity: 0.8,
-  },
-  trayActionDisabled: {
-    opacity: 0.6,
-  },
-  trayActionText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  trayActionHint: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  trayDanger: {
-    backgroundColor: 'rgba(239,68,68,0.08)',
-  },
-  trayDangerText: {
-    color: '#f87171',
-  },
-  trayCancel: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-  },
-  trayCancelText: {
-    color: '#f5f7fb',
-    fontSize: 15,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-});
+const createCallStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    list: {
+      flex: 1,
+    },
+    content: {
+      paddingTop: 12,
+    },
+    filterBar: {
+      marginTop: 20,
+      marginBottom: 12,
+      width: '100%',
+    },
+    sectionHeader: {
+      marginTop: 20,
+      marginBottom: 12,
+    },
+    sectionHeaderText: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+      marginBottom: 12,
+    },
+    callItem: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 32,
+      padding: 20,
+      marginBottom: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.1),
+      shadowColor: '#000',
+      shadowOpacity: 0.14,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 8 },
+    },
+    callItemHandled: {
+      backgroundColor: withOpacity(theme.colors.text, 0.04),
+      borderColor: withOpacity(theme.colors.text, 0.15),
+    },
+    callItemArchived: {
+      backgroundColor: withOpacity(theme.colors.text, 0.035),
+      borderColor: withOpacity(theme.colors.text, 0.12),
+    },
+    callItemPressed: {
+      transform: [{ scale: 0.98 }],
+    },
+    callItemMuted: {
+      opacity: 0.7,
+      backgroundColor: withOpacity(theme.colors.text, 0.04),
+      borderColor: withOpacity(theme.colors.text, 0.15),
+      shadowOpacity: 0.1,
+    },
+    callRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    callIcon: {
+      marginRight: 16,
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      position: 'relative',
+    },
+    callIconStack: {
+      width: 44,
+      height: 44,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    callIconStackHandled: {
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+    },
+    callIconStackArchived: {
+      backgroundColor: withOpacity(theme.colors.text, 0.05),
+    },
+    callIconStackMuted: {
+      opacity: 0.55,
+    },
+    callIconMuted: {
+      opacity: 0.6,
+    },
+    transcriptBadge: {
+      position: 'absolute',
+      right: -4,
+      bottom: -4,
+      width: 22,
+      height: 22,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.bg,
+    },
+    callText: {
+      flex: 1,
+    },
+    callTitle: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    callTitleMuted: {
+      color: theme.colors.textMuted,
+    },
+    callTimestamp: {
+      color: theme.colors.textMuted,
+      marginTop: 4,
+      fontSize: 14,
+    },
+    callTimestampMuted: {
+      color: theme.colors.textDim,
+    },
+    statusPill: {
+      borderRadius: 999,
+      paddingVertical: 6,
+      paddingHorizontal: 14,
+    },
+    statusPillHandled: {
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+    },
+    statusPillArchived: {
+      backgroundColor: withOpacity(theme.colors.text, 0.05),
+    },
+    statusPillMuted: {
+      opacity: 0.45,
+    },
+    statusText: {
+      fontSize: 13,
+      fontWeight: '700',
+      letterSpacing: 0.3,
+    },
+    statusTextMuted: {
+      opacity: 0.6,
+    },
+    emptyStateWrap: {
+      marginTop: 100,
+      alignItems: 'stretch',
+      paddingHorizontal: 0,
+    },
+    skeletonList: {
+      marginTop: 24,
+    },
+    skeletonCard: {
+      height: 82,
+      borderRadius: 32,
+      backgroundColor: theme.colors.surface,
+      marginBottom: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.08),
+    },
+    footer: {
+      marginTop: 24,
+      paddingBottom: 60,
+    },
+    trayOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      zIndex: 999,
+      elevation: 999,
+    },
+    trayBackdrop: {
+      backgroundColor: withOpacity(theme.colors.text, 0.2),
+    },
+    tray: {
+      position: 'absolute',
+      left: -12,
+      right: -12,
+      bottom: 0,
+      borderRadius: 30,
+      backgroundColor: theme.colors.surface,
+      paddingVertical: 24,
+      paddingHorizontal: 26,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.08),
+      shadowColor: '#000',
+      shadowOpacity: 0.4,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 12 },
+      zIndex: 1000,
+      elevation: 30,
+    },
+    trayHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: withOpacity(theme.colors.text, 0.3),
+      alignSelf: 'center',
+      marginBottom: 12,
+    },
+    trayTitle: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+      textAlign: 'left',
+      marginBottom: 6,
+    },
+    traySubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      textAlign: 'left',
+      marginBottom: 2,
+    },
+    trayDetail: {
+      color: theme.colors.textDim,
+      fontSize: 12,
+      textAlign: 'left',
+      marginBottom: 18,
+    },
+    trayAction: {
+      borderRadius: 18,
+      paddingVertical: 14,
+      paddingHorizontal: 18,
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+      marginBottom: 12,
+    },
+    trayActionPressed: {
+      opacity: 0.8,
+    },
+    trayActionDisabled: {
+      opacity: 0.6,
+    },
+    trayActionText: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    trayActionHint: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      marginTop: 4,
+    },
+    trayDanger: {
+      backgroundColor: withOpacity(theme.colors.danger, 0.15),
+    },
+    trayDangerText: {
+      color: theme.colors.danger,
+    },
+    trayCancel: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+    },
+    trayCancelText: {
+      color: theme.colors.textMuted,
+      fontSize: 15,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+  });

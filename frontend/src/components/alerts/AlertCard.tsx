@@ -50,11 +50,19 @@ export default function AlertCard({
   const pillBackground = withOpacity(theme.colors.surface, 0.2);
   const scoreBackground = scoreBackgroundColor ?? pillBackground;
   const scoreTextColor = scoreColor ?? accentColor;
-  const mutedStyle = muted ? { opacity: 0.6 } : null;
+  const mutedStyle = muted ? { opacity: 0.75 } : null;
+  const cardBackground = theme.colors.surface;
+  const cardBorderColor = withOpacity(theme.colors.text, 0.1);
+  const actionBackground = withOpacity(theme.colors.text, 0.08);
+  const viewButtonBackground = withOpacity(theme.colors.text, 0.12);
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: '#121a26' }, mutedStyle]}
+      style={[
+        styles.card,
+        { backgroundColor: cardBackground, borderColor: cardBorderColor },
+        mutedStyle,
+      ]}
       activeOpacity={0.85}
       onPress={onPress}
       onLongPress={onLongPress}
@@ -97,8 +105,8 @@ export default function AlertCard({
             </Text>
           </View>
           {actionLabel ? (
-            <View style={[styles.actionWrapper, { backgroundColor: theme.colors.surface }]}>
-              <View style={[styles.actionButton, { backgroundColor: theme.colors.border }]}>
+            <View style={[styles.actionWrapper, { backgroundColor: 'transparent' }]}>
+              <View style={[styles.actionButton, { backgroundColor: viewButtonBackground }]}>
                 <Text style={[styles.actionButtonText, { color: accentColor }]}>{actionLabel.toUpperCase()}</Text>
                 <Ionicons name={actionIcon} size={12} color={accentColor} style={styles.actionIcon} />
               </View>
