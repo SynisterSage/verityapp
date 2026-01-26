@@ -1,7 +1,14 @@
 import 'react-native-gesture-handler';
 import { useCallback, useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { DefaultTheme, NavigationContainer, NavigationProp, useNavigation } from '@react-navigation/native';
+import {
+  DefaultTheme,
+  NavigationContainer,
+  NavigationProp,
+  useNavigation,
+  CommonActions,
+  createNavigationContainerRef,
+} from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
@@ -13,6 +20,7 @@ import {
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
+import * as Notifications from 'expo-notifications';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ProfileProvider, useProfile } from './src/context/ProfileContext';
@@ -57,6 +65,12 @@ import {
 import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientManager';
 
 enableScreens(true);
+
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+type PendingNotificationData = {
+  callId?: string;
+  alertId?: string;
+};
 
 const navTheme = {
   ...DefaultTheme,
@@ -335,6 +349,59 @@ function RootNavigator() {
 }
 
 export default function App() {
+  const { session } = useAuth();
+  const pendingNotificationRef = useRef<PendingNotificationData | null>(null);
+  const notificationListenerRef = useRef<Notifications.Subscription | null>(null);
+
+  const resolvePendingNotification = useCallback(() => {
+    const payload = pendingNotificationRef.current;
+    if (!payload) {
+      return;
+    }
+    if (!session) {
+      return;
+    }
+    if (!navigationRef.current?.isReady()) {
+      return;
+    }
+    pendingNotificationRef.current = null;
+    if (payload.callId) {
+      navigationRef.current.navigate('CallDetailModal', { callId: payload.callId });
+      return;
+    }
+    if (payload.alertId) {
+      navigationRef.current.dispatch(
+        CommonActions.navigate({
+          name: 'AppTabs',
+          params: { screen: 'AlertsTab' },
+        })
+      );
+    }
+  }, [session]);
+
+  useEffect(() => {
+    notificationListenerRef.current = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        const data = response.notification.request.content.data as Record<string, unknown>;
+        const payload: PendingNotificationData = {
+          callId: typeof data.callId === 'string' ? data.callId : undefined,
+          alertId: typeof data.alertId === 'string' ? data.alertId : undefined,
+        };
+        if (!payload.callId && !payload.alertId) {
+          return;
+        }
+        pendingNotificationRef.current = payload;
+        resolvePendingNotification();
+      }
+    );
+    return () => {
+      notificationListenerRef.current?.remove();
+    };
+  }, [resolvePendingNotification]);
+
+  useEffect(() => {
+    resolvePendingNotification();
+  }, [session, resolvePendingNotification]);
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -343,7 +410,15 @@ export default function App() {
           <InviteLinkHandler />
           <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
             <GestureHandlerRootView style={{ flex: 1 }}>
-              <NavigationContainer theme={navTheme}>
+              <NavigationContainer
+                theme={navTheme}
+                ref={navigationRef}
+                onReady={() => {
+                  if (pendingNotificationRef.current) {
+                    resolvePendingNotification();
+                  }
+                }}
+              >
                 <RootNavigator />
                 <StatusBar style="light" />
               </NavigationContainer>

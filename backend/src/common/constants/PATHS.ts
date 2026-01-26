@@ -39,6 +39,7 @@ const PATHS = {
     InviteAccept: '/invites/:inviteId/accept',
     Records: '/:profileId/records',
     Export: '/:profileId/export',
+    DeviceTokens: '/:profileId/device-tokens',
   },
 } as const;
 

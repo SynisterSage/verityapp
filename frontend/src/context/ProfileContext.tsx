@@ -15,6 +15,10 @@ import {
   requestTwilioClientToken,
   sendTwilioClientHeartbeat,
 } from '../services/twilioClient';
+import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+import { registerProfileDeviceToken } from '../services/notifications';
 
 export type Profile = {
   id: string;
@@ -83,6 +87,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [twilioClientError, setTwilioClientError] = useState<string | null>(null);
   const [twilioClientHeartbeatActive, setTwilioClientHeartbeatActive] = useState(false);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pushRegistrationRef = useRef<{ profileId: string; token: string } | null>(null);
+  const isRegisteringPushRef = useRef(false);
 
   const refreshProfiles = useCallback(async () => {
     if (!session) {
@@ -167,6 +173,61 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     };
     loadMembership();
   }, [session, activeProfile?.id]);
+
+  const registerPushTokenForProfile = useCallback(async () => {
+    if (!session || !activeProfile?.id) {
+      return;
+    }
+    if (activeProfile.enable_push_alerts === false) {
+      return;
+    }
+    if (isRegisteringPushRef.current) {
+      return;
+    }
+    try {
+      isRegisteringPushRef.current = true;
+      const { status: initialStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = initialStatus;
+      if (initialStatus !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+      if (finalStatus !== 'granted') {
+        return;
+      }
+      const tokenResult = await Notifications.getExpoPushTokenAsync();
+      const pushToken = tokenResult?.data;
+      if (!pushToken) {
+        return;
+      }
+      const alreadyRegistered = pushRegistrationRef.current;
+      if (alreadyRegistered?.profileId === activeProfile.id && alreadyRegistered.token === pushToken) {
+        return;
+      }
+      const locale = new Intl.DateTimeFormat().resolvedOptions().locale;
+      const metadata = {
+        appVersion:
+          Constants.expoConfig?.version ??
+          (typeof Constants.manifest === 'object' ? Constants.manifest?.version : undefined),
+      };
+      await registerProfileDeviceToken({
+        profileId: activeProfile.id,
+        expoPushToken: pushToken,
+        platform: Platform.OS,
+        locale,
+        metadata,
+      });
+      pushRegistrationRef.current = { profileId: activeProfile.id, token: pushToken };
+    } catch (err) {
+      console.warn('Failed to register push token', err);
+    } finally {
+      isRegisteringPushRef.current = false;
+    }
+  }, [activeProfile?.enable_push_alerts, activeProfile?.id, session]);
+
+  useEffect(() => {
+    registerPushTokenForProfile();
+  }, [registerPushTokenForProfile]);
 
   useEffect(() => {
     if (!activeProfile?.id) {

@@ -14,6 +14,7 @@ import {
 } from '@src/services/passcode';
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
+import { notifyProfileForAlert } from '@src/services/pushNotifications';
 
 const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call may be recorded for safety.';
 const PUBLIC_API_URL = process.env.PUBLIC_API_URL?.replace(/\/+$/, '');
@@ -687,25 +688,49 @@ async function recordingReady(req: Request, res: Response) {
     if (typeof fraudScore === 'number' && fraudScore >= fraudThreshold) {
       const alertsEnabled =
         profile.enable_email_alerts || profile.enable_sms_alerts || profile.enable_push_alerts;
-      if (alertsEnabled) {
-        await supabaseAdmin
-          .from('alerts')
-          .upsert(
-            {
-              profile_id: profile.id,
-              call_id: callRow.id,
-              alert_type: 'fraud',
-              status: 'pending',
-              payload: {
-                score: fraudScore,
-                riskLevel: fraudRiskLevel,
-                keywords: fraudKeywords,
-                callerHash,
-              },
+    if (alertsEnabled) {
+      await supabaseAdmin
+        .from('alerts')
+        .upsert(
+          {
+            profile_id: profile.id,
+            call_id: callRow.id,
+            alert_type: 'fraud',
+            status: 'pending',
+            payload: {
+              score: fraudScore,
+              riskLevel: fraudRiskLevel,
+              keywords: fraudKeywords,
+              callerHash,
             },
-            { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
-          );
+          },
+          { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
+        );
+      if (profile.enable_push_alerts) {
+        const { data: recentAlerts } = await supabaseAdmin
+          .from('alerts')
+          .select('id, call_id')
+          .eq('profile_id', profile.id)
+          .eq('call_id', callRow.id)
+          .eq('alert_type', 'fraud')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        const latestAlert = recentAlerts?.[0];
+        if (latestAlert) {
+          const pushData: Record<string, string> = { type: 'fraud' };
+          if (fraudRiskLevel) {
+            pushData.riskLevel = fraudRiskLevel;
+          }
+          await notifyProfileForAlert(profile.id, {
+            alertId: latestAlert.id,
+            callId: latestAlert.call_id ?? callRow.id,
+            title: `Priority alert (${Math.round(fraudScore)}%)`,
+            body: `Call from ${resolvedFrom ?? 'unknown'} flagged as ${fraudRiskLevel}`,
+            data: pushData,
+          });
+        }
       }
+    }
 
       const callBlockingEnabled = process.env.ENABLE_CALL_BLOCKING === 'true';
       if (callBlockingEnabled && callerHash && automationBlockEnabled) {
