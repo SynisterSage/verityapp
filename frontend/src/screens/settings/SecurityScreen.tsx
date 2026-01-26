@@ -149,7 +149,7 @@ export default function SecurityScreen() {
           styles.content,
           {
             paddingBottom: Math.max(insets.bottom, 32) + 20,
-            paddingTop: Math.max(insets.top, 160),
+            paddingTop: Math.max(insets.top, 12 + 0),
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -303,10 +303,6 @@ const createSecurityStyles = (theme: AppTheme) =>
       borderColor: theme.colors.border,
       padding: 24,
       gap: 16,
-      shadowColor: '#000',
-      shadowOpacity: 0.25,
-      shadowRadius: 40,
-      shadowOffset: { width: 0, height: 12 },
       elevation: 18,
     },
     cardLabel: {

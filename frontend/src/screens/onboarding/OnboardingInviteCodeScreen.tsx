@@ -115,7 +115,7 @@ export default function OnboardingInviteCodeScreen() {
               {
                 paddingTop: 28,
                 flexGrow: 1,
-                paddingBottom: Math.max(insets.bottom, 32) + 220,
+                paddingBottom: Math.max(insets.bottom, 32) + 260,
               },
             ]}
             showsVerticalScrollIndicator={false}

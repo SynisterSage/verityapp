@@ -1,10 +1,11 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 
 import { useTheme } from '../../context/ThemeContext';
-import { useAuth } from '../../context/AuthContext';
+import { SignUpResult, useAuth } from '../../context/AuthContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 
 type AlertState = {
@@ -27,6 +28,17 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputBorderColor = (field: 'email' | 'password' | 'confirm') =>
     focusField === field ? theme.colors.accent : theme.colors.border;
+  const isLengthValid = password.length >= 8;
+  const hasLetter = /[A-Za-z]/.test(password);
+  const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+  const passwordCriteria = useMemo(
+    () => [
+      { label: 'At least 8 characters', met: isLengthValid },
+      { label: 'Includes a letter', met: hasLetter },
+      { label: 'Includes a special character', met: hasSpecialChar },
+    ],
+    [hasLetter, hasSpecialChar, isLengthValid]
+  );
 
   const handleSubmit = async () => {
     setAlert(null);
@@ -49,9 +61,14 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
     }
 
     setIsSubmitting(true);
-    const message = await signUp(email.trim(), password);
-    if (message) {
-      setAlert({ message, type: 'danger' });
+    const result = await signUp(email.trim(), password);
+    if (result.error) {
+      setAlert({ message: result.error, type: 'danger' });
+      return;
+    }
+    if (result.needsConfirmation) {
+      navigation.navigate('ConfirmEmail', { email: email.trim() });
+      return;
     }
     setIsSubmitting(false);
   };
@@ -78,6 +95,9 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const alertBg =
     alert?.type === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(225, 29, 72, 0.08)';
 
+  const alertSpacing = alert ? 40 : 24;
+  const scrollPaddingBottom = Math.max(insets.bottom, 32) + 220 + alertSpacing;
+
   return (
     <SafeAreaView
       style={[
@@ -90,7 +110,15 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
       ]}
       edges={['bottom']}
     >
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: scrollPaddingBottom },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View>
           <Text style={[styles.title, { color: theme.colors.text, fontFamily: theme.typography.fontFamily }]}>
             Start Today
@@ -128,10 +156,10 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
             />
           </View>
 
-          <View style={styles.fieldWrapper}>
-            <Text style={[styles.fieldLabel, { color: theme.colors.textDim }]}>Password</Text>
-            <View style={styles.passwordRow}>
-              <TextInput
+        <View style={styles.fieldWrapper}>
+          <Text style={[styles.fieldLabel, { color: theme.colors.textDim }]}>Password</Text>
+          <View style={styles.passwordRow}>
+            <TextInput
                 placeholder="••••••••"
                 placeholderTextColor={theme.colors.textDim}
                 secureTextEntry={!showPassword}
@@ -148,21 +176,21 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
                 onChangeText={setPassword}
                 onFocus={() => setFocusField('password')}
                 onBlur={() => setFocusField((prev) => (prev === 'password' ? null : prev))}
-              />
-              <Pressable
-                style={styles.eyeButton}
+            />
+            <Pressable
+              style={styles.eyeButton}
                 onPress={() => setShowPassword((prev) => !prev)}
                 android_ripple={{ color: 'rgba(255,255,255,0.15)', borderless: true }}
               >
                 {renderEye(showPassword)}
               </Pressable>
-            </View>
           </View>
+        </View>
 
           <View style={styles.fieldWrapper}>
-            <Text style={[styles.fieldLabel, { color: theme.colors.textDim }]}>Confirm password</Text>
-            <View style={styles.passwordRow}>
-              <TextInput
+          <Text style={[styles.fieldLabel, { color: theme.colors.textDim }]}>Confirm password</Text>
+          <View style={styles.passwordRow}>
+            <TextInput
                 placeholder="••••••••"
                 placeholderTextColor={theme.colors.textDim}
                 secureTextEntry={!showConfirm}
@@ -179,16 +207,36 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
                 onChangeText={setConfirmPassword}
                 onFocus={() => setFocusField('confirm')}
                 onBlur={() => setFocusField((prev) => (prev === 'confirm' ? null : prev))}
-              />
-              <Pressable
-                style={styles.eyeButton}
-                onPress={() => setShowConfirm((prev) => !prev)}
-                android_ripple={{ color: 'rgba(255,255,255,0.15)', borderless: true }}
-              >
-                {renderEye(showConfirm)}
-              </Pressable>
-            </View>
+            />
+            <Pressable
+              style={styles.eyeButton}
+              onPress={() => setShowConfirm((prev) => !prev)}
+              android_ripple={{ color: 'rgba(255,255,255,0.15)', borderless: true }}
+            >
+              {renderEye(showConfirm)}
+            </Pressable>
           </View>
+          <View style={styles.criteriaList}>
+            {passwordCriteria.map((item) => (
+              <View key={item.label} style={styles.criteriaRow}>
+                <Ionicons
+                  name={item.met ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={16}
+                  color={item.met ? theme.colors.success : theme.colors.textDim}
+                  style={styles.criteriaIcon}
+                />
+                <Text
+                  style={[
+                    styles.criteriaText,
+                    { color: item.met ? theme.colors.text : theme.colors.textDim },
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
 
           {alert ? (
             <View
@@ -205,7 +253,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
             </View>
           ) : null}
         </View>
-      </View>
+      </ScrollView>
 
       <ActionFooter
         primaryLabel={isSubmitting ? 'Creating…' : 'Create Account'}
@@ -231,6 +279,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     paddingHorizontal: 0,
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
     flex: 1,
@@ -259,6 +310,24 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     marginBottom: 4,
   },
+  criteriaList: {
+    marginTop: 12,
+    paddingLeft: 4,
+    gap: 4,
+  },
+  criteriaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  criteriaIcon: {
+    marginTop: 2,
+  },
+  criteriaText: {
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+  },
   input: {
     height: 60,
     borderWidth: 1,
@@ -285,7 +354,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 10,
-    marginBottom: 12,
+    marginBottom: 24,
     marginTop: 14,
     backgroundColor: 'rgba(225, 29, 72, 0.08)',
   },

@@ -7,11 +7,16 @@ import { Session } from '@supabase/supabase-js';
 
 import { supabase } from '../services/supabase';
 
+export type SignUpResult = {
+  error: string | null;
+  needsConfirmation?: boolean;
+};
+
 type AuthContextValue = {
   session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
-  signUp: (email: string, password: string) => Promise<string | null>;
+  signUp: (email: string, password: string) => Promise<SignUpResult>;
   signInWithGoogle: () => Promise<string | null>;
   signOut: () => Promise<void>;
 };
@@ -94,8 +99,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return error ? error.message : null;
       },
       signUp: async (email, password) => {
-        const { error } = await supabase.auth.signUp({ email, password });
-        return error ? error.message : null;
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        return {
+          error: error ? error.message : null,
+          needsConfirmation: !error && !data?.session,
+        };
       },
       signInWithGoogle: async () => {
         const redirectTo = 'exp://192.168.1.174:8081/--/auth/callback';

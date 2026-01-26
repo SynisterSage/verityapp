@@ -29,6 +29,7 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { authorizedFetch } from './src/services/backend';
 import SignInScreen from './src/screens/auth/SignInScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
+import ConfirmEmailScreen from './src/screens/auth/ConfirmEmailScreen';
 import HomeScreen from './src/screens/dashboard/HomeScreen';
 import CallsScreen from './src/screens/dashboard/CallsScreen';
 import CallDetailScreen from './src/screens/dashboard/CallDetailScreen';
@@ -330,6 +331,11 @@ function RootNavigator() {
           <RootStack.Screen
             name="SignUp"
             component={SignUpScreen}
+            options={{ headerShown: false, animation: 'none' }}
+          />
+          <RootStack.Screen
+            name="ConfirmEmail"
+            component={ConfirmEmailScreen}
             options={{ headerShown: false, animation: 'none' }}
           />
         </>

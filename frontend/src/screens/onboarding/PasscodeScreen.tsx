@@ -208,7 +208,7 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
             contentContainerStyle={[
               styles.body,
               {
-                paddingBottom: 220,
+                paddingBottom: 180,
               },
             ]}
             showsVerticalScrollIndicator={false}

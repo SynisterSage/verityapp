@@ -133,7 +133,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         {
           paddingTop: 28,
           flexGrow: 1,
-          paddingBottom: Math.max(insets.bottom, 32) + 220,
+          paddingBottom: Math.max(insets.bottom, 32) + 100,
         },
       ]}
       showsVerticalScrollIndicator={false}
