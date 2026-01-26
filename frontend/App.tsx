@@ -348,7 +348,7 @@ function RootNavigator() {
   );
 }
 
-export default function App() {
+function AppContent() {
   const { session } = useAuth();
   const pendingNotificationRef = useRef<PendingNotificationData | null>(null);
   const notificationListenerRef = useRef<Notifications.Subscription | null>(null);
@@ -402,29 +402,36 @@ export default function App() {
   useEffect(() => {
     resolvePendingNotification();
   }, [session, resolvePendingNotification]);
+
+  return (
+    <ProfileProvider>
+      <TwilioVoiceClientManager />
+      <InviteLinkHandler />
+      <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <NavigationContainer
+            theme={navTheme}
+            ref={navigationRef}
+            onReady={() => {
+              if (pendingNotificationRef.current) {
+                resolvePendingNotification();
+              }
+            }}
+          >
+            <RootNavigator />
+            <StatusBar style="light" />
+          </NavigationContainer>
+        </GestureHandlerRootView>
+      </SafeAreaProvider>
+    </ProfileProvider>
+  );
+}
+
+export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ProfileProvider>
-          <TwilioVoiceClientManager />
-          <InviteLinkHandler />
-          <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
-            <GestureHandlerRootView style={{ flex: 1 }}>
-              <NavigationContainer
-                theme={navTheme}
-                ref={navigationRef}
-                onReady={() => {
-                  if (pendingNotificationRef.current) {
-                    resolvePendingNotification();
-                  }
-                }}
-              >
-                <RootNavigator />
-                <StatusBar style="light" />
-              </NavigationContainer>
-            </GestureHandlerRootView>
-          </SafeAreaProvider>
-        </ProfileProvider>
+        <AppContent />
       </AuthProvider>
     </ThemeProvider>
   );
