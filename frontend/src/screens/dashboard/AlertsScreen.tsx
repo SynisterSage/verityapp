@@ -1162,6 +1162,7 @@ const createAlertStyles = (theme: AppTheme) =>
     },
     skeletonWrapper: {
       marginBottom: 12,
+      marginTop: 18,
     },
     skeletonCard: {
       backgroundColor: theme.colors.surface,

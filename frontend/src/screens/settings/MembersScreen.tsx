@@ -27,6 +27,9 @@ import { SettingsStackParamList } from '../../navigation/types';
 import { useAuth } from '../../context/AuthContext';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
+import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 import * as Clipboard from 'expo-clipboard';
 
@@ -59,20 +62,20 @@ const ROLE_DISPLAY_NAMES: Record<MemberRole, string> = {
   admin: 'Caretaker',
 };
 
-const roleHelperItems = [
+const createRoleHelperItems = (theme: AppTheme) => [
   {
     icon: 'shield-checkmark',
-    color: '#4ade80',
+    color: theme.colors.success,
     text: 'Family members (Full access) can manage the protected profile and alerts.',
   },
   {
     icon: 'eye',
-    color: '#2d6df6',
+    color: theme.colors.accent,
     text: 'Caretakers just monitor activity and receive recordings.',
   },
   {
     icon: 'refresh',
-    color: '#64748b',
+    color: theme.colors.textMuted,
     text: 'Roles can be updated anytime via the menu next to each member.',
   },
 ];
@@ -97,6 +100,7 @@ export default function MembersScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const { session } = useAuth();
+  const { theme } = useTheme();
   const sessionUserId = session?.user?.id ?? null;
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -132,6 +136,8 @@ export default function MembersScreen() {
   }, [currentUserIsAdmin]);
 
   const highlightInviteEntry = route.params?.highlightInviteEntry ?? false;
+  const styles = useMemo(() => createMembersStyles(theme), [theme]);
+  const roleHelperItems = useMemo(() => createRoleHelperItems(theme), [theme]);
 
   const closeMemberMenu = useCallback(() => {
     setActiveMemberMenuId(null);
@@ -504,7 +510,7 @@ export default function MembersScreen() {
               </View>
             ) : members.length === 0 ? (
               <View style={styles.emptyState}>
-                <Ionicons name="people-outline" size={40} color="#7d9dff" />
+                <Ionicons name="people-outline" size={40} color={theme.colors.accent} />
                 <Text style={styles.emptyStateTitle}>No members yet</Text>
               </View>
             ) : (
@@ -551,7 +557,7 @@ export default function MembersScreen() {
                             onPress={() => toggleMemberMenu(member)}
                             activeOpacity={0.7}
                           >
-                            <Ionicons name="ellipsis-vertical" size={18} color="#7d9dff" />
+                            <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.accent} />
                           </TouchableOpacity>
                         )}
                       </View>
@@ -632,7 +638,7 @@ export default function MembersScreen() {
                 </View>
               ) : invites.length === 0 ? (
                 <View style={styles.emptyState}>
-                  <Ionicons name="mail-open-outline" size={40} color="#7d9dff" />
+                  <Ionicons name="mail-open-outline" size={40} color={theme.colors.accent} />
                   <Text style={styles.emptyStateTitle}>No pending invites</Text>
                 </View>
               ) : (
@@ -654,7 +660,7 @@ export default function MembersScreen() {
                           style={styles.pendingActions}
                           onPress={() => openInviteActions(invite)}
                         >
-                          <Ionicons name="ellipsis-horizontal" size={22} color="#fff" />
+                          <Ionicons name="ellipsis-horizontal" size={22} color={theme.colors.text} />
                         </TouchableOpacity>
                       </View>
                     );
@@ -667,7 +673,7 @@ export default function MembersScreen() {
               onPress={() => navigation.navigate('EnterInviteCode')}
             >
               <Text style={styles.enterCodeText}>Enter invite code</Text>
-              <Ionicons name="chevron-forward" size={18} color="#7d9dff" />
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.accent} />
             </TouchableOpacity>
           </View>
 
@@ -705,7 +711,7 @@ export default function MembersScreen() {
                 </Text>
               </View>
               <Pressable onPress={closeInviteActions} style={styles.actionClose}>
-                <Ionicons name="close" size={20} color="#fff" />
+                <Ionicons name="close" size={20} color={theme.colors.text} />
               </Pressable>
             </View>
             <TouchableOpacity
@@ -726,7 +732,7 @@ export default function MembersScreen() {
               disabled={revokingInviteId === selectedInvite?.id}
             >
               {revokingInviteId === selectedInvite?.id ? (
-                <ActivityIndicator size="small" color="#f97316" />
+                <ActivityIndicator size="small" color={theme.colors.accent} />
               ) : (
                 <Text style={styles.actionDangerText}>Revoke invite</Text>
               )}
@@ -785,445 +791,450 @@ export default function MembersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-  },
-  heroSection: {
-    marginBottom: 16,
-  },
-  heroTitle: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: '#f5f7fb',
-    marginBottom: 6,
-  },
-  heroSubtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#8aa0c6',
-  },
-  sectionCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    padding: 20,
-    marginBottom: 16,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    letterSpacing: 1.5,
-    color: '#8796b0',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    fontWeight: '600',
-  },
-  sectionDescription: {
-    color: '#95a2bd',
-    fontSize: 13,
-    marginBottom: 6,
-  },
-  sectionDescriptionSpacing: {
-    marginBottom: 12,
-  },
-  pendingHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'baseline',
-    marginBottom: 6,
-  },
-  pendingCount: {
-    color: '#7d9dff',
-    fontSize: 12,
-    letterSpacing: 1.5,
-  },
-  membersList: {
-    gap: 12,
-  },
-  memberCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#1f2735',
-    paddingVertical: 16,
-    paddingHorizontal: 18,
-    backgroundColor: '#0f141d',
-    marginBottom: 2,
-  },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  memberNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  memberAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  memberAvatarText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  memberContent: {
-    flex: 1,
-  },
-  memberName: {
-    color: '#f5f7fb',
-    fontWeight: '600',
-  },
-  memberRole: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  youBadge: {
-    backgroundColor: '#131c30',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#1f2b46',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    color: '#7d9dff',
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  memberMenu: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#0f141d',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#1f2735',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 8,
-    zIndex: 2,
-  },
-  memberMenuPortal: {
-    position: 'absolute',
-    minWidth: MENU_WIDTH,
-    maxWidth: MENU_WIDTH,
-    zIndex: 2,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-  },
-  menuItemText: {
-    color: '#f5f7fb',
-    fontWeight: '500',
-  },
-  menuItemDisabled: {
-    opacity: 0.5,
-  },
-  menuItemTextDisabled: {
-    color: '#95a2bd',
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#1b2333',
-    marginVertical: 6,
-  },
-  placeholder: {
-    color: '#95a2bd',
-    fontSize: 13,
-  },
-  highlightCard: {
-    borderColor: '#5d9dff',
-    borderWidth: 1,
-    shadowColor: '#5d9dff',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-  },
-  skeletonWrapper: {
-    gap: 12,
-    marginBottom: 8,
-  },
-  skeletonAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#1f2735',
-  },
-  skeletonContent: {
-    flex: 1,
-    justifyContent: 'center',
-    gap: 6,
-  },
-  skeletonLine: {
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: '#1f2735',
-  },
-  skeletonLineShort: {
-    width: '65%',
-  },
-  skeletonLineTiny: {
-    width: '40%',
-  },
-  roleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  rolePill: {
-    flex: 1,
-    paddingVertical: 18,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0f1724',
-  },
-  rolePillActive: {
-    backgroundColor: '#2d6df6',
-  },
-  rolePillInactive: {
-    backgroundColor: '#0f1724',
-  },
-  roleLabel: {
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  roleLabelActive: {
-    color: '#fff',
-  },
-  roleLabelInactive: {
-    color: '#8aa0c6',
-  },
-  roleSubLabel: {
-    fontSize: 12,
-  },
-  roleSubLabelActive: {
-    color: '#e0e7ff',
-  },
-  roleSubLabelInactive: {
-    color: '#5b657d',
-  },
-  button: {
-    marginTop: 12,
-    width: '100%',
-    paddingVertical: 16,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2d6df6',
-  },
-  inviteButton: {},
-  disabledButton: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: '#f5f7fb',
-    fontWeight: '600',
-  },
-  error: {
-    color: '#ff8a8a',
-    fontSize: 12,
-  },
-  invitesList: {
-    gap: 12,
-  },
-  pendingCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#0f141d',
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    borderRadius: 24,
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    marginBottom: 6,
-    shadowColor: '#000',
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.15,
-  shadowRadius: 8,
-  elevation: 4,
-  },
-  pendingInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  pendingRole: {
-    color: '#7d9dff',
-    fontSize: 12,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  pendingCode: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-    letterSpacing: 2,
-  },
-  pendingStatus: {
-    color: '#64748b',
-    fontSize: 12,
-  },
-  pendingActions: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2d2f47',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#0f1724',
-  },
-  enterCodeButton: {
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: '#1f2735',
-    backgroundColor: '#0f141d',
-    borderRadius: 16,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  enterCodeText: {
-    color: '#f5f7fb',
-    fontWeight: '600',
-  },
-  inviteSkeletonList: {
-    gap: 10,
-  },
-  inviteSkeletonRow: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1e2837',
-    padding: 12,
-    gap: 6,
-  },
-  inviteSkeletonLineShort: {
-    height: 12,
-    width: '40%',
-    borderRadius: 6,
-    backgroundColor: '#1f2735',
-  },
-  inviteSkeletonLineLong: {
-    height: 12,
-    width: '70%',
-    borderRadius: 6,
-    backgroundColor: '#1f2735',
-  },
-  menuPortal: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 999,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'transparent',
-    zIndex: 1,
-  },
-  faded: {
-    opacity: 0.5,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 16,
-  },
-  emptyStateTitle: {
-    color: '#f5f7fb',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  actionOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    zIndex: 20,
-  },
-  actionBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000',
-    opacity: 0.5,
-  },
-  tray: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
-    backgroundColor: '#121a26',
-  },
-  trayHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#1f2937',
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  actionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  actionCode: {
-    color: '#8aa0c6',
-    marginTop: 4,
-  },
-  actionClose: {
-    padding: 6,
-  },
-  actionButton: {
-    backgroundColor: '#1f2534',
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  actionButtonText: {
-    color: '#f5f7fb',
-    fontWeight: '600',
-  },
-  actionDanger: {
-    backgroundColor: '#211122',
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#3f1627',
-  },
-  actionDangerText: {
-    color: '#f97316',
-    fontWeight: '600',
-  },
-});
+const createMembersStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: 'transparent',
+    },
+    content: {
+      paddingHorizontal: 24,
+      paddingTop: 12,
+    },
+    heroSection: {
+      marginBottom: 16,
+    },
+    heroTitle: {
+      fontSize: 34,
+      fontWeight: '700',
+      color: theme.colors.text,
+      marginBottom: 6,
+    },
+    heroSubtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      color: theme.colors.textMuted,
+    },
+    sectionCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 20,
+      marginBottom: 16,
+      elevation: 10,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      letterSpacing: 1.5,
+      color: theme.colors.textMuted,
+      marginBottom: 8,
+      textTransform: 'uppercase',
+      fontWeight: '600',
+    },
+    sectionDescription: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      marginBottom: 6,
+    },
+    sectionDescriptionSpacing: {
+      marginBottom: 12,
+    },
+    pendingHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'baseline',
+      marginBottom: 6,
+    },
+    pendingCount: {
+      color: theme.colors.accent,
+      fontSize: 12,
+      letterSpacing: 1.5,
+    },
+    membersList: {
+      gap: 12,
+    },
+    memberCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingVertical: 16,
+      paddingHorizontal: 18,
+      backgroundColor: theme.colors.surface,
+      marginBottom: 2,
+      elevation: 4,
+    },
+    memberRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    memberNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    menuButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.text, 0.05),
+    },
+    memberAvatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    memberAvatarText: {
+      color: theme.colors.surface,
+      fontWeight: '600',
+    },
+    memberContent: {
+      flex: 1,
+    },
+    memberName: {
+      color: theme.colors.text,
+      fontWeight: '600',
+    },
+    memberRole: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    youBadge: {
+      backgroundColor: withOpacity(theme.colors.accent, 0.15),
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, 0.4),
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      color: theme.colors.accent,
+      fontSize: 10,
+      fontWeight: '600',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+    },
+    memberMenu: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      elevation: 8,
+      zIndex: 2,
+    },
+    memberMenuPortal: {
+      position: 'absolute',
+      minWidth: MENU_WIDTH,
+      maxWidth: MENU_WIDTH,
+      zIndex: 2,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 10,
+    },
+    menuItemText: {
+      color: theme.colors.text,
+      fontWeight: '500',
+    },
+    menuItemDisabled: {
+      opacity: 0.5,
+    },
+    menuItemTextDisabled: {
+      color: theme.colors.textMuted,
+    },
+    menuDivider: {
+      height: 1,
+      backgroundColor: theme.colors.border,
+      marginVertical: 6,
+    },
+    placeholder: {
+      color: withOpacity(theme.colors.text, 0.6),
+      fontSize: 13,
+    },
+    highlightCard: {
+      borderColor: theme.colors.accent,
+      borderWidth: 1,
+
+    },
+    skeletonWrapper: {
+      gap: 12,
+      marginBottom: 8,
+    },
+    skeletonAvatar: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    skeletonContent: {
+      flex: 1,
+      justifyContent: 'center',
+      gap: 6,
+    },
+    skeletonLine: {
+      height: 10,
+      borderRadius: 6,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    skeletonLineShort: {
+      width: '65%',
+    },
+    skeletonLineTiny: {
+      width: '40%',
+    },
+    roleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    rolePill: {
+      flex: 1,
+      paddingVertical: 18,
+      borderRadius: 16,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+    },
+    rolePillActive: {
+      backgroundColor: theme.colors.accent,
+      borderColor: 'transparent',
+    },
+    rolePillInactive: {
+      backgroundColor: theme.colors.surface,
+    },
+    roleLabel: {
+      fontWeight: '700',
+      fontSize: 16,
+      color: theme.colors.text,
+    },
+    roleLabelActive: {
+      color: theme.colors.surface,
+    },
+    roleLabelInactive: {
+      color: theme.colors.textMuted,
+    },
+    roleSubLabel: {
+      fontSize: 12,
+      color: theme.colors.textMuted,
+    },
+    roleSubLabelActive: {
+      color: theme.colors.surface,
+    },
+    roleSubLabelInactive: {
+      color: withOpacity(theme.colors.textMuted, 0.8),
+    },
+    button: {
+      marginTop: 12,
+      width: '100%',
+      paddingVertical: 16,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.accent,
+    },
+    inviteButton: {},
+    disabledButton: {
+      opacity: 0.5,
+    },
+    buttonText: {
+      color: theme.colors.surface,
+      fontWeight: '600',
+    },
+    error: {
+      color: theme.colors.danger,
+      fontSize: 12,
+    },
+    invitesList: {
+      gap: 12,
+    },
+    pendingCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 24,
+      paddingVertical: 18,
+      paddingHorizontal: 20,
+      marginBottom: 6,
+
+      elevation: 4,
+    },
+    pendingInfo: {
+      flex: 1,
+      gap: 4,
+    },
+    pendingRole: {
+      color: theme.colors.accent,
+      fontSize: 12,
+      letterSpacing: 2,
+      textTransform: 'uppercase',
+    },
+    pendingCode: {
+      color: theme.colors.text,
+      fontSize: 24,
+      fontWeight: '700',
+      letterSpacing: 2,
+    },
+    pendingStatus: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+    },
+    pendingActions: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    enterCodeButton: {
+      marginTop: 6,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    enterCodeText: {
+      color: theme.colors.text,
+      fontWeight: '600',
+    },
+    inviteSkeletonList: {
+      gap: 10,
+    },
+    inviteSkeletonRow: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 12,
+      gap: 6,
+    },
+    inviteSkeletonLineShort: {
+      height: 12,
+      width: '40%',
+      borderRadius: 6,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    inviteSkeletonLineLong: {
+      height: 12,
+      width: '70%',
+      borderRadius: 6,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    menuPortal: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 999,
+    },
+    overlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'transparent',
+      zIndex: 1,
+    },
+    faded: {
+      opacity: 0.5,
+    },
+    emptyState: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 16,
+    },
+    emptyStateTitle: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    actionOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      zIndex: 20,
+    },
+    actionBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: withOpacity(theme.colors.text, 0.65),
+    },
+    tray: {
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      padding: 20,
+      backgroundColor: theme.colors.surface,
+    },
+    trayHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: withOpacity(theme.colors.text, 0.3),
+      alignSelf: 'center',
+      marginBottom: 12,
+    },
+    actionHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    actionTitle: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    actionCode: {
+      color: theme.colors.accent,
+      fontSize: 14,
+    },
+    actionClose: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+    },
+    actionButton: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: 'transparent',
+      paddingVertical: 14,
+      paddingHorizontal: 18,
+      backgroundColor: theme.colors.surfaceAlt,
+      marginBottom: 10,
+    },
+    actionButtonText: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    actionDanger: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.danger, 0.35),
+      paddingVertical: 14,
+      paddingHorizontal: 18,
+      backgroundColor: withOpacity(theme.colors.danger, 0.15),
+    },
+    actionDangerText: {
+      color: theme.colors.danger,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+  });

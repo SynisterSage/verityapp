@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 
 import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
 
 type Props = {
   chapter: string;
@@ -24,7 +25,7 @@ export default function OnboardingHeader({
 }: Props) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
+  const { theme, mode } = useTheme();
   const steps = useMemo(() => Array.from({ length: totalSteps }, (_, index) => index), [totalSteps]);
   const animatedWidthsRef = useRef<Animated.Value[]>([]);
 
@@ -46,9 +47,12 @@ export default function OnboardingHeader({
 
   const animatedWidths = animatedWidthsRef.current;
 
+  const progressActiveColor = theme.colors.accent;
+  const progressInactiveColor = withOpacity(theme.colors.accent, 0.15);
+
   return (
     <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: theme.colors.bg }]}>
-      <BlurView intensity={100} tint="dark" style={styles.blur}>
+      <BlurView intensity={100} tint={mode === 'light' ? 'light' : 'dark'} style={styles.blur}>
         <View style={[styles.overlay, { backgroundColor: theme.colors.bg }]} pointerEvents="none" />
         <View
           style={[
@@ -91,20 +95,20 @@ export default function OnboardingHeader({
               const isActive = step < activeStep;
               const width = animatedWidths[step];
               return (
-                <Animated.View
-                  key={step}
-                  style={[
-                    styles.pill,
-                    step !== steps.length - 1 && styles.pillSpacing,
-                    {
-                      width,
-                      backgroundColor: isActive ? '#2d6df6' : 'rgba(45,109,246,0.1)',
-                    },
-                  ]}
-                />
-              );
-            })}
-          </View>
+              <Animated.View
+                key={step}
+                style={[
+                  styles.pill,
+                  step !== steps.length - 1 && styles.pillSpacing,
+                  {
+                    width,
+                    backgroundColor: isActive ? progressActiveColor : progressInactiveColor,
+                  },
+                ]}
+              />
+            );
+          })}
+        </View>
         </View>
       </BlurView>
     </SafeAreaView>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
@@ -31,6 +31,9 @@ import {
   verifyPasscode,
 } from '../../services/profile';
 import { BlurView } from 'expo-blur';
+import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 const POLICY_SECTIONS = [
   {
@@ -83,37 +86,78 @@ const PERMISSIONS = [
   { name: 'Contacts', description: 'Required to import Trusted Contacts', icon: 'people-outline' },
 ];
 
+type SettingRowProps = {
+  icon: string;
+  label: string;
+  description: string;
+  children: React.ReactNode;
+  destructive?: boolean;
+  styles: ReturnType<typeof createDataPrivacyStyles>;
+  theme: AppTheme;
+};
+
 function SettingRow({
   icon,
   label,
   description,
   children,
   destructive = false,
-}: {
-  icon: string;
-  label: string;
-  description: string;
-  children: React.ReactNode;
-  destructive?: boolean;
-}) {
+  styles,
+  theme,
+}: SettingRowProps) {
   return (
     <View style={styles.row}>
-      <View style={[styles.iconBox, destructive && styles.iconBoxDestructive]}>
-        <Ionicons name={icon as any} size={22} color={destructive ? '#fff' : '#94a3b8'} />
+      <View
+        style={[
+          styles.iconBox,
+          destructive ? styles.iconBoxDestructive : styles.iconBoxAlt,
+        ]}
+      >
+        <Ionicons
+          name={icon as any}
+          size={22}
+          color={destructive ? theme.colors.surface : theme.colors.accent}
+        />
       </View>
       <View style={styles.rowText}>
-        <Text style={styles.rowTitle}>{label}</Text>
-        <Text style={styles.rowDescription}>{description}</Text>
+        <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{label}</Text>
+        <Text style={[styles.rowDescription, { color: theme.colors.textMuted }]}>{description}</Text>
       </View>
       {children}
     </View>
   );
 }
 
-function Toggle({ value, onToggle }: { value: boolean; onToggle: () => void }) {
+
+function Toggle({
+  value,
+  onToggle,
+  styles,
+  theme,
+}: {
+  value: boolean;
+  onToggle: () => void;
+  styles: ReturnType<typeof createDataPrivacyStyles>;
+  theme: AppTheme;
+}) {
   return (
-    <Pressable onPress={onToggle} style={[styles.toggle, value && styles.toggleActive]}>
-      <View style={[styles.toggleThumb, value && styles.toggleThumbActive]} />
+    <Pressable
+      onPress={onToggle}
+      style={[
+        styles.toggle,
+        value ? styles.toggleActive : {},
+        {
+          backgroundColor: value ? theme.colors.accent : withOpacity(theme.colors.text, 0.1),
+        },
+      ]}
+    >
+      <View
+        style={[
+          styles.toggleThumb,
+          value ? styles.toggleThumbActive : styles.toggleThumbInactive,
+          { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+        ]}
+      />
     </Pressable>
   );
 }
@@ -152,6 +196,13 @@ export default function DataPrivacyScreen() {
 
   const { activeProfile, canManageProfile, refreshProfiles } = useProfile();
   const { signOut } = useAuth();
+  const { theme, mode } = useTheme();
+  const styles = useMemo(() => createDataPrivacyStyles(theme), [theme]);
+  const policyIconColor = theme.colors.accent;
+  const placeholderColor = useMemo(
+    () => withOpacity(theme.colors.textMuted, 0.65),
+    [theme.colors.textMuted]
+  );
   const [manageAction, setManageAction] = useState<ManageActionKey | null>(null);
   const [manageError, setManageError] = useState('');
   const [pinModalAction, setPinModalAction] = useState<ManageActionKey | null>(null);
@@ -349,8 +400,15 @@ export default function DataPrivacyScreen() {
                 icon={item.icon}
                 label={item.name}
                 description={item.description}
+                styles={styles}
+                theme={theme}
               >
-                <Toggle value={permissions[item.name]} onToggle={() => togglePermission(item.name)} />
+                <Toggle
+                  value={permissions[item.name]}
+                  onToggle={() => togglePermission(item.name)}
+                  styles={styles}
+                  theme={theme}
+                />
               </SettingRow>
             ))}
           </View>
@@ -361,7 +419,7 @@ export default function DataPrivacyScreen() {
               <View key={section.title} style={styles.policyBlock}>
                 <View style={styles.policyHeader}>
                   <View style={styles.policyIcon}>
-                    <Ionicons name="information-circle-outline" size={18} color="#2d6df6" />
+                <Ionicons name="information-circle-outline" size={18} color={policyIconColor} />
                   </View>
                   <Text style={styles.policyTitle}>{section.title}</Text>
                 </View>
@@ -403,7 +461,7 @@ export default function DataPrivacyScreen() {
                     <Ionicons
                       name={action.icon as any}
                       size={22}
-                      color={action.destructive ? '#f87171' : '#8aa0c6'}
+                      color={action.destructive ? theme.colors.danger : theme.colors.accent}
                     />
                   </View>
                   <View style={styles.rowText}>
@@ -420,9 +478,9 @@ export default function DataPrivacyScreen() {
                     </Text>
                   </View>
                   {isWorking ? (
-                    <ActivityIndicator color="#94a3b8" />
+                    <ActivityIndicator color={theme.colors.text} />
                   ) : (
-                    <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
                   )}
                 </TouchableOpacity>
               );
@@ -441,9 +499,13 @@ export default function DataPrivacyScreen() {
             onRequestClose={closePinModal}
           >
             <View style={styles.modalOverlay}>
-              <Pressable style={styles.modalBackdrop} onPress={closePinModal}>
-                <BlurView intensity={65} tint="dark" style={styles.modalBlur} />
-              </Pressable>
+                <Pressable style={styles.modalBackdrop} onPress={closePinModal}>
+                  <BlurView
+                    intensity={65}
+                    tint={mode === 'dark' ? 'dark' : 'light'}
+                    style={styles.modalBlur}
+                  />
+                </Pressable>
               <View style={styles.pinModal}>
                 <Text style={styles.pinTitle}>Confirm {pendingActionLabel}</Text>
                 <Text style={styles.pinSubtitle}>
@@ -454,7 +516,7 @@ export default function DataPrivacyScreen() {
                   onChangeText={setPinValue}
                   keyboardType="number-pad"
                   placeholder="Passcode"
-                  placeholderTextColor="#6c768a"
+                  placeholderTextColor={placeholderColor}
                   style={styles.pinInput}
                   maxLength={6}
                   secureTextEntry
@@ -491,262 +553,262 @@ export default function DataPrivacyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  content: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    gap: 40,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    letterSpacing: 1.5,
-    color: '#8796b0',
-    marginBottom: -10,
-    textTransform: 'uppercase',
-  },
-  card: {
-    backgroundColor: '#121a26',
-    borderRadius: 32,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    padding: 20,
-    gap: 18,
-  },
-  manageControls: {
-    gap: 12,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    paddingVertical: 6,
-  },
-  iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 18,
-    backgroundColor: '#1a2333',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconBoxAlt: {
-    backgroundColor: '#242c3d',
-  },
-  iconBoxDestructive: {
-    backgroundColor: '#3b0d14',
-  },
-  rowText: {
-    flex: 1,
-  },
-  rowTitle: {
-    color: '#f5f7fb',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  rowDescription: {
-    color: '#8aa0c6',
-    fontSize: 13,
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  toggle: {
-    width: 51,
-    height: 31,
-    borderRadius: 16,
-    backgroundColor: '#2f3a52',
-    justifyContent: 'center',
-    padding: 4,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-  },
-  toggleActive: {
-    backgroundColor: '#2d6df6',
-    borderColor: '#2d6df6',
-  },
-  toggleThumb: {
-    width: 23,
-    height: 23,
-    borderRadius: 999,
-    backgroundColor: '#f5f7fb',
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
-    transform: [{ translateX: 0 }],
-  },
-  toggleThumbActive: {
-    transform: [{ translateX: 18 }],
-  },
-  policyList: {
-    gap: 16,
-  },
-  policyBlock: {
-    backgroundColor: '#0f1724',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 16,
-    gap: 10,
-  },
-  policyHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  policyIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 14,
-    backgroundColor: '#1a2333',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  policyTitle: {
-    color: '#f5f7fb',
-    fontSize: 12,
-    letterSpacing: 0.4,
-    textTransform: 'uppercase',
-    fontWeight: '700',
-  },
-  policyBody: {
-    color: '#d2daea',
-    fontSize: 15,
-    fontWeight: '500',
-    lineHeight: 22,
-  },
-  bulletRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginTop: 4,
-  },
-  bulletDot: {
-    color: '#2d6df6',
-    fontSize: 16,
-    lineHeight: 18,
-  },
-  bulletText: {
-    color: '#d2daea',
-    flex: 1,
-    lineHeight: 20,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 64,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 14,
-    borderRadius: 28,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: '#121a26',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 10,
-  },
-  actionRowDisabled: {
-    opacity: 0.55,
-  },
-  actionRowWorking: {
-    opacity: 0.8,
-  },
-  destructiveText: {
-    color: '#ef4444',
-  },
-  manageMessage: {
-    color: '#ff8a8a',
-    fontSize: 12,
-    marginTop: 12,
-  },
-  footnote: {
-    color: '#7385a6',
-    textAlign: 'center',
-    fontSize: 12,
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  pinModal: {
-    backgroundColor: '#0f141d',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 24,
-    width: '100%',
-    maxWidth: 360,
-    gap: 12,
-  },
-  pinTitle: {
-    color: '#f5f7fb',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  pinSubtitle: {
-    color: '#94a3b8',
-    fontSize: 14,
-  },
-  pinInput: {
-    borderWidth: 1,
-    borderColor: '#202a3e',
-    borderRadius: 14,
-    padding: 12,
-    fontSize: 18,
-    letterSpacing: 4,
-    color: '#fff',
-    backgroundColor: '#121a26',
-  },
-  pinError: {
-    color: '#ff8a8a',
-    fontSize: 12,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 6,
-  },
-  modalButton: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#121a26',
-  },
-  modalButtonPrimary: {
-    borderColor: '#2d6df6',
-    backgroundColor: '#2d6df6',
-  },
-  modalButtonDisabled: {
-    opacity: 0.7,
-  },
-  modalButtonLabel: {
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-  modalButtonLabelPrimary: {
-    color: '#fff',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalBlur: {
-    ...StyleSheet.absoluteFillObject,
-  },
-});
+
+
+const createDataPrivacyStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: 'transparent',
+    },
+    content: {
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      paddingBottom: 40,
+      gap: 20,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      color: theme.colors.textMuted,
+      marginBottom: 0,
+      paddingTop: 4,
+    },
+    card: {
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      padding: 20,
+      gap: 18,
+    },
+    manageControls: {
+      gap: 12,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      paddingVertical: 6,
+    },
+    iconBox: {
+      width: 48,
+      height: 48,
+      borderRadius: 18,
+      backgroundColor: theme.colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconBoxAlt: {
+      backgroundColor: withOpacity(theme.colors.text, 0.05),
+    },
+    iconBoxDestructive: {
+      borderWidth: 0,
+      borderColor: theme.colors.danger,
+      backgroundColor: withOpacity(theme.colors.danger, 0.16),
+    },
+    rowText: {
+      flex: 1,
+    },
+    rowTitle: {
+      color: theme.colors.text,
+      fontSize: 17,
+      fontWeight: '700',
+    },
+    rowDescription: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      marginTop: 2,
+      fontWeight: '600',
+    },
+    toggle: {
+      width: 51,
+      height: 31,
+      borderRadius: 16,
+      justifyContent: 'center',
+      padding: 4,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    toggleActive: {
+      backgroundColor: theme.colors.accent,
+      borderColor: theme.colors.accent,
+    },
+    toggleThumb: {
+      width: 23,
+      height: 23,
+      borderRadius: 999,
+      backgroundColor: theme.colors.surface,
+    },
+    toggleThumbActive: {
+      transform: [{ translateX: 18 }],
+    },
+    toggleThumbInactive: {
+      transform: [{ translateX: 0 }],
+    },
+    policyList: {
+      gap: 16,
+    },
+    policyBlock: {
+      backgroundColor: theme.colors.surfaceAlt,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 16,
+      gap: 10,
+    },
+    policyHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    policyIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 14,
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    policyTitle: {
+      color: theme.colors.text,
+      fontSize: 12,
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+      fontWeight: '700',
+    },
+    policyBody: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: '500',
+      lineHeight: 22,
+    },
+    bulletRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      marginTop: 4,
+    },
+    bulletDot: {
+      color: theme.colors.accent,
+      fontSize: 16,
+      lineHeight: 18,
+    },
+    bulletText: {
+      color: theme.colors.text,
+      flex: 1,
+      lineHeight: 20,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 64,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 14,
+      borderRadius: 28,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      elevation: 10,
+    },
+    actionRowDisabled: {
+      opacity: 0.55,
+    },
+    actionRowWorking: {
+      opacity: 0.8,
+    },
+    destructiveText: {
+      color: theme.colors.danger,
+    },
+    manageMessage: {
+      color: theme.colors.danger,
+      fontSize: 12,
+      marginTop: 12,
+    },
+    modalOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: withOpacity(theme.colors.text, 0.45),
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 32,
+    },
+    modalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    modalBlur: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    pinModal: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 24,
+      width: '100%',
+      maxWidth: 360,
+      gap: 12,
+    },
+    pinTitle: {
+      color: theme.colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    pinSubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+    },
+    pinInput: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 16,
+      padding: 12,
+      fontSize: 18,
+      letterSpacing: 6,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    pinError: {
+      color: theme.colors.danger,
+      fontSize: 12,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    modalButton: {
+      flex: 1,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingVertical: 12,
+      alignItems: 'center',
+      backgroundColor: theme.colors.surface,
+    },
+    modalButtonPrimary: {
+      borderColor: theme.colors.accent,
+      backgroundColor: theme.colors.accent,
+    },
+    modalButtonDisabled: {
+      opacity: 0.7,
+    },
+    modalButtonLabel: {
+      color: theme.colors.textMuted,
+      fontWeight: '600',
+    },
+    modalButtonLabelPrimary: {
+      color: theme.colors.surface,
+    },
+    footnote: {
+      color: withOpacity(theme.colors.text, 0.6),
+      fontSize: 11,
+      marginTop: 16,
+      textAlign: 'center',
+    },
+  });

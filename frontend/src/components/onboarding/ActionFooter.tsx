@@ -65,28 +65,28 @@ export default function ActionFooter({
       {primaryLabel ? (
         <TouchableOpacity
           activeOpacity={primaryLoading ? 1 : 0.85}
+        style={[
+          styles.primaryButton,
+          {
+            backgroundColor: primaryBackgroundColor ?? theme.colors.accent,
+            opacity: primaryDisabled || primaryLoading ? 0.5 : 1,
+          },
+        ]}
+        onPress={onPrimaryPress}
+        disabled={primaryDisabled || primaryLoading}
+      >
+        {primaryIcon ? <View style={styles.primaryIcon}>{primaryIcon}</View> : null}
+        <Text
           style={[
-            styles.primaryButton,
+            styles.primaryButtonText,
             {
-              backgroundColor: primaryBackgroundColor ?? theme.colors.accent,
-              opacity: primaryDisabled || primaryLoading ? 0.5 : 1,
+              fontFamily: theme.typography.fontFamily,
+              color: primaryTextColor ?? theme.colors.surface,
             },
           ]}
-          onPress={onPrimaryPress}
-          disabled={primaryDisabled || primaryLoading}
         >
-          {primaryIcon ? <View style={styles.primaryIcon}>{primaryIcon}</View> : null}
-          <Text
-            style={[
-              styles.primaryButtonText,
-              {
-                fontFamily: theme.typography.fontFamily,
-                color: primaryTextColor ?? '#fff',
-              },
-            ]}
-          >
-            {primaryLoading ? 'Working…' : primaryLabel}
-          </Text>
+          {primaryLoading ? 'Working…' : primaryLabel}
+        </Text>
         </TouchableOpacity>
       ) : null}
 
@@ -175,7 +175,6 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   primaryButtonText: {
-    color: '#fff',
     fontSize: 18,
     fontWeight: '600',
   },

@@ -17,6 +17,9 @@ import { useProfile } from '../../context/ProfileContext';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
+import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 const LEVELS = [
   { label: 'Standard', breakpoint: 39 },
@@ -35,6 +38,8 @@ type NotificationChannel = {
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile, setActiveProfile } = useProfile();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createNotificationStyles(theme), [theme]);
   const [threshold, setThreshold] = useState(activeProfile?.alert_threshold_score ?? 90);
   const [emailAlerts, setEmailAlerts] = useState(activeProfile?.enable_email_alerts ?? true);
   const [pushAlerts, setPushAlerts] = useState(activeProfile?.enable_push_alerts ?? true);
@@ -135,16 +140,16 @@ export default function NotificationsScreen() {
     () => [
       {
         icon: 'speedometer',
-        color: '#2d6df6',
+        color: theme.colors.success,
         text: 'Higher settings stop more suspicious calls before your phone rings.',
       },
       {
         icon: 'notifications-outline',
-        color: '#4ade80',
+        color: theme.colors.accent,
         text: 'Choose which alerts your trusted circle receives.',
       },
     ],
-    []
+    [theme.colors.accent, theme.colors.success]
   );
 
   return (
@@ -177,9 +182,9 @@ export default function NotificationsScreen() {
             minimumValue={1}
             maximumValue={100}
             step={1}
-            minimumTrackTintColor="#2d6df6"
-            maximumTrackTintColor="#1b2534"
-            thumbTintColor="#fff"
+            minimumTrackTintColor={theme.colors.accent}
+            maximumTrackTintColor={withOpacity(theme.colors.text, 0.15)}
+            thumbTintColor={theme.colors.surface}
             onValueChange={setThreshold}
           />
           <View style={styles.sliderLabels}>
@@ -207,7 +212,7 @@ export default function NotificationsScreen() {
                 <Ionicons
                   name={channel.icon as any}
                   size={20}
-                  color={channel.active ? '#fff' : '#5b657d'}
+                  color={channel.active ? theme.colors.surface : theme.colors.textMuted}
                 />
               </View>
               <View style={styles.notificationText}>
@@ -260,157 +265,159 @@ function getLevelLabel(value: number) {
   return LEVELS[2].label;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  content: {
-    paddingHorizontal: 28,
-    paddingTop: 28,
-    gap: 24,
-  },
-  headerSection: {
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    letterSpacing: -0.35,
-    color: '#f5f7fb',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#8aa0c6',
-  },
-  sensitivityCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 40,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
-  },
-  sensitivityHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sensitivityLabel: {
-    fontSize: 10,
-    letterSpacing: 1.5,
-    fontWeight: '900',
-    color: '#8aa0c6',
-  },
-  sensitivityValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#2d6df6',
-  },
-  slider: {
-    width: '100%',
-    height: 40,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sliderLabel: {
-    fontSize: 11,
-    letterSpacing: 1,
-    color: '#7b8aa5',
-    fontWeight: '600',
-  },
-  notificationsSection: {
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    letterSpacing: 2,
-    color: '#8796b0',
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  notificationRow: {
-    height: 92,
-    borderRadius: 32,
-    borderWidth: 1,
-    borderColor: '#1f2735',
-    backgroundColor: '#121a26',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-  },
-  notificationRowActive: {
-    borderColor: '#2d6df6',
-    backgroundColor: '#0f1724',
-  },
-  notificationRowInactive: {
-    backgroundColor: '#0f1724',
-  },
-  iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  iconBoxActive: {
-    backgroundColor: '#2d6df6',
-  },
-  iconBoxInactive: {
-    backgroundColor: '#101726',
-  },
-  notificationText: {
-    flex: 1,
-  },
-  notificationTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  notificationTitleActive: {
-    color: '#fff',
-  },
-  notificationSubtitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#7b8aa5',
-  },
-  toggle: {
-    width: 51,
-    height: 31,
-    borderRadius: 16,
-    padding: 3,
-    justifyContent: 'center',
-  },
-  toggleActive: {
-    backgroundColor: '#2d6df6',
-  },
-  toggleInactive: {
-    backgroundColor: '#1f2735',
-  },
-  toggleThumb: {
-    width: 25,
-    height: 25,
-    borderRadius: 12.5,
-    backgroundColor: '#fff',
-  },
-  toggleThumbActive: {
-    alignSelf: 'flex-end',
-  },
-  toggleThumbInactive: {
-    alignSelf: 'flex-start',
-  },
-  error: {
-    color: '#ff8a8a',
-    marginTop: 12,
-  },
-});
+
+
+const createNotificationStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    content: {
+      paddingHorizontal: 28,
+      paddingTop: 28,
+      gap: 24,
+    },
+    headerSection: {
+      marginBottom: 16,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: '700',
+      letterSpacing: -0.35,
+      color: theme.colors.text,
+      marginBottom: 6,
+    },
+    subtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      color: theme.colors.textMuted,
+    },
+    sensitivityCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 40,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      elevation: 5,
+    },
+    sensitivityHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    sensitivityLabel: {
+      fontSize: 10,
+      letterSpacing: 1.5,
+      fontWeight: '900',
+      color: theme.colors.textMuted,
+    },
+    sensitivityValue: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.colors.accent,
+    },
+    slider: {
+      width: '100%',
+      height: 40,
+    },
+    sliderLabels: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    sliderLabel: {
+      fontSize: 11,
+      letterSpacing: 1,
+      color: withOpacity(theme.colors.text, 0.65),
+      fontWeight: '600',
+    },
+    notificationsSection: {
+      gap: 12,
+    },
+    sectionTitle: {
+      fontSize: 11,
+      letterSpacing: 2,
+      color: theme.colors.textMuted,
+      fontWeight: '700',
+      marginBottom: 8,
+    },
+    notificationRow: {
+      height: 92,
+      borderRadius: 32,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+    },
+    notificationRowActive: {
+      borderColor: theme.colors.accent,
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+    },
+    notificationRowInactive: {
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    iconBox: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+    },
+    iconBoxActive: {
+      backgroundColor: theme.colors.accent,
+    },
+    iconBoxInactive: {
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    notificationText: {
+      flex: 1,
+    },
+    notificationTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    notificationTitleActive: {
+      color: theme.colors.text,
+    },
+    notificationSubtitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.textMuted,
+    },
+    toggle: {
+      width: 51,
+      height: 31,
+      borderRadius: 16,
+      padding: 3,
+      justifyContent: 'center',
+    },
+    toggleActive: {
+      backgroundColor: theme.colors.accent,
+    },
+    toggleInactive: {
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+    },
+    toggleThumb: {
+      width: 25,
+      height: 25,
+      borderRadius: 12.5,
+      backgroundColor: theme.colors.surface,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+    },
+    toggleThumbActive: {
+      alignSelf: 'flex-end',
+    },
+    toggleThumbInactive: {
+      alignSelf: 'flex-start',
+    },
+    error: {
+      color: theme.colors.danger,
+      marginTop: 12,
+    },
+  });

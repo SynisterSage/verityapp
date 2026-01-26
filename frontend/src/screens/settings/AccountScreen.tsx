@@ -17,6 +17,8 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTheme } from '../../context/ThemeContext';
+import type { AppTheme } from '../../theme/tokens';
 
 import SettingsHeader from '../../components/common/SettingsHeader';
 import { deleteProfile, verifyPasscode } from '../../services/profile';
@@ -25,6 +27,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import * as Clipboard from 'expo-clipboard';
 import { BlurView } from 'expo-blur';
+import { withOpacity } from '../../utils/color';
 
 type PinAction = 'delete' | null;
 type SafetyActionKey = 'logout' | 'delete';
@@ -86,6 +89,8 @@ export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const { signOut, session } = useAuth();
   const { activeProfile, setActiveProfile, canManageProfile, refreshProfiles } = useProfile();
+  const { theme, mode } = useTheme();
+  const styles = useMemo(() => createAccountStyles(theme), [theme]);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -322,7 +327,7 @@ export default function AccountScreen() {
               value={firstName}
               onChangeText={setFirstName}
               placeholder="First name"
-              placeholderTextColor="#6c768a"
+              placeholderTextColor={theme.colors.textDim}
               editable={!isReadOnly}
             />
             <Text style={styles.inputLabel}>Last name</Text>
@@ -331,7 +336,7 @@ export default function AccountScreen() {
               value={lastName}
               onChangeText={setLastName}
               placeholder="Last name"
-              placeholderTextColor="#6c768a"
+              placeholderTextColor={theme.colors.textDim}
               editable={!isReadOnly}
             />
             <Text style={styles.inputLabel}>Recipient phone</Text>
@@ -341,7 +346,7 @@ export default function AccountScreen() {
               onChangeText={handlePhoneChange}
               onKeyPress={handlePhoneKeyPress}
               placeholder="+1 (000) 000-0000"
-              placeholderTextColor="#6c768a"
+              placeholderTextColor={theme.colors.textDim}
               keyboardType="phone-pad"
               editable={!isReadOnly}
             />
@@ -353,7 +358,7 @@ export default function AccountScreen() {
             />
             <Text style={styles.inputLabel}>Account created</Text>
             <View style={styles.metaRow}>
-              <Ionicons name="calendar-outline" size={18} color="#94a3b8" />
+              <Ionicons name="calendar-outline" size={18} color={theme.colors.textMuted} />
               <Text style={styles.metaText}>{createdAt}</Text>
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -369,7 +374,7 @@ export default function AccountScreen() {
           <Text style={styles.sectionLabel}>Active protection line</Text>
           <View style={styles.activeCard}>
             <View style={styles.activeIcon}>
-              <Ionicons name={'keypad-outline' as any} size={26} color="#fff" />
+              <Ionicons name={'keypad-outline' as any} size={26} color={theme.colors.text} />
             </View>
             <View style={styles.activeInfo}>
               <Text style={styles.activeLabel}>Verity phone number</Text>
@@ -394,17 +399,17 @@ export default function AccountScreen() {
               }}
               disabled={!hasTwilioNumber}
             >
-              <Ionicons name="copy-outline" size={20} color="#94a3b8" />
+              <Ionicons name="copy-outline" size={20} color={theme.colors.textMuted} />
             </Pressable>
           </View>
 
           <Text style={styles.sectionLabel}>Safety controls</Text>
           <View style={styles.safetyControls}>
-            {SAFETY_ACTIONS.map((action) => {
-              const isWorking =
-                action.key === 'logout' ? isSigningOut : action.key === 'delete' ? isPinVerifying : false;
-              const disabled = action.key === 'logout' ? isSigningOut : isPinVerifying;
-              const iconColor = action.destructive ? '#f87171' : '#8aa0c6';
+          {SAFETY_ACTIONS.map((action) => {
+            const isWorking =
+              action.key === 'logout' ? isSigningOut : action.key === 'delete' ? isPinVerifying : false;
+            const disabled = action.key === 'logout' ? isSigningOut : isPinVerifying;
+            const iconColor = action.destructive ? theme.colors.danger : theme.colors.accent;
               return (
                 <TouchableOpacity
                   key={action.key}
@@ -446,9 +451,9 @@ export default function AccountScreen() {
                     <Text style={styles.rowDescription}>{action.description}</Text>
                   </View>
                   {isWorking ? (
-                    <ActivityIndicator color="#94a3b8" />
+                    <ActivityIndicator color={theme.colors.textMuted} />
                   ) : (
-                    <Ionicons name="chevron-forward" size={20} color="#94a3b8" />
+                    <Ionicons name="chevron-forward" size={20} color={theme.colors.textMuted} />
                   )}
                 </TouchableOpacity>
               );
@@ -465,7 +470,7 @@ export default function AccountScreen() {
           >
             <View style={styles.modalOverlay}>
               <Pressable style={styles.modalBackdrop} onPress={closePinModal}>
-                <BlurView intensity={65} tint="dark" style={styles.modalBlur} />
+            <BlurView intensity={65} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.modalBlur} />
               </Pressable>
               <View style={styles.pinModal}>
                 <Text style={styles.pinTitle}>Confirm delete</Text>
@@ -475,7 +480,7 @@ export default function AccountScreen() {
                   onChangeText={setPinValue}
                   keyboardType="number-pad"
                   placeholder="Passcode"
-                  placeholderTextColor="#6c768a"
+                  placeholderTextColor={theme.colors.textDim}
                   style={styles.pinInput}
                   maxLength={6}
                   secureTextEntry
@@ -495,7 +500,7 @@ export default function AccountScreen() {
                     disabled={isPinVerifying}
                   >
                     {isPinVerifying ? (
-                      <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={theme.colors.text} />
                     ) : (
                       <Text style={[styles.modalButtonLabel, styles.modalButtonLabelPrimary]}>
                         Continue
@@ -512,315 +517,338 @@ export default function AccountScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: 'transparent',
-  },
-  body: {
-    paddingHorizontal: 24,
-    gap: 20,
-  },
-  profileForm: {
-    gap: 18,
-  },
-  sectionLabel: {
-    color: '#98a7c2',
-    fontWeight: '600',
-    letterSpacing: 0.6,
-    fontSize: 12,
-    textTransform: 'uppercase',
-  },
-  card: {
-    backgroundColor: '#121a26',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 18,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: 12 },
-    shadowRadius: 24,
-    elevation: 10,
-  },
-  safetyControls: {
-    gap: 12,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 64,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 14,
-    borderRadius: 28,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: '#121a26',
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 10,
-  },
-  actionRowWorking: {
-    opacity: 0.8,
-  },
-  actionRowDisabled: {
-    opacity: 0.6,
-  },
-  rowText: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#f5f7fb',
-  },
-  rowDescription: {
-    color: '#8aa0c6',
-    fontSize: 13,
-    marginTop: 2,
-    fontWeight: '600',
-  },
-  iconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#1a2333',
-  },
-  iconBoxAlt: {
-    backgroundColor: '#242c3d',
-  },
-  iconBoxDestructive: {
-    backgroundColor: '#3b0d14',
-  },
-  manageMessage: {
-    color: '#ff8a8a',
-    fontSize: 12,
-    marginTop: 12,
-  },
-  inputLabel: {
-    color: '#94a3b8',
-    fontSize: 12,
-    marginBottom: 2,
-    letterSpacing: 0.4,
-  },
-  input: {
-    height: 60,
-    borderWidth: 1,
-    borderColor: '#202a3f',
-    borderRadius: 24,
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    color: '#f5f7fb',
-    backgroundColor: '#0f141d',
-  },
-  inputDisabled: {
-    opacity: 0.6,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 6,
-  },
-  metaText: {
-    color: '#f5f7fb',
-    fontWeight: '600',
-  },
-  primaryButton: {
-    marginTop: 8,
-    backgroundColor: '#2d6df6',
-    borderRadius: 16,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  primaryText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  primaryDisabled: {
-    opacity: 0.55,
-  },
-  numberRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
-  },
-  statusOn: {
-    backgroundColor: '#2a3f6a',
-  },
-  statusOff: {
-    backgroundColor: '#1d2230',
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  activeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 18,
-    backgroundColor: '#121a26',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    gap: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: 8 },
-    shadowRadius: 20,
-    elevation: 6,
-  },
-  activeIcon: {
-    width: 58,
-    height: 58,
-    borderRadius: 20,
-    backgroundColor: '#2d6df6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  activeInfo: {
-    flex: 1,
-  },
-  activeLabel: {
-    fontSize: 12,
-    letterSpacing: 0.4,
-    color: '#8aa0c6',
-    marginBottom: 4,
-  },
-  activeNumber: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    flexShrink: 0,
-  },
-  activeStatus: {
-    marginTop: 4,
-    color: '#94a3b8',
-    fontSize: 12,
-  },
-  missingValue: {
-    color: '#f87171',
-  },
-  copyButton: {
-    width: 46,
-    height: 46,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0f141d',
-  },
-  copyButtonPressed: {
-    opacity: 1.8,
-  },
-  copyButtonDisabled: {
-    borderColor: '#111826',
-    backgroundColor: 'rgb(3, 4, 7)',
-  },
-  destructiveText: {
-    color: '#ef4444',
-  },
-  error: {
-    color: '#ff8a8a',
-    fontSize: 12,
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalBlur: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  pinModal: {
-    backgroundColor: '#0f141d',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 24,
-    width: '100%',
-    maxWidth: 360,
-    gap: 12,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginTop: 6,
-  },
-  modalButton: {
-    flex: 1,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    paddingVertical: 12,
-    alignItems: 'center',
-    backgroundColor: '#121a26',
-  },
-  modalButtonPrimary: {
-    borderColor: '#2d6df6',
-    backgroundColor: '#2d6df6',
-  },
-  modalButtonDisabled: {
-    opacity: 0.7,
-  },
-  modalButtonLabel: {
-    color: '#94a3b8',
-    fontWeight: '600',
-  },
-  modalButtonLabelPrimary: {
-    color: '#fff',
-  },
-  pinTitle: {
-    color: '#f5f7fb',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  pinSubtitle: {
-    color: '#94a3b8',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  pinInput: {
-    borderWidth: 1,
-    borderColor: '#202a3e',
-    borderRadius: 16,
-    padding: 12,
-    fontSize: 18,
-    letterSpacing: 4,
-    color: '#fff',
-    backgroundColor: '#121a26',
-    textAlign: 'center',
-    width: '100%',
-  },
-  pinError: {
-    color: '#ff8a8a',
-    fontSize: 12,
-  },
-});
+const createAccountStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: 'transparent',
+    },
+    body: {
+      paddingHorizontal: 24,
+      gap: 20,
+    },
+    profileForm: {
+      gap: 18,
+    },
+    sectionLabel: {
+      color: theme.colors.textMuted,
+      fontWeight: '600',
+      letterSpacing: 0.6,
+      fontSize: 12,
+      textTransform: 'uppercase',
+    },
+    card: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 18,
+      gap: 12,
+      elevation: 10,
+    },
+    safetyControls: {
+      gap: 12,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 64,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 14,
+      borderRadius: 28,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      elevation: 10,
+    },
+    actionRowWorking: {
+      opacity: 0.8,
+    },
+    actionRowDisabled: {
+      opacity: 0.6,
+    },
+    rowText: {
+      flex: 1,
+    },
+    rowTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    rowDescription: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      marginTop: 2,
+      fontWeight: '600',
+    },
+    iconBox: {
+      width: 48,
+      height: 48,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    iconBoxAlt: {
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+    },
+    iconBoxDestructive: {
+      backgroundColor: withOpacity(theme.colors.danger, 0.15),
+    },
+    manageMessage: {
+      color: theme.colors.danger,
+      fontSize: 12,
+      marginTop: 12,
+    },
+    inputLabel: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      marginBottom: 2,
+      letterSpacing: 0.4,
+    },
+    input: {
+      height: 60,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 24,
+      paddingHorizontal: 20,
+      justifyContent: 'center',
+      color: theme.colors.text,
+      backgroundColor: theme.colors.surface,
+    },
+    inputDisabled: {
+      opacity: 0.6,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 6,
+    },
+    metaText: {
+      color: theme.colors.text,
+      fontWeight: '600',
+    },
+    primaryButton: {
+      marginTop: 8,
+      backgroundColor: theme.colors.accent,
+      borderRadius: 16,
+      paddingVertical: 14,
+      alignItems: 'center',
+    },
+    primaryText: {
+      color: theme.colors.surface,
+      fontWeight: '700',
+      fontSize: 16,
+    },
+    primaryDisabled: {
+      opacity: 0.55,
+    },
+    numberRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    statusPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 16,
+    },
+    statusOn: {
+      backgroundColor: withOpacity(theme.colors.success, 0.15),
+    },
+    statusOff: {
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+    },
+    statusText: {
+      color: theme.colors.surface,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    activeCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 18,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      gap: 16,
+      elevation: 6,
+    },
+    activeIcon: {
+      width: 58,
+      height: 58,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.accent, 0.2),
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    activeInfo: {
+      flex: 1,
+    },
+    activeLabel: {
+      fontSize: 12,
+      letterSpacing: 0.4,
+      color: theme.colors.textMuted,
+      marginBottom: 4,
+    },
+    activeNumber: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+      flexShrink: 0,
+    },
+    activeStatus: {
+      marginTop: 4,
+      color: theme.colors.textMuted,
+      fontSize: 12,
+    },
+    missingValue: {
+      color: theme.colors.danger,
+    },
+    copyButton: {
+      width: 46,
+      height: 46,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surface,
+    },
+    copyButtonPressed: {
+      opacity: 0.8,
+    },
+    copyButtonDisabled: {
+      borderColor: withOpacity(theme.colors.text, 0.2),
+      backgroundColor: theme.colors.surface,
+    },
+    destructiveText: {
+      color: theme.colors.danger,
+    },
+    error: {
+      color: theme.colors.danger,
+      fontSize: 12,
+    },
+    modalOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: withOpacity(theme.colors.text, 0.45),
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 32,
+    },
+    modalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    modalBlur: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    pinModal: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 24,
+      width: '100%',
+      maxWidth: 360,
+      gap: 12,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginTop: 6,
+    },
+    modalButton: {
+      flex: 1,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingVertical: 12,
+      alignItems: 'center',
+      backgroundColor: theme.colors.surface,
+    },
+    modalButtonPrimary: {
+      borderColor: theme.colors.accent,
+      backgroundColor: theme.colors.accent,
+    },
+    modalButtonDisabled: {
+      opacity: 0.7,
+    },
+    modalButtonLabel: {
+      color: theme.colors.textMuted,
+      fontWeight: '600',
+    },
+    modalButtonLabelPrimary: {
+      color: theme.colors.surface,
+    },
+    pinTitle: {
+      color: theme.colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    pinSubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      textAlign: 'center',
+    },
+    pinInput: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 16,
+      padding: 12,
+      fontSize: 18,
+      letterSpacing: 4,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.surface,
+      textAlign: 'center',
+      width: '100%',
+    },
+    pinError: {
+      color: theme.colors.danger,
+      fontSize: 12,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      position: 'relative',
+    },
+    rowContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    rowHighlight: {
+      position: 'absolute',
+      top: -4,
+      bottom: -4,
+      left: -24,
+      right: -24,
+    },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      marginLeft: 68,
+      marginVertical: 4,
+    },
+    signOutCard: {
+      marginTop: 0,
+    },
+    footerText: {
+      marginTop: 32,
+      textAlign: 'center',
+      letterSpacing: 0.3,
+      fontSize: 12,
+      color: withOpacity(theme.colors.text, 0.5),
+    },
+  });
