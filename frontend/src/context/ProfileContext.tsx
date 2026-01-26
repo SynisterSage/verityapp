@@ -78,7 +78,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [activeProfile, setActiveProfile] = useState<Profile | null>(null);
   const [activeMembership, setActiveMembership] = useState<ProfileMembership | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [authInvalid, setAuthInvalid] = useState(false);
   const [passcodeDraft, setPasscodeDraft] = useState('');
   const [redirectToSettings, setRedirectToSettings] = useState(false);
@@ -91,14 +91,15 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const isRegisteringPushRef = useRef(false);
 
   const refreshProfiles = useCallback(async () => {
+    setIsLoading(true);
     if (!session) {
       setProfiles([]);
       setActiveProfile(null);
       setActiveMembership(null);
       setAuthInvalid(false);
+      setIsLoading(false);
       return;
     }
-    setIsLoading(true);
     try {
       const data = await authorizedFetch('/profiles');
       const list = (data?.profiles ?? []) as Profile[];
@@ -116,9 +117,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setActiveProfile(null);
       setOnboardingComplete(false);
       setActiveMembership(null);
-    } finally {
-      setIsLoading(false);
-    }
+   } finally {
+     setIsLoading(false);
+   }
   }, [session, signOut]);
 
   useEffect(() => {

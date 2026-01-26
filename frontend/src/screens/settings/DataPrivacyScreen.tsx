@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  Linking,
   Modal,
   ScrollView,
   StyleSheet,
@@ -63,6 +64,19 @@ const POLICY_SECTIONS = [
     bullets: [
       'Caretaker and invited family members on the protected profile.',
       'Row-level security enforces profile-based access.',
+    ],
+  },
+  {
+    title: 'Data retention',
+    body:
+      'Call logs, recordings, and alerts remain available while your profile is active so you can review them at any time. You can delete a profile to remove its data immediately.',
+  },
+  {
+    title: 'Third-party partners',
+    bullets: [
+      'Twilio powers voice & SMS delivery.',
+      'Supabase secures authentication and storage.',
+      'Resend delivers transactional email.',
     ],
   },
 ];
@@ -378,6 +392,15 @@ export default function DataPrivacyScreen() {
   const pendingActionLabel = pinModalAction
     ? MANAGE_ACTIONS.find((item) => item.key === pinModalAction)?.label ?? ''
     : '';
+  const [linkError, setLinkError] = useState('');
+
+  const handleOpenUrl = async (url: string) => {
+    try {
+      await Linking.openURL(url);
+    } catch (err: any) {
+      setLinkError('Unable to open link right now.');
+    }
+  };
 
   return (
     <View style={styles.outer}>
@@ -489,7 +512,34 @@ export default function DataPrivacyScreen() {
               <Text style={styles.manageMessage}>{manageMessageText}</Text>
             ) : null}
           </View>
-          <Text style={styles.footnote}>By using Verity Protect, you acknowledge our privacy and data processing terms. {"\n"} {"\n"}  Last Updated Jan 18th, 2026</Text>
+          <View style={styles.contactCard}>
+            <Text style={styles.contactTitle}>Need help with your data?</Text>
+            <Text style={styles.contactBody}>
+              Reach out to support@verityprotect.com to export, correct, or delete anything we store for you.
+            </Text>
+            <View style={styles.contactActions}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.legalButton,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
+                onPress={() => handleOpenUrl('https://verityprotect.com/privacy')}
+              >
+                <Text style={styles.legalButtonText}>Privacy policy</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.legalButton,
+                  { opacity: pressed ? 0.7 : 1 },
+                ]}
+                onPress={() => handleOpenUrl('https://verityprotect.com/terms')}
+              >
+                <Text style={styles.legalButtonText}>Terms of service</Text>
+              </Pressable>
+            </View>
+            {linkError ? <Text style={[styles.manageMessage]}>{linkError}</Text> : null}
+          </View>
+          <Text style={styles.footnote}>By using Verity Protect, you acknowledge our privacy and data processing terms. {"\n"} {"\n"}  Last Updated Jan 26th, 2026</Text>
         </ScrollView>
         {pinModalAction ? (
           <Modal
@@ -804,6 +854,45 @@ const createDataPrivacyStyles = (theme: AppTheme) =>
     },
     modalButtonLabelPrimary: {
       color: theme.colors.surface,
+    },
+    contactCard: {
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      padding: 20,
+      gap: 10,
+    },
+    contactTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    contactBody: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    contactActions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 8,
+    },
+    legalButton: {
+      flex: 1,
+      borderRadius: 18,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.2),
+      backgroundColor: withOpacity(theme.colors.accent, 0.08),
+      alignItems: 'center',
+    },
+    legalButtonText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.accent,
+      letterSpacing: 0.2,
     },
     footnote: {
       color: withOpacity(theme.colors.text, 0.6),

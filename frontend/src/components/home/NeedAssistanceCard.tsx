@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View, Text } from 'react-native';
+import { Linking, Pressable, StyleSheet, View, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -12,7 +12,11 @@ export default function NeedAssistanceCard({ onPress }: Props) {
   const { theme } = useTheme();
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-    onPress?.();
+    const url = 'mailto:support@verityprotect.com';
+    Linking.openURL(url).catch((error) => {
+      console.warn('Unable to open mail client', error);
+      onPress?.();
+    });
   };
   return (
     <Pressable
