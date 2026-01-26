@@ -491,6 +491,13 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'share your screen', weight: 26, category: 'tech' },
   { phrase: 'license renewal', weight: 26, category: 'tech' },
   { phrase: 'virus alert', weight: 26, category: 'tech' },
+  { phrase: 'apple tech support', weight: 32, category: 'tech' },
+  { phrase: 'laptop needing service', weight: 28, category: 'tech' },
+  { phrase: 'laptop service', weight: 26, category: 'tech' },
+  { phrase: 'virus on it', weight: 30, category: 'tech' },
+  { phrase: 'email me for gift cards', weight: 24, category: 'tech' },
+  { phrase: 'we received an email from you', weight: 18, category: 'tech' },
+  { phrase: 'contact me', weight: 12, category: 'tech' },
 
   // Investment & stock pressure
   { phrase: 'investment opportunity', weight: 30, category: 'investment' },
@@ -620,6 +627,11 @@ const COMBO_RULES = [
   { all: ['govt tech support', 'pay per view'], add: 16 },
   { all: ['support ticket', 'gift card number'], add: 18 },
   { all: ['remote login', 'delivery on hold'], add: 16 },
+  { all: ['apple tech support', 'virus notice'], add: 20 },
+  { all: ['laptop needing service', 'email me for gift cards'], add: 18 },
+  { all: ['laptop service', 'contact me'], add: 16 },
+  { all: ['virus on it', 'apple tech support'], add: 18 },
+  { all: ['email me for gift cards', 'gift card'], add: 18 },
 ];
 
 const URGENCY_TERMS = [
@@ -1006,6 +1018,12 @@ const TECH_SUPPORT_PHRASES = [
   'server patch',
   'software license audit',
   'zscaler portal',
+  'apple tech support',
+  'laptop service',
+  'laptop needing service',
+  'email support team',
+  'gift cards',
+  'virus notice',
 ];
 
 const CRYPTO_TERMS = [
@@ -1280,6 +1298,10 @@ const HARD_BLOCK_TERMS = [
   'immigration hold notice',
   'security breach notice',
   'account disabled',
+  'virus on it',
+  'email me for gift cards',
+  'laptop needing service',
+  'apple tech support',
   'delivery on hold',
   'package held',
   'mail intercept',
