@@ -17,6 +17,9 @@ import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
+import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 type SafePhrase = {
   id: string;
@@ -30,19 +33,6 @@ const normalizePhrase = (value: string) => {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 };
 
-const helperItems = [
-  {
-    icon: 'shield-checkmark',
-    color: '#4ade80',
-    text: 'Safe Phrases help confirm a caller is legitimate.',
-  },
-  {
-    icon: 'flash',
-    color: '#2d6df6',
-    text: 'When a phrase is used, it helps lower the risk, but the call is still screened.',
-  },
-];
-
 export default function SafePhrasesScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
@@ -55,6 +45,27 @@ export default function SafePhrasesScreen() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const shimmer = useMemo(() => new Animated.Value(0.6), []);
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `safe-phrase-skeleton-${i}`), []);
+  const { theme } = useTheme();
+  const styles = useMemo(() => createSafePhrasesStyles(theme), [theme]);
+  const placeholderColor = useMemo(
+    () => withOpacity(theme.colors.textMuted, 0.65),
+    [theme.colors.textMuted]
+  );
+  const helperItems = useMemo(
+    () => [
+      {
+        icon: 'shield-checkmark',
+        color: theme.colors.success,
+        text: 'Safe Phrases help confirm a caller is legitimate.',
+      },
+      {
+        icon: 'flash',
+        color: theme.colors.accent,
+        text: 'When a phrase is used, it helps lower the risk, but the call is still screened.',
+      },
+    ],
+    [theme.colors.accent, theme.colors.success]
+  );
 
   const loadPhrases = async ({ showLoading = false } = {}) => {
     if (!activeProfile) return;
@@ -147,8 +158,9 @@ export default function SafePhrasesScreen() {
                   setRefreshing(false);
                 }
               }}
-              tintColor="#8ab4ff"
-              colors={['#8ab4ff']}
+              tintColor={theme.colors.accent}
+              colors={[theme.colors.accent]}
+              progressBackgroundColor={theme.colors.surface}
             />
           }
           showsVerticalScrollIndicator={false}
@@ -160,7 +172,7 @@ export default function SafePhrasesScreen() {
             <TextInput
               style={styles.input}
               placeholder="e.g. Doctor Smith"
-              placeholderTextColor="#8aa0c6"
+              placeholderTextColor={placeholderColor}
               value={input}
               onChangeText={setInput}
               returnKeyType="done"
@@ -175,9 +187,9 @@ export default function SafePhrasesScreen() {
               disabled={!input.trim() || adding}
             >
               {adding ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={theme.colors.surface} />
               ) : (
-                <Ionicons name="add" size={24} color="#fff" />
+                <Ionicons name="add" size={24} color={theme.colors.surface} />
               )}
             </Pressable>
           </View>
@@ -187,7 +199,10 @@ export default function SafePhrasesScreen() {
           {showSkeleton ? (
             <View style={styles.skeletonWrapper}>
               {skeletonRows.map((key) => (
-                <Animated.View key={key} style={[styles.skeletonCard, { opacity: shimmer }]}>
+                <Animated.View
+                  key={key}
+                  style={[styles.skeletonCard, { opacity: shimmer }]}
+                >
                   <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
                   <View style={styles.skeletonLine} />
                   <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
@@ -197,29 +212,29 @@ export default function SafePhrasesScreen() {
           ) : phrases.length === 0 ? (
             <View style={styles.emptyCard}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="chatbubble-ellipses" size={24} color="#4ade80" />
+                <Ionicons name="chatbubble-ellipses" size={24} color={theme.colors.success} />
               </View>
               <Text style={styles.emptyText}>No topics added yet.</Text>
             </View>
           ) : (
             phrases.map((item) => (
-                <View key={item.id} style={styles.phraseCard}>
-                  <View style={styles.phraseIcon}>
-                    <Ionicons name="chatbubble-ellipses" size={20} color="#22c55e" />
-                  </View>
-                  <Text style={styles.phraseText}>{item.phrase}</Text>
-                  <Pressable
-                    style={styles.deleteButton}
-                    onPress={() => removePhrase(item.id)}
-                    disabled={deletingId === item.id}
-                  >
-                    {deletingId === item.id ? (
-                      <ActivityIndicator size="small" color="#e11d48" />
-                    ) : (
-                      <Ionicons name="trash" size={18} color="#e11d48" />
-                    )}
-                  </Pressable>
+              <View key={item.id} style={styles.phraseCard}>
+                <View style={styles.phraseIcon}>
+                  <Ionicons name="chatbubble-ellipses" size={20} color={theme.colors.success} />
                 </View>
+                <Text style={styles.phraseText}>{item.phrase}</Text>
+                <Pressable
+                  style={styles.deleteButton}
+                  onPress={() => removePhrase(item.id)}
+                  disabled={deletingId === item.id}
+                >
+                  {deletingId === item.id ? (
+                    <ActivityIndicator size="small" color={theme.colors.danger} />
+                  ) : (
+                    <Ionicons name="trash" size={18} color={theme.colors.danger} />
+                  )}
+                </Pressable>
+              </View>
             ))
           )}
 
@@ -233,140 +248,141 @@ export default function SafePhrasesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  content: {
-    paddingHorizontal: 28,
-    paddingTop: 20,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    letterSpacing: 1.5,
-    color: '#8796b0',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 60,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    borderRadius: 32,
-    backgroundColor: '#121a26',
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 16,
-  },
-  input: {
-    flex: 1,
-    color: '#e6ebf5',
-    fontSize: 16,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  error: {
-    color: '#ff8a8a',
-    marginBottom: 12,
-  },
-  emptyCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    borderStyle: 'dashed',
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 16,
-    backgroundColor: '#121a26',
-  },
-  emptyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#0f1b2d',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  emptyText: {
-    color: '#8aa0c6',
-  },
-  skeletonWrapper: {
-    backgroundColor: 'transparent',
-    gap: 2,
-    marginBottom: 12,
-  },
-  skeletonCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 16,
-    backgroundColor: '#121a26',
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  skeletonLine: {
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#1b2534',
-    marginBottom: 8,
-  },
-  skeletonLineShort: {
-    width: '60%',
-  },
-  skeletonLineTiny: {
-    width: '40%',
-  },
-  phraseCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  phraseIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#0e2d18',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  phraseText: {
-    flex: 1,
-    color: '#f5f7fb',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  deleteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1c1c22',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  warning: {
-    color: '#f7c16e',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-});
+const createSafePhrasesStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    content: {
+      paddingHorizontal: 28,
+      paddingTop: 20,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      letterSpacing: 1.5,
+      color: theme.colors.textMuted,
+      marginBottom: 12,
+      textTransform: 'uppercase',
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 60,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 32,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 16,
+      gap: 12,
+      marginBottom: 16,
+    },
+    input: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 16,
+    },
+    addButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    error: {
+      color: theme.colors.danger,
+      marginBottom: 12,
+    },
+    emptyCard: {
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      padding: 24,
+      alignItems: 'center',
+      marginBottom: 16,
+      backgroundColor: theme.colors.surface,
+    },
+    emptyIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+    },
+    emptyText: {
+      color: theme.colors.textMuted,
+    },
+    skeletonWrapper: {
+      backgroundColor: 'transparent',
+      gap: 2,
+      marginBottom: 12,
+    },
+    skeletonCard: {
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+      overflow: 'hidden',
+      marginBottom: 12,
+    },
+    skeletonLine: {
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.textMuted, 0.2),
+      marginBottom: 8,
+    },
+    skeletonLineShort: {
+      width: '60%',
+    },
+    skeletonLineTiny: {
+      width: '40%',
+    },
+    phraseCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 12,
+    },
+    phraseIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.success, 0.16),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    phraseText: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    deleteButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    warning: {
+      color: theme.colors.warning,
+      marginTop: 16,
+      textAlign: 'center',
+    },
+  });

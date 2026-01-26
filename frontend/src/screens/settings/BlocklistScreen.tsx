@@ -21,6 +21,9 @@ import { useProfile } from '../../context/ProfileContext';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import { BlurView } from 'expo-blur';
+import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 type BlockedCaller = {
   id: string;
@@ -79,20 +82,26 @@ export default function BlocklistScreen() {
   const trayAnim = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.65)).current;
 
+  const { theme, mode } = useTheme();
+  const styles = useMemo(() => createBlocklistStyles(theme), [theme]);
+  const placeholderColor = useMemo(
+    () => withOpacity(theme.colors.textMuted, 0.65),
+    [theme.colors.textMuted]
+  );
   const howItems = useMemo(
     () => [
       {
         icon: 'call-outline',
-        color: '#2d6df6',
+        color: theme.colors.accent,
         text: 'Block suspicious callers so your loved one stays protected.',
       },
       {
         icon: 'shield-checkmark',
-        color: '#4ade80',
+        color: theme.colors.success,
         text: 'Trusted callers reach through, blocked ones stay silent.',
       },
     ],
-    []
+    [theme.colors.accent, theme.colors.success]
   );
 
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `block-skel-${i}`), []);
@@ -220,7 +229,7 @@ export default function BlocklistScreen() {
         <TextInput
           style={styles.manualInputField}
           placeholder="(123) 456-7890"
-          placeholderTextColor="#6c768a"
+          placeholderTextColor={placeholderColor}
           value={inputValue}
           onChangeText={handleInputChange}
           keyboardType="phone-pad"
@@ -232,9 +241,9 @@ export default function BlocklistScreen() {
           disabled={isAdding || !inputDigits}
         >
           {isAdding ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={theme.colors.surface} />
           ) : (
-            <Ionicons name="add" size={24} color="#fff" />
+            <Ionicons name="add" size={24} color={theme.colors.surface} />
           )}
         </TouchableOpacity>
       </View>
@@ -267,7 +276,7 @@ export default function BlocklistScreen() {
   const renderBlockRow = (caller: BlockedCaller) => (
     <View key={caller.id} style={styles.blockRow}>
       <View style={styles.blockAvatar}>
-        <Ionicons name="ban" size={22} color="#f87171" />
+        <Ionicons name="ban" size={22} color={theme.colors.danger} />
       </View>
       <View style={styles.blockContent}>
         <Text style={styles.blockNumber}>{formatDisplayNumber(caller.caller_number)}</Text>
@@ -295,8 +304,9 @@ export default function BlocklistScreen() {
           <RefreshControl
             refreshing={loading}
             onRefresh={fetchBlocked}
-            tintColor="#8ab4ff"
-            colors={['#8ab4ff']}
+            tintColor={theme.colors.accent}
+            colors={[theme.colors.accent]}
+            progressBackgroundColor={theme.colors.surface}
           />
         }
         keyboardShouldPersistTaps="handled"
@@ -317,9 +327,9 @@ export default function BlocklistScreen() {
           ) : listEmpty ? (
             <View style={styles.emptyStateWrap}>
               <View style={styles.emptyCard}>
-                <View style={styles.emptyIcon}>
-                  <Ionicons name="person-circle-outline" size={30} color="#4ade80" />
-                </View>
+            <View style={styles.emptyIcon}>
+                <Ionicons name="person-circle-outline" size={30} color={theme.colors.success} />
+            </View>
                 <Text style={styles.emptyBody}>
                   Import someone from your phone or add a number from above.
                 </Text>
@@ -337,7 +347,7 @@ export default function BlocklistScreen() {
         <Modal transparent animationType="fade" visible>
           <View style={styles.modalOverlay}>
             <Pressable style={styles.modalBackdrop} onPress={closeTray}>
-              <BlurView intensity={65} tint="dark" style={styles.modalBlur} />
+              <BlurView intensity={65} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.modalBlur} />
             </Pressable>
             <Animated.View
               style={[
@@ -369,7 +379,7 @@ export default function BlocklistScreen() {
                 disabled={isRemoving}
               >
                 {isRemoving ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={theme.colors.surface} />
                 ) : (
                   <Text style={styles.trayButtonText}>Unblock number</Text>
                 )}
@@ -385,239 +395,240 @@ export default function BlocklistScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  content: {
-    paddingHorizontal: 24,
-    gap: 0,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    color: '#94a3b8',
-  },
-  sectionLabelSpacing: {
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  manualEntry: {
-    gap: 18,
-    marginBottom: 28,
-  },
-  manualInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    borderRadius: 32,
-    backgroundColor: '#121a26',
-    paddingHorizontal: 16,
-    gap: 12,
-    height: 60,
-  },
-  manualInputField: {
-    flex: 1,
-    fontSize: 16,
-    color: '#fff',
-  },
-  manualAddButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#2d6df6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    
-  },
-  addButtonDisabled: {
-    opacity: 0.5,
-  },
-  inputError: {
-    color: '#ff8a8a',
-    fontSize: 13,
-  },
-  listSection: {
-    marginTop: 0,
-    gap: 12,
-    marginBottom: 16,
-  },
-  emptyStateWrap: {
-    marginTop: 24,
-  },
-  emptyCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    borderStyle: 'dashed',
-    padding: 24,
-    backgroundColor: '#121a26',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-  },
-  emptyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#0f1b2d',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  emptyBody: {
-    color: '#8aa0c6',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  skeletonList: {
-    gap: 14,
-  },
-  skeletonCard: {
-    height: 70,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    backgroundColor: '#121a26',
-    padding: 16,
-    gap: 8,
-  },
-  skeletonLine: {
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#1d2433',
-  },
-  skeletonLineShort: {
-    width: '60%',
-  },
-  skeletonLineTiny: {
-    width: '40%',
-  },
-  blockRow: {
-    backgroundColor: '#121a26',
-    borderRadius: 32,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 18,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  blockAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 24,
-    backgroundColor: '#0f1724',
-    borderWidth: 1,
-    borderColor: '#1f2330',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  blockContent: {
-    flex: 1,
-    gap: 6,
-  },
-  blockNumber: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  blockReason: {
-    fontSize: 14,
-    color: '#8aa0c6',
-  },
-  manageText: {
-    fontSize: 15,
-    color: '#2d6df6',
-    fontWeight: '600',
-  },
-  howItWorks: {
-    borderRadius: 32,
-    overflow: 'hidden',
-  },
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  modalBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  modalBlur: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  tray: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#0f1724',
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 24,
-    gap: 12,
-    alignItems: 'center',
-  },
-  trayHandle: {
-    width: 48,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#1d2534',
-    marginBottom: 12,
-  },
-  trayContent: {
-    gap: 6,
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  trayTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#f5f7fb',
-  },
-  trayNumber: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  trayReason: {
-    fontSize: 14,
-    color: '#94a3b8',
-  },
-  trayButton: {
-    width: '100%',
-    height: 60,
-    borderRadius: 24,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 6,
-    marginBottom: -10,
-  },
-  trayButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  trayButtonDisabled: {
-    opacity: 0.6,
-  },
-  trayCancelButton: {
-    width: '100%',
-    height: 52,
-    borderRadius: 24,
-    backgroundColor: '#1f2230',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#2a3448',
-  },
-  trayCancelText: {
-    color: '#cbd5f5',
-    fontWeight: '600',
-  },
-});
+const createBlocklistStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    content: {
+      paddingHorizontal: 24,
+      gap: 0,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      letterSpacing: 0.6,
+      textTransform: 'uppercase',
+      color: theme.colors.textMuted,
+    },
+    sectionLabelSpacing: {
+      marginTop: 12,
+      marginBottom: 6,
+    },
+    manualEntry: {
+      gap: 18,
+      marginBottom: 28,
+    },
+    manualInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 32,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 16,
+      gap: 12,
+      height: 60,
+    },
+    manualInputField: {
+      flex: 1,
+      fontSize: 16,
+      color: theme.colors.text,
+    },
+    manualAddButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    addButtonDisabled: {
+      opacity: 0.5,
+    },
+    inputError: {
+      color: theme.colors.danger,
+      fontSize: 13,
+    },
+    listSection: {
+      marginTop: 0,
+      gap: 12,
+      marginBottom: 16,
+    },
+    emptyStateWrap: {
+      marginTop: 24,
+    },
+    emptyCard: {
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      padding: 24,
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      marginBottom: 16,
+      gap: 12,
+    },
+    emptyIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.text, 0.06),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 6,
+    },
+    emptyBody: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      textAlign: 'center',
+    },
+    skeletonList: {
+      gap: 14,
+    },
+    skeletonCard: {
+      height: 70,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      padding: 16,
+      gap: 8,
+    },
+    skeletonLine: {
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.textMuted, 0.2),
+    },
+    skeletonLineShort: {
+      width: '60%',
+    },
+    skeletonLineTiny: {
+      width: '40%',
+    },
+    blockRow: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 32,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 18,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    blockAvatar: {
+      width: 52,
+      height: 52,
+      borderRadius: 24,
+      backgroundColor: theme.colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.textMuted, 0.4),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    blockContent: {
+      flex: 1,
+      gap: 6,
+    },
+    blockNumber: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    blockReason: {
+      fontSize: 14,
+      color: theme.colors.textMuted,
+    },
+    manageText: {
+      fontSize: 15,
+      color: theme.colors.accent,
+      fontWeight: '600',
+    },
+    howItWorks: {
+      borderRadius: 32,
+      overflow: 'hidden',
+    },
+    modalOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      backgroundColor: withOpacity(theme.colors.text, 0.4),
+    },
+    modalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    modalBlur: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    tray: {
+      width: '100%',
+      maxWidth: 420,
+      backgroundColor: theme.colors.surface,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 24,
+      gap: 12,
+      alignItems: 'center',
+    },
+    trayHandle: {
+      width: 48,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.border,
+      marginBottom: 12,
+    },
+    trayContent: {
+      gap: 6,
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    trayTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    trayNumber: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    trayReason: {
+      fontSize: 14,
+      color: theme.colors.textMuted,
+    },
+    trayButton: {
+      width: '100%',
+      height: 60,
+      borderRadius: 24,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 6,
+      marginBottom: -10,
+    },
+    trayButtonText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.surface,
+    },
+    trayButtonDisabled: {
+      opacity: 0.6,
+    },
+    trayCancelButton: {
+      width: '100%',
+      height: 52,
+      borderRadius: 24,
+      backgroundColor: theme.colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    trayCancelText: {
+      color: theme.colors.textMuted,
+      fontWeight: '600',
+    },
+  });

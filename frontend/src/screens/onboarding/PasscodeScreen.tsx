@@ -21,9 +21,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import { useTheme } from '../../context/ThemeContext';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
+import type { AppTheme } from '../../theme/tokens';
 
 const PIN_LENGTH = 6;
 
@@ -31,6 +33,8 @@ const formatDigits = (digits: string[]) => digits.join('');
 
 export default function PasscodeScreen({ navigation }: { navigation: any }) {
   const { activeProfile, setActiveProfile } = useProfile();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createPasscodeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const [createDigits, setCreateDigits] = useState<string[]>(Array(PIN_LENGTH).fill(''));
   const [confirmDigits, setConfirmDigits] = useState<string[]>(Array(PIN_LENGTH).fill(''));
@@ -112,11 +116,26 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
     }
   };
 
-  const howCardItems = [
-    { icon: 'people-outline', color: '#4ade80', text: 'Trusted Contacts can call you without the PIN.' },
-    { icon: 'shield-checkmark-outline', color: '#2d6df6', text: 'All other callers must enter your Safety PIN.' },
-    { icon: 'ban-outline', color: '#ef4444', text: 'Blocked numbers and callers not in Trusted Contacts are stopped before your phone rings.' },
-  ];
+  const howCardItems = useMemo(
+    () => [
+      {
+        icon: 'people-outline',
+        color: theme.colors.success,
+        text: 'Trusted Contacts can call you without the PIN.',
+      },
+      {
+        icon: 'shield-checkmark-outline',
+        color: theme.colors.accent,
+        text: 'All other callers must enter your Safety PIN.',
+      },
+      {
+        icon: 'ban-outline',
+        color: theme.colors.danger,
+        text: 'Blocked numbers and callers not in Trusted Contacts are stopped before your phone rings.',
+      },
+    ],
+    [theme.colors.accent, theme.colors.danger, theme.colors.success]
+  );
 
   const handleContinue = async () => {
     if (!activeProfile) {
@@ -160,7 +179,11 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
           }}
           style={[
             styles.pinBox,
-            { borderColor: borderColor ?? (digit ? '#2d6df6' : '#1b2534') },
+            {
+              borderColor:
+                borderColor ??
+                (digit ? theme.colors.accent : theme.colors.border),
+            },
             disabled && styles.pinBoxDisabled,
           ]}
           keyboardType="number-pad"
@@ -249,93 +272,95 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  body: {
-    paddingHorizontal: 32,
-    paddingTop: 28,
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    letterSpacing: -0.35,
-    color: '#f5f7fb',
-    lineHeight: 40,
-    maxWidth: 320,
-  },
-  subtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#8aa0c6',
-    marginTop: 8,
-    maxWidth: 320,
-  },
-  pinSection: {
-    marginBottom: 28,
-  },
-  pinHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  pinLabel: {
-    fontSize: 12,
-    letterSpacing: 0.6,
-    color: '#8aa0c6',
-    fontWeight: '700',
-  },
-  helperText: {
-    fontSize: 12,
-    letterSpacing: 0.6,
-    color: '#4d5d85',
-    fontWeight: '600',
-  },
-  toggleText: {
-    fontSize: 12,
-    letterSpacing: 0.6,
-    color: '#2d6df6',
-    fontWeight: '700',
-  },
-  pinRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  pinBox: {
-    width: 46,
-    aspectRatio: 1,
-    borderRadius: 24,
-    backgroundColor: '#1a2333',
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
-    padding: 0,
-  },
-  pinBoxDisabled: {
-    backgroundColor: '#111628',
-  },
-  error: {
-    color: '#ff8a8a',
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  keyboardAvoiding: {
-    flex: 1,
-    width: '100%',
-  },
-});
+const createPasscodeStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    body: {
+      paddingHorizontal: 32,
+      paddingTop: 28,
+      gap: 24,
+    },
+    header: {
+      marginBottom: 32,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: '700',
+      letterSpacing: -0.35,
+      color: theme.colors.text,
+      lineHeight: 40,
+      maxWidth: 320,
+    },
+    subtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      color: theme.colors.textMuted,
+      marginTop: 8,
+      maxWidth: 320,
+    },
+    pinSection: {
+      marginBottom: 28,
+    },
+    pinHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    pinLabel: {
+      fontSize: 12,
+      letterSpacing: 0.6,
+      color: theme.colors.textMuted,
+      fontWeight: '700',
+    },
+    helperText: {
+      fontSize: 12,
+      letterSpacing: 0.6,
+      color: theme.colors.textDim,
+      fontWeight: '600',
+    },
+    toggleText: {
+      fontSize: 12,
+      letterSpacing: 0.6,
+      color: theme.colors.accent,
+      fontWeight: '700',
+    },
+    pinRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      width: '100%',
+    },
+    pinBox: {
+      width: 46,
+      aspectRatio: 1,
+      borderRadius: 24,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      fontSize: 24,
+      fontWeight: '700',
+      color: theme.colors.text,
+      textAlign: 'center',
+      padding: 0,
+    },
+    pinBoxDisabled: {
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    error: {
+      color: theme.colors.danger,
+      fontSize: 12,
+      textAlign: 'center',
+      marginBottom: 12,
+    },
+    keyboardAvoiding: {
+      flex: 1,
+      width: '100%',
+    },
+  });

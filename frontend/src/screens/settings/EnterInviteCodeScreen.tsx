@@ -12,14 +12,19 @@ import { useProfile } from '../../context/ProfileContext';
 import { authorizedFetch } from '../../services/backend';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../../context/ThemeContext';
 
 import SettingsHeader from '../../components/common/SettingsHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 const CODE_LENGTH = 6;
 
 export default function EnterInviteCodeScreen() {
   const navigation = useNavigation();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createEnterInviteCodeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const { refreshProfiles, setOnboardingComplete } = useProfile();
   const [firstName, setFirstName] = useState('');
@@ -96,6 +101,12 @@ export default function EnterInviteCodeScreen() {
     }
   };
 
+  const placeholderColor = useMemo(
+    () => withOpacity(theme.colors.textMuted, 0.65),
+    [theme.colors.textMuted]
+  );
+  const iconColor = useMemo(() => withOpacity(theme.colors.text, 0.55), [theme.colors.text]);
+
   return (
     <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={[]}>
@@ -117,11 +128,11 @@ export default function EnterInviteCodeScreen() {
 
             <Text style={styles.inputLabel}>First name</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
+              <Ionicons name="person-outline" size={18} color={iconColor} />
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Robert"
-                placeholderTextColor="#8aa0c6"
+                placeholderTextColor={placeholderColor}
                 value={firstName}
                 onChangeText={setFirstName}
                 autoCapitalize="words"
@@ -132,11 +143,11 @@ export default function EnterInviteCodeScreen() {
             </View>
             <Text style={styles.inputLabel}>Last name</Text>
             <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
+              <Ionicons name="person-outline" size={18} color={iconColor} />
               <TextInput
                 style={styles.input}
                 placeholder="e.g. Miller"
-                placeholderTextColor="#8aa0c6"
+                placeholderTextColor={placeholderColor}
                 value={lastName}
                 onChangeText={setLastName}
                 autoCapitalize="words"
@@ -156,10 +167,12 @@ export default function EnterInviteCodeScreen() {
                   ref={(ref) => {
                     codeRefs.current[index] = ref;
                   }}
-                  style={[
-                    styles.codeBox,
-                    { borderColor: digit ? '#2d6df6' : '#1b2534' },
-                  ]}
+                style={[
+                  styles.codeBox,
+                  {
+                    borderColor: digit ? theme.colors.accent : withOpacity(theme.colors.text, 0.15),
+                  },
+                ]}
                   keyboardType="number-pad"
                   maxLength={1}
                   value={digit}
@@ -187,85 +200,77 @@ export default function EnterInviteCodeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  body: {
-    paddingHorizontal: 24,
-    flexGrow: 1,
-  },
-  inputGroup: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: '#f5f7fb',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#8aa0c6',
-  },
-  inputLabel: {
-    fontSize: 12,
-    letterSpacing: 1.5,
-    color: '#8796b0',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    borderRadius: 16,
-    backgroundColor: '#121a26',
-    paddingHorizontal: 12,
-    height: 52,
-    gap: 8,
-  },
-  input: {
-    flex: 1,
-    color: '#e6ebf5',
-    fontSize: 16,
-  },
-  codeSection: {
-    marginBottom: 20,
-  },
-  codeLabel: {
-    fontSize: 12,
-    letterSpacing: 1.5,
-    color: '#8796b0',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  codeRow: {
-    flexDirection: 'row',
-    gap: 6,
-    justifyContent: 'flex-start',
-    width: '100%',
-  },
-  codeBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: '#1b2534',
-    backgroundColor: '#121a26',
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  message: {
-    color: '#ff8a8a',
-  },
-});
+const createEnterInviteCodeStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    body: {
+      paddingHorizontal: 24,
+      flexGrow: 1,
+      gap: 24,
+    },
+    inputGroup: {
+      gap: 12,
+      marginBottom: 24,
+    },
+    inputLabel: {
+      fontSize: 12,
+      letterSpacing: 1.5,
+      color: theme.colors.textMuted,
+      marginBottom: 6,
+      textTransform: 'uppercase',
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 16,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 12,
+      height: 52,
+      gap: 8,
+    },
+    input: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 16,
+    },
+    codeSection: {
+      marginBottom: 20,
+    },
+    codeLabel: {
+      fontSize: 12,
+      letterSpacing: 1.5,
+      color: theme.colors.textMuted,
+      marginBottom: 12,
+      textTransform: 'uppercase',
+    },
+    codeRow: {
+      flexDirection: 'row',
+      gap: 6,
+      justifyContent: 'flex-start',
+      width: '100%',
+    },
+    codeBox: {
+      width: 52,
+      height: 52,
+      borderRadius: 18,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      color: theme.colors.text,
+      fontSize: 24,
+      fontWeight: '700',
+    },
+    message: {
+      color: theme.colors.danger,
+      marginTop: 4,
+    },
+  });

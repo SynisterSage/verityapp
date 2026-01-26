@@ -17,10 +17,13 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import { useTheme } from '../../context/ThemeContext';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { selectContacts } from '../../native/ContactPicker';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 type DeviceContact = {
   id: string;
@@ -89,6 +92,8 @@ async function writeContactMap(profileId: string, map: Record<string, ContactMap
 
 export default function OnboardingTrustedContactsScreen({ navigation }: { navigation: any }) {
   const { activeProfile } = useProfile();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createTrustedContactsStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const [trustedList, setTrustedList] = useState<TrustedContactRow[]>([]);
   const [contactMap, setContactMap] = useState<Record<string, ContactMapEntry>>({});
@@ -104,21 +109,21 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
   const trayAnim = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.65)).current;
   const [safeListLoading, setSafeListLoading] = useState(true);
-  
+
   const helperItems = useMemo(
     () => [
       {
         icon: 'people-outline',
-        color: '#4ade80',
+        color: theme.colors.success,
         text: 'Trusted Contacts can call you directly, without the Safety PIN.\nTheir calls are never screened or recorded.',
       },
       {
         icon: 'ban',
-        color: '#ef4444',
+        color: theme.colors.danger,
         text: 'Calls from numbers not in Trusted Contacts, or from blocked numbers, are stopped before your phone rings.',
       },
     ],
-    []
+    [theme.colors.success, theme.colors.danger]
   );
 
   const skeletonRows = useMemo(
@@ -404,9 +409,11 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
 
   const getContactDisplayName = (contact: TrustedContactRow) =>
     contact.contact_name ?? contactMap[contact.caller_number]?.name ?? contact.caller_number;
+
   const getRelationshipLabel = (contact: TrustedContactRow) =>
     contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Trusted Safe Contact';
-const safeList = useMemo(() => {
+
+  const safeList = useMemo(() => {
   const seen = new Set<string>();
   return trustedList.filter((contact) => {
     const canonical = normalizePhoneNumber(contact.caller_number);
@@ -454,13 +461,13 @@ const safeList = useMemo(() => {
             disabled={importing}
           >
             <View style={styles.importIcon}>
-              <Ionicons name="person-add" size={24} color="#fff" />
+              <Ionicons name="person-add" size={24} color={theme.colors.surface} />
             </View>
             <View style={styles.importText}>
               <Text style={styles.importTitle}>Import from Phone</Text>
               <Text style={styles.importSubtitle}>Add friends &amp; family</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#2d6df6" />
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.accent} />
           </Pressable>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -482,8 +489,8 @@ const safeList = useMemo(() => {
             </View>
           ) : safeList.length === 0 ? (
             <View style={styles.emptyCard}>
-              <View style={styles.emptyIcon}>
-                <Ionicons name="person-circle-outline" size={30} color="#4ade80" />
+            <View style={styles.emptyIcon}>
+                <Ionicons name="person-circle-outline" size={30} color={theme.colors.success} />
               </View>
               <Text style={styles.emptyBody}>
                 Import someone from your phone or create an invite above.
@@ -501,7 +508,7 @@ const safeList = useMemo(() => {
                   <View style={styles.identityText}>
                     <View style={styles.nameRow}>
                       <Text style={styles.personName}>{getContactDisplayName(contact)}</Text>
-                      <Ionicons name="shield-checkmark" size={18} color="#4ade80" />
+                    <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
                     </View>
                     <Text style={styles.relationship}>{getRelationshipLabel(contact)}</Text>
                   </View>
@@ -560,7 +567,7 @@ const safeList = useMemo(() => {
                   {trayMode === 'import' ? 'Tag Contact' : 'Manage Contact'}
                 </Text>
                 <Pressable onPress={closeTray}>
-                  <Ionicons name="close" size={20} color="#fff" />
+                  <Ionicons name="close" size={20} color={theme.colors.text} />
                 </Pressable>
               </View>
               <View style={styles.trayIdentity}>
@@ -642,307 +649,310 @@ const safeList = useMemo(() => {
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  body: {
-    paddingHorizontal: 32,
-    paddingTop: 28,
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    letterSpacing: -0.35,
-    color: '#f5f7fb',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#8aa0c6',
-    maxWidth: 330,
-  },
-  importCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#121a26',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 18,
-    gap: 12,
-    marginBottom: 24,
-  },
-  importIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 20,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  importText: {
-    flex: 1,
-  },
-  importTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2d6df6',
-  },
-  importSubtitle: {
-    fontSize: 13,
-    color: '#8aa0c6',
-  },
-  sectionLabel: {
-    fontSize: 12,
-    letterSpacing: 1.5,
-    color: '#8796b0',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  listCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  identity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  identityText: {
-    gap: 4,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  personName: {
-    color: '#f5f7fb',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  relationship: {
-    color: '#8aa0c6',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  manageLabel: {
-    color: '#2d6df6',
-    fontSize: 11,
-    letterSpacing: 1,
-    fontWeight: '700',
-  },
-  emptyCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    borderStyle: 'dashed',
-    padding: 24,
-    backgroundColor: '#121a26',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-  },
-  emptyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#0f1b2d',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#f5f7fb',
-  },
-  emptyBody: {
-    color: '#8aa0c6',
-    fontSize: 13,
-    textAlign: 'center',
-    lineHeight: 18,
-    maxWidth: 240,
-  },
-  error: {
-    color: '#ff8a8a',
-    marginBottom: 12,
-  },
-  skeletonWrapper: {
-    marginBottom: 12,
-  },
-  skeletonCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 24,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    marginBottom: 12,
-  },
-  skeletonLine: {
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: '#1c2430',
-    marginTop: 8,
-  },
-  skeletonLineShort: {
-    width: '50%',
-    marginTop: 4,
-  },
-  skeletonLineTiny: {
-    width: '30%',
-  },
-  trayOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-  },
-  trayBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-  tray: {
-    backgroundColor: '#0d1119',
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    padding: 24,
-    borderColor: '#1b2534',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: -12 },
-    shadowRadius: 30,
-    elevation: 20,
-    marginBottom:  -2,
-  },
-  trayHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#1b2534',
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  trayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  trayTitle: {
-    color: '#f5f7fb',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  trayIdentity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  trayAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trayAvatarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  trayName: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  trayHint: {
-    color: '#8aa0c6',
-    fontSize: 13,
-  },
-  trayLabel: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    letterSpacing: 1,
-    marginBottom: 12,
-  },
-  tagGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  tagPill: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-  },
-  tagPillActive: {
-    backgroundColor: '#2d6df6',
-    borderColor: '#2d6df6',
-  },
-  tagText: {
-    color: '#f5f7fb',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  tagTextActive: {
-    color: '#fff',
-  },
-  trayPrimary: {
-    backgroundColor: '#2d6df6',
-    borderRadius: 20,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  trayPrimaryText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  trayDanger: {
-    backgroundColor: '#1f1b25',
-    borderRadius: 20,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  trayDangerText: {
-    color: '#ef4444',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-});
+const createTrustedContactsStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    body: {
+      paddingHorizontal: 32,
+      paddingTop: 28,
+      gap: 24,
+    },
+    header: {
+      marginBottom: 24,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: '700',
+      letterSpacing: -0.35,
+      color: theme.colors.text,
+      marginBottom: 6,
+    },
+    subtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      color: theme.colors.textMuted,
+      maxWidth: 330,
+    },
+    importCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surface,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 18,
+      gap: 12,
+      marginBottom: 24,
+    },
+    importIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 20,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    importText: {
+      flex: 1,
+    },
+    importTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.accent,
+    },
+    importSubtitle: {
+      fontSize: 13,
+      color: theme.colors.textMuted,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      letterSpacing: 1.5,
+      color: theme.colors.textMuted,
+      marginBottom: 12,
+      textTransform: 'uppercase',
+    },
+    listCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    identity: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    avatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      color: theme.colors.surface,
+      fontWeight: '700',
+      fontSize: 18,
+    },
+    identityText: {
+      gap: 4,
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    personName: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    relationship: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    manageLabel: {
+      color: theme.colors.accent,
+      fontSize: 11,
+      letterSpacing: 1,
+      fontWeight: '700',
+    },
+    emptyCard: {
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.05),
+      borderStyle: 'dashed',
+      padding: 24,
+      backgroundColor: theme.colors.surfaceAlt,
+      alignItems: 'center',
+      marginBottom: 16,
+      gap: 12,
+    },
+    emptyIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.success, 0.2),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 6,
+    },
+    emptyTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    emptyBody: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      textAlign: 'center',
+      lineHeight: 18,
+      maxWidth: 240,
+    },
+    error: {
+      color: theme.colors.danger,
+      marginBottom: 12,
+    },
+    skeletonWrapper: {
+      marginBottom: 12,
+    },
+    skeletonCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: 12,
+    },
+    skeletonLine: {
+      height: 10,
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.15),
+      marginTop: 8,
+    },
+    skeletonLineShort: {
+      width: '50%',
+      marginTop: 4,
+    },
+    skeletonLineTiny: {
+      width: '30%',
+    },
+    trayOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+    },
+    trayBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme.colors.overlay,
+    },
+    tray: {
+      backgroundColor: theme.colors.surface,
+      borderTopLeftRadius: 40,
+      borderTopRightRadius: 40,
+      padding: 24,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      shadowColor: '#000',
+      shadowOpacity: 0.35,
+      shadowOffset: { width: 0, height: -12 },
+      shadowRadius: 30,
+      elevation: 20,
+      marginBottom: -2,
+    },
+    trayHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.border,
+      alignSelf: 'center',
+      marginBottom: 16,
+    },
+    trayHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    trayTitle: {
+      color: theme.colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    trayIdentity: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 12,
+    },
+    trayAvatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    trayAvatarText: {
+      color: theme.colors.surface,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    trayName: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    trayHint: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+    },
+    trayLabel: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      letterSpacing: 1,
+      marginBottom: 12,
+    },
+    tagGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginBottom: 20,
+    },
+    tagPill: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    tagPillActive: {
+      backgroundColor: theme.colors.accent,
+      borderColor: theme.colors.accent,
+    },
+    tagText: {
+      color: theme.colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    tagTextActive: {
+      color: theme.colors.surface,
+    },
+    trayPrimary: {
+      backgroundColor: theme.colors.accent,
+      borderRadius: 20,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    trayPrimaryText: {
+      color: theme.colors.surface,
+      fontWeight: '700',
+      fontSize: 16,
+    },
+    trayDanger: {
+      backgroundColor: theme.colors.surfaceAlt,
+      borderRadius: 20,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    trayDangerText: {
+      color: theme.colors.danger,
+      fontWeight: '700',
+      fontSize: 16,
+    },
+  });

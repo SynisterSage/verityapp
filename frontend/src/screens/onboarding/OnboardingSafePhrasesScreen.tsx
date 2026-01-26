@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,9 +14,12 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import { useTheme } from '../../context/ThemeContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import ActionFooter from '../../components/onboarding/ActionFooter';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 type SafePhrase = {
   id: string;
@@ -33,6 +35,8 @@ const normalizePhrase = (value: string) => {
 
 export default function OnboardingSafePhrasesScreen({ navigation }: { navigation: any }) {
   const { activeProfile } = useProfile();
+  const { theme } = useTheme();
+  const styles = useMemo(() => createSafePhrasesStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const [input, setInput] = useState('');
   const [phrases, setPhrases] = useState<SafePhrase[]>([]);
@@ -46,18 +50,25 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
     []
   );
 
-  const helperItems = [
-    {
-      icon: 'shield-checkmark',
-      color: '#4ade80',
-      text: 'Safe Phrases help confirm a caller is legitimate.',
-    },
-    {
-      icon: 'flash',
-      color: '#2d6df6',
-      text: 'When a phrase is used, it helps lower the risk, but the call is still screened.',
-    },
-  ];
+  const placeholderColor = useMemo(
+    () => withOpacity(theme.colors.textMuted, 0.6),
+    [theme.colors.textMuted]
+  );
+  const helperItems = useMemo(
+    () => [
+      {
+        icon: 'shield-checkmark',
+        color: theme.colors.success,
+        text: 'Safe Phrases help confirm a caller is legitimate.',
+      },
+      {
+        icon: 'flash',
+        color: theme.colors.accent,
+        text: 'When a phrase is used, it helps lower the risk, but the call is still screened.',
+      },
+    ],
+    [theme.colors.success, theme.colors.accent]
+  );
 
   const loadPhrases = async () => {
     if (!activeProfile) return;
@@ -142,7 +153,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
             <TextInput
               style={styles.input}
               placeholder="e.g. Golf"
-              placeholderTextColor="#8aa0c6"
+              placeholderTextColor={placeholderColor}
               value={input}
               onChangeText={setInput}
             />
@@ -154,7 +165,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
               onPress={addPhrase}
               disabled={!input.trim()}
             >
-              <Ionicons name="add" size={24} color="#fff" />
+              <Ionicons name="add" size={24} color={theme.colors.surface} />
             </Pressable>
           </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -173,7 +184,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
           ) : phrases.length === 0 ? (
             <View style={styles.emptyCard}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="chatbubble-ellipses" size={24} color="#4ade80" />
+                <Ionicons name="chatbubble-ellipses" size={24} color={theme.colors.success} />
               </View>
               <Text style={styles.emptyText}>No topics added yet.</Text>
             </View>
@@ -181,7 +192,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
             phrases.map((item) => (
               <View key={item.id} style={styles.phraseCard}>
                 <View style={styles.phraseIcon}>
-                  <Ionicons name="chatbubble-ellipses" size={20} color="#22c55e" />
+                  <Ionicons name="chatbubble-ellipses" size={20} color={theme.colors.success} />
                 </View>
                 <Text style={styles.phraseText}>{item.phrase}</Text>
                 <Pressable
@@ -190,9 +201,9 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
                   disabled={deletingId === item.id}
                 >
                   {deletingId === item.id ? (
-                    <ActivityIndicator size="small" color="#e11d48" />
+                    <ActivityIndicator size="small" color={theme.colors.danger} />
                   ) : (
-                    <Ionicons name="trash" size={18} color="#e11d48" />
+                    <Ionicons name="trash" size={18} color={theme.colors.danger} />
                   )}
                 </Pressable>
               </View>
@@ -213,149 +224,151 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  content: {
-    paddingHorizontal: 28,
-    paddingTop: 28,
-  },
-  headerSection: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    letterSpacing: -0.35,
-    color: '#f5f7fb',
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#8aa0c6',
-  },
-  sectionLabel: {
-    fontSize: 12,
-    letterSpacing: 1.5,
-    color: '#8796b0',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 60,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    borderRadius: 32,
-    backgroundColor: '#121a26',
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 16,
-  },
-  input: {
-    flex: 1,
-    color: '#e6ebf5',
-    fontSize: 16,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  error: {
-    color: '#ff8a8a',
-    marginBottom: 12,
-  },
-  emptyCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    borderStyle: 'dashed',
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 16,
-    backgroundColor: '#121a26',
-  },
-  emptyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#0f1b2d',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  emptyText: {
-    color: '#8aa0c6',
-  },
-  phraseCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  phraseIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#0e2d18',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  phraseText: {
-    flex: 1,
-    color: '#f5f7fb',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  deleteButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1c1c22',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skeletonWrapper: {
-    backgroundColor: 'transparent',
-    gap: 12,
-    marginBottom: 12,
-  },
-  skeletonCard: {
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 16,
-    backgroundColor: '#121a26',
-    overflow: 'hidden',
-  },
-  skeletonLine: {
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#1b2534',
-    marginBottom: 8,
-  },
-  skeletonLineShort: {
-    width: '60%',
-  },
-  skeletonLineTiny: {
-    width: '40%',
-  },
-});
+const createSafePhrasesStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    content: {
+      paddingHorizontal: 28,
+      paddingTop: 28,
+      gap: 24,
+    },
+    headerSection: {
+      marginBottom: 24,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: '700',
+      letterSpacing: -0.35,
+      color: theme.colors.text,
+      marginBottom: 6,
+    },
+    subtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      color: theme.colors.textMuted,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      letterSpacing: 1.5,
+      color: theme.colors.textMuted,
+      marginBottom: 12,
+      textTransform: 'uppercase',
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 60,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 32,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 16,
+      gap: 12,
+      marginBottom: 16,
+    },
+    input: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 16,
+    },
+    addButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    error: {
+      color: theme.colors.danger,
+      marginBottom: 12,
+    },
+    emptyCard: {
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      padding: 24,
+      alignItems: 'center',
+      marginBottom: 16,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    emptyIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.success, 0.2),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+    },
+    emptyText: {
+      color: theme.colors.textMuted,
+    },
+    phraseCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 12,
+    },
+    phraseIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.success, 0.18),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    phraseText: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    deleteButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    skeletonWrapper: {
+      backgroundColor: 'transparent',
+      gap: 12,
+      marginBottom: 12,
+    },
+    skeletonCard: {
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.15),
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+      overflow: 'hidden',
+    },
+    skeletonLine: {
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.15),
+      marginBottom: 8,
+    },
+    skeletonLineShort: {
+      width: '60%',
+    },
+    skeletonLineTiny: {
+      width: '40%',
+    },
+  });

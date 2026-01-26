@@ -25,6 +25,8 @@ import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { Ionicons } from '@expo/vector-icons';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 type MemberRole = 'admin' | 'editor';
 
 type Member = {

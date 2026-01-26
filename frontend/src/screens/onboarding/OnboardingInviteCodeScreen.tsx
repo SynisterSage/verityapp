@@ -15,6 +15,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
@@ -25,6 +27,7 @@ export default function OnboardingInviteCodeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'OnboardingInviteCode'>>();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const styles = useMemo(() => createInviteCodeStyles(theme), [theme]);
   const { refreshProfiles, setOnboardingComplete } = useProfile();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -126,12 +129,12 @@ export default function OnboardingInviteCodeScreen() {
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>First name</Text>
-              <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
-                <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
                 <TextInput
                   style={styles.input}
                   placeholder="e.g. Robert"
-                  placeholderTextColor="#8aa0c6"
+                  placeholderTextColor={withOpacity(theme.colors.textMuted, 0.7)}
                   value={firstName}
                   onChangeText={setFirstName}
                   autoCapitalize="words"
@@ -141,12 +144,12 @@ export default function OnboardingInviteCodeScreen() {
                 />
               </View>
               <Text style={styles.inputLabel}>Last name</Text>
-              <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
-                <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
                 <TextInput
                   style={styles.input}
                   placeholder="e.g. Miller"
-                  placeholderTextColor="#8aa0c6"
+                  placeholderTextColor={withOpacity(theme.colors.textMuted, 0.7)}
                   value={lastName}
                   onChangeText={setLastName}
                   autoCapitalize="words"
@@ -168,7 +171,7 @@ export default function OnboardingInviteCodeScreen() {
                     }}
                     style={[
                       styles.codeBox,
-                      { borderColor: digit ? '#2d6df6' : '#1b2534' },
+                      { borderColor: digit ? theme.colors.accent : theme.colors.border },
                     ]}
                     keyboardType="number-pad"
                     maxLength={1}
@@ -196,110 +199,93 @@ export default function OnboardingInviteCodeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  body: {
-    paddingHorizontal: 32,
-    paddingBottom: 20,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    letterSpacing: -0.35,
-    color: '#f5f7fb',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#8aa0c6',
-    maxWidth: 320,
-  },
-  inputGroup: {
-    marginTop: 32,
-    gap: 16,
-  },
-  inputLabel: {
-    fontSize: 12,
-    letterSpacing: 0.6,
-    color: '#8aa0c6',
-    marginBottom: 4,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 60,
-    borderRadius: 24,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    gap: 12,
-    backgroundColor: '#121a26',
-  },
-  input: {
-    flex: 1,
-    color: '#fff',
-  },
-  codeSection: {
-    marginTop: 32,
-    gap: 12,
-  },
-  codeLabel: {
-    fontSize: 12,
-    letterSpacing: 0.6,
-    color: '#8aa0c6',
-    marginBottom: 4,
-  },
-  codeRow: {
-    flexDirection: 'row',
-    gap: 6,
-    justifyContent: 'flex-start',
-    width: '100%',
-  },
-  codeBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 18,
-    backgroundColor: '#121a26',
-    borderWidth: 2,
-    borderColor: '#1b2534',
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  message: {
-    marginTop: 16,
-    color: '#ff8a8a',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  keyboardAvoiding: {
-    flex: 1,
-    width: '100%',
-  },
-  actionContainer: {
-    paddingHorizontal: 32,
-    paddingBottom: 24,
-  },
-  actionButton: {
-    height: 60,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#2d6df6',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.4,
-    shadowRadius: 30,
-  },
-  actionText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-  },
-});
+const createInviteCodeStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    body: {
+      paddingHorizontal: 32,
+      paddingBottom: 20,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: '700',
+      letterSpacing: -0.35,
+      color: theme.colors.text,
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      color: theme.colors.textMuted,
+      maxWidth: 320,
+    },
+    inputGroup: {
+      marginTop: 32,
+      gap: 16,
+    },
+    inputLabel: {
+      fontSize: 12,
+      letterSpacing: 0.6,
+      color: theme.colors.textMuted,
+      marginBottom: 4,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 60,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 12,
+      gap: 12,
+      backgroundColor: theme.colors.surface,
+    },
+    input: {
+      flex: 1,
+      color: theme.colors.text,
+    },
+    codeSection: {
+      marginTop: 32,
+      gap: 12,
+    },
+    codeLabel: {
+      fontSize: 12,
+      letterSpacing: 0.6,
+      color: theme.colors.textMuted,
+      marginBottom: 4,
+    },
+    codeRow: {
+      flexDirection: 'row',
+      gap: 6,
+      justifyContent: 'flex-start',
+      width: '100%',
+    },
+    codeBox: {
+      width: 52,
+      height: 52,
+      borderRadius: 18,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      fontSize: 24,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    message: {
+      marginTop: 16,
+      color: theme.colors.danger,
+      fontSize: 12,
+      textAlign: 'center',
+    },
+    keyboardAvoiding: {
+      flex: 1,
+      width: '100%',
+    },
+  });

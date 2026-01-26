@@ -1,6 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
 import {
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -15,6 +14,9 @@ import { useProfile } from '../../context/ProfileContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
+import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 const formatPhone = (digits: string) => {
   const area = digits.slice(0, 3);
@@ -53,6 +55,9 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const twilioRef = useRef<TextInput | null>(null);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { theme } = useTheme();
+  const styles = useMemo(() => createProfileStyles(theme), [theme]);
+  const placeholderColor = withOpacity(theme.colors.textMuted, 0.7);
 
   const formattedPhone = useMemo(() => formatPhone(phoneDigits), [phoneDigits]);
   const formattedTwilio = useMemo(() => formatPhone(twilioDigits), [twilioDigits]);
@@ -142,14 +147,14 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         </Text>
       </View>
 
-          <View style={styles.inputGroup}>
+      <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>First name</Text>
-        <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
-          <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
+        <View style={styles.inputContainer}>
+          <Ionicons name="person-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
           <TextInput
             style={styles.input}
             placeholder="e.g. Martha"
-            placeholderTextColor="#8aa0c6"
+            placeholderTextColor={placeholderColor}
             value={firstName}
             onChangeText={setFirstName}
             autoCapitalize="words"
@@ -159,12 +164,12 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         </View>
 
         <Text style={styles.inputLabel}>Last name</Text>
-        <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
-          <Ionicons name="person-outline" size={18} color="rgba(255,255,255,0.4)" />
+        <View style={styles.inputContainer}>
+          <Ionicons name="person-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
           <TextInput
             style={styles.input}
             placeholder="e.g. Stewart"
-            placeholderTextColor="#8aa0c6"
+            placeholderTextColor={placeholderColor}
             value={lastName}
             onChangeText={setLastName}
             autoCapitalize="words"
@@ -175,13 +180,13 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         </View>
 
         <Text style={styles.inputLabel}>Mobile number</Text>
-            <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
-              <Ionicons name="call-outline" size={18} color="rgba(255,255,255,0.4)" />
-              <Text style={styles.prefix}>+1</Text>
-              <TextInput
-                style={[styles.input, styles.phoneInput]}
+        <View style={styles.inputContainer}>
+          <Ionicons name="call-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
+          <Text style={styles.prefix}>+1</Text>
+          <TextInput
+            style={[styles.input, styles.phoneInput]}
             placeholder="(000) 000-0000"
-            placeholderTextColor="#8aa0c6"
+            placeholderTextColor={placeholderColor}
             keyboardType="phone-pad"
             value={formattedPhone}
             onChangeText={handlePhoneChange}
@@ -193,36 +198,36 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         </View>
 
         <Text style={styles.inputLabel}>Verity number</Text>
-        <View style={[styles.inputContainer, { borderColor: '#1b2534' }]}>
-          <Ionicons name="call-outline" size={18} color="rgba(255,255,255,0.4)" />
+        <View style={styles.inputContainer}>
+          <Ionicons name="call-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
           <Text style={styles.prefix}>+1</Text>
-              <TextInput
-                style={[styles.input, styles.phoneInput]}
-                placeholder="(000) 000-0000"
-                placeholderTextColor="#8aa0c6"
-                keyboardType="phone-pad"
-                value={formattedTwilio}
-                onChangeText={handleTwilioChange}
-                onKeyPress={handleTwilioKeyPress}
-                ref={twilioRef}
-              />
-            </View>
+          <TextInput
+            style={[styles.input, styles.phoneInput]}
+            placeholder="(000) 000-0000"
+            placeholderTextColor={placeholderColor}
+            keyboardType="phone-pad"
+            value={formattedTwilio}
+            onChangeText={handleTwilioChange}
+            onKeyPress={handleTwilioKeyPress}
+            ref={twilioRef}
+          />
+        </View>
             <HowItWorksCard
               caption="HOW IT WORKS"
               items={[
                 {
                   icon: 'shield-checkmark',
-                  color: '#4ade80',
+                  color: theme.colors.success,
                   text: 'Your Verity number lets us screen incoming calls before they reach you.',
                 },
                 {
                   icon: 'call-outline',
-                  color: '#2d6df6',
+                  color: theme.colors.accent,
                   text: 'It is not a replacement number; your phone stays the same while Verity guards the line.',
                 },
                 {
                   icon: 'settings-outline',
-                  color: '#64748b',
+                  color: theme.colors.textMuted,
                   text: 'In a bit, we will show you how to connect it to your Mobile number.',
                 },
               ]}
@@ -288,77 +293,78 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  body: {
-    paddingHorizontal: 32,
-    paddingBottom: 20,
-  },
-  header: {
-    marginBottom: 10,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    letterSpacing: -0.35,
-    color: '#f5f7fb',
-    lineHeight: 40,
-    maxWidth: 320,
-  },
-  subtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#8aa0c6',
-    marginTop: 8,
-    maxWidth: 320,
-  },
-  inputGroup: {
-    marginTop: 24,
-    gap: 16,
-  },
-  inputLabel: {
-    fontSize: 12,
-    letterSpacing: 0.6,
-    color: '#8aa0c6',
-    marginBottom: 4,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    height: 60,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    paddingHorizontal: 12,
-    gap: 12,
-    backgroundColor: '#121a26',
-  },
-  input: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 16,
-  },
-  phoneInput: {
-    letterSpacing: 1,
-  },
-  prefix: {
-    color: '#8aa0c6',
-    fontWeight: '600',
-  },
-  error: {
-    color: '#ff8a8a',
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  keyboardAvoiding: {
-    flex: 1,
-    width: '100%',
-  },
-});
+const createProfileStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    body: {
+      paddingHorizontal: 32,
+      paddingBottom: 20,
+    },
+    header: {
+      marginBottom: 10,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: '700',
+      letterSpacing: -0.35,
+      color: theme.colors.text,
+      lineHeight: 40,
+      maxWidth: 320,
+    },
+    subtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      color: theme.colors.textMuted,
+      marginTop: 8,
+      maxWidth: 320,
+    },
+    inputGroup: {
+      marginTop: 24,
+      gap: 16,
+    },
+    inputLabel: {
+      fontSize: 12,
+      letterSpacing: 0.6,
+      color: theme.colors.textMuted,
+      marginBottom: 4,
+    },
+    inputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 60,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 12,
+      gap: 12,
+      backgroundColor: theme.colors.surface,
+    },
+    input: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 16,
+    },
+    phoneInput: {
+      letterSpacing: 1,
+    },
+    prefix: {
+      color: theme.colors.textMuted,
+      fontWeight: '600',
+    },
+    error: {
+      color: theme.colors.danger,
+      fontSize: 12,
+      textAlign: 'center',
+    },
+    keyboardAvoiding: {
+      flex: 1,
+      width: '100%',
+    },
+  });

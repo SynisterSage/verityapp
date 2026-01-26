@@ -20,6 +20,9 @@ import { useNavigation } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import { getAllContacts, selectContacts } from '../../native/ContactPicker';
@@ -119,20 +122,26 @@ export default function TrustedContactsScreen() {
   const trayAnim = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.65)).current;
 
+  const { theme } = useTheme();
+  const styles = useMemo(() => createTrustedContactsStyles(theme), [theme]);
+  const placeholderColor = useMemo(
+    () => withOpacity(theme.colors.textMuted, 0.65),
+    [theme.colors.textMuted]
+  );
   const helperItems = useMemo(
     () => [
       {
         icon: 'people-outline',
-        color: '#4ade80',
+        color: theme.colors.success,
         text: 'Trusted Contacts skip the Safety PIN and connect directly.',
       },
       {
         icon: 'ban',
-        color: '#ef4444',
+        color: theme.colors.danger,
         text: 'Unknown or blocked numbers are screened before they ring.',
       },
     ],
-    []
+    [theme.colors.success, theme.colors.danger]
   );
 
   const skeletonRows = useMemo(
@@ -672,13 +681,13 @@ export default function TrustedContactsScreen() {
             disabled={isImportDisabled}
           >
             <View style={styles.importIcon}>
-              <Ionicons name="person-add" size={24} color="#fff" />
+              <Ionicons name="person-add" size={24} color={theme.colors.surface} />
             </View>
             <View style={styles.importText}>
               <Text style={styles.importTitle}>Import from Phone</Text>
               <Text style={styles.importSubtitle}>Add friends &amp; family</Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color="#2d6df6" />
+            <Ionicons name="chevron-forward" size={20} color={theme.colors.accent} />
           </Pressable>
           {!contactsPermissionEnabled && (
             <Text style={styles.permissionHint}>
@@ -697,9 +706,9 @@ export default function TrustedContactsScreen() {
               disabled={isSyncDisabled}
             >
               {syncing ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={theme.colors.surface} />
               ) : (
-                <Ionicons name="sync-outline" size={18} color="#fff" />
+                <Ionicons name="sync-outline" size={18} color={theme.colors.surface} />
               )}
               <Text style={styles.syncButtonText}>
                 {syncing ? 'Syncing contacts…' : 'Sync contacts'}
@@ -712,7 +721,7 @@ export default function TrustedContactsScreen() {
             <TextInput
               style={styles.input}
               placeholder="Phone #"
-              placeholderTextColor="#8aa0c6"
+              placeholderTextColor={placeholderColor}
               value={manualNumber}
               onChangeText={handleManualNumberChange}
               keyboardType="phone-pad"
@@ -725,7 +734,7 @@ export default function TrustedContactsScreen() {
               onPress={addManualNumber}
               disabled={!manualNumberDigits}
             >
-              <Ionicons name="add" size={20} color="#fff" />
+              <Ionicons name="add" size={20} color={theme.colors.surface} />
             </Pressable>
           </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -745,7 +754,7 @@ export default function TrustedContactsScreen() {
           ) : safeList.length === 0 ? (
             <View style={styles.emptyCard}>
               <View style={styles.emptyIcon}>
-                <Ionicons name="person-circle-outline" size={30} color="#4ade80" />
+                <Ionicons name="person-circle-outline" size={30} color={theme.colors.success} />
               </View>
               <Text style={styles.emptyBody}>
                 Import someone from your phone or add a number from above.
@@ -763,8 +772,8 @@ export default function TrustedContactsScreen() {
                     </View>
                     <View style={styles.identityText}>
                       <View style={styles.nameRow}>
-                        <Text style={styles.personName}>{getContactDisplayName(contact)}</Text>
-                        <Ionicons name="shield-checkmark" size={18} color="#4ade80" />
+                      <Text style={styles.personName}>{getContactDisplayName(contact)}</Text>
+                        <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
                       </View>
                       <Text style={styles.relationship}>{getRelationshipLabel(contact)}</Text>
                     </View>
@@ -819,7 +828,7 @@ export default function TrustedContactsScreen() {
                   {trayMode === 'import' ? 'Tag Contact' : 'Manage Contact'}
                 </Text>
                 <Pressable onPress={closeTray}>
-                  <Ionicons name="close" size={20} color="#fff" />
+                  <Ionicons name="close" size={20} color={theme.colors.text} />
                 </Pressable>
               </View>
               <View style={styles.trayIdentity}>
@@ -845,7 +854,7 @@ export default function TrustedContactsScreen() {
                             value={manualContactName}
                             onChangeText={setManualContactName}
                             placeholder="Display name"
-                            placeholderTextColor="#94a3b8"
+                            placeholderTextColor={placeholderColor}
                             style={styles.trayManualInput}
                             autoFocus
                           />
@@ -858,7 +867,7 @@ export default function TrustedContactsScreen() {
                           onPress={() => setManualNameEditing((prev) => !prev)}
                           style={styles.trayManualEditIcon}
                         >
-                          <Ionicons name="pencil-outline" size={18} color="#8ab4ff" />
+                          <Ionicons name="pencil-outline" size={18} color={theme.colors.accent} />
                         </Pressable>
                       </View>
                       <Text style={styles.trayHint}>Manual trusted caller</Text>
@@ -871,7 +880,7 @@ export default function TrustedContactsScreen() {
                             value={manualContactName}
                             onChangeText={setManualContactName}
                             placeholder="Display name"
-                            placeholderTextColor="#94a3b8"
+                            placeholderTextColor={placeholderColor}
                             style={styles.trayManualInput}
                             autoFocus
                           />
@@ -882,7 +891,7 @@ export default function TrustedContactsScreen() {
                           onPress={() => setManualNameEditing((prev) => !prev)}
                           style={styles.trayManualEditIcon}
                         >
-                          <Ionicons name="pencil-outline" size={18} color="#8ab4ff" />
+                          <Ionicons name="pencil-outline" size={18} color={theme.colors.accent} />
                         </Pressable>
                       </View>
                       <Text style={styles.trayHint}>Manual trusted caller</Text>
@@ -895,7 +904,7 @@ export default function TrustedContactsScreen() {
                             ? (trayContact as DeviceContact).name
                             : getContactDisplayName(trayContact as TrustedContactRow)}
                         </Text>
-                        <Ionicons name="shield-checkmark" size={18} color="#4ade80" />
+                        <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
                       </View>
                       <Text style={styles.trayHint}>Trusted Safe Contact</Text>
                     </>
@@ -962,375 +971,376 @@ export default function TrustedContactsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  outer: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: '#0f141d',
-  },
-  body: {
-    paddingHorizontal: 32,
-    paddingTop: 24,
-    gap: 24,
-  },
-  importCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#121a26',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 18,
-    gap: 12,
-    marginBottom: 0,
-  },
-  importCardDisabled: {
-    borderColor: '#0b131f',
-    backgroundColor: '#0b131f',
-  },
-  importCardPressed: {
-    opacity: 0.85,
-  },
-  importIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 20,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  importText: {
-    flex: 1,
-  },
-  importTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2d6df6',
-  },
-  importSubtitle: {
-    fontSize: 13,
-    color: '#8aa0c6',
-  },
-  sectionLabel: {
-    fontSize: 12,
-    letterSpacing: 1.5,
-    color: '#8796b0',
-    marginBottom: 0,
-    textTransform: 'uppercase',
-  },
-  syncRow: {
-    width: '100%',
-    marginBottom: 12,
-    marginTop: -8,
-  },
-  syncButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    backgroundColor: '#2d6df6',
-    width: '100%',
-  },
-  syncButtonPressed: {
-    opacity: 0.85,
-  },
-  syncButtonDisabled: {
-    opacity: 0.6,
-  },
-  syncButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    borderRadius: 32,
-    backgroundColor: '#121a26',
-    paddingHorizontal: 16,
-    gap: 12,
-    height: 60,
-  },
-  input: {
-    flex: 1,
-    color: '#e6ebf5',
-    fontSize: 16,
-  },
-  addButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  error: {
-    color: '#ff8a8a',
-    marginBottom: 4,
-  },
-  permissionHint: {
-    color: '#94a3b8',
-    fontSize: 12,
-    marginTop: -2,
-    marginBottom: 12,
-    paddingHorizontal: 4,
-  },
-  listCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  identity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 18,
-  },
-  identityText: {
-    gap: 4,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  trayIdentityText: {
-    gap: 4,
-  },
-  trayNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  trayManualInput: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#2d6df6',
-    color: '#f5f7fb',
-    fontSize: 18,
-    fontWeight: '700',
-    minWidth: 120,
-  },
-  trayManualEditIcon: {
-    padding: 4,
-  },
-  personName: {
-    color: '#f5f7fb',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  relationship: {
-    color: '#8aa0c6',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  manageLabel: {
-    color: '#2d6df6',
-    fontSize: 11,
-    letterSpacing: 1,
-    fontWeight: '700',
-  },
-  emptyCard: {
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: '#1f2937',
-    borderStyle: 'dashed',
-    padding: 24,
-    backgroundColor: '#121a26',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 12,
-  },
-  emptyIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#0f1b2d',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  emptyBody: {
-    color: '#8aa0c6',
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  skeletonWrapper: {
-    marginBottom: 12,
-  },
-  skeletonCard: {
-    backgroundColor: '#121a26',
-    borderRadius: 24,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-    marginBottom: 12,
-  },
-  safeList: {
-    marginBottom: 0,
-    gap: 8,
-  },
-  helperWrap: {
-    marginTop: 0,
-  },
-  skeletonLine: {
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: '#1c2430',
-    marginTop: 8,
-  },
-  skeletonLineShort: {
-    width: '55%',
-    marginTop: 4,
-  },
-  skeletonLineTiny: {
-    width: '30%',
-  },
-  trayOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-  },
-  trayBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-  },
-  tray: {
-    backgroundColor: '#0d1119',
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    padding: 24,
-    borderColor: '#1b2534',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.35,
-    shadowOffset: { width: 0, height: -12 },
-    shadowRadius: 30,
-    elevation: 20,
-    marginBottom: -2,
-  },
-  trayHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#1b2534',
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  trayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  trayTitle: {
-    color: '#f5f7fb',
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  trayIdentity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  trayAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2d6df6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trayAvatarText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  trayName: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  trayHint: {
-    color: '#8aa0c6',
-    fontSize: 13,
-  },
-  trayLabel: {
-    color: '#8aa0c6',
-    fontSize: 12,
-    letterSpacing: 1,
-    marginBottom: 12,
-  },
-  tagGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 20,
-  },
-  tagPill: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#1b2534',
-  },
-  tagPillActive: {
-    backgroundColor: '#2d6df6',
-    borderColor: '#2d6df6',
-  },
-  tagText: {
-    color: '#f5f7fb',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  tagTextActive: {
-    color: '#fff',
-  },
-  trayPrimary: {
-    backgroundColor: '#2d6df6',
-    borderRadius: 20,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  trayPrimaryText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  trayDanger: {
-    backgroundColor: '#1f1b25',
-    borderRadius: 20,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  trayDangerText: {
-    color: '#ef4444',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-});
+const createTrustedContactsStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    outer: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    body: {
+      paddingHorizontal: 32,
+      paddingTop: 24,
+      gap: 24,
+    },
+    importCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surface,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 18,
+      gap: 12,
+      marginBottom: 0,
+    },
+    importCardDisabled: {
+      borderColor: withOpacity(theme.colors.border, 0.5),
+      backgroundColor: withOpacity(theme.colors.surface, 0.75),
+    },
+    importCardPressed: {
+      opacity: 0.85,
+    },
+    importIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.accent, 0.16),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    importText: {
+      flex: 1,
+    },
+    importTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.accent,
+    },
+    importSubtitle: {
+      fontSize: 13,
+      color: theme.colors.textMuted,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      letterSpacing: 1.5,
+      color: theme.colors.textMuted,
+      marginBottom: 0,
+      textTransform: 'uppercase',
+    },
+    syncRow: {
+      width: '100%',
+      marginBottom: 12,
+      marginTop: -8,
+    },
+    syncButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 999,
+      backgroundColor: theme.colors.accent,
+      width: '100%',
+    },
+    syncButtonPressed: {
+      opacity: 0.85,
+    },
+    syncButtonDisabled: {
+      opacity: 0.6,
+    },
+    syncButtonText: {
+      color: theme.colors.surface,
+      fontWeight: '600',
+    },
+    inputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 32,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 16,
+      gap: 12,
+      height: 60,
+    },
+    input: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 16,
+    },
+    addButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    error: {
+      color: theme.colors.danger,
+      marginBottom: 4,
+    },
+    permissionHint: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      marginTop: -2,
+      marginBottom: 12,
+      paddingHorizontal: 4,
+    },
+    listCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+    },
+    identity: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    avatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: withOpacity(theme.colors.accent, 0.16),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      color: theme.colors.surface,
+      fontWeight: '700',
+      fontSize: 18,
+    },
+    identityText: {
+      gap: 4,
+    },
+    nameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    trayIdentityText: {
+      gap: 4,
+    },
+    trayNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    trayManualInput: {
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.accent,
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+      minWidth: 120,
+    },
+    trayManualEditIcon: {
+      padding: 4,
+    },
+    personName: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    relationship: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    manageLabel: {
+      color: theme.colors.accent,
+      fontSize: 11,
+      letterSpacing: 1,
+      fontWeight: '700',
+    },
+    emptyCard: {
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      padding: 24,
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      marginBottom: 16,
+      gap: 12,
+    },
+    emptyIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.text, 0.06),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 6,
+    },
+    emptyBody: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      textAlign: 'center',
+    },
+    skeletonWrapper: {
+      marginBottom: 12,
+    },
+    skeletonCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginBottom: 12,
+    },
+    safeList: {
+      marginBottom: 0,
+      gap: 8,
+    },
+    helperWrap: {
+      marginTop: 0,
+    },
+    skeletonLine: {
+      height: 10,
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.textMuted, 0.2),
+      marginTop: 8,
+    },
+    skeletonLineShort: {
+      width: '55%',
+      marginTop: 4,
+    },
+    skeletonLineTiny: {
+      width: '30%',
+    },
+    trayOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+    },
+    trayBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme.colors.overlay,
+    },
+    tray: {
+      backgroundColor: theme.colors.surface,
+      borderTopLeftRadius: 40,
+      borderTopRightRadius: 40,
+      padding: 24,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      shadowColor: '#000',
+      shadowOpacity: 0.35,
+      shadowOffset: { width: 0, height: -12 },
+      shadowRadius: 30,
+      elevation: 20,
+      marginBottom: -2,
+    },
+    trayHandle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.colors.border,
+      alignSelf: 'center',
+      marginBottom: 16,
+    },
+    trayHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    trayTitle: {
+      color: theme.colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    trayIdentity: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 12,
+    },
+    trayAvatar: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: withOpacity(theme.colors.accent, 0.16),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    trayAvatarText: {
+      color: theme.colors.surface,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    trayName: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    trayHint: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+    },
+    trayLabel: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      letterSpacing: 1,
+      marginBottom: 12,
+    },
+    tagGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+      marginBottom: 20,
+    },
+    tagPill: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    tagPillActive: {
+      backgroundColor: theme.colors.accent,
+      borderColor: theme.colors.accent,
+    },
+    tagText: {
+      color: theme.colors.text,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    tagTextActive: {
+      color: theme.colors.surface,
+    },
+    trayPrimary: {
+      backgroundColor: theme.colors.accent,
+      borderRadius: 20,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    trayPrimaryText: {
+      color: theme.colors.surface,
+      fontWeight: '700',
+      fontSize: 16,
+    },
+    trayDanger: {
+      backgroundColor: withOpacity(theme.colors.danger, 0.16),
+      borderRadius: 20,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    trayDangerText: {
+      color: theme.colors.danger,
+      fontWeight: '700',
+      fontSize: 16,
+    },
+  });

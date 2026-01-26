@@ -9,6 +9,9 @@ import { authorizedFetch } from '../../services/backend';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import SettingsHeader from '../../components/common/SettingsHeader';
+import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 export default function AutomationScreen() {
   const insets = useSafeAreaInsets();
@@ -19,6 +22,16 @@ export default function AutomationScreen() {
   const [autoTrustOnSafe, setAutoTrustOnSafe] = useState(false);
   const [autoBlockOnFraud, setAutoBlockOnFraud] = useState(true);
   const [saving, setSaving] = useState(false);
+  const { theme } = useTheme();
+  const styles = useMemo(() => createAutomationStyles(theme), [theme]);
+  const sliderInactiveTrackColor = useMemo(
+    () => withOpacity(theme.colors.textMuted, 0.25),
+    [theme.colors.textMuted]
+  );
+  const switchInactiveTrackColor = useMemo(
+    () => withOpacity(theme.colors.textMuted, 0.35),
+    [theme.colors.textMuted]
+  );
 
   const syncFromProfile = useCallback(() => {
     if (!activeProfile) {
@@ -104,16 +117,16 @@ export default function AutomationScreen() {
     () => [
       {
         icon: 'speedometer',
-        color: '#2d6df6',
+        color: theme.colors.accent,
         text: 'Sliders set how strict Verity evaluates each call so you can keep the circle calm.',
       },
       {
         icon: 'shield-checkmark',
-        color: '#4ade80',
+        color: theme.colors.success,
         text: 'Toggles decide whether to block suspicious calls or trust the gentle ones automatically.',
       },
     ],
-    []
+    [theme.colors.accent, theme.colors.success]
   );
 
   const hasChanges = useMemo(() => {
@@ -178,8 +191,8 @@ export default function AutomationScreen() {
             <Switch
               value={autoMarkEnabled}
               onValueChange={setAutoMarkEnabled}
-              trackColor={{ false: '#1f2a3a', true: '#2d6df6' }}
-              thumbColor="#f5f7fb"
+              trackColor={{ false: switchInactiveTrackColor, true: theme.colors.accent }}
+              thumbColor={theme.colors.surface}
             />
           </View>
 
@@ -196,9 +209,9 @@ export default function AutomationScreen() {
               minimumValue={60}
               maximumValue={100}
               step={1}
-              minimumTrackTintColor="#2d6df6"
-              maximumTrackTintColor="#202836"
-              thumbTintColor="#fff"
+              minimumTrackTintColor={theme.colors.accent}
+              maximumTrackTintColor={sliderInactiveTrackColor}
+              thumbTintColor={theme.colors.surface}
               disabled={!autoMarkEnabled}
             />
             <Text style={styles.helper}>Recommended: 85–95 for strict fraud catches.</Text>
@@ -215,9 +228,9 @@ export default function AutomationScreen() {
               minimumValue={0}
               maximumValue={60}
               step={1}
-              minimumTrackTintColor="#2d6df6"
-              maximumTrackTintColor="#202836"
-              thumbTintColor="#fff"
+              minimumTrackTintColor={theme.colors.accent}
+              maximumTrackTintColor={sliderInactiveTrackColor}
+              thumbTintColor={theme.colors.surface}
               disabled={!autoMarkEnabled}
             />
             <Text style={styles.helper}>Recommended: 20–35 for clearly low-risk calls.</Text>
@@ -231,8 +244,8 @@ export default function AutomationScreen() {
             <Switch
               value={autoBlockOnFraud}
               onValueChange={setAutoBlockOnFraud}
-              trackColor={{ false: '#1f2a3a', true: '#2d6df6' }}
-              thumbColor="#f5f7fb"
+              trackColor={{ false: switchInactiveTrackColor, true: theme.colors.accent }}
+              thumbColor={theme.colors.surface}
               disabled={!autoMarkEnabled}
             />
           </View>
@@ -245,8 +258,8 @@ export default function AutomationScreen() {
             <Switch
               value={autoTrustOnSafe}
               onValueChange={setAutoTrustOnSafe}
-              trackColor={{ false: '#1f2a3a', true: '#2d6df6' }}
-              thumbColor="#f5f7fb"
+              trackColor={{ false: switchInactiveTrackColor, true: theme.colors.accent }}
+              thumbColor={theme.colors.surface}
               disabled={!autoMarkEnabled}
             />
           </View>
@@ -266,98 +279,100 @@ export default function AutomationScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f141d',},
-  content: {
-    paddingHorizontal: 24,
-    paddingBottom: 28,
-    paddingTop: 16,
-    gap: 20,
-  },
-  card: {
-    backgroundColor: '#121a26',
-    borderRadius: 32,
-    padding: 22,
-    borderWidth: 1,
-    borderColor: '#1c2636',
-    gap: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 12 },
-  },
-  headerSection: {
-    paddingHorizontal: 0,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  rowTop: {
-    marginBottom: 6,
-  },
-  rowText: {
-    flex: 1,
-    gap: 4,
-  },
-  title: {
-    color: '#f5f7fb',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  subtitle: {
-    color: '#9fb0cc',
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  subtitleSpaced: {
-    marginTop: 4,
-  },
-  thresholdRow: {
-    gap: 10,
-    marginBottom: 6,
-  },
-  sliderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sliderHint: {
-    color: '#7f8aa3',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  thresholdLabel: {
-    color: '#c8d3ea',
-    fontWeight: '600',
-  },
-  helper: {
-    color: '#94a3b8',
-    fontSize: 12,
-  },
-  toggleRow: {
-    paddingTop: 8,
-  },
-  disabled: {
-    opacity: 0.55,
-  },
-  disabledText: {
-    color: '#8aa0c6',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#1b2331',
-  },
-  helperWrap: {
-    paddingHorizontal: 4,
-    marginTop: 12,
-  },
-  disabledContent: {
-    paddingHorizontal: 24,
-    marginTop: 24,
-  },
-});
+const createAutomationStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    content: {
+      paddingHorizontal: 24,
+      paddingBottom: 28,
+      paddingTop: 16,
+      gap: 20,
+    },
+    card: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 32,
+      padding: 22,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      gap: 16,
+      shadowColor: theme.colors.border,
+      shadowOpacity: 0.25,
+      shadowRadius: 30,
+      shadowOffset: { width: 0, height: 12 },
+    },
+    headerSection: {
+      paddingHorizontal: 0,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    rowTop: {
+      marginBottom: 6,
+    },
+    rowText: {
+      flex: 1,
+      gap: 4,
+    },
+    title: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    subtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    subtitleSpaced: {
+      marginTop: 4,
+    },
+    thresholdRow: {
+      gap: 10,
+      marginBottom: 6,
+    },
+    sliderHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    sliderHint: {
+      color: theme.colors.textDim,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    thresholdLabel: {
+      color: theme.colors.text,
+      fontWeight: '600',
+    },
+    helper: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+    },
+    toggleRow: {
+      paddingTop: 8,
+    },
+    disabled: {
+      opacity: 0.55,
+    },
+    disabledText: {
+      color: theme.colors.textMuted,
+    },
+    separator: {
+      height: 1,
+      backgroundColor: theme.colors.border,
+    },
+    helperWrap: {
+      paddingHorizontal: 4,
+      marginTop: 12,
+    },
+    disabledContent: {
+      paddingHorizontal: 24,
+      marginTop: 24,
+    },
+  });

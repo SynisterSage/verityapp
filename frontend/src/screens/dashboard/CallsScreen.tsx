@@ -757,10 +757,6 @@ const createCallStyles = (theme: AppTheme) =>
       marginBottom: 12,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: withOpacity(theme.colors.text, 0.1),
-      shadowColor: '#000',
-      shadowOpacity: 0.14,
-      shadowRadius: 20,
-      shadowOffset: { width: 0, height: 8 },
     },
     callItemHandled: {
       backgroundColor: withOpacity(theme.colors.text, 0.04),

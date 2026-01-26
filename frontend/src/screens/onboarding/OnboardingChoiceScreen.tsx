@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { View, StyleSheet, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +8,8 @@ import { useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import { useTheme } from '../../context/ThemeContext';
+import { withOpacity } from '../../utils/color';
+import type { AppTheme } from '../../theme/tokens';
 
 type OnboardingChoiceTarget = 'OnboardingProfile' | 'OnboardingInviteCode';
 
@@ -33,6 +36,7 @@ export default function OnboardingChoiceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'OnboardingChoice'>>();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const styles = useMemo(() => createChoiceStyles(theme), [theme]);
 
   const handlePress = (target: OnboardingChoiceTarget) => {
     navigation.navigate(target);
@@ -77,17 +81,17 @@ export default function OnboardingChoiceScreen() {
                   card.variant === 'primary' ? styles.iconBoxPrimary : styles.iconBoxSecondary,
                 ]}
               >
-                <Ionicons
-                  name={card.icon as any}
-                  size={28}
-                  color={card.variant === 'primary' ? '#fff' : '#2d6df6'}
-                />
+          <Ionicons
+            name={card.icon as any}
+            size={28}
+            color={card.variant === 'primary' ? theme.colors.surface : theme.colors.accent}
+          />
               </View>
               <View style={styles.textStack}>
                 <Text style={styles.cardTitle}>{card.title}</Text>
                 <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
               </View>
-              <Ionicons name="chevron-forward-outline" size={24} color="rgba(255,255,255,0.2)" />
+              <Ionicons name="chevron-forward-outline" size={24} color={withOpacity(theme.colors.textMuted, 0.35)} />
             </Pressable>
           ))}
         </View>
@@ -111,126 +115,127 @@ export default function OnboardingChoiceScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#0b111b',
-    justifyContent: 'flex-start',
-  },
-  body: {
-    paddingHorizontal: 32,
-    paddingBottom: 160,
-  },
-  header: {
-    marginBottom: 32,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: '#f5f7fb',
-    letterSpacing: -0.35,
-    lineHeight: 38,
-    maxWidth: 320,
-  },
-  subtitle: {
-    fontSize: 17,
-    fontWeight: '500',
-    color: '#8aa0c6',
-    marginTop: 8,
-    maxWidth: 320,
-  },
-  cards: {
-    flexDirection: 'column',
-  },
-  card: {
-    backgroundColor: '#121a26',
-    borderRadius: 32,
-    minHeight: 80,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#1f2a3a',
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  cardPrimary: {
-    borderColor: '#1f2a3a',
-  },
-  cardSecondary: {
-    borderColor: '#1f2a3a',
-  },
-  cardPressed: {
-    transform: [{ scale: 0.97 }],
-    opacity: 0.95,
-  },
-  iconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  iconBoxPrimary: {
-    backgroundColor: '#2d6df6',
-    shadowColor: '#2d6df6',
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
-  },
-  iconBoxSecondary: {
-    backgroundColor: '#0b111b',
-    borderWidth: 1,
-    borderColor: '#2d6df6',
-  },
-  textStack: {
-    flex: 1,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#f5f7fb',
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#8aa0c6',
-    marginTop: 4,
-  },
-  footerCard: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: -2,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingHorizontal: 32,
-    paddingTop: 20,
-    borderWidth: 1,
-    shadowOpacity: 0.25,
-    shadowOffset: { width: 0, height: -12 },
-    shadowRadius: 40,
-    elevation: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardSpacing: {
-    marginBottom: 20,
-  },
-  footerCaption: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#8796b0',
-    textAlign: 'center',
-  },
-  footerLink: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2d6df6',
-    marginTop: 4,
-    textAlign: 'center',
-  },
-});
+const createChoiceStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+      justifyContent: 'flex-start',
+    },
+    body: {
+      paddingHorizontal: 32,
+      paddingBottom: 160,
+    },
+    header: {
+      marginBottom: 32,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: '700',
+      color: theme.colors.text,
+      letterSpacing: -0.35,
+      lineHeight: 38,
+      maxWidth: 320,
+    },
+    subtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      color: theme.colors.textMuted,
+      marginTop: 8,
+      maxWidth: 320,
+    },
+    cards: {
+      flexDirection: 'column',
+    },
+    card: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 32,
+      minHeight: 80,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      flexDirection: 'row',
+      alignItems: 'center',
+      shadowColor: theme.colors.border,
+      shadowOpacity: 0.15,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: 8 },
+    },
+    cardPrimary: {
+      borderColor: theme.colors.border,
+    },
+    cardSecondary: {
+      borderColor: theme.colors.border,
+    },
+    cardPressed: {
+      transform: [{ scale: 0.97 }],
+      opacity: 0.95,
+    },
+    iconBox: {
+      width: 64,
+      height: 64,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+    },
+    iconBoxPrimary: {
+      backgroundColor: theme.colors.accent,
+      shadowColor: theme.colors.accent,
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 8 },
+    },
+    iconBoxSecondary: {
+      backgroundColor: theme.colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    textStack: {
+      flex: 1,
+    },
+    cardTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    cardSubtitle: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.colors.textMuted,
+      marginTop: 4,
+    },
+    footerCard: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: -2,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
+      paddingHorizontal: 32,
+      paddingTop: 20,
+      borderWidth: 1,
+      shadowOpacity: 0.25,
+      shadowOffset: { width: 0, height: -12 },
+      shadowRadius: 40,
+      elevation: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardSpacing: {
+      marginBottom: 20,
+    },
+    footerCaption: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.colors.textMuted,
+      textAlign: 'center',
+    },
+    footerLink: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.accent,
+      marginTop: 4,
+      textAlign: 'center',
+    },
+  });
