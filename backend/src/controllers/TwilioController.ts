@@ -4,6 +4,7 @@ import twilio from 'twilio';
 import fetch from 'node-fetch';
 import supabaseAdmin from '@src/services/supabase';
 import { transcribeWavBuffer } from '@src/services/azure';
+import { detectSyntheticVoice, VoiceAnalysisResult } from '@src/services/voiceDetector';
 import { analyzeTranscript, hashCallerNumber, matchPhrases, scoreToRiskLevel } from '@src/services/fraud';
 import { getCallerMetadata } from '@src/services/phone';
 import {
@@ -550,6 +551,16 @@ async function recordingReady(req: Request, res: Response) {
       logger.err(`Supabase upload failed: ${uploadError.message}`);
       return res.status(204).end();
     }
+    let voiceResult: VoiceAnalysisResult | null = null;
+    try {
+      voiceResult = await detectSyntheticVoice(recordingBuffer);
+    } catch (err) {
+      logger.err(
+        `Synthetic voice detection failed: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
     const { text, confidence } = await transcribeWavBuffer(recordingBuffer);
     const fraudThreshold =
       typeof profile.alert_threshold_score === 'number'
@@ -563,6 +574,8 @@ async function recordingReady(req: Request, res: Response) {
           callDurationSeconds: recordingDurationSeconds,
           callTimestamp,
           repeatCallCount: previousCalls,
+          voiceSyntheticScore: voiceResult?.score ?? null,
+          voiceAnalysis: voiceResult ?? undefined,
         })
       : null;
     let fraudScore = fraudResult?.score ?? null;
@@ -589,6 +602,9 @@ async function recordingReady(req: Request, res: Response) {
       safePhraseDampening: number;
       repeatCallerBoost: number;
       callerHistory: { windowDays: number; previousCalls: number } | null;
+      voiceSyntheticScore: number | null;
+      voiceBoost: number;
+      voiceAnalysis?: VoiceAnalysisResult | null;
     } | null = fraudResult
       ? {
           ...fraudResult.notes,
@@ -671,6 +687,9 @@ async function recordingReady(req: Request, res: Response) {
         caller_country: callerMeta.country ?? null,
         caller_region: callerMeta.region ?? null,
         caller_hash: callerHash,
+        voice_synthetic_score: voiceResult?.score ?? null,
+        voice_analysis: voiceResult ?? null,
+        voice_detected_at: voiceResult ? new Date().toISOString() : null,
         fraud_score: fraudScore,
         fraud_risk_level: fraudRiskLevel,
         fraud_keywords: fraudKeywords,

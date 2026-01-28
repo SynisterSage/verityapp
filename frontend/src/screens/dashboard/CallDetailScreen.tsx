@@ -31,6 +31,16 @@ type FraudNotes = {
   safePhraseMatches?: string[];
 };
 
+type VoiceAnalysis = {
+  rawOutput?: string;
+  chunkCount?: number | null;
+  chunkMedianFake?: number | null;
+  chunkMaxFake?: number | null;
+  highChunkCount?: number | null;
+  highChunkRatio?: number | null;
+  alertBand?: 'none' | 'caution' | 'high';
+};
+
 type CallRow = {
   id: string;
   profile_id: string | null;
@@ -43,6 +53,10 @@ type CallRow = {
   caller_number: string | null;
   feedback_status?: string | null;
   caller_hash?: string | null;
+  voice_synthetic_score?: number | null;
+  voice_analysis?: VoiceAnalysis | null;
+  voice_detected_at?: string | null;
+  voice_feedback?: string | null;
 };
 
 function escapeRegExp(value: string) {
@@ -153,6 +167,7 @@ export default function CallDetailScreen({
   const [recordingStatus, setRecordingStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [isMarkingSafe, setIsMarkingSafe] = useState(false);
   const [isMarkingFraud, setIsMarkingFraud] = useState(false);
+  const [isSubmittingVoiceFeedback, setIsSubmittingVoiceFeedback] = useState(false);
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const riskBarAnim = useRef(new Animated.Value(0)).current;
   const transcriptAnim = useRef(new Animated.Value(0)).current;
@@ -181,7 +196,7 @@ export default function CallDetailScreen({
       const { data } = await supabase
         .from('calls')
         .select(
-          'id, profile_id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords, fraud_notes, caller_number, feedback_status, caller_hash'
+          'id, profile_id, created_at, transcript, fraud_score, fraud_risk_level, fraud_keywords, fraud_notes, caller_number, feedback_status, caller_hash, voice_synthetic_score, voice_analysis, voice_detected_at, voice_feedback'
         )
         .eq('id', callId)
         .single();
@@ -398,6 +413,27 @@ export default function CallDetailScreen({
     }
   };
 
+  const handleVoiceFeedback = useCallback(async () => {
+    if (!callRow || callRow.voice_feedback === 'real_voice') {
+      return;
+    }
+    setIsSubmittingVoiceFeedback(true);
+    try {
+      await authorizedFetch(`/calls/${callId}/voice-feedback`, {
+        method: 'PATCH',
+        body: JSON.stringify({ feedback: 'real_voice' }),
+      });
+      setCallRow((prev) => (prev ? { ...prev, voice_feedback: 'real_voice' } : prev));
+    } catch (error) {
+      Alert.alert(
+        'Feedback',
+        'We could not save that note. Please try again in a moment.'
+      );
+    } finally {
+      setIsSubmittingVoiceFeedback(false);
+    }
+  }, [callId, callRow?.voice_feedback]);
+
   const handleMarkFraud = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     markFeedback('marked_fraud');
@@ -577,6 +613,48 @@ export default function CallDetailScreen({
   const recordingLabel =
     recordingStatus === 'ready' ? 'Ready' : recordingStatus === 'loading' ? 'Loading' : 'Unavailable';
   const playDisabled = recordingStatus === 'error' || recordingStatus === 'loading';
+  const voiceAnalysis = callRow?.voice_analysis;
+  const aggregatedScore =
+    voiceAnalysis?.chunkMedianFake ?? callRow?.voice_synthetic_score ?? null;
+  const voiceScorePercent = aggregatedScore != null ? Math.round(aggregatedScore * 100) : null;
+  const fallbackBand: 'none' | 'caution' | 'high' =
+    aggregatedScore != null
+      ? aggregatedScore >= 0.93
+        ? 'high'
+        : aggregatedScore >= 0.8
+        ? 'caution'
+        : 'none'
+      : 'none';
+  const voiceAlertBand: 'none' | 'caution' | 'high' =
+    voiceAnalysis?.alertBand ?? fallbackBand;
+  const showVoiceWarning = voiceAlertBand === 'high' && voiceScorePercent != null;
+  const voiceWarningAccent = voiceAlertBand === 'high' ? theme.colors.danger : theme.colors.warning;
+  const voiceWarningTitle =
+    voiceAlertBand === 'high' ? 'Voice likely synthetic' : 'Voice may sound AI-generated';
+  const voiceWarningSubtitle =
+    voiceAlertBand === 'high'
+      ? 'Multiple speech segments triggered our high-confidence band.'
+      : 'The detector raised a caution flag; listen carefully before trusting.';
+  const voiceWarningMetadataParts = [];
+  const voiceDetectedStamp = (() => {
+    const voiceDate = formatDateLabel(callRow?.voice_detected_at);
+    const voiceTime = formatTimeLabel(callRow?.voice_detected_at);
+    return [voiceDate, voiceTime].filter(Boolean);
+  })();
+  if (voiceDetectedStamp.length > 0) {
+    voiceWarningMetadataParts.push(`Detected ${voiceDetectedStamp.join(' • ')}`);
+  }
+  if (typeof voiceAnalysis?.chunkCount === 'number' && voiceAnalysis.chunkCount > 0) {
+    voiceWarningMetadataParts.push(`${voiceAnalysis.chunkCount} voiced segments analyzed`);
+  }
+  if (
+    typeof voiceAnalysis?.highChunkRatio === 'number' &&
+    voiceAnalysis.highChunkRatio > 0
+  ) {
+    const percent = Math.round(voiceAnalysis.highChunkRatio * 100);
+    voiceWarningMetadataParts.push(`${percent}% of those segments listened high`);
+  }
+  const voiceWarningMetadata = voiceWarningMetadataParts.join(' • ');
   const footerDisabledSafe = callRow.feedback_status === 'marked_safe';
   const footerDisabledFraud = callRow.feedback_status === 'marked_fraud';
   const disabledButtonBackground = withOpacity(theme.colors.text, 0.05);
@@ -763,6 +841,57 @@ export default function CallDetailScreen({
               )}
             </View>
           </View>
+          {showVoiceWarning && (
+            <View
+              style={[
+                styles.card,
+                styles.voiceWarningCard,
+                { borderColor: withOpacity(voiceWarningAccent, 0.2) },
+              ]}
+            >
+              <View style={styles.cardContent}>
+                <View style={styles.voiceWarningHeader}>
+                  <View
+                    style={[
+                      styles.voiceWarningIcon,
+                      { backgroundColor: withOpacity(voiceWarningAccent, 0.18) },
+                    ]}
+                  >
+                    <Ionicons name="alert-circle-outline" size={20} color={voiceWarningAccent} />
+                  </View>
+                  <View style={styles.voiceWarningText}>
+                    <Text style={styles.voiceWarningTitle}>{voiceWarningTitle}</Text>
+                    <Text style={styles.voiceWarningSubtitle}>{voiceWarningSubtitle}</Text>
+                  </View>
+                </View>
+                {voiceScorePercent != null && (
+                  <Text style={[styles.voiceWarningSubtitle, { marginBottom: 6 }]}>
+                    Confidence {voiceScorePercent}% — higher means more AI-like artifacts.
+                  </Text>
+                )}
+                {voiceWarningMetadata ? (
+                  <Text style={styles.voiceWarningMetadata}>{voiceWarningMetadata}</Text>
+                ) : null}
+                <Text style={styles.voiceWarningBody}>
+                  {callRow?.voice_feedback === 'real_voice'
+                    ? 'Thanks — we logged that this sounded normal.'
+                    : voiceAlertBand === 'high'
+                    ? 'We recommend reviewing this call carefully before trusting the caller.'
+                    : 'If this call felt genuine, tap the text below to tell us.'}
+                </Text>
+                {callRow?.voice_feedback !== 'real_voice' && (
+                  <TouchableOpacity
+                    onPress={handleVoiceFeedback}
+                    disabled={isSubmittingVoiceFeedback}
+                  >
+                    <Text style={styles.voiceFeedbackAction}>
+                      {isSubmittingVoiceFeedback ? 'Saving…' : 'Looks real to me'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
         </View>
       </ScrollView>
       {canManageProfile && (
@@ -1016,6 +1145,51 @@ const createCallDetailStyles = (theme: AppTheme) =>
     hint: {
       color: theme.colors.textMuted,
       marginTop: 10,
+    },
+    voiceWarningCard: {
+      marginTop: 12,
+      borderColor: withOpacity(theme.colors.warning, 0.2),
+    },
+    voiceWarningHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+    },
+    voiceWarningIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    voiceWarningText: {
+      flex: 1,
+    },
+    voiceWarningTitle: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    voiceWarningSubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      marginTop: 2,
+    },
+    voiceWarningMetadata: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      marginBottom: 4,
+    },
+    voiceWarningBody: {
+      color: theme.colors.text,
+      fontSize: 14,
+      marginBottom: 6,
+    },
+    voiceFeedbackAction: {
+      color: theme.colors.accent,
+      fontSize: 14,
+      fontWeight: '600',
     },
     skeletonWrapper: {
       paddingHorizontal: 24,

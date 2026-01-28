@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import type { VoiceAnalysisResult } from '@src/services/voiceDetector';
 
 export type FraudRiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
@@ -16,6 +17,8 @@ export type FraudMetadata = {
   callTimestamp?: string | null;
   repeatCallCount?: number;
   detectedLocale?: string | null;
+  voiceSyntheticScore?: number | null;
+  voiceAnalysis?: VoiceAnalysisResult | null;
 };
 
 export type FraudNotes = {
@@ -60,6 +63,9 @@ export type FraudNotes = {
   investmentHits: number;
   medicalHits: number;
   deviceHits: number;
+  voiceSyntheticScore: number | null;
+  voiceBoost: number;
+  voiceAnalysis?: VoiceAnalysisResult | null;
 };
 
 export type FraudAnalysis = {
@@ -1945,6 +1951,28 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   const localeBoost = calculateLocaleBoost(detectedLocale, callerCountry);
   const regionMismatchBoost =
     callerRegion && callerRegion !== '+1' ? 12 : callerCountry && callerCountry !== 'US' ? 12 : 0;
+  const voiceSyntheticScore =
+    typeof metadata.voiceSyntheticScore === 'number' ? metadata.voiceSyntheticScore : null;
+  const voiceAnalysis = metadata.voiceAnalysis ?? null;
+  const voiceMedian = voiceAnalysis?.chunkMedianFake ?? voiceSyntheticScore;
+  const voiceMax = voiceAnalysis?.chunkMaxFake ?? voiceSyntheticScore;
+  const inferredAlertBand =
+    voiceAnalysis?.alertBand ??
+    (voiceMedian != null
+      ? voiceMedian >= 0.93
+        ? 'high'
+        : voiceMedian >= 0.8
+        ? 'caution'
+        : 'none'
+      : 'none');
+  const voiceAlertBand: 'none' | 'caution' | 'high' = inferredAlertBand;
+  let voiceBoost = 0;
+  if (voiceAlertBand === 'high' && voiceMedian !== null) {
+    voiceBoost = Math.min(30, voiceMedian * 40);
+  } else if (voiceAlertBand === 'caution' && voiceMedian !== null) {
+    voiceBoost = Math.min(15, voiceMedian * 30);
+  }
+  const voiceHardOverride = voiceAlertBand === 'high' && (voiceMax ?? 0) >= 0.97;
   const heuristic = heuristicBoosts(normalized);
   const actionBoost = heuristic.actionBoost;
 
@@ -1991,6 +2019,9 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         investmentHits: 0,
         medicalHits: 0,
         deviceHits: 0,
+        voiceSyntheticScore,
+        voiceBoost,
+        voiceAnalysis: metadata.voiceAnalysis ?? null,
       },
     } satisfies FraudAnalysis;
   }
@@ -2039,6 +2070,9 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         investmentHits: heuristic.investmentHits,
         medicalHits: heuristic.medicalHits,
         deviceHits: heuristic.deviceHits,
+        voiceSyntheticScore,
+        voiceBoost,
+        voiceAnalysis: metadata.voiceAnalysis ?? null,
       },
     } satisfies FraudAnalysis;
   }
@@ -2056,7 +2090,8 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
     durationBoost +
     localeBoost +
     regionMismatchBoost +
-    heuristic.actionBoost;
+    heuristic.actionBoost +
+    voiceBoost;
 
   const criticalKeywordHits = matches.filter((kw) => CRITICAL_KEYWORDS.has(kw.phrase)).length;
   const taxKeywordHits = matches.filter((kw) => TAX_SCAM_TERMS.includes(kw.phrase)).length;
@@ -2126,11 +2161,20 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   if (piiHarvestHits >= 2 && actionBoost > 0) {
     score = Math.max(score, 85);
   }
+  if (voiceAlertBand === 'high') {
+    score = Math.max(score, 90);
+  } else if (voiceAlertBand === 'caution') {
+    score = Math.max(score, 75);
+  }
+  if (voiceHardOverride) {
+    score = Math.max(score, 95);
+  }
 
   // If hard-block terms or tax+payment patterns hit, force alert-required signal.
   const hardBlockOverride =
     heuristic.hardBlockHits >= 1 ||
-    (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment')));
+    (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment'))) ||
+    voiceHardOverride;
   const techSupportOverride = techSupportHits >= 1;
 
   const finalScore = Math.min(100, Math.round(score));
@@ -2176,6 +2220,9 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         investmentHits: heuristic.investmentHits,
         medicalHits: heuristic.medicalHits,
         deviceHits: heuristic.deviceHits,
+        voiceSyntheticScore,
+        voiceBoost,
+        voiceAnalysis: metadata.voiceAnalysis ?? null,
       },
     override: hardBlockOverride || techSupportOverride,
   };

@@ -6,6 +6,7 @@ const callsRouter = Router();
 
 callsRouter.get('/:callId/recording-url', CallsController.getRecordingUrl);
 callsRouter.patch('/:callId/feedback', CallsController.submitFeedback);
+callsRouter.patch('/:callId/voice-feedback', CallsController.submitVoiceFeedback);
 callsRouter.delete('/:callId', CallsController.deleteCall);
 
 export default callsRouter;

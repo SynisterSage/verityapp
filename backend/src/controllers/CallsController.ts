@@ -21,6 +21,7 @@ async function getAuthenticatedUserId(req: Request) {
 }
 
 const allowedStatuses = new Set(['marked_safe', 'marked_fraud', 'reviewed', 'archived']);
+const allowedVoiceFeedback = new Set(['real_voice']);
 
 type AuthorizedCallRow = {
   profile_id: string | null;
@@ -256,6 +257,42 @@ async function submitFeedback(req: Request, res: Response) {
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
 }
 
+async function submitVoiceFeedback(req: Request, res: Response) {
+  const { callId } = req.params;
+  if (!callId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing callId' });
+  }
+
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { feedback } = req.body as { feedback?: string };
+  if (!feedback || !allowedVoiceFeedback.has(feedback)) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid voice feedback' });
+  }
+
+  const access = await authorizeCallAccess(callId, userId);
+  if ('status' in access) {
+    return res.status(access.status).json({ error: access.message });
+  }
+
+  const { error: updateError } = await supabaseAdmin
+    .from('calls')
+    .update({
+      voice_feedback: feedback,
+    })
+    .eq('id', callId);
+
+  if (updateError) {
+    logger.err(updateError);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to save voice feedback' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
+}
+
 async function deleteCall(req: Request, res: Response) {
   const { callId } = req.params;
   if (!callId) {
@@ -288,5 +325,6 @@ async function deleteCall(req: Request, res: Response) {
 export default {
   getRecordingUrl,
   submitFeedback,
+  submitVoiceFeedback,
   deleteCall,
 };
