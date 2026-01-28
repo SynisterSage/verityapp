@@ -20,6 +20,7 @@ import { copy, copyFilesRec, exec, remove } from './common/utils';
     await copyFilesRec('./src', './dist', ['.ts']);
     await copy('./temp/config.js', './config.js');
     await copy('./temp/src', './dist');
+    await copyFilesRec('./voice-detector', './dist/voice-detector');
     await remove('./temp/');
   } catch (err) {
     logger.err(err);
