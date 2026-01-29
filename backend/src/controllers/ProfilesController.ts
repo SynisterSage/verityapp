@@ -17,6 +17,7 @@ function sanitizeProfileRow(row: Record<string, any>): Record<string, any> {
   const sanitized = {
     ...row,
     has_passcode: Boolean(row.pin_hash ?? row.passcode_hash),
+    last_pin_update: row.pin_updated_at ?? null,
     pin_hash: undefined,
     passcode_hash: undefined,
     pin_salt: undefined,

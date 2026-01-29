@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
+  Keyboard,
   Linking,
   Modal,
   Pressable,
@@ -15,33 +17,45 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
+import { useFocusEffect } from '@react-navigation/native';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import { verifyPasscode } from '../../services/profile';
 import { supabase } from '../../services/supabase';
+import { authorizedFetch } from '../../services/backend';
 import { BlurView } from 'expo-blur';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 
-type ModalAction = 'password' | null;
+type ModalAction = 'password' | 'pin' | null;
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return 'Never updated';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Unknown';
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
 
 export default function SecurityScreen() {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
-  const { activeProfile, canManageProfile } = useProfile();
+  const { activeProfile, canManageProfile, refreshProfiles } = useProfile();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createSecurityStyles(theme), [theme]);
   const placeholderColor = useMemo(
     () => withOpacity(theme.colors.textMuted, 0.65),
     [theme.colors.textMuted]
   );
-
-  const provider = session?.user?.app_metadata?.provider ?? 'email';
-  const isEmailProvider = provider === 'email';
-
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -50,8 +64,45 @@ export default function SecurityScreen() {
   const [modalAction, setModalAction] = useState<ModalAction>(null);
   const [pinValue, setPinValue] = useState('');
   const [pinError, setPinError] = useState('');
+  const [pinStep, setPinStep] = useState<'verify' | 'update'>('verify');
+  const [newPinValue, setNewPinValue] = useState('');
+  const [confirmNewPinValue, setConfirmNewPinValue] = useState('');
+  const [changePinError, setChangePinError] = useState('');
+  const [pinChangeSuccess, setPinChangeSuccess] = useState('');
   const [isPinVerifying, setIsPinVerifying] = useState(false);
+  const [isChangingPin, setIsChangingPin] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const successAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (pinChangeSuccess) {
+      successAnim.setValue(0);
+      Animated.timing(successAnim, {
+        toValue: 1,
+        duration: 320,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [pinChangeSuccess, successAnim]);
+
+  const provider = session?.user?.app_metadata?.provider ?? 'email';
+  useFocusEffect(
+    useCallback(() => {
+      if (activeProfile?.id) {
+        refreshProfiles();
+      }
+    }, [activeProfile?.id, refreshProfiles])
+  );
+  const isEmailProvider = provider === 'email';
 
   const clearFields = () => {
     setCurrentPassword('');
@@ -99,6 +150,21 @@ export default function SecurityScreen() {
     }
   };
 
+  const handleChangePinPress = () => {
+    if (!canManageProfile) {
+      setChangePinError('Only caretakers can update the passcode.');
+      return;
+    }
+    setModalAction('pin');
+    setPinStep('verify');
+    setPinValue('');
+    setPinError('');
+    setNewPinValue('');
+    setConfirmNewPinValue('');
+    setChangePinError('');
+    setPinChangeSuccess('');
+  };
+
   const handlePinSubmit = async () => {
     if (!modalAction || !activeProfile) return;
     if (!/^\d{6}$/.test(pinValue)) {
@@ -109,9 +175,14 @@ export default function SecurityScreen() {
     try {
       await verifyPasscode(activeProfile.id, pinValue);
       setPinError('');
-      setModalAction(null);
-      setPinValue('');
-      await runPasswordChange();
+      if (modalAction === 'password') {
+        setModalAction(null);
+        setPinValue('');
+        await runPasswordChange();
+      } else if (modalAction === 'pin') {
+        setPinStep('update');
+        setPinValue('');
+      }
     } catch (err: any) {
       const raw = err?.message ?? 'Passcode not recognized';
       const normalized =
@@ -124,11 +195,42 @@ export default function SecurityScreen() {
     }
   };
 
+  const handleSubmitNewPin = async () => {
+    if (!activeProfile) return;
+    if (!/^\d{6}$/.test(newPinValue)) {
+      setChangePinError('Enter a six-digit passcode.');
+      return;
+    }
+    if (newPinValue !== confirmNewPinValue) {
+      setChangePinError('Passcodes must match.');
+      return;
+    }
+    setIsChangingPin(true);
+    try {
+      await authorizedFetch(`/profiles/${activeProfile.id}/passcode`, {
+        method: 'POST',
+        body: JSON.stringify({ pin: newPinValue }),
+      });
+      await refreshProfiles();
+      setPinChangeSuccess('Safety PIN updated.');
+      setModalAction(null);
+    } catch (err: any) {
+      setChangePinError(err?.message || 'Failed to update passcode.');
+    } finally {
+      setIsChangingPin(false);
+    }
+  };
+
   const closeModal = () => {
     setModalAction(null);
     setPinValue('');
     setPinError('');
+    setNewPinValue('');
+    setConfirmNewPinValue('');
+    setChangePinError('');
+    setPinStep('verify');
     setIsPinVerifying(false);
+    setIsChangingPin(false);
   };
 
   const handleGoogleSettings = async () => {
@@ -218,6 +320,32 @@ export default function SecurityScreen() {
           <Text style={styles.footerLabel}>Security managed by Verity Protect.</Text>
         </View>
       )}
+
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>Change Safety PIN</Text>
+        <Text style={styles.cardHelper}>
+          Update the six-digit passcode that unlocks sensitive data and actions.
+        </Text>
+        {pinChangeSuccess ? (
+          <Animated.View style={[styles.successBanner, { opacity: successAnim }]}>
+            <Text style={styles.successText}>{pinChangeSuccess}</Text>
+          </Animated.View>
+        ) : null}
+        <TouchableOpacity
+          style={[styles.secondaryButton, !canManageProfile && styles.secondaryButtonDisabled]}
+          onPress={handleChangePinPress}
+          disabled={!canManageProfile}
+        >
+          <Text style={styles.secondaryText}>Change passcode</Text>
+          <Ionicons name="lock-closed-outline" size={18} color={theme.colors.text} />
+        </TouchableOpacity>
+        {!canManageProfile ? (
+          <Text style={styles.cardHelper}>Only caretakers can update the passcode.</Text>
+        ) : null}
+        <Text style={styles.lastUpdateText}>
+          Last updated {formatDateTime(activeProfile?.last_pin_update)}
+        </Text>
+      </View>
     </ScrollView>
 
       {isEmailProvider ? (
@@ -238,23 +366,72 @@ export default function SecurityScreen() {
       {modalAction ? (
         <Modal visible transparent animationType="fade" onRequestClose={closeModal}>
           <View style={styles.modalOverlay}>
-            <Pressable style={styles.modalBackdrop} onPress={closeModal}>
+            <Pressable
+              style={styles.modalBackdrop}
+              onPress={() => {
+                if (keyboardVisible) {
+                  Keyboard.dismiss();
+                  return;
+                }
+                closeModal();
+              }}
+            >
               <BlurView intensity={65} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.modalBlur} />
             </Pressable>
             <View style={styles.pinModal}>
-              <Text style={styles.pinTitle}>Confirm changes</Text>
-              <Text style={styles.pinSubtitle}>Enter your six-digit passcode to continue.</Text>
-              <TextInput
-                value={pinValue}
-                onChangeText={setPinValue}
-                keyboardType="number-pad"
-                placeholder="Passcode"
-                placeholderTextColor={placeholderColor}
-                style={styles.pinInput}
-                maxLength={6}
-                secureTextEntry
-              />
-              {pinError ? <Text style={styles.pinError}>{pinError}</Text> : null}
+              <Text style={styles.pinTitle}>
+                {modalAction === 'pin'
+                  ? pinStep === 'verify'
+                    ? 'Confirm Safety PIN'
+                    : 'Set new passcode'
+                  : 'Confirm changes'}
+              </Text>
+              <Text style={styles.pinSubtitle}>
+                {modalAction === 'pin'
+                  ? pinStep === 'verify'
+                    ? 'Enter your current six-digit passcode.'
+                    : 'Choose and confirm a new six-digit passcode.'
+                  : 'Enter your six-digit passcode to continue.'}
+              </Text>
+              {modalAction === 'pin' && pinStep === 'update' ? (
+                <>
+                  <TextInput
+                    value={newPinValue}
+                    onChangeText={setNewPinValue}
+                    keyboardType="number-pad"
+                    placeholder="New passcode"
+                    placeholderTextColor={placeholderColor}
+                    style={styles.pinInput}
+                    maxLength={6}
+                    secureTextEntry
+                  />
+                  <TextInput
+                    value={confirmNewPinValue}
+                    onChangeText={setConfirmNewPinValue}
+                    keyboardType="number-pad"
+                    placeholder="Confirm passcode"
+                    placeholderTextColor={placeholderColor}
+                    style={styles.pinInput}
+                    maxLength={6}
+                    secureTextEntry
+                  />
+                  {changePinError ? <Text style={styles.pinError}>{changePinError}</Text> : null}
+                </>
+              ) : (
+                <>
+                  <TextInput
+                    value={pinValue}
+                    onChangeText={setPinValue}
+                    keyboardType="number-pad"
+                    placeholder="Passcode"
+                    placeholderTextColor={placeholderColor}
+                    style={styles.pinInput}
+                    maxLength={6}
+                    secureTextEntry
+                  />
+                  {pinError ? <Text style={styles.pinError}>{pinError}</Text> : null}
+                </>
+              )}
               <View style={styles.modalActions}>
                 <Pressable style={styles.modalButton} onPress={closeModal}>
                   <Text style={styles.modalButtonLabel}>Cancel</Text>
@@ -263,12 +440,24 @@ export default function SecurityScreen() {
                   style={[
                     styles.modalButton,
                     styles.modalButtonPrimary,
-                    isPinVerifying && styles.modalButtonDisabled,
+                    (isPinVerifying || isChangingPin) && styles.modalButtonDisabled,
                   ]}
-                  onPress={handlePinSubmit}
-                  disabled={isPinVerifying}
+                  onPress={
+                    modalAction === 'pin' && pinStep === 'update'
+                      ? handleSubmitNewPin
+                      : handlePinSubmit
+                  }
+                  disabled={isPinVerifying || isChangingPin}
                 >
-                  {isPinVerifying ? (
+                  {modalAction === 'pin' && pinStep === 'update' ? (
+                    isChangingPin ? (
+                      <ActivityIndicator color={theme.colors.surface} />
+                    ) : (
+                      <Text style={[styles.modalButtonLabel, styles.modalButtonLabelPrimary]}>
+                        Update PIN
+                      </Text>
+                    )
+                  ) : isPinVerifying ? (
                     <ActivityIndicator color={theme.colors.surface} />
                   ) : (
                     <Text style={[styles.modalButtonLabel, styles.modalButtonLabelPrimary]}>
@@ -354,6 +543,9 @@ const createSecurityStyles = (theme: AppTheme) =>
       justifyContent: 'space-between',
       paddingHorizontal: 20,
     },
+    secondaryButtonDisabled: {
+      opacity: 0.55,
+    },
     secondaryText: {
       fontSize: 16,
       fontWeight: '600',
@@ -423,7 +615,7 @@ const createSecurityStyles = (theme: AppTheme) =>
       borderRadius: 16,
       padding: 14,
       fontSize: 18,
-      letterSpacing: 6,
+      letterSpacing: 3,
       color: theme.colors.text,
       backgroundColor: theme.colors.surfaceAlt,
       textAlign: 'center',
@@ -459,5 +651,17 @@ const createSecurityStyles = (theme: AppTheme) =>
     },
     modalButtonLabelPrimary: {
       color: theme.colors.surface,
+    },
+    successBanner: {
+      paddingVertical: 6,
+      paddingHorizontal: 14,
+      backgroundColor: withOpacity(theme.colors.success, 0.12),
+      borderRadius: 16,
+      marginBottom: 6,
+    },
+    lastUpdateText: {
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      marginTop: 6,
     },
   });

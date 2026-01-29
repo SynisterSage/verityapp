@@ -37,6 +37,7 @@ export type Profile = {
   auto_trust_on_safe?: boolean | null;
   auto_block_on_fraud?: boolean | null;
   created_at: string;
+  last_pin_update?: string | null;
 };
 
 export type ProfileMembership = {
