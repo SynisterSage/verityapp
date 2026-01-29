@@ -21,6 +21,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
+import type { Profile } from '../../context/ProfileContext';
 import { verifyPasscode } from '../../services/profile';
 import { supabase } from '../../services/supabase';
 import { authorizedFetch } from '../../services/backend';
@@ -48,7 +49,7 @@ const formatDateTime = (value?: string | null) => {
 export default function SecurityScreen() {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
-  const { activeProfile, canManageProfile, refreshProfiles } = useProfile();
+  const { activeProfile, canManageProfile, setActiveProfile } = useProfile();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createSecurityStyles(theme), [theme]);
   const placeholderColor = useMemo(
@@ -95,12 +96,41 @@ export default function SecurityScreen() {
   }, [pinChangeSuccess, successAnim]);
 
   const provider = session?.user?.app_metadata?.provider ?? 'email';
+  const [lastPinUpdate, setLastPinUpdate] = useState<string | null>(activeProfile?.last_pin_update ?? null);
+  useEffect(() => {
+    setLastPinUpdate(activeProfile?.last_pin_update ?? null);
+  }, [activeProfile?.last_pin_update]);
+
+  const fetchProfileDetails = useCallback(async () => {
+    if (!activeProfile?.id) {
+      return null;
+    }
+    const data = (await authorizedFetch(`/profiles/${activeProfile.id}`)) as {
+      profile?: Profile;
+    };
+    return data.profile ?? null;
+  }, [activeProfile?.id]);
+
   useFocusEffect(
     useCallback(() => {
-      if (activeProfile?.id) {
-        refreshProfiles();
-      }
-    }, [activeProfile?.id, refreshProfiles])
+      let cancelled = false;
+      const load = async () => {
+        try {
+          const profile = await fetchProfileDetails();
+          if (cancelled || !profile) {
+            return;
+          }
+          setActiveProfile(profile);
+          setLastPinUpdate(profile.last_pin_update ?? null);
+        } catch (err) {
+          console.warn('Failed to refresh PIN timestamp', err);
+        }
+      };
+      load();
+      return () => {
+        cancelled = true;
+      };
+    }, [fetchProfileDetails, setActiveProfile])
   );
   const isEmailProvider = provider === 'email';
 
@@ -211,7 +241,13 @@ export default function SecurityScreen() {
         method: 'POST',
         body: JSON.stringify({ pin: newPinValue }),
       });
-      await refreshProfiles();
+      const updatedProfile = await fetchProfileDetails();
+      if (updatedProfile) {
+        setActiveProfile(updatedProfile);
+        setLastPinUpdate(updatedProfile.last_pin_update ?? null);
+      } else {
+        setLastPinUpdate(new Date().toISOString());
+      }
       setPinChangeSuccess('Safety PIN updated.');
       setModalAction(null);
     } catch (err: any) {
@@ -321,30 +357,32 @@ export default function SecurityScreen() {
         </View>
       )}
 
-      <View style={styles.card}>
-        <Text style={styles.cardLabel}>Change Safety PIN</Text>
-        <Text style={styles.cardHelper}>
-          Update the six-digit passcode that unlocks sensitive data and actions.
-        </Text>
+      <View style={[styles.card, styles.pinCard]}>
+        <View style={styles.pinHeader}>
+          <Text style={styles.cardLabel}>Change Safety PIN</Text>
+          <Text style={[styles.cardHelper, styles.pinHelper]}>
+            Update the six-digit PIN that allows untrusted contacts to reach you.
+          </Text>
+        </View>
         {pinChangeSuccess ? (
-          <Animated.View style={[styles.successBanner, { opacity: successAnim }]}>
+          <Animated.View style={[styles.successBanner, styles.pinSuccessBadge, { opacity: successAnim }]}>
             <Text style={styles.successText}>{pinChangeSuccess}</Text>
           </Animated.View>
         ) : null}
-        <TouchableOpacity
-          style={[styles.secondaryButton, !canManageProfile && styles.secondaryButtonDisabled]}
-          onPress={handleChangePinPress}
-          disabled={!canManageProfile}
-        >
-          <Text style={styles.secondaryText}>Change passcode</Text>
-          <Ionicons name="lock-closed-outline" size={18} color={theme.colors.text} />
-        </TouchableOpacity>
-        {!canManageProfile ? (
-          <Text style={styles.cardHelper}>Only caretakers can update the passcode.</Text>
-        ) : null}
-        <Text style={styles.lastUpdateText}>
-          Last updated {formatDateTime(activeProfile?.last_pin_update)}
-        </Text>
+        <View style={styles.pinActions}>
+          <TouchableOpacity
+            style={[styles.secondaryButton, !canManageProfile && styles.secondaryButtonDisabled]}
+            onPress={handleChangePinPress}
+            disabled={!canManageProfile}
+          >
+            <Text style={styles.secondaryText}>Change passcode</Text>
+            <Ionicons name="lock-closed-outline" size={18} color={theme.colors.text} />
+          </TouchableOpacity>
+          {!canManageProfile ? (
+            <Text style={styles.cardHelper}>Only caretakers can update the passcode.</Text>
+          ) : null}
+        </View>
+        <Text style={styles.lastUpdateText}>Last updated {formatDateTime(lastPinUpdate)}</Text>
       </View>
     </ScrollView>
 
@@ -493,6 +531,9 @@ const createSecurityStyles = (theme: AppTheme) =>
       padding: 24,
       gap: 16,
       elevation: 18,
+    },
+    pinCard: {
+      gap: 12,
     },
     cardLabel: {
       fontSize: 18,
@@ -657,7 +698,20 @@ const createSecurityStyles = (theme: AppTheme) =>
       paddingHorizontal: 14,
       backgroundColor: withOpacity(theme.colors.success, 0.12),
       borderRadius: 16,
-      marginBottom: 6,
+      marginBottom: 8,
+    },
+    pinSuccessBadge: {
+      alignSelf: 'flex-start',
+    },
+    pinHeader: {
+      gap: 4,
+    },
+    pinHelper: {
+      marginTop: 2,
+      lineHeight: 20,
+    },
+    pinActions: {
+      gap: 6,
     },
     lastUpdateText: {
       fontSize: 12,
