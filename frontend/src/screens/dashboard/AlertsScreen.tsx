@@ -449,13 +449,13 @@ const loadMemberNames = useCallback(async () => {
   const circleActivity = useMemo<CircleActivity[]>(() => {
     const now = Date.now();
     const window = 1000 * 60 * 60 * 24; // last 24h
-    return alerts
-      .filter((alert) => alert.processed && new Date(alert.created_at).getTime() >= now - window)
-      .sort(
-        (a, b) =>
-          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    const cutoff = now - window;
+
+    const processedActivities = alerts
+      .filter(
+        (alert) =>
+          alert.processed && new Date(alert.created_at).getTime() >= cutoff
       )
-      .slice(0, 2)
       .map((alert) => {
         const callerNumber =
           (alert.payload?.callerNumber as string | undefined) ||
@@ -479,17 +479,43 @@ const loadMemberNames = useCallback(async () => {
         const actionLabel =
           alert.feedback_status === 'marked_safe' ? 'Marked safe' : 'Flagged as fraud';
         const description = `${actionLabel.toLowerCase()} ${suspiciousCaller ?? 'this caller'}.`;
-        const timestamp = new Date(alert.created_at).toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-        });
+        const timestamp = formatAlertTime(alert.created_at);
         return {
           id: alert.id,
           label: handlerName,
           description,
           timestamp,
+          order: new Date(alert.created_at).getTime(),
         };
       });
+
+    const pinChangeActivities = alerts
+      .filter(
+        (alert) =>
+          alert.alert_type === 'pin_change' &&
+          new Date(alert.created_at).getTime() >= cutoff
+      )
+      .map((alert) => {
+        const actorId = alert.payload?.actor_user_id as string | undefined;
+        const label =
+          (actorId && memberNames[actorId]) ??
+          alert.payload?.actor_label ??
+          'Circle member';
+        const description = alert.payload?.message ?? 'Updated the Safety PIN.';
+        const timestamp = formatAlertTime(alert.created_at);
+        return {
+          id: `${alert.id}-pin`,
+          label,
+          description,
+          timestamp,
+          order: new Date(alert.created_at).getTime(),
+        };
+      });
+
+    const combined = [...pinChangeActivities, ...processedActivities].sort(
+      (a, b) => b.order - a.order
+    );
+    return combined.slice(0, 2).map(({ order, ...rest }) => rest);
   }, [alerts, callNumberMap, contactNames, memberNames]);
 
   const handleDelete = useCallback(async (alertId: string) => {

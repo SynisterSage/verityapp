@@ -365,23 +365,23 @@ export default function SecurityScreen() {
           </Text>
         </View>
         {pinChangeSuccess ? (
-          <Animated.View style={[styles.successBanner, styles.pinSuccessBadge, { opacity: successAnim }]}>
-            <Text style={styles.successText}>{pinChangeSuccess}</Text>
+          <Animated.View
+            style={[styles.successBanner, styles.pinSuccessBadge, { opacity: successAnim }]}
+          >
+            <Text style={[styles.successText, styles.successTextBadge]}>{pinChangeSuccess}</Text>
           </Animated.View>
         ) : null}
-        <View style={styles.pinActions}>
-          <TouchableOpacity
-            style={[styles.secondaryButton, !canManageProfile && styles.secondaryButtonDisabled]}
-            onPress={handleChangePinPress}
-            disabled={!canManageProfile}
-          >
-            <Text style={styles.secondaryText}>Change passcode</Text>
-            <Ionicons name="lock-closed-outline" size={18} color={theme.colors.text} />
-          </TouchableOpacity>
-          {!canManageProfile ? (
-            <Text style={styles.cardHelper}>Only caretakers can update the passcode.</Text>
-          ) : null}
-        </View>
+        <TouchableOpacity
+          style={[styles.secondaryButton, !canManageProfile && styles.secondaryButtonDisabled]}
+          onPress={handleChangePinPress}
+          disabled={!canManageProfile}
+        >
+          <Text style={styles.secondaryText}>Change passcode</Text>
+          <Ionicons name="lock-closed-outline" size={18} color={theme.colors.text} />
+        </TouchableOpacity>
+        {!canManageProfile ? (
+          <Text style={styles.cardHelper}>Only caretakers can update the passcode.</Text>
+        ) : null}
         <Text style={styles.lastUpdateText}>Last updated {formatDateTime(lastPinUpdate)}</Text>
       </View>
     </ScrollView>
@@ -533,7 +533,8 @@ const createSecurityStyles = (theme: AppTheme) =>
       elevation: 18,
     },
     pinCard: {
-      gap: 12,
+      gap: 10,
+      paddingBottom: 18,
     },
     cardLabel: {
       fontSize: 18,
@@ -617,6 +618,10 @@ const createSecurityStyles = (theme: AppTheme) =>
       color: theme.colors.success,
       fontSize: 13,
       marginTop: 4,
+    },
+    successTextBadge: {
+      marginTop: 0,
+      textAlign: 'center',
     },
     modalOverlay: {
       ...StyleSheet.absoluteFillObject,
@@ -709,9 +714,7 @@ const createSecurityStyles = (theme: AppTheme) =>
     pinHelper: {
       marginTop: 2,
       lineHeight: 20,
-    },
-    pinActions: {
-      gap: 6,
+      maxWidth: '88%',
     },
     lastUpdateText: {
       fontSize: 12,

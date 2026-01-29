@@ -6,6 +6,7 @@ import { hashPasscode, verifyCurrentPasscode, verifyLegacyPasscode } from '@src/
 import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { generateUniqueShortCode } from '@src/common/helpers/invite';
+import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
 
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];
@@ -217,6 +218,32 @@ async function setPasscode(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update passcode' });
   }
 
+  try {
+    const { data: memberRow } = await supabaseAdmin
+      .from('profile_members')
+      .select('display_name')
+      .eq('profile_id', profileId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    const actorLabel =
+      memberRow?.display_name ??
+      (isCaretaker ? 'Circle owner' : 'Circle member');
+    const payload = {
+      actor_user_id: userId,
+      actor_role: isCaretaker ? 'caretaker' : 'member',
+      actor_label: actorLabel,
+      message: 'Updated the Safety PIN',
+    };
+    await supabaseAdmin.from('alerts').insert({
+      profile_id: profileId,
+      alert_type: 'pin_change',
+      status: 'pending',
+      payload,
+    });
+  } catch (alertError) {
+    logger.err(alertError);
+  }
+
   return res.status(HTTP_STATUS_CODES.Ok).json({ message: 'Passcode updated' });
 }
 
@@ -242,6 +269,15 @@ async function verifyPasscode(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
+  const clientIp = req.ip;
+  const currentLockState = await getPinLockState(profileId, clientIp);
+  if (currentLockState.locked) {
+    return res.status(HTTP_STATUS_CODES.TooManyRequests).json({
+      error: 'Too many passcode attempts. Try again later.',
+      lockedUntil: currentLockState.lockedUntil?.toISOString() ?? null,
+    });
+  }
+
   const { data: profileRow, error } = await supabaseAdmin
     .from('profiles')
     .select('pin_hash, pin_pepper_version, passcode_hash')
@@ -257,7 +293,16 @@ async function verifyPasscode(req: Request, res: Response) {
       (await verifyCurrentPasscode(pin, profileRow.pin_hash, profileRow.pin_pepper_version))) ||
     verifyLegacyPasscode(pin, profileRow.passcode_hash ?? null);
 
+  await recordPinAttempt(profileId, clientIp, isValidPin);
+
   if (!isValidPin) {
+    const updatedLockState = await getPinLockState(profileId, clientIp);
+    if (updatedLockState.locked) {
+      return res.status(HTTP_STATUS_CODES.TooManyRequests).json({
+        error: 'Too many passcode attempts. Try again later.',
+        lockedUntil: updatedLockState.lockedUntil?.toISOString() ?? null,
+      });
+    }
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Invalid passcode' });
   }
 
