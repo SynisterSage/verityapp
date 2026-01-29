@@ -35,9 +35,8 @@ export default function RecentCallCard({
   const { theme } = useTheme();
   const formattedCreatedAt = createdAt ? formatTimestamp(createdAt) : undefined;
   const riskStyles = getRiskStyles(fraudLevel);
-  const statusAccent = theme.colors.danger;
-  const badgeBackground = withOpacity(statusAccent, 0.25);
-  const badgeTextColor = statusAccent;
+  const badgeBackground = riskStyles.background;
+  const badgeTextColor = riskStyles.accent;
   const badgeText = (badgeLabel ?? fraudLevel ?? 'unknown').toUpperCase();
   const body = transcript
     ? transcript.length > maxLength

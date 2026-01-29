@@ -129,6 +129,26 @@ const formatAlertDateLabel = (value?: string | null) => {
   });
 };
 
+const ONE_DAY_MS = 1000 * 60 * 60 * 24;
+
+const formatRecencyLabel = (value?: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const delta = Date.now() - date.getTime();
+  if (delta >= ONE_DAY_MS) {
+    const days = Math.floor(delta / ONE_DAY_MS);
+    return `${days}d`;
+  }
+  return formatAlertTime(value);
+};
+
+const formatHandledTimestampLabel = (value?: string | null) => {
+  if (!value) return '';
+  const dateLabel = formatAlertDateLabel(value);
+  return dateLabel || formatAlertTime(value);
+};
+
 const formatTrustedContactName = (name?: string | null, relationship?: string | null) => {
   if (!name) return relationship ? relationship : 'Trusted contact';
   const trimmed = name.trim();
@@ -566,7 +586,7 @@ const loadMemberNames = useCallback(async () => {
                 categoryLabel="Security alert"
                 title={alert.risk_label ? `${alert.risk_label} detected` : 'Fraud detected'}
                 description={reason}
-                timestamp={formatAlertTime(alert.created_at)}
+                timestamp={formatRecencyLabel(alert.created_at)}
                 metaLabel={metaLabel}
                 scoreLabel={scoreLabel}
                 scoreColor={riskStyles.accent}
@@ -610,7 +630,7 @@ const loadMemberNames = useCallback(async () => {
                 categoryLabel="System shield"
                 title={alert.risk_label ?? 'System event'}
                 description={reason}
-                timestamp={formatAlertTime(alert.created_at)}
+                timestamp={formatRecencyLabel(alert.created_at)}
                 metaLabel={metaLabel}
                 actionLabel="View details"
                 iconName="shield-checkmark-outline"
@@ -662,7 +682,7 @@ const loadMemberNames = useCallback(async () => {
                 categoryLabel="Trusted circle"
                 title={resolvedName}
                 description={description}
-                timestamp={formatAlertTime(alert.created_at)}
+                timestamp={formatRecencyLabel(alert.created_at)}
                 metaLabel={statusLabel}
                 scoreLabel="Safe"
                 scoreColor={successColor}
@@ -776,9 +796,7 @@ const loadMemberNames = useCallback(async () => {
             const greyAccent = theme.colors.textDim;
             const greyBackground = withOpacity(greyAccent, 0.25);
             const handledTimestamp = alert.feedback_at ?? alert.created_at;
-            const handledDateLabel = formatAlertDateLabel(handledTimestamp);
-            const handledTime = handledTimestamp ? formatAlertTime(handledTimestamp) : '';
-            const timestamp = handledDateLabel && handledTime ? `${handledTime} · ${handledDateLabel}` : handledTime;
+            const timestamp = formatHandledTimestampLabel(handledTimestamp);
             const handlePress = () => {
               if (!alert.call_id) return;
               navigateToCallDetail(alert.call_id);
@@ -792,7 +810,7 @@ const loadMemberNames = useCallback(async () => {
                 categoryLabel="Handled alert"
                 title={alert.risk_label ? `${alert.risk_label} detected` : 'Handled alert'}
                  description={reason}
-                timestamp={timestamp || formatAlertTime(alert.created_at)}
+                timestamp={timestamp}
                  metaLabel={statusLabel}
                  scoreLabel={scoreLabel}
                 scoreColor={greyAccent}
@@ -856,13 +874,13 @@ const loadMemberNames = useCallback(async () => {
                   description={`${reason} • ${
                     callerName ? callerName : formatPhoneNumber(callerNumber)
                   }`}
-                  timestamp={formatAlertTime(item.created_at)}
-                metaLabel={statusLabel}
-                scoreLabel={scoreLabel}
-                scoreColor={riskStyles.accent}
-                iconName={iconName}
-                iconColor={riskStyles.accent}
-                stripColor={riskStyles.accent}
+                  timestamp={formatRecencyLabel(item.created_at)}
+                  metaLabel={statusLabel}
+                  scoreLabel={scoreLabel}
+                  scoreColor={riskStyles.accent}
+                  iconName={iconName}
+                  iconColor={riskStyles.accent}
+                  stripColor={riskStyles.accent}
                   actionLabel="View details"
                   muted={isHandledAlert(item)}
                   onPress={item.call_id ? handlePress : undefined}
