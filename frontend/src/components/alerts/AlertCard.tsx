@@ -47,14 +47,15 @@ export default function AlertCard({
   const accentColor = iconColor ?? theme.colors.accent;
   const iconBg = iconBackgroundColor ?? withOpacity(accentColor, 0.16);
   const stripBg = stripColor ?? accentColor;
-  const pillBackground = withOpacity(theme.colors.surface, 0.2);
-  const scoreBackground = scoreBackgroundColor ?? pillBackground;
-  const scoreTextColor = scoreColor ?? accentColor;
+  const pillBackground = scoreBackgroundColor ?? withOpacity(theme.colors.textDim, 0.12);
+  const scoreBackground = pillBackground;
+  const scoreTextColor = scoreColor ?? theme.colors.text;
   const mutedStyle = muted ? { opacity: 0.75 } : null;
   const cardBackground = theme.colors.surface;
   const cardBorderColor = withOpacity(theme.colors.text, 0.1);
-  const actionBackground = withOpacity(theme.colors.text, 0.08);
-  const viewButtonBackground = withOpacity(theme.colors.text, 0.12);
+  const metaBackground = theme.colors.surfaceAlt;
+  const actionBackground = withOpacity(theme.colors.textDim, 0.15);
+  const actionBorderColor = withOpacity(theme.colors.textDim, 0.3);
 
   return (
     <TouchableOpacity
@@ -70,49 +71,52 @@ export default function AlertCard({
     >
       <View style={[styles.leftStrip, { backgroundColor: stripBg }]} />
       <View style={styles.content}>
-        <View style={styles.headerRow}>
-          <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
-            <Ionicons name={iconName} size={16} color={accentColor} />
-          </View>
+      <View style={styles.topRow}>
+        <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+          <Ionicons name={iconName} size={16} color={accentColor} />
+        </View>
+        <View style={styles.topText}>
           <Text style={[styles.category, { color: theme.colors.textMuted }]}>
             {(categoryLabel ?? 'Alert').toUpperCase()}
           </Text>
-          <View style={styles.headerSpacer} />
-          <View style={styles.timeGroup}>
-            <Ionicons name="time-outline" size={12} color={theme.colors.textDim} />
-            <Text style={[styles.timestamp, { color: theme.colors.textDim }]}>{timestamp}</Text>
+          <Text style={[styles.timestamp, { color: theme.colors.textDim }]}>
+            {timestamp}
+          </Text>
+        </View>
+        {scoreLabel ? (
+          <View style={[styles.scoreBadge, { backgroundColor: scoreBackground }]}>
+            <Text style={[styles.scoreText, { color: scoreTextColor }]}>{scoreLabel.toUpperCase()}</Text>
           </View>
-        </View>
-        <View style={styles.titleRow}>
-          <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
-            {title}
-          </Text>
-          {scoreLabel ? (
-            <View style={[styles.scoreBadge, { backgroundColor: scoreBackground }]}>
-              <Text style={[styles.scoreText, { color: scoreTextColor }]}>{scoreLabel.toUpperCase()}</Text>
-            </View>
-          ) : null}
-        </View>
-        {description ? (
-          <Text style={[styles.description, { color: theme.colors.textMuted }]} numberOfLines={3}>
-            {description}
-          </Text>
         ) : null}
-        <View style={styles.footerRow}>
-          <View style={[styles.metaContainer, { backgroundColor: withOpacity(theme.colors.surface, 0.12) }]}>
-            <Text style={[styles.meta, { color: theme.colors.textDim }]} numberOfLines={1}>
-              {metaLabel?.toUpperCase() ?? 'STATUS'}
-            </Text>
-          </View>
-          {actionLabel ? (
-            <View style={[styles.actionWrapper, { backgroundColor: 'transparent' }]}>
-              <View style={[styles.actionButton, { backgroundColor: viewButtonBackground }]}>
-                <Text style={[styles.actionButtonText, { color: accentColor }]}>{actionLabel.toUpperCase()}</Text>
-                <Ionicons name={actionIcon} size={12} color={accentColor} style={styles.actionIcon} />
-              </View>
-            </View>
-          ) : null}
+      </View>
+      <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
+        {title}
+      </Text>
+      {description ? (
+        <Text style={[styles.description, { color: theme.colors.textMuted }]} numberOfLines={2}>
+          {description}
+        </Text>
+      ) : null}
+      <View style={styles.footerRow}>
+        <View style={[styles.metaBadge, { backgroundColor: metaBackground }]}>
+          <Text style={[styles.meta, { color: theme.colors.textDim }]}>
+            {metaLabel?.toUpperCase() ?? 'STATUS'}
+          </Text>
         </View>
+        {actionLabel ? (
+          <View
+            style={[
+              styles.actionButton,
+              { backgroundColor: actionBackground, borderColor: actionBorderColor },
+            ]}
+          >
+            <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>
+              {actionLabel.toUpperCase()}
+            </Text>
+            <Ionicons name={actionIcon} size={12} color={theme.colors.text} style={styles.actionIcon} />
+          </View>
+        ) : null}
+      </View>
       </View>
     </TouchableOpacity>
   );
@@ -149,43 +153,34 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   category: {
-    fontSize: 14,
-    letterSpacing: 0.2,
+    fontSize: 13,
+    letterSpacing: 0.4,
     fontWeight: '700',
     textTransform: 'uppercase',
   },
-  headerSpacer: {
-    flex: 1,
-  },
   timestamp: {
-    fontSize: 11,
+    fontSize: 12,
+    marginTop: 2,
   },
-  headerRow: {
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
     marginBottom: 6,
   },
-  timeGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
+  topText: {
+    flex: 1,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     letterSpacing: -0.02,
-    flex: 1,
   },
   scoreBadge: {
-    paddingVertical: 2,
+    paddingVertical: 4,
     paddingHorizontal: 12,
     borderRadius: 999,
-    marginLeft: 8,
+    marginLeft: 'auto',
   },
   scoreText: {
     fontSize: 10,
@@ -194,19 +189,24 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 15,
-    lineHeight: 22,
+    lineHeight: 20,
+    marginTop: 4,
   },
-  actionRow: {
+  footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: 12,
-    gap: 10,
   },
   meta: {
     fontSize: 12,
     letterSpacing: 0.2,
     fontWeight: '600',
+  },
+  metaBadge: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
   },
   actionButton: {
     flexDirection: 'row',
@@ -216,9 +216,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     gap: 6,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-        left: 10,
-
   },
   actionButtonText: {
     fontSize: 11,
@@ -228,28 +225,5 @@ const styles = StyleSheet.create({
   },
   actionIcon: {
     marginLeft: 2,
-  },
-  footerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 16,
-    marginHorizontal: -8,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  metaContainer: {
-    flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderTopLeftRadius: 20,
-    borderBottomLeftRadius: 20,
-  },
-  actionWrapper: {
-    borderTopRightRadius: 20,
-    borderBottomRightRadius: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    flexShrink: 0,
   },
 });

@@ -167,7 +167,7 @@ export default function SettingsScreen({
     [handleLogout]
   );
   const openSupport = useCallback(() => {
-    Linking.openURL('mailto:support@safecall.app').catch(() => null);
+    Linking.openURL('mailto:support@verityprotect.com').catch(() => null);
   }, []);
   const supportRow = useMemo<SettingsRowItem>(
     () => ({

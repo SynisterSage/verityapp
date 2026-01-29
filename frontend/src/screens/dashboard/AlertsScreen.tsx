@@ -53,6 +53,20 @@ type CircleActivity = {
   timestamp: string;
 };
 
+const capitalizeLabel = (value?: string | null) => {
+  if (!value) return '';
+  return value
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
+
+const formatDetectedTitle = (fallback: string, label?: string | null) => {
+  const capitalized = capitalizeLabel(label);
+  return capitalized ? `${capitalized} Detected` : fallback;
+};
+
 function formatReason(alert: AlertRow) {
   if (alert.payload?.reason) return alert.payload.reason;
   const keywords = alert.payload?.matchedKeywords as string[] | undefined;
@@ -584,7 +598,7 @@ const loadMemberNames = useCallback(async () => {
               <AlertCard
                 key={`priority-${alert.id}`}
                 categoryLabel="Security alert"
-                title={alert.risk_label ? `${alert.risk_label} detected` : 'Fraud detected'}
+                title={formatDetectedTitle('Fraud detected', alert.risk_label)}
                 description={reason}
                 timestamp={formatRecencyLabel(alert.created_at)}
                 metaLabel={metaLabel}
@@ -628,7 +642,7 @@ const loadMemberNames = useCallback(async () => {
               <AlertCard
                 key={`system-${alert.id}`}
                 categoryLabel="System shield"
-                title={alert.risk_label ?? 'System event'}
+                title={alert.risk_label ? capitalizeLabel(alert.risk_label) : 'System event'}
                 description={reason}
                 timestamp={formatRecencyLabel(alert.created_at)}
                 metaLabel={metaLabel}
@@ -808,7 +822,7 @@ const loadMemberNames = useCallback(async () => {
               <AlertCard
                 key={`handled-${alert.id}`}
                 categoryLabel="Handled alert"
-                title={alert.risk_label ? `${alert.risk_label} detected` : 'Handled alert'}
+                title={formatDetectedTitle('Handled alert', alert.risk_label)}
                  description={reason}
                 timestamp={timestamp}
                  metaLabel={statusLabel}
@@ -1000,34 +1014,36 @@ const loadMemberNames = useCallback(async () => {
                 },
               ]}
             >
-              <View style={styles.trayHandle} />
-              <Text style={styles.trayTitle}>Alert options</Text>
-              <Text style={styles.traySubtitle}>{trayAlert.risk_label ?? 'Handled alert'}</Text>
-              {trayHandledDisplay ? <Text style={styles.trayDetail}>{trayHandledDisplay}</Text> : null}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.trayAction,
-                  styles.trayDanger,
-                  pressed && styles.trayActionPressed,
-                  trayProcessing && styles.trayActionDisabled,
-                ]}
-                onPress={handleTrayDelete}
-                disabled={trayProcessing}
-              >
-                <Text style={[styles.trayActionText, styles.trayDangerText]}>{deleteActionLabel}</Text>
-                <Text style={styles.trayActionHint}>Removes the alert permanently.</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.trayAction,
-                  styles.trayCancel,
-                  pressed && styles.trayActionPressed,
-                ]}
-                onPress={hideTray}
-                disabled={trayProcessing}
-              >
-                <Text style={styles.trayCancelText}>Cancel</Text>
-              </Pressable>
+              <View style={styles.trayContent}>
+                <View style={styles.trayHandle} />
+                <Text style={styles.trayTitle}>Alert options</Text>
+                <Text style={styles.traySubtitle}>{trayAlert.risk_label ?? 'Handled alert'}</Text>
+                {trayHandledDisplay ? <Text style={styles.trayDetail}>{trayHandledDisplay}</Text> : null}
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.trayAction,
+                    styles.trayDanger,
+                    pressed && styles.trayActionPressed,
+                    trayProcessing && styles.trayActionDisabled,
+                  ]}
+                  onPress={handleTrayDelete}
+                  disabled={trayProcessing}
+                >
+                  <Text style={[styles.trayActionText, styles.trayDangerText]}>{deleteActionLabel}</Text>
+                  <Text style={styles.trayActionHint}>Removes the alert permanently.</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.trayAction,
+                    styles.trayCancel,
+                    pressed && styles.trayActionPressed,
+                  ]}
+                  onPress={hideTray}
+                  disabled={trayProcessing}
+                >
+                  <Text style={styles.trayCancelText}>Cancel</Text>
+                </Pressable>
+              </View>
             </Animated.View>
           )}
         </View>
@@ -1220,7 +1236,7 @@ const createAlertStyles = (theme: AppTheme) =>
       borderRadius: 30,
       backgroundColor: theme.colors.surface,
       paddingVertical: 24,
-      paddingHorizontal: 26,
+      paddingHorizontal: 0,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: withOpacity(theme.colors.text, 0.08),
       shadowColor: '#000',
@@ -1296,5 +1312,8 @@ const createAlertStyles = (theme: AppTheme) =>
       fontWeight: '600',
       color: theme.colors.textMuted,
       textAlign: 'center',
+    },
+    trayContent: {
+      paddingHorizontal: 30,
     },
   });

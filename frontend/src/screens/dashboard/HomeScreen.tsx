@@ -206,12 +206,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               : call.fraud_risk_level
               ? call.fraud_risk_level.toUpperCase()
               : 'CALL';
+          const badgeLevel =
+            feedback === 'marked_fraud'
+              ? 'critical'
+              : feedback === 'marked_safe'
+              ? 'low'
+              : call.fraud_risk_level ?? 'unknown';
           return {
             type: 'call' as const,
             id: call.id,
             created_at: call.created_at,
             label: call.caller_number ?? 'Unknown caller',
             badge: badgeLabel,
+            badgeLevel,
             callId: call.id,
           };
         }),

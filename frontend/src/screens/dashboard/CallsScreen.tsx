@@ -189,8 +189,18 @@ function CallRecordItem({
           )}
         </View>
         <View style={styles.callText}>
-          <Text style={[styles.callTitle, isMuted && styles.callTitleMuted]}>{title}</Text>
-          <Text style={[styles.callTimestamp, isMuted && styles.callTimestampMuted]}>
+          <Text
+            style={[styles.callTitle, isMuted && styles.callTitleMuted]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {title}
+          </Text>
+          <Text
+            style={[styles.callTimestamp, isMuted && styles.callTimestampMuted]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {timeLabel}
           </Text>
         </View>
@@ -664,55 +674,57 @@ const sections = useMemo<CallSection[]>(() => {
                 },
               ]}
             >
-              <View style={styles.trayHandle} />
-              <Text style={styles.trayTitle}>Call options</Text>
-              <Text style={styles.traySubtitle}>
-                {formatPhoneNumber(trayCall.caller_number, 'Recent call')}
-              </Text>
-              <Text style={styles.trayDetail}>
-                {formatTime(trayCall.created_at)}
-                {formatDateLabel(trayCall.created_at) ? ` · ${formatDateLabel(trayCall.created_at)}` : ''}
-              </Text>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.trayAction,
-                  pressed && styles.trayActionPressed,
-                  trayProcessing && styles.trayActionDisabled,
-                ]}
-                onPress={toggleArchiveCall}
-                disabled={trayProcessing}
-              >
-                <Text style={styles.trayActionText}>{primaryActionLabel}</Text>
-                <Text style={styles.trayActionHint}>
-                  {isTrayArchived
-                    ? 'Restores it to the main feed.'
-                    : 'Moves it to archived section.'}
+              <View style={styles.trayContent}>
+                <View style={styles.trayHandle} />
+                <Text style={styles.trayTitle}>Call options</Text>
+                <Text style={styles.traySubtitle}>
+                  {formatPhoneNumber(trayCall.caller_number, 'Recent call')}
                 </Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.trayAction,
-                  styles.trayDanger,
-                  pressed && styles.trayActionPressed,
-                  trayProcessing && styles.trayActionDisabled,
-                ]}
-                onPress={deleteCall}
-                disabled={trayProcessing}
-              >
-                <Text style={[styles.trayActionText, styles.trayDangerText]}>{deleteActionLabel}</Text>
-                <Text style={styles.trayActionHint}>Removes the call permanently.</Text>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.trayAction,
-                  styles.trayCancel,
-                  pressed && styles.trayActionPressed,
-                ]}
-                onPress={hideTray}
-                disabled={trayProcessing}
-              >
-                <Text style={styles.trayCancelText}>Cancel</Text>
-              </Pressable>
+                <Text style={styles.trayDetail}>
+                  {formatTime(trayCall.created_at)}
+                  {formatDateLabel(trayCall.created_at) ? ` · ${formatDateLabel(trayCall.created_at)}` : ''}
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.trayAction,
+                    pressed && styles.trayActionPressed,
+                    trayProcessing && styles.trayActionDisabled,
+                  ]}
+                  onPress={toggleArchiveCall}
+                  disabled={trayProcessing}
+                >
+                  <Text style={styles.trayActionText}>{primaryActionLabel}</Text>
+                  <Text style={styles.trayActionHint}>
+                    {isTrayArchived
+                      ? 'Restores it to the main feed.'
+                      : 'Moves it to archived section.'}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.trayAction,
+                    styles.trayDanger,
+                    pressed && styles.trayActionPressed,
+                    trayProcessing && styles.trayActionDisabled,
+                  ]}
+                  onPress={deleteCall}
+                  disabled={trayProcessing}
+                >
+                  <Text style={[styles.trayActionText, styles.trayDangerText]}>{deleteActionLabel}</Text>
+                  <Text style={styles.trayActionHint}>Removes the call permanently.</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.trayAction,
+                    styles.trayCancel,
+                    pressed && styles.trayActionPressed,
+                  ]}
+                  onPress={hideTray}
+                  disabled={trayProcessing}
+                >
+                  <Text style={styles.trayCancelText}>Cancel</Text>
+                </Pressable>
+              </View>
             </Animated.View>
           )}
         </View>
@@ -823,7 +835,7 @@ const createCallStyles = (theme: AppTheme) =>
     },
     callTitle: {
       color: theme.colors.text,
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: '700',
     },
     callTitleMuted: {
@@ -896,7 +908,7 @@ const createCallStyles = (theme: AppTheme) =>
       borderRadius: 30,
       backgroundColor: theme.colors.surface,
       paddingVertical: 24,
-      paddingHorizontal: 26,
+      paddingHorizontal: 0,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: withOpacity(theme.colors.text, 0.08),
       shadowColor: '#000',
@@ -972,5 +984,8 @@ const createCallStyles = (theme: AppTheme) =>
       fontSize: 15,
       fontWeight: '600',
       textAlign: 'center',
+    },
+    trayContent: {
+      paddingHorizontal: 30,
     },
   });
