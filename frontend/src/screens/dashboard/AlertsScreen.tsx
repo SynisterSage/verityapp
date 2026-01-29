@@ -107,6 +107,7 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
   const [callNumberMap, setCallNumberMap] = useState<Record<string, string>>({});
   const [memberNames, setMemberNames] = useState<Record<string, string>>({});
+  const isPinChangeAlert = useCallback((alert: AlertRow) => alert.alert_type === 'pin_change', []);
   const loadAlertsRef = useRef<((silent?: boolean) => Promise<void>) | null>(null);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const shimmer = useRef(new Animated.Value(0.6)).current;
@@ -425,6 +426,7 @@ const loadMemberNames = useCallback(async () => {
     return alerts.filter((alert) => {
       const riskLevel = (alert.risk_level ?? '').toLowerCase();
       return (
+        !isPinChangeAlert(alert) &&
         !alert.processed &&
         (highRiskLevels.has(riskLevel) ||
           (typeof alert.payload?.score === 'number' && alert.payload.score >= 80))
@@ -434,6 +436,7 @@ const loadMemberNames = useCallback(async () => {
   const shieldAlerts = useMemo(() => {
     return alerts.filter(
       (alert) =>
+        !isPinChangeAlert(alert) &&
         (alert.processed || alert.feedback_status === 'marked_safe') &&
         (alert.risk_label?.toLowerCase() === 'safe' ||
           alert.feedback_status === 'marked_safe' ||
@@ -443,8 +446,14 @@ const loadMemberNames = useCallback(async () => {
   const priorityIds = new Set(priorityAlerts.map((row) => row.id));
   const shieldIds = new Set(shieldAlerts.map((row) => row.id));
   const filteredAlerts = useMemo(
-    () => sortedAlerts.filter((alert) => !priorityIds.has(alert.id) && !shieldIds.has(alert.id)),
-    [sortedAlerts, priorityIds, shieldIds]
+    () =>
+      sortedAlerts.filter(
+        (alert) =>
+          !priorityIds.has(alert.id) &&
+          !shieldIds.has(alert.id) &&
+          !isPinChangeAlert(alert)
+      ),
+    [sortedAlerts, priorityIds, shieldIds, isPinChangeAlert]
   );
   const circleActivity = useMemo<CircleActivity[]>(() => {
     const now = Date.now();
@@ -552,6 +561,7 @@ const loadMemberNames = useCallback(async () => {
     return alerts
       .filter(
         (alert) =>
+          !isPinChangeAlert(alert) &&
           !priorityIds.has(alert.id) &&
           !shieldIds.has(alert.id) &&
           (alert.payload?.auto === true ||
@@ -567,7 +577,7 @@ const loadMemberNames = useCallback(async () => {
     return alerts
       .filter(
         (alert) =>
-          isHandledAlert(alert) &&
+          !isPinChangeAlert(alert) &&
           !priorityIds.has(alert.id) &&
           !systemHealthIds.has(alert.id)
       )

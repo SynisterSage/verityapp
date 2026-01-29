@@ -224,20 +224,30 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         }),
         ...alertRows.map((alert) => {
           const isTrusted = alert.alert_type === 'trusted';
+          const isPinChange = alert.alert_type === 'pin_change';
           const callerNumber = alert.payload?.callerNumber as string | undefined;
           const callerName = callerNumber ? contactNameMap[callerNumber] : '';
           const feedback = alert.call_id ? alertFeedbackMap.get(alert.call_id)?.feedback_status ?? '' : '';
           const label =
             isTrusted
               ? callerName || callerNumber || 'Trusted contact'
+              : isPinChange
+              ? 'Pin change'
               : feedback === 'marked_fraud'
               ? 'Fraud'
               : feedback === 'marked_safe'
               ? 'Safe'
               : (alert.risk_label ?? alert.payload?.riskLevel ?? 'alert').toString();
-          const badge = isTrusted ? 'TRUSTED' : label.toUpperCase();
+          const badge =
+            isPinChange
+              ? 'PIN CHANGE'
+              : isTrusted
+              ? 'TRUSTED'
+              : label.toUpperCase();
           const badgeLevel =
-            isTrusted
+            isPinChange
+              ? 'circle'
+              : isTrusted
               ? 'low'
               : feedback === 'marked_fraud'
               ? 'critical'
@@ -248,7 +258,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             type: 'alert' as const,
             id: alert.id,
             created_at: alert.created_at,
-            label: isTrusted ? 'Trusted call' : 'Fraud alert',
+            label: isTrusted ? 'Trusted call' : isPinChange ? 'Pin change' : 'Fraud alert',
             badge,
             badgeLevel,
           };

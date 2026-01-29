@@ -237,7 +237,7 @@ async function setPasscode(req: Request, res: Response) {
     await supabaseAdmin.from('alerts').insert({
       profile_id: profileId,
       alert_type: 'pin_change',
-      status: 'pending',
+      status: 'resolved',
       payload,
     });
   } catch (alertError) {

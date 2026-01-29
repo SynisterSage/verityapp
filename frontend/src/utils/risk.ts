@@ -1,7 +1,7 @@
 import { tokens } from '../theme/tokens';
 import { withOpacity } from './color';
 
-export type RiskSeverity = 'low' | 'medium' | 'high' | 'critical' | 'unknown';
+export type RiskSeverity = 'low' | 'medium' | 'high' | 'critical' | 'unknown' | 'circle';
 
 type RiskPalette = {
   [key in RiskSeverity]: {
@@ -39,6 +39,11 @@ const RISK_PALETTE: RiskPalette = {
     background: withOpacity(accent, 0.18),
     accent,
   },
+  circle: {
+    text: '#e6effc',
+    background: withOpacity(accent, 0.3),
+    accent,
+  },
 };
 
 function normalizeLevel(level?: string | null): RiskSeverity {
@@ -46,6 +51,9 @@ function normalizeLevel(level?: string | null): RiskSeverity {
     return 'unknown';
   }
   const normalized = level.toLowerCase();
+  if (normalized.includes('pin') || normalized.includes('circle')) {
+    return 'circle';
+  }
   if (normalized.includes('critical')) {
     return 'critical';
   }

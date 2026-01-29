@@ -1138,7 +1138,7 @@ const createCallDetailStyles = (theme: AppTheme) =>
       opacity: 0.6,
     },
     playButtonText: {
-      color: theme.colors.text,
+      color: theme.colors.surface,
       fontSize: 16,
       fontWeight: '600',
     },
