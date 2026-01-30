@@ -17,6 +17,7 @@ router.delete(PATHS.Profiles.Records, ProfilesController.clearProfileRecords);
 router.delete(PATHS.Profiles.Delete, ProfilesController.deleteProfile);
 router.post(PATHS.Profiles.PasscodeVerify, ProfilesController.verifyPasscode);
 router.post(PATHS.Profiles.Passcode, ProfilesController.setPasscode);
+router.post(PATHS.Profiles.Activity, ProfilesController.recordActivity);
 router.patch(PATHS.Profiles.Alerts, ProfilesController.updateAlertPrefs);
 router.post(PATHS.Profiles.Invites, ProfilesController.inviteMember);
 router.get(PATHS.Profiles.Invites, ProfilesController.listInvites);

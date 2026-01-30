@@ -298,7 +298,7 @@ const createSafePhrasesStyles = (theme: AppTheme) =>
       padding: 24,
       alignItems: 'center',
       marginBottom: 16,
-      backgroundColor: theme.colors.surfaceAlt,
+      backgroundColor: theme.colors.surface,
     },
     emptyIcon: {
       width: 40,

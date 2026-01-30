@@ -170,6 +170,22 @@ export default function SecurityScreen() {
       if (error) {
         throw error;
       }
+      if (activeProfile?.id) {
+        try {
+          await authorizedFetch(`/profiles/${activeProfile.id}/activity`, {
+            method: 'POST',
+            body: JSON.stringify({
+              alertType: 'security_password',
+              payload: {
+                message: 'Updated the account password.',
+                actor_label: session?.user?.email ?? 'Circle owner',
+              },
+            }),
+          });
+        } catch (err) {
+          console.warn('Failed to log password activity', err);
+        }
+      }
       Alert.alert('Saved', 'Your password has been updated.');
       setSuccessMessage('Password updated.');
       clearFields();
@@ -286,7 +302,10 @@ export default function SecurityScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingBottom: Math.max(insets.bottom, 32) + 20,
+            paddingBottom:
+              Math.max(insets.bottom, 32) +
+              20 +
+              (isEmailProvider ? 160 : 0),
             paddingTop: Math.max(insets.top, 12 + 0),
           },
         ]}

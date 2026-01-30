@@ -51,6 +51,7 @@ type CircleActivity = {
   label: string;
   description: string;
   timestamp: string;
+  alertRow: AlertRow;
 };
 
 const capitalizeLabel = (value?: string | null) => {
@@ -78,6 +79,14 @@ function formatReason(alert: AlertRow) {
 
 const highRiskLevels = new Set(['critical', 'high', 'medium']);
 const HANDLED_STATUSES = new Set(['acknowledged', 'resolved']);
+const CIRCLE_ALERT_TYPES = new Set([
+  'pin_change',
+  'circle_invite',
+  'security_password',
+  'safe_phrase_added',
+  'trusted_contact_added',
+  'blocked_caller_added',
+]);
 
 function isHandledByStatus(status?: string | null) {
   if (!status) return false;
@@ -107,7 +116,10 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
   const [callNumberMap, setCallNumberMap] = useState<Record<string, string>>({});
   const [memberNames, setMemberNames] = useState<Record<string, string>>({});
-  const isPinChangeAlert = useCallback((alert: AlertRow) => alert.alert_type === 'pin_change', []);
+  const isCircleActivityAlert = useCallback(
+    (alert: AlertRow) => CIRCLE_ALERT_TYPES.has(alert.alert_type ?? ''),
+    []
+  );
   const loadAlertsRef = useRef<((silent?: boolean) => Promise<void>) | null>(null);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const shimmer = useRef(new Animated.Value(0.6)).current;
@@ -414,6 +426,11 @@ const loadMemberNames = useCallback(async () => {
   const showSkeleton = loading && alerts.length === 0;
   const contentOpacity = showSkeleton ? 0 : 1;
   const accent = theme.colors.accent;
+  const newAlertsCount = useMemo(
+    () =>
+      alerts.filter((alert) => !isHandledAlert(alert) && !isCircleActivityAlert(alert)).length,
+    [alerts, isCircleActivityAlert]
+  );
   const sortedAlerts = useMemo(() => {
     const weight = (row: AlertRow) => (row.processed ? 1 : 0);
     return [...alerts].sort((a, b) => {
@@ -426,7 +443,7 @@ const loadMemberNames = useCallback(async () => {
     return alerts.filter((alert) => {
       const riskLevel = (alert.risk_level ?? '').toLowerCase();
       return (
-        !isPinChangeAlert(alert) &&
+        !isCircleActivityAlert(alert) &&
         !alert.processed &&
         (highRiskLevels.has(riskLevel) ||
           (typeof alert.payload?.score === 'number' && alert.payload.score >= 80))
@@ -436,7 +453,7 @@ const loadMemberNames = useCallback(async () => {
   const shieldAlerts = useMemo(() => {
     return alerts.filter(
       (alert) =>
-        !isPinChangeAlert(alert) &&
+        !isCircleActivityAlert(alert) &&
         (alert.processed || alert.feedback_status === 'marked_safe') &&
         (alert.risk_label?.toLowerCase() === 'safe' ||
           alert.feedback_status === 'marked_safe' ||
@@ -451,9 +468,9 @@ const loadMemberNames = useCallback(async () => {
         (alert) =>
           !priorityIds.has(alert.id) &&
           !shieldIds.has(alert.id) &&
-          !isPinChangeAlert(alert)
+          !isCircleActivityAlert(alert)
       ),
-    [sortedAlerts, priorityIds, shieldIds, isPinChangeAlert]
+    [sortedAlerts, priorityIds, shieldIds, isCircleActivityAlert]
   );
   const circleActivity = useMemo<CircleActivity[]>(() => {
     const now = Date.now();
@@ -495,13 +512,14 @@ const loadMemberNames = useCallback(async () => {
           description,
           timestamp,
           order: new Date(alert.created_at).getTime(),
+          alertRow: alert,
         };
       });
 
-    const pinChangeActivities = alerts
+    const circleActivities = alerts
       .filter(
         (alert) =>
-          alert.alert_type === 'pin_change' &&
+          CIRCLE_ALERT_TYPES.has(alert.alert_type ?? '') &&
           new Date(alert.created_at).getTime() >= cutoff
       )
       .map((alert) => {
@@ -510,18 +528,37 @@ const loadMemberNames = useCallback(async () => {
           (actorId && memberNames[actorId]) ??
           alert.payload?.actor_label ??
           'Circle member';
-        const description = alert.payload?.message ?? 'Updated the Safety PIN.';
+        let description =
+          alert.payload?.message ??
+          (alert.alert_type === 'circle_invite'
+            ? `Shared an invite link${alert.payload?.invite_role ? ` (role: ${alert.payload.invite_role})` : ''}.`
+            : alert.alert_type === 'security_password'
+            ? 'Updated the account password.'
+            : undefined);
+        if (!description) {
+          if (alert.alert_type === 'safe_phrase_added') {
+            description = `Added safe word "${alert.payload?.phrase ?? 'a phrase'}".`;
+          } else if (alert.alert_type === 'trusted_contact_added') {
+            const count = alert.payload?.added ?? 1;
+            description = `Added ${count} trusted contact${count === 1 ? '' : 's'}.`;
+          } else if (alert.alert_type === 'blocked_caller_added') {
+            description = `Blocked number ${alert.payload?.caller_number ?? 'a caller'}.`;
+          } else {
+            description = 'Updated the Safety PIN.';
+          }
+        }
         const timestamp = formatAlertTime(alert.created_at);
         return {
-          id: `${alert.id}-pin`,
+          id: `${alert.id}-circle`,
           label,
           description,
           timestamp,
           order: new Date(alert.created_at).getTime(),
+          alertRow: alert,
         };
       });
 
-    const combined = [...pinChangeActivities, ...processedActivities].sort(
+    const combined = [...circleActivities, ...processedActivities].sort(
       (a, b) => b.order - a.order
     );
     return combined.slice(0, 2).map(({ order, ...rest }) => rest);
@@ -561,7 +598,7 @@ const loadMemberNames = useCallback(async () => {
     return alerts
       .filter(
         (alert) =>
-          !isPinChangeAlert(alert) &&
+          !isCircleActivityAlert(alert) &&
           !priorityIds.has(alert.id) &&
           !shieldIds.has(alert.id) &&
           (alert.payload?.auto === true ||
@@ -577,7 +614,7 @@ const loadMemberNames = useCallback(async () => {
     return alerts
       .filter(
         (alert) =>
-          !isPinChangeAlert(alert) &&
+          !isCircleActivityAlert(alert) &&
           !priorityIds.has(alert.id) &&
           !systemHealthIds.has(alert.id)
       )
@@ -756,8 +793,17 @@ const loadMemberNames = useCallback(async () => {
       <View style={[styles.section, styles.circleSection]}>
         {renderSectionHeader('Circle activity')}
         <View style={styles.circleGroup}>
-          {circleActivity.map((activity) => (
-            <View key={activity.id} style={styles.circleCard}>
+        {circleActivity.map((activity) => (
+          <Pressable
+            key={activity.id}
+            onLongPress={() => showTray(activity.alertRow)}
+            android_ripple={{ color: withOpacity(theme.colors.text, 0.08) }}
+            style={({ pressed }) => [
+              styles.circleCardWrapper,
+              pressed && styles.circleCardPressed,
+            ]}
+          >
+            <View style={styles.circleCard}>
               <View style={[styles.circleAccentStrip, { backgroundColor: theme.colors.accent }]} />
               <View style={styles.circleCardContent}>
                 <View style={styles.circleHeaderRow}>
@@ -783,11 +829,12 @@ const loadMemberNames = useCallback(async () => {
                 </Text>
               </View>
             </View>
-          ))}
-        </View>
+          </Pressable>
+        ))}
       </View>
-    );
-  };
+    </View>
+  );
+};
 
   const showTray = useCallback(
     (alert: AlertRow) => {
@@ -975,6 +1022,39 @@ const loadMemberNames = useCallback(async () => {
       : trayHandledTimestamp
       ? formatAlertTime(trayHandledTimestamp)
       : '';
+  const circleTrayCopy = useMemo(() => {
+    if (!trayAlert || !CIRCLE_ALERT_TYPES.has(trayAlert.alert_type ?? '')) {
+      return { title: 'Alert options', subtitle: trayAlert?.risk_label ?? 'Handled alert', detail: trayHandledDisplay };
+    }
+    const actorLabel = trayAlert.payload?.actor_label ?? 'Circle member';
+    const displayTitle = 'Circle activity';
+    let detail = trayAlert.payload?.message ?? trayHandledDisplay;
+    switch (trayAlert.alert_type) {
+      case 'pin_change':
+        detail = trayAlert.payload?.message ?? 'Updated the Safety PIN.';
+        break;
+      case 'circle_invite':
+        detail =
+          trayAlert.payload?.message ??
+          `Shared an invite${trayAlert.payload?.invite_role ? ` for ${trayAlert.payload.invite_role}` : ''}.`;
+        break;
+      case 'security_password':
+        detail = trayAlert.payload?.message ?? 'Updated the account password.';
+        break;
+      case 'safe_phrase_added':
+        detail = trayAlert.payload?.message ?? `Added safe word "${trayAlert.payload?.phrase ?? ''}".`;
+        break;
+      case 'trusted_contact_added':
+        detail =
+          trayAlert.payload?.message ??
+          `Added ${trayAlert.payload?.added ?? 1} trusted contact${(trayAlert.payload?.added ?? 1) === 1 ? '' : 's'}.`;
+        break;
+      case 'blocked_caller_added':
+        detail = trayAlert.payload?.message ?? `Blocked number ${trayAlert.payload?.caller_number ?? ''}.`;
+        break;
+    }
+    return { title: displayTitle, subtitle: actorLabel, detail };
+  }, [trayAlert, trayHandledDisplay]);
   const isTrayVisible = isTrayMounted && Boolean(trayAlert);
 
   return (
@@ -983,7 +1063,10 @@ const loadMemberNames = useCallback(async () => {
       edges={[]}
     >
       <View style={styles.headerWrapper}>
-        <DashboardHeader title="Alerts" subtitle="Keep track of suspicious calls" />
+        <DashboardHeader
+          title="Alerts"
+          subtitle={`You have ${newAlertsCount} new alert${newAlertsCount === 1 ? '' : 's'}`}
+        />
       </View>
       <View style={styles.listWrapper}>
         <ScrollView
@@ -1052,9 +1135,11 @@ const loadMemberNames = useCallback(async () => {
             >
               <View style={styles.trayContent}>
                 <View style={styles.trayHandle} />
-                <Text style={styles.trayTitle}>Alert options</Text>
-                <Text style={styles.traySubtitle}>{trayAlert.risk_label ?? 'Handled alert'}</Text>
-                {trayHandledDisplay ? <Text style={styles.trayDetail}>{trayHandledDisplay}</Text> : null}
+                <Text style={styles.trayTitle}>{circleTrayCopy.title}</Text>
+                <Text style={styles.traySubtitle}>{circleTrayCopy.subtitle}</Text>
+                {circleTrayCopy.detail ? (
+                  <Text style={styles.trayDetail}>{circleTrayCopy.detail}</Text>
+                ) : null}
                 <Pressable
                   style={({ pressed }) => [
                     styles.trayAction,
@@ -1181,6 +1266,13 @@ const createAlertStyles = (theme: AppTheme) =>
       paddingLeft: 20,
       overflow: 'hidden',
       backgroundColor: theme.colors.surface,
+    },
+    circleCardWrapper: {
+      borderRadius: 20,
+      overflow: 'hidden',
+    },
+    circleCardPressed: {
+      opacity: 0.7,
     },
     circleAccentStrip: {
       position: 'absolute',

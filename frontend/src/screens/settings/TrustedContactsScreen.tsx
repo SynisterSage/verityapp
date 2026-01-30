@@ -143,6 +143,25 @@ export default function TrustedContactsScreen() {
     ],
     [theme.colors.success, theme.colors.danger]
   );
+  const relationshipColorMap = useMemo<Record<string, string>>(
+    () => ({
+      wife: theme.colors.accent,
+      husband: theme.colors.success,
+      son: theme.colors.warning,
+      daughter: theme.colors.accent,
+      grandchild: withOpacity(theme.colors.accent, 0.8),
+      friend: theme.colors.accent,
+      doctor: theme.colors.success,
+      neighbor: withOpacity(theme.colors.textMuted, 0.8),
+      'trusted safe contact': theme.colors.success,
+    }),
+    [
+      theme.colors.accent,
+      theme.colors.success,
+      theme.colors.warning,
+      theme.colors.textMuted,
+    ]
+  );
 
   const skeletonRows = useMemo(
     () => Array.from({ length: 3 }, (_, i) => `trusted-settings-skeleton-${i}`),
@@ -613,6 +632,10 @@ export default function TrustedContactsScreen() {
     contact.contact_name ?? contactMap[contact.caller_number]?.name ?? contact.caller_number;
   const getRelationshipLabel = (contact: TrustedContactRow) =>
     contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Trusted Safe Contact';
+  const getRelationshipColor = (label: string) => {
+    const normalized = label.trim().toLowerCase() || 'trusted safe contact';
+    return relationshipColorMap[normalized] ?? theme.colors.success;
+  };
   const safeList = useMemo(() => {
     const seen = new Set<string>();
     return trustedList.filter((contact) => {
@@ -681,7 +704,7 @@ export default function TrustedContactsScreen() {
             disabled={isImportDisabled}
           >
             <View style={styles.importIcon}>
-              <Ionicons name="person-add" size={24} color={theme.colors.surface} />
+              <Ionicons name="person-add" size={24} color={theme.colors.accent} />
             </View>
             <View style={styles.importText}>
               <Text style={styles.importTitle}>Import from Phone</Text>
@@ -762,27 +785,40 @@ export default function TrustedContactsScreen() {
             </View>
           ) : (
             <View style={styles.safeList}>
-              {safeList.map((contact) => (
-                <View key={contact.id} style={styles.listCard}>
-                  <View style={styles.identity}>
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>
-                        {getContactDisplayName(contact)?.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={styles.identityText}>
-                      <View style={styles.nameRow}>
-                      <Text style={styles.personName}>{getContactDisplayName(contact)}</Text>
-                        <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
+              {safeList.map((contact) => {
+                const relationshipLabel = getRelationshipLabel(contact);
+                const relationshipColor = getRelationshipColor(relationshipLabel);
+                return (
+                  <View key={contact.id} style={styles.listCard}>
+                    <View style={styles.identity}>
+                      <View
+                        style={[
+                          styles.avatar,
+                          { backgroundColor: withOpacity(relationshipColor, 0.18) },
+                        ]}
+                      >
+                        <Text
+                          style={[styles.avatarText, { color: relationshipColor }]}
+                        >
+                          {getContactDisplayName(contact)?.charAt(0).toUpperCase()}
+                        </Text>
                       </View>
-                      <Text style={styles.relationship}>{getRelationshipLabel(contact)}</Text>
+                      <View style={styles.identityText}>
+                        <View style={styles.nameRow}>
+                          <Text style={styles.personName}>{getContactDisplayName(contact)}</Text>
+                          <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
+                        </View>
+                      <View style={styles.relationshipBadge}>
+                        <Text style={styles.relationship}>{relationshipLabel}</Text>
+                      </View>
+                      </View>
                     </View>
+                    <TouchableOpacity onPress={() => openManageTray(contact)}>
+                      <Text style={styles.manageLabel}>Manage</Text>
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity onPress={() => openManageTray(contact)}>
-                    <Text style={styles.manageLabel}>Manage</Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
+                );
+              })}
             </View>
           )}
 
@@ -1002,7 +1038,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       backgroundColor: withOpacity(theme.colors.surface, 0.75),
     },
     importCardPressed: {
-      opacity: 0.85,
+      elevation: 4,
     },
     importIcon: {
       width: 48,
@@ -1112,7 +1148,6 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: withOpacity(theme.colors.accent, 0.16),
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1123,6 +1158,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
     },
     identityText: {
       gap: 4,
+      alignItems: 'flex-start',
     },
     nameRow: {
       flexDirection: 'row',
@@ -1157,6 +1193,11 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       color: theme.colors.textMuted,
       fontSize: 13,
       fontWeight: '600',
+      textAlign: 'left',
+    },
+    relationshipBadge: {
+      alignSelf: 'flex-start',
+      marginTop: 2,
     },
     manageLabel: {
       color: theme.colors.accent,

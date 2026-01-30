@@ -455,7 +455,8 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
           <Pressable
             style={({ pressed }) => [
               styles.importCard,
-              { opacity: pressed || importing ? 0.85 : 1 },
+              { opacity: importing ? 0.7 : 1 },
+              !importing && pressed && styles.importCardPressed,
             ]}
             onPress={handleImport}
             disabled={importing}
@@ -497,27 +498,36 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
               </Text>
             </View>
           ) : (
-            safeList.map((contact) => (
+          safeList.map((contact) => {
+            const relationshipLabel = getRelationshipLabel(contact);
+            const relationshipColor = theme.colors.accent;
+            return (
               <View key={contact.id} style={styles.listCard}>
                 <View style={styles.identity}>
-                  <View style={styles.avatar}>
-                    <Text style={styles.avatarText}>
+                  <View
+                    style={[
+                      styles.avatar,
+                      { backgroundColor: withOpacity(relationshipColor, 0.18) },
+                    ]}
+                  >
+                    <Text style={[styles.avatarText, { color: relationshipColor }]}>
                       {getContactDisplayName(contact).charAt(0).toUpperCase()}
                     </Text>
                   </View>
                   <View style={styles.identityText}>
                     <View style={styles.nameRow}>
                       <Text style={styles.personName}>{getContactDisplayName(contact)}</Text>
-                    <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
+                      <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
                     </View>
-                    <Text style={styles.relationship}>{getRelationshipLabel(contact)}</Text>
+                    <Text style={styles.relationship}>{relationshipLabel}</Text>
                   </View>
                 </View>
                 <TouchableOpacity onPress={() => openManageTray(contact)}>
                   <Text style={styles.manageLabel}>Manage</Text>
                 </TouchableOpacity>
               </View>
-            ))
+            );
+          })
           )}
 
           <HowItWorksCard items={helperItems} />
@@ -691,6 +701,14 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       gap: 12,
       marginBottom: 24,
     },
+    importCardPressed: {
+      borderColor: theme.colors.surface,
+      shadowColor: theme.colors.overlay,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: Platform.OS === 'ios' ? 0.12 : 0.25,
+      shadowRadius: 12,
+      elevation: 6,
+    },
     importIcon: {
       width: 48,
       height: 48,
@@ -738,7 +756,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: theme.colors.accent,
+      backgroundColor: theme.colors.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -749,6 +767,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
     },
     identityText: {
       gap: 4,
+      alignItems: 'flex-start',
     },
     nameRow: {
       flexDirection: 'row',
@@ -764,6 +783,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       color: theme.colors.textMuted,
       fontSize: 13,
       fontWeight: '600',
+      textAlign: 'left',
     },
     manageLabel: {
       color: theme.colors.accent,
@@ -774,10 +794,10 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
     emptyCard: {
       borderRadius: 28,
       borderWidth: 1,
-      borderColor: withOpacity(theme.colors.text, 0.05),
+      borderColor: theme.colors.border,
       borderStyle: 'dashed',
       padding: 24,
-      backgroundColor: theme.colors.surfaceAlt,
+      backgroundColor: theme.colors.surface,
       alignItems: 'center',
       marginBottom: 16,
       gap: 12,

@@ -32,6 +32,7 @@ const PATHS = {
     Passcode: '/:profileId/passcode',
     PasscodeVerify: '/:profileId/passcode/verify',
     Alerts: '/:profileId/alerts',
+    Activity: '/:profileId/activity',
     Invites: '/:profileId/invites',
     Invite: '/:profileId/invites/:inviteId',
     Members: '/:profileId/members',

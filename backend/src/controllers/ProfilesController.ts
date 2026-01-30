@@ -28,6 +28,25 @@ function sanitizeProfileRow(row: Record<string, any>): Record<string, any> {
   return sanitized;
 }
 
+async function insertCircleAlert({
+  profileId,
+  alertType,
+  payload = {},
+  status = 'resolved',
+}: {
+  profileId: string;
+  alertType: string;
+  payload?: Record<string, unknown>;
+  status?: string;
+}) {
+  await supabaseAdmin.from('alerts').insert({
+    profile_id: profileId,
+    alert_type: alertType,
+    status,
+    payload,
+  });
+}
+
 async function getAuthenticatedUserId(req: Request) {
   const authHeader = req.header('authorization') ?? '';
   const token = authHeader.toLowerCase().startsWith('bearer ')
@@ -234,10 +253,9 @@ async function setPasscode(req: Request, res: Response) {
       actor_label: actorLabel,
       message: 'Updated the Safety PIN',
     };
-    await supabaseAdmin.from('alerts').insert({
-      profile_id: profileId,
-      alert_type: 'pin_change',
-      status: 'resolved',
+    await insertCircleAlert({
+      profileId,
+      alertType: 'pin_change',
       payload,
     });
   } catch (alertError) {
@@ -307,6 +325,57 @@ async function verifyPasscode(req: Request, res: Response) {
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ valid: true });
+}
+
+async function recordActivity(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId } = req.params as { profileId: string };
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const { alertType, payload, status } = req.body as {
+    alertType?: string;
+    payload?: Record<string, unknown>;
+    status?: string;
+  };
+
+  if (!alertType) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing alertType' });
+  }
+
+  const isCaretaker = await userIsCaretaker(userId, profileId);
+  const isAdmin = await userHasRole(userId, profileId, 'admin');
+  if (!isCaretaker && !isAdmin) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const defaultLabel = isCaretaker ? 'Circle owner' : 'Circle member';
+  const enrichedPayload = {
+    actor_user_id: payload?.actor_user_id ?? userId,
+    actor_role: payload?.actor_role ?? (isCaretaker ? 'caretaker' : 'admin'),
+    actor_label: payload?.actor_label ?? defaultLabel,
+    ...(payload ?? {}),
+  };
+
+  try {
+    await insertCircleAlert({
+      profileId,
+      alertType,
+      payload: enrichedPayload,
+      status: status ?? 'resolved',
+    });
+    return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
+  } catch (err) {
+    logger.err(err);
+    return res
+      .status(HTTP_STATUS_CODES.InternalServerError)
+      .json({ error: 'Failed to record activity' });
+  }
 }
 
 async function updateAlertPrefs(req: Request, res: Response) {
@@ -685,6 +754,23 @@ async function inviteMember(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to create invite' });
   }
 
+  try {
+    await insertCircleAlert({
+      profileId,
+      alertType: 'circle_invite',
+      payload: {
+        actor_user_id: userId,
+        actor_role: 'caretaker',
+        actor_label: 'Circle owner',
+        invite_email: inviteEmail,
+        invite_role: memberRole,
+        message: `Shared an invite link for role ${memberRole}.`,
+      },
+    });
+  } catch (alertError) {
+    logger.err(alertError);
+  }
+
   return res.status(HTTP_STATUS_CODES.Ok).json({ invite: data, status: 'pending' });
 }
 
@@ -782,6 +868,7 @@ export default {
   createProfile,
   setPasscode,
   verifyPasscode,
+  recordActivity,
   updateAlertPrefs,
   updateProfile,
   getProfile,

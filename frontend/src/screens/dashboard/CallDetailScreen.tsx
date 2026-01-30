@@ -556,10 +556,10 @@ export default function CallDetailScreen({
   const intelligenceTitle = useMemo(() => {
     const score = callRow?.fraud_score ?? 0;
     if (score <= 10) {
-      return { title: 'Call verified', subtitle: 'Automatic screening, no concerns' };
+      return { title: 'Call verified', subtitle: 'Automatic screening, \nno concerns' };
     }
     if (score <= 35) {
-      return { title: 'Low risk', subtitle: 'Proceed with caution, monitor patterns' };
+      return { title: 'Low risk', subtitle: 'Proceed with caution, \nmonitor patterns' };
     }
     if (score <= 70) {
       return { title: 'Elevated risk', subtitle: 'Behaviors resemble known scams' };
