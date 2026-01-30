@@ -45,13 +45,11 @@ if (ENV.NodeEnv === NODE_ENVS.Dev) {
   app.use(morgan('dev'));
 }
 
-// Security
-if (ENV.NodeEnv === NODE_ENVS.Production) {
-  // eslint-disable-next-line n/no-process-env
-  if (!process.env.DISABLE_HELMET) {
-    app.use(helmet());
-  }
+const disableHelmet = process.env.DISABLE_HELMET === 'true';
+if (disableHelmet) {
+  throw new Error('DISABLE_HELMET is not supported; helmet middleware must stay enabled.');
 }
+app.use(helmet());
 
 // Add APIs, must be after middleware
 app.use(Paths._, apiLimiter, BaseRouter);

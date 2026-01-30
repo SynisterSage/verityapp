@@ -143,25 +143,7 @@ export default function TrustedContactsScreen() {
     ],
     [theme.colors.success, theme.colors.danger]
   );
-  const relationshipColorMap = useMemo<Record<string, string>>(
-    () => ({
-      wife: theme.colors.accent,
-      husband: theme.colors.success,
-      son: theme.colors.warning,
-      daughter: theme.colors.accent,
-      grandchild: withOpacity(theme.colors.accent, 0.8),
-      friend: theme.colors.accent,
-      doctor: theme.colors.success,
-      neighbor: withOpacity(theme.colors.textMuted, 0.8),
-      'trusted safe contact': theme.colors.success,
-    }),
-    [
-      theme.colors.accent,
-      theme.colors.success,
-      theme.colors.warning,
-      theme.colors.textMuted,
-    ]
-  );
+  const primaryRelationshipColor = theme.colors.accent;
 
   const skeletonRows = useMemo(
     () => Array.from({ length: 3 }, (_, i) => `trusted-settings-skeleton-${i}`),
@@ -632,10 +614,6 @@ export default function TrustedContactsScreen() {
     contact.contact_name ?? contactMap[contact.caller_number]?.name ?? contact.caller_number;
   const getRelationshipLabel = (contact: TrustedContactRow) =>
     contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Trusted Safe Contact';
-  const getRelationshipColor = (label: string) => {
-    const normalized = label.trim().toLowerCase() || 'trusted safe contact';
-    return relationshipColorMap[normalized] ?? theme.colors.success;
-  };
   const safeList = useMemo(() => {
     const seen = new Set<string>();
     return trustedList.filter((contact) => {
@@ -787,7 +765,7 @@ export default function TrustedContactsScreen() {
             <View style={styles.safeList}>
               {safeList.map((contact) => {
                 const relationshipLabel = getRelationshipLabel(contact);
-                const relationshipColor = getRelationshipColor(relationshipLabel);
+                const relationshipColor = primaryRelationshipColor;
                 return (
                   <View key={contact.id} style={styles.listCard}>
                     <View style={styles.identity}>

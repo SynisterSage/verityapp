@@ -2,6 +2,12 @@ import { Request, Response, NextFunction } from 'express';
 import twilio from 'twilio';
 
 const PUBLIC_API_URL = process.env.PUBLIC_API_URL?.replace(/\/+$/, '');
+const signatureValidationEnabled = process.env.TWILIO_VALIDATE_SIGNATURE === 'true';
+const isTestEnv = process.env.NODE_ENV === 'test';
+
+if (!signatureValidationEnabled && !isTestEnv) {
+  throw new Error('TWILIO_VALIDATE_SIGNATURE must be set to "true" in non-test environments.');
+}
 
 function getPublicBaseUrl(req: Request) {
   if (PUBLIC_API_URL) {
@@ -18,7 +24,7 @@ export default function validateTwilioSignature(
   res: Response,
   next: NextFunction
 ) {
-  const shouldValidate = process.env.TWILIO_VALIDATE_SIGNATURE === 'true';
+  const shouldValidate = signatureValidationEnabled;
   if (!shouldValidate) {
     return next();
   }
