@@ -426,11 +426,6 @@ const loadMemberNames = useCallback(async () => {
   const showSkeleton = loading && alerts.length === 0;
   const contentOpacity = showSkeleton ? 0 : 1;
   const accent = theme.colors.accent;
-  const newAlertsCount = useMemo(
-    () =>
-      alerts.filter((alert) => !isHandledAlert(alert) && !isCircleActivityAlert(alert)).length,
-    [alerts, isCircleActivityAlert]
-  );
   const sortedAlerts = useMemo(() => {
     const weight = (row: AlertRow) => (row.processed ? 1 : 0);
     return [...alerts].sort((a, b) => {
@@ -563,6 +558,11 @@ const loadMemberNames = useCallback(async () => {
     );
     return combined.slice(0, 2).map(({ order, ...rest }) => rest);
   }, [alerts, callNumberMap, contactNames, memberNames]);
+  const pendingAlertCount = useMemo(
+    () => alerts.filter((alert) => !isHandledAlert(alert)).length,
+    [alerts]
+  );
+  const newAlertsCount = pendingAlertCount + circleActivity.length;
 
   const handleDelete = useCallback(async (alertId: string) => {
     try {
@@ -1198,6 +1198,7 @@ const createAlertStyles = (theme: AppTheme) =>
       paddingTop: 0,
     },
     scrollContent: {
+      flexGrow: 1,
       paddingBottom: 120,
       paddingTop: 12,
       paddingHorizontal: 0,

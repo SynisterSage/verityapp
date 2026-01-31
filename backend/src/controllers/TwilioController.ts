@@ -562,6 +562,21 @@ async function recordingReady(req: Request, res: Response) {
       );
     }
     const { text, confidence } = await transcribeWavBuffer(recordingBuffer);
+    let safePhraseMatches: string[] = [];
+    if (text) {
+      const { data: safeRows, error: safeError } = await supabaseAdmin
+        .from('fraud_safe_phrases')
+        .select('phrase')
+        .eq('profile_id', profile.id);
+      if (safeError) {
+        logger.err(safeError);
+      } else {
+        safePhraseMatches = matchPhrases(
+          text,
+          safeRows?.map((row) => row.phrase) ?? []
+        );
+      }
+    }
     const fraudThreshold =
       typeof profile.alert_threshold_score === 'number'
         ? profile.alert_threshold_score
@@ -576,6 +591,7 @@ async function recordingReady(req: Request, res: Response) {
           repeatCallCount: previousCalls,
           voiceSyntheticScore: voiceResult?.score ?? null,
           voiceAnalysis: voiceResult ?? undefined,
+          safePhraseMatches,
         })
       : null;
     let fraudScore = fraudResult?.score ?? null;
@@ -625,19 +641,11 @@ async function recordingReady(req: Request, res: Response) {
     }
 
     if (text && fraudNotes) {
-      const { data: safeRows } = await supabaseAdmin
-        .from('fraud_safe_phrases')
-        .select('phrase')
-        .eq('profile_id', profile.id);
-      const safeMatches = matchPhrases(
-        text,
-        safeRows?.map((row) => row.phrase) ?? []
-      );
       const dampening =
         typeof fraudScore === 'number'
-          ? Math.min(20, safeMatches.length * 8)
+          ? Math.min(20, safePhraseMatches.length * 8)
           : 0;
-      fraudNotes.safePhraseMatches = safeMatches;
+      fraudNotes.safePhraseMatches = safePhraseMatches;
       fraudNotes.safePhraseDampening = dampening;
       if (typeof fraudScore === 'number' && dampening > 0) {
         fraudScore = Math.max(0, fraudScore - dampening);

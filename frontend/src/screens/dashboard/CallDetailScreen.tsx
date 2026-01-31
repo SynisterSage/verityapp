@@ -26,20 +26,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { emitCallUpdated } from '../../utils/callEvents';
 import { getRiskStyles } from '../../utils/risk';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
-
-type FraudNotes = {
-  safePhraseMatches?: string[];
-};
-
-type VoiceAnalysis = {
-  rawOutput?: string;
-  chunkCount?: number | null;
-  chunkMedianFake?: number | null;
-  chunkMaxFake?: number | null;
-  highChunkCount?: number | null;
-  highChunkRatio?: number | null;
-  alertBand?: 'none' | 'caution' | 'high';
-};
+import type { FraudNotes, VoiceAnalysis } from '../../types/fraud';
 
 type CallRow = {
   id: string;
@@ -610,6 +597,62 @@ export default function CallDetailScreen({
     callRow?.fraud_score != null ? `${Math.round(callRow.fraud_score)}%` : '—';
   const riskLevelLabel = (callRow?.fraud_risk_level ?? 'Unknown').toUpperCase();
   const keywordTags = callRow?.fraud_keywords?.slice(0, 4) ?? [];
+  const detectionTags = useMemo(() => {
+    const notes = callRow?.fraud_notes;
+    if (!notes) {
+      return [];
+    }
+    const tags: string[] = [];
+    const giftCardHits = notes.giftCardHits ?? 0;
+    const grandchildHits = notes.grandchildHits ?? 0;
+    const sweepstakesHits = notes.sweepstakesHits ?? 0;
+    const romanceHits = notes.romanceHits ?? 0;
+    const jobLoanHits = notes.jobLoanHits ?? 0;
+    const emailHits = notes.emailHits ?? 0;
+    const medicalScamHits = notes.medicalScamHits ?? 0;
+    const utilityHits = notes.utilityHits ?? 0;
+    const charityHits = notes.charityHits ?? 0;
+    const familyEmergencyHits = notes.familyEmergencyHits ?? 0;
+    const governmentImpersonationHits = notes.governmentImpersonationHits ?? 0;
+    const techSupportHits = notes.techSupportHits ?? 0;
+    if (giftCardHits > 0) {
+      tags.push('Gift card request');
+    }
+    if (grandchildHits > 0) {
+      tags.push('Grandchild scam');
+    }
+    if (sweepstakesHits > 0) {
+      tags.push('Sweepstakes/prize');
+    }
+    if (romanceHits > 0) {
+      tags.push('Romance scam');
+    }
+    if (jobLoanHits > 0) {
+      tags.push('Job/loan advance');
+    }
+    if (emailHits > 0) {
+      tags.push('Email/phishing');
+    }
+    if (medicalScamHits > 0) {
+      tags.push('Medical/insurance');
+    }
+    if (utilityHits > 0) {
+      tags.push('Utility/collections');
+    }
+    if (charityHits > 0) {
+      tags.push('Charity/donation');
+    }
+    if (familyEmergencyHits > 0) {
+      tags.push('Family emergency');
+    }
+    if (governmentImpersonationHits > 0) {
+      tags.push('Government impersonation');
+    }
+    if (techSupportHits > 0) {
+      tags.push('Tech support');
+    }
+    return tags;
+  }, [callRow?.fraud_notes]);
   const recordingLabel =
     recordingStatus === 'ready' ? 'Ready' : recordingStatus === 'loading' ? 'Loading' : 'Unavailable';
   const playDisabled = recordingStatus === 'error' || recordingStatus === 'loading';
@@ -787,17 +830,26 @@ export default function CallDetailScreen({
                   ]}
                 />
               </View>
-              <View style={styles.keywordRow}>
-                {keywordTags.length === 0 ? (
-                  <Text style={styles.keywordFallback}>No keywords detected.</Text>
-                ) : (
-                  keywordTags.map((keyword) => (
-                    <View key={keyword} style={styles.keywordPill}>
-                      <Text style={styles.keywordText}>{keyword}</Text>
-                    </View>
-                  ))
-                )}
+            <View style={styles.keywordRow}>
+              {keywordTags.length === 0 ? (
+                <Text style={styles.keywordFallback}>No keywords detected.</Text>
+              ) : (
+                keywordTags.map((keyword) => (
+                  <View key={keyword} style={styles.keywordPill}>
+                    <Text style={styles.keywordText}>{keyword}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+            {detectionTags.length > 0 && (
+              <View style={styles.detectionRow}>
+                {detectionTags.map((tag) => (
+                  <View key={tag} style={styles.detectionPill}>
+                    <Text style={styles.detectionText}>{tag}</Text>
+                  </View>
+                ))}
               </View>
+            )}
             </View>
           </View>
         </View>
@@ -1102,6 +1154,25 @@ const createCallDetailStyles = (theme: AppTheme) =>
       paddingHorizontal: 14,
       marginRight: 8,
       marginBottom: 8,
+    },
+    detectionRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginTop: 8,
+    },
+    detectionPill: {
+      borderRadius: 999,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.2),
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    detectionText: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
     },
     keywordText: {
       color: theme.colors.textMuted,

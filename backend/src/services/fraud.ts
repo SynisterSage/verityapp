@@ -19,6 +19,7 @@ export type FraudMetadata = {
   detectedLocale?: string | null;
   voiceSyntheticScore?: number | null;
   voiceAnalysis?: VoiceAnalysisResult | null;
+  safePhraseMatches?: string[];
 };
 
 export type FraudNotes = {
@@ -40,7 +41,20 @@ export type FraudNotes = {
   taxScamHits: number;
   bankFraudHits: number;
   piiHarvestHits: number;
+  giftCardHits: number;
+  emailHits: number;
+  linkHits: number;
   criticalKeywordHits: number;
+  callbackHits: number;
+  grandchildHits: number;
+  sweepstakesHits: number;
+  romanceHits: number;
+  jobLoanHits: number;
+  medicalScamHits: number;
+  utilityHits: number;
+  charityHits: number;
+  familyEmergencyHits: number;
+  governmentImpersonationHits: number;
   safePhraseMatches: string[];
   safePhraseDampening: number;
   repeatCallerBoost: number;
@@ -63,6 +77,7 @@ export type FraudNotes = {
   investmentHits: number;
   medicalHits: number;
   deviceHits: number;
+  remoteAccessHits: number;
   voiceSyntheticScore: number | null;
   voiceBoost: number;
   voiceAnalysis?: VoiceAnalysisResult | null;
@@ -96,6 +111,12 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'send me your money', weight: 38, category: 'explicit' },
   { phrase: 'pay me', weight: 32, category: 'explicit' },
   { phrase: 'payment information', weight: 34, category: 'explicit' },
+  { phrase: 'call me back', weight: 26, category: 'callback' },
+  { phrase: 'call me right back', weight: 26, category: 'callback' },
+  { phrase: 'call me now', weight: 26, category: 'callback' },
+  { phrase: 'phishing attempt', weight: 36, category: 'explicit' },
+  { phrase: 'official notice', weight: 30, category: 'explicit' },
+  { phrase: 'fake agent', weight: 34, category: 'explicit' },
 
   // Account takeover & identity
   { phrase: 'account takeover', weight: 38, category: 'identity' },
@@ -112,6 +133,8 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'account integrity check', weight: 30, category: 'identity' },
   { phrase: 'account under review', weight: 30, category: 'identity' },
   { phrase: 'account update required', weight: 28, category: 'identity' },
+  { phrase: 'ownership verification', weight: 30, category: 'identity' },
+  { phrase: 'identity compliance', weight: 26, category: 'identity' },
 
   // Banking & finance
   { phrase: 'wire money', weight: 20, category: 'banking' },
@@ -185,6 +208,10 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'commission refund', weight: 22, category: 'investment' },
   { phrase: 'verify trading account', weight: 28, category: 'investment' },
   { phrase: 'settlement department', weight: 26, category: 'investment' },
+  { phrase: 'long distance relationship', weight: 30, category: 'romance' },
+  { phrase: 'flight ticket', weight: 22, category: 'romance' },
+  { phrase: 'family must never know', weight: 22, category: 'romance' },
+  { phrase: 'send it secretly', weight: 20, category: 'romance' },
 
   // Government & taxes
   { phrase: 'irs', weight: 32, category: 'government' },
@@ -239,6 +266,10 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'taxes', weight: 22, category: 'government' },
   { phrase: 'federal', weight: 18, category: 'government' },
   { phrase: 'law enforcement', weight: 18, category: 'government' },
+  { phrase: 'reconnection deposit', weight: 28, category: 'utility' },
+  { phrase: 'field technician arrives', weight: 26, category: 'utility' },
+  { phrase: 'power cut', weight: 20, category: 'utility' },
+  { phrase: 'cut off power', weight: 20, category: 'utility' },
   { phrase: 'compliance', weight: 14, category: 'government' },
   { phrase: 'national fraud helpline', weight: 32, category: 'government' },
   { phrase: 'federal reserve', weight: 30, category: 'government' },
@@ -548,6 +579,117 @@ const REPORTING_MARKERS = [
   'he said it was a scam',
   'they said it was fraudulent',
   'i think it is a scam',
+  'i think it is phishing',
+  'this feels like a scam',
+  'it said to email me',
+  'the email told me to',
+];
+
+const EMAIL_PHISHING_TERMS = [
+  'verify your email',
+  'click the link',
+  'open this link',
+  'confirm your email',
+  'update your account',
+  'secure your account',
+  'email verification',
+  'reset your password',
+  'confirm billing info',
+  'update payment',
+  'account locked due to unusual activity',
+  'security alert',
+  'verify your identity now',
+  'new login detected',
+  'support ticket',
+  'password reset',
+];
+
+const MEDICAL_SCAM_TERMS = [
+  'medical bill',
+  'insurance fraud',
+  'hospital bill',
+  'health alert',
+  'medical emergency',
+  'medical debt',
+  'insurance payment',
+  'medicare overpayment',
+  'medical debt collection',
+  'care insurance',
+  'Medicare audit',
+  'insurance fraud unit',
+  'prescription refill',
+  'medical alert',
+  'claim denied',
+  'urgent medical notice',
+  'critical care notification',
+];
+
+const UTILITY_TERMS = [
+  'service suspension',
+  'account suspended',
+  'utility account',
+  'pay the reconnection fee',
+  'utility shut-off notice',
+  'electric bill',
+  'water bill',
+  'gas bill',
+  'phone service suspension',
+  'cable disconnected',
+  'power company',
+  'energy service',
+  'red tag',
+  'meter shut down',
+  'disconnection notice',
+  'shut off notice',
+  'turn off your service',
+  'past due amount',
+  'billing arrears',
+  'amount due today',
+  'reconnect fee',
+  'service disconnection',
+  'ComEd',
+  'PG&E',
+  'Duke Energy',
+  'Spectrum bill',
+  'Xcel Energy',
+  'CenterPoint energy',
+  'field technician arriving',
+  'deposit before reconnection',
+  'utility lien',
+  'billing department',
+  'gas leak alert',
+  'city utility',
+  'water service hold',
+  'cut off power',
+  'cutting your power',
+  'power cut',
+  'reconnection deposit',
+  'pg&e',
+  'municipal utility',
+];
+
+const CHARITY_TERMS = [
+  'charity',
+  'donation',
+  'donations',
+  'disaster relief',
+  'hurricane relief',
+  'emergency donations',
+  'fire victims',
+  'school fundraiser',
+  'mission trip',
+  'church donation',
+  'charity drive',
+  'support our cause',
+  'celebrity charity',
+  'celebrity fundraiser',
+  'celebrity endorsement',
+  'kids in need',
+  'give back to the community',
+  'nonprofit',
+  'humanitarian aid',
+  'relief fund',
+  'emergency relief',
 ];
 
 const COMBO_RULES = [
@@ -617,6 +759,7 @@ const COMBO_RULES = [
   { all: ['custom broker', 'doorstep delivery fee'], add: 16 },
   { all: ['parcel intercept', 'international shipment hold'], add: 18 },
   { all: ['security audit', 'allow remote access'], add: 18 },
+  { all: ['field technician arrives', 'reconnection deposit'], add: 16 },
   { all: ['software license audit', 'download this app'], add: 16 },
   { all: ['remittance', 'funds release'], add: 18 },
   { all: ['onlyfans', 'send a tip'], add: 20 },
@@ -638,6 +781,15 @@ const COMBO_RULES = [
   { all: ['laptop service', 'contact me'], add: 16 },
   { all: ['virus on it', 'apple tech support'], add: 18 },
   { all: ['email me for gift cards', 'gift card'], add: 18 },
+  { all: ['grandchild in jail', 'gift card number'], add: 24 },
+  { all: ['grandchild needs bail money', 'wire money'], add: 20 },
+  { all: ['grandchild in jail', 'send money'], add: 18 },
+  { all: ['sweepstakes winner', 'tax due'], add: 22 },
+  { all: ['you have won', 'processing fee'], add: 18 },
+  { all: ['long distance relationship', 'send money'], add: 20 },
+  { all: ['long distance relationship', 'flight ticket'], add: 16 },
+  { all: ['romance scam', 'need money for ticket'], add: 18 },
+  { all: ['police bail warning', 'gift card'], add: 18 },
 ];
 
 const URGENCY_TERMS = [
@@ -648,6 +800,13 @@ const URGENCY_TERMS = [
   'limited time',
   'act now',
   'asap',
+  'final warning',
+  'last chance',
+  'deadline today',
+  'cutoff',
+  'service interruption',
+  'power cut',
+  'act before',
 ];
 
 const SECRECY_TERMS = [
@@ -658,6 +817,12 @@ const SECRECY_TERMS = [
   "don't hang up",
   'do not hang up',
   'confidential',
+  'keep this between us',
+  'hide this from your spouse',
+  'don’t mention',
+  'discrete transaction',
+  'cover this up',
+  'keep it between us',
 ];
 
 const THREAT_TERMS = [
@@ -686,6 +851,15 @@ const THREAT_TERMS = [
   'utility shut-off notice',
   'police bail warning',
   'immigration hold notice',
+  'red tag',
+  'meter sealed',
+  'field technician arriving',
+  'anger to disconnect',
+  'power shut off',
+  'field technician arrives',
+  'cut off power',
+  'cutting your power',
+  'service cut off',
 ];
 
 const AUTHORITY_TERMS = [
@@ -713,6 +887,40 @@ const AUTHORITY_TERMS = [
   'marshal office',
   'police bail warning',
   'immigration hold notice',
+  'social security suspension',
+  'IRS refund notice',
+  'retirement account review',
+  'security threat report',
+  'compliance department',
+  'consumer advocate',
+  'federal enforcement',
+];
+
+const GOVERNMENT_IMPERSONATION_TERMS = [
+  'social security suspension',
+  'social security blocked',
+  'federal audit',
+  'fbi warrant',
+  'immigration hold',
+  'immigration office',
+  'border patrol',
+  'customs hold',
+  'tax fraud unit',
+  'rmv hold',
+  'child support arrears',
+  'court order',
+  'government agent',
+  'federal agent',
+  'agent from the department',
+  'we represent the government',
+  'illegal immigration notice',
+  'tax enforcement',
+  'deportation proceeding',
+  'IRS refund notice',
+  'customs clearance notice',
+  'treasury department',
+  'social security fraud unit',
+  'special investigation team',
 ];
 
 const REMOTE_ACCESS_TERMS = [
@@ -756,6 +964,11 @@ const REMOTE_ACCESS_TERMS = [
   'software license audit',
   'zscaler portal',
   'remote vpn access',
+  'allow us to take control',
+  'grant remote access',
+  'remote login prompt',
+  'support agent on the line',
+  'security certificate expiring',
 ];
 
 const GIFT_CARD_TERMS = [
@@ -788,6 +1001,161 @@ const CALLBACK_TERMS = [
   'don\'t disconnect',
   'do not hang up',
   'call back this number',
+  'press pound',
+  'stay on the phone',
+  'hold the line',
+  'call back immediately',
+  'call back now',
+  'do not end this call',
+  'hang on',
+  'call me back',
+  'call me right back',
+  'call me now',
+];
+
+const GRANDCHILD_TERMS = [
+  'grandchild in jail',
+  'grandchild is in jail',
+  'grandchild needs bail money',
+  'bail money',
+  'pay bail',
+  'grandchild arrested',
+  'lawyer fee',
+  'send gift card',
+  'gift card number',
+  'gift card fee',
+  'car accident',
+  'hospitalized',
+  'family emergency',
+  'emergency funds',
+  'son in accident',
+  'daughter in accident',
+  'nephew in hospital',
+  'licence check',
+  'emergency surgery',
+  'hospital bill',
+  'attorney on the phone',
+  'accident on the highway',
+  'emergency wire transfer',
+];
+
+const FAMILY_EMERGENCY_TERMS = [
+  'son in jail',
+  'son is in jail',
+  'daughter in jail',
+  'daughter is in jail',
+  'child in jail',
+  'child is in jail',
+  'niece in jail',
+  'nephew in jail',
+  'attorney fee',
+  'lawyer fees',
+  'bail bond',
+  'court fees',
+  'immigration detention',
+  'accident on the highway',
+  'hospital bill',
+  'car crash',
+  'emergency for the family',
+  'do not tell mom',
+  'do not tell dad',
+  'keep this secret',
+  'urgent bail money',
+  'pay the bail',
+  'pay attorney now',
+  'family member arrested',
+  'don’t mention to anyone',
+  'keep it between us',
+  'lawyer is on the line',
+  'hospital wing',
+  'wires the ambulance',
+  'accident in the city',
+  'emergency surgery bill',
+  'immigration lawyer fee',
+  'family emergency',
+  'attorney fees',
+];
+
+const SWEEPSTAKES_TERMS = [
+  'sweepstakes winner',
+  'sweepstakes',
+  'you have won',
+  'prize claim',
+  'lottery winner',
+  'tax due',
+  'processing fee',
+  'pay the fee',
+  'congratulations you won',
+  'prize alert',
+  'claim reward',
+  'grand prize',
+  'free vacation',
+  'exclusive prize',
+  'customs fee',
+  'customs hold',
+  'delivery clearance',
+  'tax on winnings',
+  'processing charge',
+  'lottery check',
+  'prize processing',
+  'winning notification',
+  'rewards check',
+  'foreign lottery',
+  'processing check',
+  'customs clearance',
+  'visa gift',
+  'prize processing fee',
+  'winning confirmation',
+  'rewards certificate',
+  'bonus check',
+  'cash reward',
+  'prize auditor',
+  'reward notice',
+];
+
+const ROMANCE_TERMS = [
+  'long distance relationship',
+  'need money for ticket',
+  'send money for flight',
+  'love you',
+  'miss you',
+  'relationship scam',
+  'romance scam',
+  'pay for my ticket',
+  'emergency for us',
+  'family is waiting',
+];
+
+const JOB_LOAN_TERMS = [
+  'work from home job',
+  'advance fee loan',
+  'loan scam',
+  'job offer scam',
+  'pay for training',
+  'credit repair fee',
+  'loan approval fee',
+  'pay to get job',
+  'employment scam',
+  'fake employer',
+  'be a mystery shopper',
+  'mystery shopper',
+  'check cashing jobs',
+  'government grant',
+  'grant approval',
+  'processing fee',
+  'training fee',
+  'tax free payment',
+  'pay the broker',
+  'deposit the check',
+  'advance payment',
+  'job placement fee',
+  'remote hiring',
+  'verify your training',
+  'training deposit',
+  'instant job offer',
+  'check cashing job',
+  'mystery shopper payout',
+  'work from anywhere job',
 ];
 
 const BRAND_IMPERSONATION_TERMS = [
@@ -809,6 +1177,13 @@ const LINK_TERMS = [
   'i\'m texting you a link',
   'check your email',
   'visit this site',
+  'visit this page',
+  'follow this link',
+  'tap this link',
+  'copy this link',
+  'link inside this message',
+  'clicking the link',
+  'link we sent you',
 ];
 
 const URL_PATTERNS = [
@@ -816,6 +1191,10 @@ const URL_PATTERNS = [
   /\bbit\.ly\b/i,
   /\btinyurl\b/i,
   /\bgoo\.gl\b/i,
+  /\binfo\b/i,
+  /\bbiz\b/i,
+  /update-account/i,
+  /support-ticket/i,
 ];
 
 const CARRIER_TERMS = [
@@ -898,9 +1277,29 @@ const IMPERSONATION_TERMS = [
   'wells fargo',
   'chase bank',
   'from the organization',
+  'official notice',
+  'fraud prevention unit',
+  'security compliance',
+  'task force agent',
+  'senior fraud team',
+  'verified agent',
+  'identity compliance team',
 ];
 
-const PAYMENT_APPS = ['zelle', 'cash app', 'venmo', 'paypal'];
+const PAYMENT_APPS = [
+  'zelle',
+  'cash app',
+  'venmo',
+  'paypal',
+  'apple pay',
+  'google pay',
+  'applepay',
+  'googlepay',
+  'revolut',
+  'wise',
+  'chase pay',
+  'samsung pay',
+];
 
 const CODE_TERMS = [
   'verification code',
@@ -984,6 +1383,14 @@ const SENSITIVE_NOUNS = [
   'remote session',
   'security alert',
   'security lock',
+  'government agency',
+  'refund check',
+  'prize money',
+  'customs fine',
+  'immigration hold',
+  'utility lien',
+  'reconnection fee',
+  'voucher',
 ];
 
 const TECH_SUPPORT_PHRASES = [
@@ -1030,6 +1437,25 @@ const TECH_SUPPORT_PHRASES = [
   'email support team',
   'gift cards',
   'virus notice',
+  'your computer is infected',
+  'call us to fix your computer',
+  'malware detected',
+  'security breach',
+  'data breach notice',
+  'windows license alert',
+  'pay to remove virus',
+  'cyber attack',
+  'urgent tech support',
+  'remote tech assistance',
+  'security certificate expiring',
+  'grant remote access',
+  'allow remote control',
+  'service your device',
+  'install security patch',
+  'tracking number issue',
+  'support agent on the line',
+  'call our security team',
+  'maintain remote session',
 ];
 
 const CRYPTO_TERMS = [
@@ -1135,6 +1561,14 @@ const MEDICAL_TERMS = [
   'medical debt collection',
   'insurance audit',
   'pharmacy pin',
+  'covid test',
+  'dialysis appointment',
+  'surgery delay',
+  'emergency room bill',
+  'hospital transfer',
+  'medical fraud unit',
+  'clinical trial',
+  'insurance premium increase',
 ];
 
 const DEVICE_TERMS = [
@@ -1150,6 +1584,9 @@ const DEVICE_TERMS = [
   'fix your laptop',
   'macbook support',
   'desktop support',
+  'computer',
+  'your computer',
+  'pc',
 ];
 
 const IDENTITY_TERMS = [
@@ -1748,7 +2185,7 @@ function comboBoost(text: string) {
   return Math.min(30, boost);
 }
 
-function heuristicBoosts(text: string) {
+function heuristicBoosts(text: string, safePhraseMatches: string[] = []) {
   const urgencyHits = countPhraseHits(text, URGENCY_TERMS);
   const secrecyHits = countPhraseHits(text, SECRECY_TERMS);
   const impersonationHits = countPhraseHits(text, IMPERSONATION_TERMS);
@@ -1776,6 +2213,7 @@ function heuristicBoosts(text: string) {
   const remoteAccessHits = countPhraseHits(text, REMOTE_ACCESS_TERMS);
   const giftCardHits = countPhraseHits(text, GIFT_CARD_TERMS);
   const callbackHits = countPhraseHits(text, CALLBACK_TERMS);
+  const callbackBoost = callbackHits >= 1 ? 12 : 0;
   const cryptoHits = countPhraseHits(text, CRYPTO_TERMS);
   const subscriptionHits = countPhraseHits(text, SUBSCRIPTION_TERMS);
   const courierHits = countPhraseHits(text, COURIER_TERMS);
@@ -1794,6 +2232,16 @@ function heuristicBoosts(text: string) {
   const investmentHits = countPhraseHits(text, INVESTMENT_TERMS);
   const medicalHits = countPhraseHits(text, MEDICAL_TERMS);
   const deviceHits = countPhraseHits(text, DEVICE_TERMS);
+  const emailHits = countPhraseHits(text, EMAIL_PHISHING_TERMS);
+  const medicalScamHits = countPhraseHits(text, MEDICAL_SCAM_TERMS);
+  const utilityHits = countPhraseHits(text, UTILITY_TERMS);
+  const charityHits = countPhraseHits(text, CHARITY_TERMS);
+  const grandchildHits = countPhraseHits(text, GRANDCHILD_TERMS);
+  const sweepstakesHits = countPhraseHits(text, SWEEPSTAKES_TERMS);
+  const romanceHits = countPhraseHits(text, ROMANCE_TERMS);
+  const jobLoanHits = countPhraseHits(text, JOB_LOAN_TERMS);
+  const familyEmergencyHits = countPhraseHits(text, FAMILY_EMERGENCY_TERMS);
+  const governmentImpersonationHits = countPhraseHits(text, GOVERNMENT_IMPERSONATION_TERMS);
 
   let boost = 0;
   if (urgencyHits >= 2) boost += 10;
@@ -1815,7 +2263,35 @@ function heuristicBoosts(text: string) {
   if (authorityHits >= 1) boost += 14;
   if (remoteAccessHits >= 1) boost += 18;
   if (giftCardHits >= 1) boost += 20;
-  if (callbackHits >= 1) boost += 12;
+  if (grandchildHits >= 1) boost += 28;
+  if (grandchildHits >= 1 && giftCardHits >= 1) boost += 18;
+  if (sweepstakesHits >= 1) boost += 22;
+  if (sweepstakesHits >= 1 && paymentRequestHits >= 1) boost += 16;
+  if (romanceHits >= 1) boost += 20;
+  if (romanceHits >= 1 && paymentAppHits >= 1) boost += 10;
+  if (jobLoanHits >= 1) boost += 26;
+  if (jobLoanHits >= 1 && paymentAppHits >= 1) boost += 8;
+  if (emailHits >= 1) boost += 18;
+  if (emailHits >= 1 && linkHits >= 1) boost += 16;
+  if (emailHits >= 1 && paymentRequestHits >= 1) boost += 12;
+  if (medicalScamHits >= 1) boost += 18;
+  if (medicalScamHits >= 1 && paymentAppHits >= 1) boost += 10;
+  if (utilityHits >= 1) boost += 16;
+  if (utilityHits >= 1 && urgencyHits >= 1) boost += 10;
+  if (charityHits >= 1) boost += 16;
+  if (charityHits >= 1 && paymentRequestHits >= 1) boost += 10;
+  if (charityHits >= 1 && urgencyHits >= 1) boost += 6;
+  if (familyEmergencyHits >= 1) boost += 24;
+  if (familyEmergencyHits >= 1 && giftCardHits >= 1) boost += 16;
+  if (familyEmergencyHits >= 1 && callbackHits >= 1) boost += 10;
+  if (familyEmergencyHits >= 1 && urgencyHits >= 1) boost += 8;
+  if (governmentImpersonationHits >= 1) boost += 22;
+  if (governmentImpersonationHits >= 1 && paymentRequestHits >= 1) boost += 14;
+  if (governmentImpersonationHits >= 2) boost += 10;
+  if (callbackBoost > 0) {
+    const callbackReduction = safePhraseMatches.length > 0 ? Math.min(8, callbackBoost) : 0;
+    boost += Math.max(0, callbackBoost - callbackReduction);
+  }
   if (cryptoHits >= 1) boost += 18;
   if (subscriptionHits >= 1) boost += 14;
   if (courierHits >= 1) boost += 22;
@@ -1912,6 +2388,16 @@ function heuristicBoosts(text: string) {
     investmentHits,
     medicalHits,
     deviceHits,
+    grandchildHits,
+    sweepstakesHits,
+    romanceHits,
+    jobLoanHits,
+    emailHits,
+    medicalScamHits,
+    utilityHits,
+    charityHits,
+    familyEmergencyHits,
+    governmentImpersonationHits,
   };
 }
 
@@ -1973,7 +2459,7 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
     voiceBoost = Math.min(15, voiceMedian * 30);
   }
   const voiceHardOverride = voiceAlertBand === 'high' && (voiceMax ?? 0) >= 0.97;
-  const heuristic = heuristicBoosts(normalized);
+  const heuristic = heuristicBoosts(normalized, metadata.safePhraseMatches ?? []);
   const actionBoost = heuristic.actionBoost;
 
   if (!normalized) {
@@ -1982,6 +2468,19 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
       riskLevel: 'low',
       matchedKeywords: [],
       notes: {
+        callbackHits: 0,
+        giftCardHits: 0,
+        linkHits: 0,
+        grandchildHits: 0,
+        sweepstakesHits: 0,
+        romanceHits: 0,
+        jobLoanHits: 0,
+        emailHits: 0,
+        medicalScamHits: 0,
+        utilityHits: 0,
+        charityHits: 0,
+        familyEmergencyHits: 0,
+        governmentImpersonationHits: 0,
         matchCount: 0,
         weightSum: 0,
         comboBoost: 0,
@@ -2019,6 +2518,7 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         investmentHits: 0,
         medicalHits: 0,
         deviceHits: 0,
+        remoteAccessHits: 0,
         voiceSyntheticScore,
         voiceBoost,
         voiceAnalysis: metadata.voiceAnalysis ?? null,
@@ -2027,55 +2527,6 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   }
 
   const { matches, negated } = findMatches(normalized, DEFAULT_KEYWORDS);
-  if (matches.length === 0) {
-    return {
-      score: 0,
-      riskLevel: 'low',
-      matchedKeywords: [],
-      notes: {
-        matchCount: 0,
-        weightSum: 0,
-        comboBoost: 0,
-        negatedMatches: negated,
-        urgencyHits: heuristic.urgencyHits,
-        secrecyHits: heuristic.secrecyHits,
-        impersonationHits: heuristic.impersonationHits,
-        paymentAppHits: heuristic.paymentAppHits,
-        codeRequestHits: heuristic.codeRequestHits,
-        explicitScamHits: heuristic.explicitScamHits,
-        paymentRequestHits: heuristic.paymentRequestHits,
-        hardBlockHits: heuristic.hardBlockHits,
-        threatHits: heuristic.threatHits,
-        accountAccessHits: heuristic.accountAccessHits,
-        moneyAmountHits: heuristic.moneyAmountHits,
-        taxScamHits: heuristic.taxScamHits,
-        bankFraudHits: heuristic.bankFraudHits,
-        piiHarvestHits: heuristic.piiHarvestHits,
-        criticalKeywordHits: 0,
-        safePhraseMatches: [],
-        safePhraseDampening: 0,
-        repeatCallerBoost: 0,
-        callerCountry,
-        callerRegion,
-        highRiskCountryBoost,
-        timeOfDayBoost,
-        durationBoost,
-        repeatCallCount,
-        detectedLocale,
-        localeBoost,
-        regionMismatchBoost,
-        commandSensitiveHits: heuristic.commandSensitiveHits,
-        actionBoost: heuristic.actionBoost,
-        techSupportHits: heuristic.techSupportHits,
-        investmentHits: heuristic.investmentHits,
-        medicalHits: heuristic.medicalHits,
-        deviceHits: heuristic.deviceHits,
-        voiceSyntheticScore,
-        voiceBoost,
-        voiceAnalysis: metadata.voiceAnalysis ?? null,
-      },
-    } satisfies FraudAnalysis;
-  }
 
   const weightSum = matches.reduce((sum, kw) => sum + kw.weight, 0);
   let score = (matches.length / 4) * 40;
@@ -2201,7 +2652,21 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         taxScamHits: heuristic.taxScamHits,
         bankFraudHits: heuristic.bankFraudHits,
         piiHarvestHits: heuristic.piiHarvestHits,
+        linkHits: heuristic.linkHits,
+        giftCardHits: heuristic.giftCardHits,
+        grandchildHits: heuristic.grandchildHits,
+        sweepstakesHits: heuristic.sweepstakesHits,
+        romanceHits: heuristic.romanceHits,
+        jobLoanHits: heuristic.jobLoanHits,
+        emailHits: heuristic.emailHits,
+        medicalScamHits: heuristic.medicalScamHits,
+        utilityHits: heuristic.utilityHits,
+        charityHits: heuristic.charityHits,
+        familyEmergencyHits: heuristic.familyEmergencyHits,
+        governmentImpersonationHits: heuristic.governmentImpersonationHits,
+        remoteAccessHits: heuristic.remoteAccessHits,
         criticalKeywordHits,
+        callbackHits: heuristic.callbackHits,
         safePhraseMatches: [],
         safePhraseDampening: 0,
         repeatCallerBoost: 0,

@@ -498,36 +498,44 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
               </Text>
             </View>
           ) : (
-          safeList.map((contact) => {
-            const relationshipLabel = getRelationshipLabel(contact);
-            const relationshipColor = theme.colors.accent;
-            return (
-              <View key={contact.id} style={styles.listCard}>
-                <View style={styles.identity}>
-                  <View
-                    style={[
-                      styles.avatar,
-                      { backgroundColor: withOpacity(relationshipColor, 0.18) },
-                    ]}
-                  >
-                    <Text style={[styles.avatarText, { color: relationshipColor }]}>
-                      {getContactDisplayName(contact).charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.identityText}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.personName}>{getContactDisplayName(contact)}</Text>
-                      <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
+            <View style={styles.safeList}>
+              {safeList.map((contact) => {
+                const relationshipLabel = getRelationshipLabel(contact);
+                const relationshipColor = theme.colors.accent;
+                return (
+                  <View key={contact.id} style={styles.listCard}>
+                    <View style={styles.identity}>
+                      <View
+                        style={[
+                          styles.avatar,
+                          { backgroundColor: withOpacity(relationshipColor, 0.18) },
+                        ]}
+                      >
+                        <Text style={[styles.avatarText, { color: relationshipColor }]}>
+                          {getContactDisplayName(contact).charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.identityText}>
+                        <View style={styles.nameRow}>
+                          <Text style={styles.personName}>
+                            {getContactDisplayName(contact)}
+                          </Text>
+                          <Ionicons
+                            name="shield-checkmark"
+                            size={18}
+                            color={theme.colors.success}
+                          />
+                        </View>
+                        <Text style={styles.relationship}>{relationshipLabel}</Text>
+                      </View>
                     </View>
-                    <Text style={styles.relationship}>{relationshipLabel}</Text>
+                    <TouchableOpacity onPress={() => openManageTray(contact)}>
+                      <Text style={styles.manageLabel}>Manage</Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
-                <TouchableOpacity onPress={() => openManageTray(contact)}>
-                  <Text style={styles.manageLabel}>Manage</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })
+                );
+              })}
+            </View>
           )}
 
           <HowItWorksCard items={helperItems} />
@@ -671,8 +679,8 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
     },
     body: {
       paddingHorizontal: 32,
-      paddingTop: 28,
-      gap: 24,
+      paddingTop: 20,
+      gap: 16,
     },
     header: {
       marginBottom: 24,
@@ -699,7 +707,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       borderColor: theme.colors.border,
       padding: 18,
       gap: 12,
-      marginBottom: 24,
+      marginBottom: 16,
     },
     importCardPressed: {
       borderColor: theme.colors.surface,
@@ -745,7 +753,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 12,
+      marginBottom: 8,
     },
     identity: {
       flexDirection: 'row',
@@ -837,6 +845,10 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       borderWidth: 1,
       borderColor: theme.colors.border,
       marginBottom: 12,
+    },
+    safeList: {
+      marginBottom: 0,
+      gap: 0,
     },
     skeletonLine: {
       height: 10,
