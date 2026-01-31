@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Easing,
@@ -23,7 +24,9 @@ import type { RootStackParamList } from '../../navigation/types';
 import type { CircleActivityItem } from './circleActivityTypes';
 import { AlertRow } from './alertTypes';
 import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
+import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
 import * as Haptics from 'expo-haptics';
+import EmptyState from '../../components/common/EmptyState';
 
 export default function CircleActivityScreen() {
   const { theme } = useTheme();
@@ -35,6 +38,7 @@ export default function CircleActivityScreen() {
   const handleBackPress = useCallback(() => {
     navigation.goBack();
   }, [navigation]);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const [trayAlert, setTrayAlert] = useState<AlertRow | null>(null);
   const [isTrayMounted, setIsTrayMounted] = useState(false);
@@ -51,6 +55,44 @@ export default function CircleActivityScreen() {
       return false;
     }
   }, []);
+
+  const circleActivitiesToDelete = useMemo(
+    () => activityList.filter((activity) => CIRCLE_ALERT_TYPES.has(activity.alertRow.alert_type ?? '')),
+    [activityList]
+  );
+
+  const deleteAllActivities = useCallback(async () => {
+    if (!circleActivitiesToDelete.length) {
+      return;
+    }
+    setDeletingAll(true);
+    for (const activity of circleActivitiesToDelete) {
+      try {
+        await authorizedFetch(`/alerts/${activity.alertRow.id}`, { method: 'DELETE' });
+      } catch {
+        // ignore individual failures
+      }
+    }
+    setActivityList((prev) =>
+      prev.filter((activity) => !CIRCLE_ALERT_TYPES.has(activity.alertRow.alert_type ?? ''))
+    );
+    setDeletingAll(false);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [circleActivitiesToDelete]);
+
+  const confirmDeleteAll = useCallback(() => {
+    if (!circleActivitiesToDelete.length || deletingAll) {
+      return;
+    }
+    Alert.alert(
+      'Delete circle activity',
+      'This removes every circle action permanently. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete all', style: 'destructive', onPress: deleteAllActivities },
+      ]
+    );
+  }, [activityList.length, deletingAll, deleteAllActivities]);
 
   const showTray = useCallback(
     (alert: AlertRow) => {
@@ -128,38 +170,60 @@ export default function CircleActivityScreen() {
             Showing {activityList.length} recent action{activityList.length === 1 ? '' : 's'}
           </Text>
         </View>
+        <TouchableOpacity
+          style={styles.headerAction}
+          onPress={confirmDeleteAll}
+          disabled={deletingAll || circleActivitiesToDelete.length === 0}
+          activeOpacity={0.7}
+        >
+          {deletingAll ? (
+            <ActivityIndicator size="small" color={theme.colors.textMuted} />
+          ) : (
+            <Ionicons name="trash-outline" size={20} color={theme.colors.text} />
+          )}
+        </TouchableOpacity>
       </View>
-      <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {activityList.map((activity) => (
-          <Pressable
-            key={activity.id}
-            style={({ pressed }) => [styles.cardWrapper, pressed && styles.cardPressed]}
-            android_ripple={{ color: '#00000010' }}
-            onLongPress={() => showTray(activity.alertRow)}
-          >
-            <View style={styles.card}>
-              <View style={[styles.accentStrip, { backgroundColor: theme.colors.accent }]} />
-              <View style={styles.cardContent}>
-                <View style={styles.cardHeader}>
-                  <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.accent}20` }]}>
-                    <Ionicons name="people-outline" size={16} color={theme.colors.accent} />
+      {activityList.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <EmptyState
+            icon="people-outline"
+            title="No circle activity"
+            body="Circle updates appear here as soon as they happen."
+          />
+        </View>
+      ) : (
+        <ScrollView
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {activityList.map((activity) => (
+            <Pressable
+              key={activity.id}
+              style={({ pressed }) => [styles.cardWrapper, pressed && styles.cardPressed]}
+              android_ripple={{ color: '#00000010' }}
+              onLongPress={() => showTray(activity.alertRow)}
+            >
+              <View style={styles.card}>
+                <View style={[styles.accentStrip, { backgroundColor: theme.colors.accent }]} />
+                <View style={styles.cardContent}>
+                  <View style={styles.cardHeader}>
+                    <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.accent}20` }]}>
+                      <Ionicons name="people-outline" size={16} color={theme.colors.accent} />
+                    </View>
+                    <Text style={[styles.cardTitle, { color: theme.colors.textMuted }]}>{activity.label}</Text>
+                    <View style={styles.cardSpacer} />
+                    <Ionicons name="time-outline" size={12} color={theme.colors.textDim} />
+                    <Text style={[styles.cardTimestamp, { color: theme.colors.textDim }]}>{activity.timestamp}</Text>
                   </View>
-                  <Text style={[styles.cardTitle, { color: theme.colors.textMuted }]}>{activity.label}</Text>
-                  <View style={styles.cardSpacer} />
-                  <Ionicons name="time-outline" size={12} color={theme.colors.textDim} />
-                  <Text style={[styles.cardTimestamp, { color: theme.colors.textDim }]}>{activity.timestamp}</Text>
+                  <Text style={[styles.cardDescription, { color: theme.colors.textMuted }]}>
+                    {activity.description}
+                  </Text>
                 </View>
-                <Text style={[styles.cardDescription, { color: theme.colors.textMuted }]}>
-                  {activity.description}
-                </Text>
               </View>
-            </View>
-          </Pressable>
-        ))}
-      </ScrollView>
+            </Pressable>
+          ))}
+        </ScrollView>
+      )}
       <Modal visible={isTrayVisible} transparent animationType="none" onRequestClose={hideTray}>
         <View style={styles.trayOverlay} pointerEvents="box-none">
           <Animated.View
@@ -251,6 +315,15 @@ const createCircleStyles = (theme: AppTheme) =>
       color: theme.colors.textMuted,
       marginTop: 2,
     },
+    headerAction: {
+      marginLeft: 8,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.text, 0.04),
+    },
     scrollContent: {
       paddingHorizontal: 24,
       paddingTop: 26,
@@ -315,6 +388,13 @@ const createCircleStyles = (theme: AppTheme) =>
     cardDescription: {
       fontSize: 13,
       lineHeight: 20,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'stretch',
+      paddingHorizontal: 24,
+      paddingTop: 36,
     },
     trayOverlay: {
       ...StyleSheet.absoluteFillObject,

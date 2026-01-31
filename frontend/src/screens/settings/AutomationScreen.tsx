@@ -11,6 +11,12 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
+import {
+  getAutoBlockManual,
+  getAutoTrustManual,
+  setAutoBlockManual,
+  setAutoTrustManual,
+} from '../../utils/blockTrustPrompt';
 import type { AppTheme } from '../../theme/tokens';
 
 type AutomationToggleProps = {
@@ -32,6 +38,10 @@ export default function AutomationScreen() {
   const [saving, setSaving] = useState(false);
   const { theme } = useTheme();
   const styles = useMemo(() => createAutomationStyles(theme), [theme]);
+  const [manualBlockEnabled, setManualBlockEnabled] = useState(false);
+  const [manualTrustEnabled, setManualTrustEnabled] = useState(false);
+  const [persistedManualBlock, setPersistedManualBlock] = useState(false);
+  const [persistedManualTrust, setPersistedManualTrust] = useState(false);
   const AutomationToggle = ({
     value,
     onValueChange,
@@ -100,6 +110,26 @@ export default function AutomationScreen() {
     syncFromProfile();
   }, [syncFromProfile]);
 
+  useEffect(() => {
+      const loadManualPref = async () => {
+        const blockPref = await getAutoBlockManual();
+        const trustPref = await getAutoTrustManual();
+        setManualBlockEnabled(blockPref);
+        setManualTrustEnabled(trustPref);
+        setPersistedManualBlock(blockPref);
+        setPersistedManualTrust(trustPref);
+      };
+    void loadManualPref();
+  }, []);
+
+  const toggleManualBlock = useCallback((value: boolean) => {
+    setManualBlockEnabled(value);
+  }, []);
+
+  const toggleManualTrust = useCallback((value: boolean) => {
+    setManualTrustEnabled(value);
+  }, []);
+
   const profileId = activeProfile?.id;
 
   const fetchActiveProfile = useCallback(async () => {
@@ -140,6 +170,10 @@ export default function AutomationScreen() {
       if (data?.profile) {
         setActiveProfile(data.profile);
       }
+      await setAutoBlockManual(manualBlockEnabled);
+      await setAutoTrustManual(manualTrustEnabled);
+      setPersistedManualBlock(manualBlockEnabled);
+      setPersistedManualTrust(manualTrustEnabled);
       Alert.alert('Saved', 'Automation preferences updated.');
     } catch (err: any) {
       Alert.alert('Error', err?.message ?? 'Failed to save preferences.');
@@ -165,22 +199,27 @@ export default function AutomationScreen() {
   );
 
   const hasChanges = useMemo(() => {
-    if (!activeProfile) return false;
-    return (
-      autoMarkEnabled !== Boolean(activeProfile.auto_mark_enabled) ||
-      fraudThreshold !==
-        (typeof activeProfile.auto_mark_fraud_threshold === 'number'
-          ? activeProfile.auto_mark_fraud_threshold
-          : typeof activeProfile.alert_threshold_score === 'number'
-          ? activeProfile.alert_threshold_score
-          : 90) ||
-      safeThreshold !==
-        (typeof activeProfile.auto_mark_safe_threshold === 'number'
-          ? activeProfile.auto_mark_safe_threshold
-          : 30) ||
-      autoTrustOnSafe !== Boolean(activeProfile.auto_trust_on_safe) ||
-      autoBlockOnFraud !== (activeProfile.auto_block_on_fraud === false ? false : true)
-    );
+    const autoSettingsDiff =
+      !activeProfile
+        ? false
+        : autoMarkEnabled !== Boolean(activeProfile.auto_mark_enabled) ||
+          fraudThreshold !==
+            (typeof activeProfile.auto_mark_fraud_threshold === 'number'
+              ? activeProfile.auto_mark_fraud_threshold
+              : typeof activeProfile.alert_threshold_score === 'number'
+              ? activeProfile.alert_threshold_score
+              : 90) ||
+          safeThreshold !==
+            (typeof activeProfile.auto_mark_safe_threshold === 'number'
+              ? activeProfile.auto_mark_safe_threshold
+              : 30) ||
+          autoTrustOnSafe !== Boolean(activeProfile.auto_trust_on_safe) ||
+          autoBlockOnFraud !==
+            (activeProfile.auto_block_on_fraud === false ? false : true);
+    const manualSettingsDiff =
+      manualBlockEnabled !== persistedManualBlock ||
+      manualTrustEnabled !== persistedManualTrust;
+    return autoSettingsDiff || manualSettingsDiff;
   }, [
     activeProfile,
     autoMarkEnabled,
@@ -188,6 +227,10 @@ export default function AutomationScreen() {
     autoTrustOnSafe,
     fraudThreshold,
     safeThreshold,
+    manualBlockEnabled,
+    manualTrustEnabled,
+    persistedManualBlock,
+    persistedManualTrust,
   ]);
 
   if (!canManageProfile) {
@@ -301,6 +344,36 @@ export default function AutomationScreen() {
           </View>
         </View>
 
+        <View style={styles.promptCard}>
+          <Text style={styles.promptCardTitle}>Manual block/trust overrides</Text>
+          <Text style={styles.promptCardBody}>
+            When you mark a call as fraud or safe, these controls decide whether to auto-block or auto-trust the caller without showing the confirmation dialog.
+          </Text>
+          <View style={[styles.row, styles.toggleRow]}>
+            <View style={styles.rowText}>
+              <Text style={styles.title}>Block on fraud</Text>
+              <Text style={styles.subtitle}>Automatically block the caller when you mark the call as fraud.</Text>
+            </View>
+            <AutomationToggle
+              value={manualBlockEnabled}
+              onValueChange={toggleManualBlock}
+              inactiveTrackColor={switchInactiveTrackColor}
+              activeTrackColor={theme.colors.accent}
+            />
+          </View>
+          <View style={[styles.row, styles.toggleRow]}>
+            <View style={styles.rowText}>
+              <Text style={styles.title}>Trust on safe</Text>
+              <Text style={styles.subtitle}>Automatically trust the caller when you mark the call as safe.</Text>
+            </View>
+            <AutomationToggle
+              value={manualTrustEnabled}
+              onValueChange={toggleManualTrust}
+              inactiveTrackColor={switchInactiveTrackColor}
+              activeTrackColor={theme.colors.accent}
+            />
+          </View>
+        </View>
         <View style={styles.helperWrap}>
           <HowItWorksCard items={helperItems} />
         </View>
@@ -430,6 +503,24 @@ const createAutomationStyles = (theme: AppTheme) =>
     helperWrap: {
       paddingHorizontal: 4,
       marginTop: 12,
+    },
+    promptCard: {
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 20,
+      marginTop: 18,
+      backgroundColor: theme.colors.surface,
+      gap: 12,
+    },
+    promptCardTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    promptCardBody: {
+      fontSize: 13,
+      color: theme.colors.textMuted,
     },
     disabledContent: {
       paddingHorizontal: 24,

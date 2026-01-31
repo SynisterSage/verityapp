@@ -2459,8 +2459,10 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
     voiceBoost = Math.min(15, voiceMedian * 30);
   }
   const voiceHardOverride = voiceAlertBand === 'high' && (voiceMax ?? 0) >= 0.97;
-  const heuristic = heuristicBoosts(normalized, metadata.safePhraseMatches ?? []);
+  const safePhraseMatches = (metadata.safePhraseMatches ?? []).filter(Boolean);
+  const heuristic = heuristicBoosts(normalized, safePhraseMatches);
   const actionBoost = heuristic.actionBoost;
+  const safePhraseDampening = safePhraseMatches.length > 0 ? Math.min(40, safePhraseMatches.length * 12) : 0;
 
   if (!normalized) {
     return {
@@ -2533,7 +2535,8 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   score += (weightSum / 100) * 60;
   const multiplier = Math.max(1, Math.log(matches.length + 1));
   score *= multiplier;
-  const boost = comboBoost(normalized) + heuristic.boost;
+  let boost = comboBoost(normalized) + heuristic.boost;
+  boost = Math.max(0, boost - safePhraseDampening);
   score +=
     boost +
     highRiskCountryBoost +
@@ -2667,8 +2670,8 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         remoteAccessHits: heuristic.remoteAccessHits,
         criticalKeywordHits,
         callbackHits: heuristic.callbackHits,
-        safePhraseMatches: [],
-        safePhraseDampening: 0,
+        safePhraseMatches,
+        safePhraseDampening,
         repeatCallerBoost: 0,
         callerCountry,
         callerRegion,

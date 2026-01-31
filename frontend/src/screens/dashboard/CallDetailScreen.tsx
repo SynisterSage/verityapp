@@ -3,13 +3,14 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import { InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av/build/Audio.types';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +20,7 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import * as Haptics from 'expo-haptics';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
+import { BlurView } from 'expo-blur';
 
 import { supabase } from '../../services/supabase';
 import { authorizedFetch } from '../../services/backend';
@@ -28,6 +30,12 @@ import { emitCallUpdated } from '../../utils/callEvents';
 import { getRiskStyles } from '../../utils/risk';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import type { FraudNotes, VoiceAnalysis } from '../../types/fraud';
+import {
+  getAutoBlockManual,
+  getAutoTrustManual,
+  setAutoBlockManual,
+  setAutoTrustManual,
+} from '../../utils/blockTrustPrompt';
 
 type CallRow = {
   id: string;
@@ -65,11 +73,10 @@ type TranscriptSegment = {
   type: 'fraud' | 'safe' | null;
 };
 
-const BLOCK_TRUST_PROMPT_KEY = 'callDetailBlockTrustPromptDisabled';
-
 type MarkFeedbackOptions = {
   forceBlock?: boolean;
   forceTrust?: boolean;
+  skipAutomation?: boolean;
 };
 function collectMatches(text: string, keywords: string[], type: KeywordMatch['type']) {
   const cleanKeywords = Array.from(new Set(keywords.map((keyword) => keyword.trim()).filter(Boolean)));
@@ -162,7 +169,15 @@ export default function CallDetailScreen({
   const [isMarkingSafe, setIsMarkingSafe] = useState(false);
   const [isMarkingFraud, setIsMarkingFraud] = useState(false);
   const [isSubmittingVoiceFeedback, setIsSubmittingVoiceFeedback] = useState(false);
-  const [blockTrustPromptDisabled, setBlockTrustPromptDisabled] = useState(false);
+  const [autoBlockManual, setAutoBlockManualState] = useState(false);
+  const [autoTrustManual, setAutoTrustManualState] = useState(false);
+  const [promptState, setPromptState] = useState<{
+    status: 'marked_safe' | 'marked_fraud';
+    actionLabel: string;
+    message: string;
+    isFraud: boolean;
+    persistentLabel: string;
+  } | null>(null);
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const riskBarAnim = useRef(new Animated.Value(0)).current;
   const transcriptAnim = useRef(new Animated.Value(0)).current;
@@ -170,14 +185,12 @@ export default function CallDetailScreen({
   const styles = useMemo(() => createCallDetailStyles(theme), [theme]);
   useEffect(() => {
     const loadPromptPref = async () => {
-      const stored = await AsyncStorage.getItem(BLOCK_TRUST_PROMPT_KEY);
-      setBlockTrustPromptDisabled(stored === 'true');
+      const blockPref = await getAutoBlockManual();
+      const trustPref = await getAutoTrustManual();
+      setAutoBlockManualState(blockPref);
+      setAutoTrustManualState(trustPref);
     };
     void loadPromptPref();
-  }, []);
-  const disableBlockTrustPrompt = useCallback(() => {
-    setBlockTrustPromptDisabled(true);
-    void AsyncStorage.setItem(BLOCK_TRUST_PROMPT_KEY, 'true');
   }, []);
 
   const fetchRecordingLink = useCallback(async () => {
@@ -382,10 +395,8 @@ export default function CallDetailScreen({
         automationEnabled && (activeProfile.auto_block_on_fraud ?? true);
       const automationTrustEnabled =
         automationEnabled && (activeProfile.auto_trust_on_safe ?? false);
-      const shouldBlock =
-        options?.forceBlock ?? (status === 'marked_fraud' && automationBlockEnabled);
-      const shouldTrust =
-        options?.forceTrust ?? (status === 'marked_safe' && automationTrustEnabled);
+    const shouldBlock = options?.forceBlock ?? (!options?.skipAutomation && status === 'marked_fraud' && automationBlockEnabled);
+    const shouldTrust = options?.forceTrust ?? (!options?.skipAutomation && status === 'marked_safe' && automationTrustEnabled);
 
       const profileId = callRow?.profile_id;
       const callerNumber = callRow?.caller_number;
@@ -426,44 +437,61 @@ export default function CallDetailScreen({
     }
   };
 
+  const setManualPromptPreference = useCallback(
+    async (isFraud: boolean, value: boolean) => {
+      if (isFraud) {
+        setAutoBlockManualState(value);
+        await setAutoBlockManual(value);
+      } else {
+        setAutoTrustManualState(value);
+        await setAutoTrustManual(value);
+      }
+    },
+    []
+  );
+
+  const handlePromptClose = () => {
+    setPromptState(null);
+  };
+
+  const handlePromptMarkOnly = () => {
+    if (!promptState) return;
+    markFeedback(promptState.status, { skipAutomation: true });
+    handlePromptClose();
+  };
+
+  const handlePromptConfirm = (status: 'marked_safe' | 'marked_fraud', autoConfirm: boolean) => {
+    const isFraud = status === 'marked_fraud';
+    if (autoConfirm) {
+      void setManualPromptPreference(isFraud, true);
+      markFeedback(status, { forceBlock: isFraud, forceTrust: !isFraud });
+    } else {
+      markFeedback(status, { forceBlock: isFraud, forceTrust: !isFraud });
+    }
+    handlePromptClose();
+  };
+
   const promptBlockTrustBeforeMark = (status: 'marked_safe' | 'marked_fraud') => {
     const isFraud = status === 'marked_fraud';
-    if (blockTrustPromptDisabled) {
+    const shouldAutoAct = isFraud ? autoBlockManual : autoTrustManual;
+    if (shouldAutoAct) {
       markFeedback(status, { forceBlock: isFraud, forceTrust: !isFraud });
       return;
     }
-    const title = isFraud ? 'Block this caller?' : 'Trust this caller?';
     const message = isFraud
       ? 'Would you like to block this caller in addition to marking the call as fraud?'
       : 'Would you like to trust this caller in addition to marking the call as safe?';
-    const actionLabel = isFraud ? 'Block & mark fraud' : 'Trust & mark safe';
+    const actionLabel = isFraud ? 'Block &\nmark fraud' : 'Trust &\nmark safe';
     const persistentLabel = isFraud
       ? 'Always block & mark fraud'
       : 'Always trust & mark safe';
-    Alert.alert(
-      title,
+    setPromptState({
+      status,
+      actionLabel,
       message,
-      [
-        {
-          text: actionLabel,
-          onPress: () => markFeedback(status, { forceBlock: isFraud, forceTrust: !isFraud }),
-        },
-        {
-          text: `Just mark ${isFraud ? 'fraud' : 'safe'}`,
-          style: 'cancel',
-          onPress: () => markFeedback(status),
-        },
-        {
-          text: persistentLabel,
-          style: 'destructive',
-          onPress: () => {
-            disableBlockTrustPrompt();
-            markFeedback(status, { forceBlock: isFraud, forceTrust: !isFraud });
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+      isFraud,
+      persistentLabel,
+    });
   };
 
   const handleVoiceFeedback = useCallback(async () => {
@@ -1013,25 +1041,96 @@ export default function CallDetailScreen({
         </View>
       </ScrollView>
       {canManageProfile && (
-      <ActionFooter
-        primaryLabel={footerDisabledFraud ? 'Marked fraud' : 'Mark fraud'}
-        onPrimaryPress={handleMarkFraud}
-        primaryDisabled={footerDisabledFraud}
-        primaryLoading={isMarkingFraud}
-        primaryIcon={<Ionicons name="ban-outline" size={20} color={primaryTextColor} />}
-        primaryBackgroundColor={primaryBackgroundColor}
-        primaryTextColor={primaryTextColor}
-        secondaryLabel={footerDisabledSafe ? 'Marked safe' : 'Mark safe'}
-        onSecondaryPress={handleMarkSafe}
-        secondaryIcon={
-          <Ionicons name="checkmark-circle-outline" size={20} color={secondaryTextColor} />
-        }
-        secondaryBackgroundColor={secondaryBackgroundColor}
-        secondaryTextColor={secondaryTextColor}
-        secondaryDisabled={footerDisabledSafe}
-        secondaryLoading={isMarkingSafe}
-      />
-    )}
+        <ActionFooter
+          primaryLabel={footerDisabledFraud ? 'Marked fraud' : 'Mark fraud'}
+          onPrimaryPress={handleMarkFraud}
+          primaryDisabled={footerDisabledFraud}
+          primaryLoading={isMarkingFraud}
+          primaryIcon={<Ionicons name="ban-outline" size={20} color={primaryTextColor} />}
+          primaryBackgroundColor={primaryBackgroundColor}
+          primaryTextColor={primaryTextColor}
+          secondaryLabel={footerDisabledSafe ? 'Marked safe' : 'Mark safe'}
+          onSecondaryPress={handleMarkSafe}
+          secondaryIcon={
+            <Ionicons name="checkmark-circle-outline" size={20} color={secondaryTextColor} />
+          }
+          secondaryBackgroundColor={secondaryBackgroundColor}
+          secondaryTextColor={secondaryTextColor}
+          secondaryDisabled={footerDisabledSafe}
+          secondaryLoading={isMarkingSafe}
+        />
+      )}
+      {promptState && (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          onRequestClose={handlePromptClose}
+        >
+          <View style={styles.promptOverlay}>
+            <BlurView
+              intensity={90}
+              tint={mode === 'dark' ? 'dark' : 'light'}
+              style={styles.promptBlur}
+              pointerEvents="none"
+            />
+            <TouchableWithoutFeedback onPress={handlePromptClose}>
+              <View style={styles.promptBackdrop} />
+            </TouchableWithoutFeedback>
+            <View style={styles.promptContainer}>
+              <Text style={styles.promptHeadline}>
+                {promptState.isFraud ? 'Mark fraud' : 'Mark safe'}
+              </Text>
+              <Text style={styles.promptMessage}>{promptState.message}</Text>
+              <View style={styles.promptActions}>
+                <TouchableOpacity
+                  style={[
+                    styles.promptActionButton,
+                    styles.promptActionMarkOnly,
+                  ]}
+                  onPress={handlePromptMarkOnly}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.promptActionText, styles.promptActionMarkText]}>
+                    {promptState.isFraud ? 'Mark fraud' : 'Mark safe'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.promptActionButton,
+                    styles.promptActionBlockTrust,
+                    {
+                      backgroundColor: promptState.isFraud
+                        ? theme.colors.danger
+                        : theme.colors.success,
+                    },
+                  ]}
+                  onPress={() => handlePromptConfirm(promptState.status, false)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[styles.promptActionText, styles.promptActionBlockText]} numberOfLines={2}>
+                    {promptState.actionLabel}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                style={styles.promptNevermindButton}
+                onPress={handlePromptClose}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.promptNevermindText}>Nevermind</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => handlePromptConfirm(promptState.status, true)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.promptPersistentText}>{promptState.persistentLabel}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </SafeAreaView>
   );
 }
@@ -1085,9 +1184,9 @@ const createCallDetailStyles = (theme: AppTheme) =>
       fontSize: 12,
     },
     content: {
-      paddingHorizontal: 24,
-      paddingTop: 8,
-    },
+    paddingHorizontal: 24,
+    paddingTop: 8,
+  },
     heroBlock: {
       paddingTop: 12,
       paddingBottom: 18,
@@ -1167,6 +1266,92 @@ const createCallDetailStyles = (theme: AppTheme) =>
       fontSize: 12,
       fontWeight: '600',
       color: theme.colors.text,
+    },
+    promptOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 24,
+      backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    },
+    promptBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'transparent',
+    },
+    promptBlur: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    promptContainer: {
+      width: '100%',
+      borderRadius: 24,
+      backgroundColor: theme.colors.surface,
+      padding: 28,
+      shadowColor: theme.colors.border,
+      shadowOpacity: 0.3,
+      shadowRadius: 30,
+      shadowOffset: { width: 0, height: 12 },
+    },
+    promptHeadline: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+      marginBottom: 8,
+    },
+    promptMessage: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      marginBottom: 18,
+    },
+    promptActions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 12,
+    },
+    promptActionButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.3),
+      backgroundColor: withOpacity(theme.colors.surface, 0.6),
+    },
+    promptActionMarkOnly: {
+      borderColor: withOpacity(theme.colors.border, 0.4),
+    },
+    promptActionBlockTrust: {
+      borderColor: 'transparent',
+    },
+    promptActionText: {
+      fontWeight: '600',
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    promptActionMarkText: {
+      color: theme.colors.text,
+    },
+    promptActionBlockText: {
+      color: theme.colors.surface,
+    },
+    promptNevermindButton: {
+      marginBottom: 12,
+      paddingVertical: 14,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.3),
+      alignItems: 'center',
+      backgroundColor: 'transparent',
+    },
+    promptNevermindText: {
+      color: theme.colors.textMuted,
+      fontWeight: '600',
+    },
+    promptPersistentText: {
+      color: theme.colors.accent,
+      fontSize: 13,
+      textAlign: 'center',
+      fontWeight: '600',
     },
     recordingBadge: {
       borderRadius: 999,

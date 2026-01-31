@@ -57,8 +57,11 @@ export default function BottomDock({
   const bounceAnim = useRef(new Animated.Value(0)).current;
   const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
 
+  const isAlertsTabFocused = state.routes[state.index].name === 'AlertsTab';
+  const shouldAnimateBounce = unhandledCount > 0 && !isAlertsTabFocused;
+
   useEffect(() => {
-    if (unhandledCount > 0) {
+    if (shouldAnimateBounce) {
       if (!bounceLoopRef.current) {
         const ySequence = Animated.sequence([
           Animated.timing(bounceAnim, {
@@ -88,7 +91,7 @@ export default function BottomDock({
         bounceLoopRef.current = null;
       }
     };
-  }, [unhandledCount, bounceAnim]);
+  }, [shouldAnimateBounce, bounceAnim]);
 
   return (
     <View
