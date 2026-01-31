@@ -1,5 +1,5 @@
 import 'react-native-gesture-handler';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   DefaultTheme,
@@ -344,9 +344,10 @@ function RootNavigator() {
   );
 }
 
-function AppContent() {
+function NavigationHost() {
   const { mode, theme } = useTheme();
-  const { session } = useAuth();
+  const { session, isLoading } = useAuth();
+  const { onboardingComplete, isLoading: profileLoading, authInvalid } = useProfile();
   const pendingNotificationRef = useRef<PendingNotificationData | null>(null);
   const notificationListenerRef = useRef<Notifications.Subscription | null>(null);
 
@@ -400,8 +401,8 @@ function AppContent() {
     resolvePendingNotification();
   }, [session, resolvePendingNotification]);
 
-    const navTheme = useMemo(() => {
-      const baseTheme = mode === 'dark' ? DarkTheme : DefaultTheme;
+  const navTheme = useMemo(() => {
+    const baseTheme = mode === 'dark' ? DarkTheme : DefaultTheme;
     return {
       ...baseTheme,
       colors: {
@@ -413,28 +414,54 @@ function AppContent() {
         primary: theme.colors.accent,
       },
     };
-  }, [theme]);
+  }, [theme, mode]);
 
-    const statusBarStyle = mode === 'light' ? 'dark' : 'light';
+  const statusBarStyle = mode === 'light' ? 'dark' : 'light';
+  const isBusy = useMemo(() => isLoading || (session ? profileLoading : false), [
+    isLoading,
+    session,
+    profileLoading,
+  ]);
+  const [splashVisible, setSplashVisible] = useState(true);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSplashVisible(false);
+    }, 900);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isBusy || splashVisible) {
+    return <SplashScreen />;
+  }
+
+  if (isBusy) {
+    return <SplashScreen />;
+  }
+  return (
+    <NavigationContainer
+      theme={navTheme}
+      ref={navigationRef}
+      onReady={() => {
+        if (pendingNotificationRef.current) {
+          resolvePendingNotification();
+        }
+      }}
+    >
+      <RootNavigator />
+      <StatusBar style={statusBarStyle} />
+    </NavigationContainer>
+  );
+}
+
+function AppContent() {
   return (
     <ProfileProvider>
       <TwilioVoiceClientManager />
       <InviteLinkHandler />
       <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
         <GestureHandlerRootView style={{ flex: 1 }}>
-          <NavigationContainer
-            theme={navTheme}
-            ref={navigationRef}
-            onReady={() => {
-              if (pendingNotificationRef.current) {
-                resolvePendingNotification();
-              }
-            }}
-          >
-            <RootNavigator />
-            <StatusBar style={statusBarStyle} />
-          </NavigationContainer>
+          <NavigationHost />
         </GestureHandlerRootView>
       </SafeAreaProvider>
     </ProfileProvider>

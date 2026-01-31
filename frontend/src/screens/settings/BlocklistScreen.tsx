@@ -20,9 +20,9 @@ import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
-import { BlurView } from 'expo-blur';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
+import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import type { AppTheme } from '../../theme/tokens';
 
 type BlockedCaller = {
@@ -32,15 +32,20 @@ type BlockedCaller = {
   created_at: string;
 };
 
-const normalizeDigits = (value = '') => {
+const normalizeEntryDigits = (value = '') => {
   const digits = value.replace(/\D/g, '');
-  if (digits.length > 10) {
-    return digits.slice(-10);
-  }
-  return digits;
+  return digits.slice(0, 10);
 };
 
-const formatPhoneNumber = (digits: string) => {
+const extractTenDigits = (value?: string | null) => {
+  const digits = (value ?? '').replace(/\D/g, '');
+  if (!digits) {
+    return '';
+  }
+  return digits.length > 10 ? digits.slice(-10) : digits;
+};
+
+const formatInputDigits = (digits: string) => {
   if (!digits) return '';
   const area = digits.slice(0, 3);
   const prefix = digits.slice(3, 6);
@@ -71,7 +76,6 @@ export default function BlocklistScreen() {
   const [loading, setLoading] = useState(false);
   const [inputDigits, setInputDigits] = useState('');
   const [inputValue, setInputValue] = useState('');
-  const [prevInputValue, setPrevInputValue] = useState('');
   const [inputError, setInputError] = useState('');
   const [isAdding, setIsAdding] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
@@ -147,13 +151,10 @@ export default function BlocklistScreen() {
   const listEmpty = !loading && blockedList.length === 0 && !showSkeleton;
 
   const handleInputChange = (text: string) => {
-    const digits = normalizeDigits(text);
-    const formatted = formatPhoneNumber(digits);
-    const isDeleting = text.length < prevInputValue.length;
-    const nextValue = isDeleting ? text : formatted;
+    const digits = normalizeEntryDigits(text);
+    const formatted = formatInputDigits(digits);
     setInputDigits(digits);
-    setInputValue(nextValue);
-    setPrevInputValue(nextValue);
+    setInputValue(formatted);
     setInputError('');
   };
 
@@ -175,7 +176,6 @@ export default function BlocklistScreen() {
       });
       setInputDigits('');
       setInputValue('');
-      setPrevInputValue('');
       await fetchBlocked();
     } catch (err: any) {
       setInputError(err?.message || 'Failed to block number.');
@@ -199,7 +199,7 @@ export default function BlocklistScreen() {
   const closeTray = () => {
     Animated.timing(trayAnim, {
       toValue: 0,
-      duration: 200,
+      duration: 160,
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
@@ -262,6 +262,9 @@ export default function BlocklistScreen() {
     if (reason?.includes('auto')) {
       return 'Blocked automatically';
     }
+    if (reason?.includes('quick')) {
+      return 'Blocked via quick action';
+    }
     if (reason?.includes('manual')) {
       return 'Blocked manually';
     }
@@ -269,8 +272,7 @@ export default function BlocklistScreen() {
   };
 
   const formatDisplayNumber = (number?: string | null) => {
-    if (!number) return 'Unknown number';
-    return formatPhoneNumber(normalizeDigits(number));
+    return formatPhoneNumber(number, 'Unknown number');
   };
 
   const renderBlockRow = (caller: BlockedCaller) => (
@@ -289,6 +291,10 @@ export default function BlocklistScreen() {
   );
 
   const trayPaddingBottom = Math.max(insets.bottom, 24) + 12;
+  const trayOpacity = trayAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
@@ -314,7 +320,7 @@ export default function BlocklistScreen() {
         {renderManualCard()}
 
         <Text style={[styles.sectionLabel, styles.sectionLabelSpacing]}>Current block list</Text>
-        <View style={styles.listSection}>
+      <View style={styles.listSection}>
           {showSkeleton ? (
             <View style={styles.skeletonList}>
               {skeletonRows.map((key) => (
@@ -345,10 +351,8 @@ export default function BlocklistScreen() {
 
       {isTrayMounted && trayContact ? (
         <Modal transparent animationType="fade" visible>
-          <View style={styles.modalOverlay}>
-            <Pressable style={styles.modalBackdrop} onPress={closeTray}>
-              <BlurView intensity={65} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.modalBlur} />
-            </Pressable>
+          <Animated.View style={[styles.modalOverlay, { opacity: trayOpacity }]}>
+            <Pressable style={styles.modalBackdrop} onPress={closeTray} />
             <Animated.View
               style={[
                 styles.tray,
@@ -368,9 +372,15 @@ export default function BlocklistScreen() {
               <View style={styles.trayHandle} />
               <View style={styles.trayContent}>
                 <Text style={styles.trayTitle}>Manage blocked caller</Text>
-                <Text style={styles.trayNumber}>{trayContact.caller_number}</Text>
+                <Text style={styles.trayNumber}>
+                  {formatPhoneNumber(trayContact.caller_number, 'Unknown number')}
+                </Text>
                 <Text style={styles.trayReason}>
-                  {trayContact.reason?.toLowerCase().includes('auto') ? 'Blocked automatically' : 'Blocked manually'}
+                  {trayContact.reason?.toLowerCase().includes('auto')
+                    ? 'Blocked automatically'
+                    : trayContact.reason?.toLowerCase().includes('quick')
+                    ? 'Blocked via quick action'
+                    : 'Blocked manually'}
                 </Text>
               </View>
               <TouchableOpacity
@@ -388,7 +398,7 @@ export default function BlocklistScreen() {
                 <Text style={styles.trayCancelText}>Cancel</Text>
               </TouchableOpacity>
             </Animated.View>
-          </View>
+          </Animated.View>
         </Modal>
       ) : null}
     </SafeAreaView>
@@ -552,12 +562,9 @@ const createBlocklistStyles = (theme: AppTheme) =>
       ...StyleSheet.absoluteFillObject,
       justifyContent: 'flex-end',
       alignItems: 'center',
-      backgroundColor: withOpacity(theme.colors.text, 0.4),
+      backgroundColor: theme.colors.overlay,
     },
     modalBackdrop: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    modalBlur: {
       ...StyleSheet.absoluteFillObject,
     },
     tray: {
@@ -571,6 +578,12 @@ const createBlocklistStyles = (theme: AppTheme) =>
       padding: 24,
       gap: 12,
       alignItems: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.35,
+      shadowOffset: { width: 0, height: -12 },
+      shadowRadius: 30,
+      elevation: 20,
+      marginBottom: -10,
     },
     trayHandle: {
       width: 48,

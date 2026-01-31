@@ -554,49 +554,6 @@ export default function CallDetailScreen({
     return { title: 'Fraud detected', subtitle: 'High probability of malicious intent' };
   }, [callRow?.fraud_score]);
 
-  if (!callRow) {
-    return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.skeletonWrapper}>
-          <View style={styles.skeletonHeader}>
-            <View style={styles.skeletonLineWide} />
-            <View style={styles.skeletonLineShort} />
-          </View>
-          <View style={styles.skeletonCard}>
-            <View style={styles.skeletonTitle} />
-            <View style={styles.skeletonLineFull} />
-            <View style={styles.skeletonLineShort} />
-          </View>
-          <View style={styles.skeletonCard}>
-            <View style={styles.skeletonTitle} />
-            <View style={styles.skeletonLineFull} />
-            <View style={styles.skeletonLineMedium} />
-          </View>
-          <View style={styles.skeletonCard}>
-            <View style={styles.skeletonTitle} />
-            <View style={styles.skeletonLineFull} />
-            <View style={styles.skeletonLineFull} />
-            <View style={styles.skeletonLineShort} />
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-
-  const baseTopPadding = Math.max(16, insets.top + 4);
-  const containerPaddingTop = isCompactModal ? Math.max(12, insets.top + 2) : baseTopPadding;
-  const contentPaddingBottom = Math.max(insets.bottom + 88, 240);
-  const heroNumber = callRow?.caller_number
-    ? formatPhoneNumber(callRow.caller_number, 'Unknown caller')
-    : 'Unknown caller';
-  const heroDate = formatDateLabel(callRow?.created_at);
-  const heroTime = formatTimeLabel(callRow?.created_at);
-  const heroMeta = [heroDate, heroTime].filter(Boolean).join(' • ');
-  const riskScoreDisplay =
-    callRow?.fraud_score != null ? `${Math.round(callRow.fraud_score)}%` : '—';
-  const riskLevelLabel = (callRow?.fraud_risk_level ?? 'Unknown').toUpperCase();
-  const keywordTags = callRow?.fraud_keywords?.slice(0, 4) ?? [];
   const detectionTags = useMemo(() => {
     const notes = callRow?.fraud_notes;
     if (!notes) {
@@ -651,14 +608,59 @@ export default function CallDetailScreen({
     if (techSupportHits > 0) {
       tags.push('Tech support');
     }
-    return tags;
+    return tags.map((tag) => tag.toLowerCase());
   }, [callRow?.fraud_notes]);
+
+  if (!callRow) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.skeletonWrapper}>
+          <View style={styles.skeletonHeader}>
+            <View style={styles.skeletonLineWide} />
+            <View style={styles.skeletonLineShort} />
+          </View>
+          <View style={styles.skeletonCard}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonLineFull} />
+            <View style={styles.skeletonLineShort} />
+          </View>
+          <View style={styles.skeletonCard}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonLineFull} />
+            <View style={styles.skeletonLineMedium} />
+          </View>
+          <View style={styles.skeletonCard}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonLineFull} />
+            <View style={styles.skeletonLineFull} />
+            <View style={styles.skeletonLineShort} />
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const baseTopPadding = Math.max(16, insets.top + 4);
+  const containerPaddingTop = isCompactModal ? Math.max(12, insets.top + 2) : baseTopPadding;
+  const contentPaddingBottom = Math.max(insets.bottom + 88, 240);
+  const heroNumber = callRow.caller_number
+    ? formatPhoneNumber(callRow.caller_number, 'Unknown caller')
+    : 'Unknown caller';
+  const heroDate = formatDateLabel(callRow.created_at);
+  const heroTime = formatTimeLabel(callRow.created_at);
+  const heroMeta = [heroDate, heroTime].filter(Boolean).join(' • ');
+  const riskScoreDisplay =
+    callRow.fraud_score != null ? `${Math.round(callRow.fraud_score)}%` : '—';
+  const riskLevelLabel = (callRow.fraud_risk_level ?? 'Unknown').toUpperCase();
+  const keywordTags = callRow.fraud_keywords?.slice(0, 4) ?? [];
+  const intelTags = [...keywordTags, ...detectionTags];
+  const hasSafePhrase = safePhraseMatches.length > 0;
   const recordingLabel =
     recordingStatus === 'ready' ? 'Ready' : recordingStatus === 'loading' ? 'Loading' : 'Unavailable';
   const playDisabled = recordingStatus === 'error' || recordingStatus === 'loading';
-  const voiceAnalysis = callRow?.voice_analysis;
+  const voiceAnalysis = callRow.voice_analysis;
   const aggregatedScore =
-    voiceAnalysis?.chunkMedianFake ?? callRow?.voice_synthetic_score ?? null;
+    voiceAnalysis?.chunkMedianFake ?? callRow.voice_synthetic_score ?? null;
   const voiceScorePercent = aggregatedScore != null ? Math.round(aggregatedScore * 100) : null;
   const fallbackBand: 'none' | 'caution' | 'high' =
     aggregatedScore != null
@@ -678,10 +680,10 @@ export default function CallDetailScreen({
     voiceAlertBand === 'high'
       ? 'Multiple speech segments triggered our high-confidence band.'
       : 'The detector raised a caution flag; listen carefully before trusting.';
-  const voiceWarningMetadataParts = [];
+  const voiceWarningMetadataParts: string[] = [];
   const voiceDetectedStamp = (() => {
-    const voiceDate = formatDateLabel(callRow?.voice_detected_at);
-    const voiceTime = formatTimeLabel(callRow?.voice_detected_at);
+    const voiceDate = formatDateLabel(callRow.voice_detected_at);
+    const voiceTime = formatTimeLabel(callRow.voice_detected_at);
     return [voiceDate, voiceTime].filter(Boolean);
   })();
   if (voiceDetectedStamp.length > 0) {
@@ -830,24 +832,22 @@ export default function CallDetailScreen({
                   ]}
                 />
               </View>
-            <View style={styles.keywordRow}>
-              {keywordTags.length === 0 ? (
-                <Text style={styles.keywordFallback}>No keywords detected.</Text>
-              ) : (
-                keywordTags.map((keyword) => (
+            {intelTags.length === 0 && !hasSafePhrase ? (
+              <View style={[styles.keywordRow, styles.keywordRowCenter]}>
+                <Text style={styles.keywordFallback}>No risk indicators detected.</Text>
+              </View>
+            ) : (
+              <View style={styles.keywordRow}>
+                {intelTags.map((keyword) => (
                   <View key={keyword} style={styles.keywordPill}>
                     <Text style={styles.keywordText}>{keyword}</Text>
                   </View>
-                ))
-              )}
-            </View>
-            {detectionTags.length > 0 && (
-              <View style={styles.detectionRow}>
-                {detectionTags.map((tag) => (
-                  <View key={tag} style={styles.detectionPill}>
-                    <Text style={styles.detectionText}>{tag}</Text>
-                  </View>
                 ))}
+                {hasSafePhrase && (
+                  <View style={styles.safePhrasePill}>
+                    <Text style={styles.safePhraseText}>{safePhraseMatches.join(', ')}</Text>
+                  </View>
+                )}
               </View>
             )}
             </View>
@@ -1093,10 +1093,9 @@ const createCallDetailStyles = (theme: AppTheme) =>
     },
     badge: {
       borderRadius: 999,
-      borderWidth: 1,
       paddingHorizontal: 10,
       paddingVertical: 4,
-      borderColor: withOpacity(theme.colors.text, 0.12),
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
     },
     badgeText: {
       fontSize: 12,
@@ -1147,6 +1146,9 @@ const createCallDetailStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       flexWrap: 'wrap',
     },
+    keywordRowCenter: {
+      justifyContent: 'center',
+    },
     keywordPill: {
       backgroundColor: withOpacity(theme.colors.text, 0.08),
       borderRadius: 999,
@@ -1155,28 +1157,22 @@ const createCallDetailStyles = (theme: AppTheme) =>
       marginRight: 8,
       marginBottom: 8,
     },
-    detectionRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginTop: 8,
-    },
-    detectionPill: {
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.text, 0.2),
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      marginRight: 8,
-      marginBottom: 8,
-    },
-    detectionText: {
-      color: theme.colors.textMuted,
-      fontSize: 12,
-      fontWeight: '600',
-    },
     keywordText: {
       color: theme.colors.textMuted,
       fontSize: 12,
+    },
+    safePhrasePill: {
+      backgroundColor: withOpacity(theme.colors.success, 0.16),
+      borderRadius: 999,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      marginRight: 8,
+      marginBottom: 8,
+    },
+    safePhraseText: {
+      color: theme.colors.success,
+      fontSize: 12,
+      fontWeight: '700',
     },
     keywordFallback: {
       color: theme.colors.textMuted,

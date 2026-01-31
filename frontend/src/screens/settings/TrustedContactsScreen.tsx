@@ -22,6 +22,7 @@ import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
+import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import type { AppTheme } from '../../theme/tokens';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import SettingsHeader from '../../components/common/SettingsHeader';
@@ -611,7 +612,9 @@ export default function TrustedContactsScreen() {
   };
 
   const getContactDisplayName = (contact: TrustedContactRow) =>
-    contact.contact_name ?? contactMap[contact.caller_number]?.name ?? contact.caller_number;
+    contact.contact_name ??
+    contactMap[contact.caller_number]?.name ??
+    formatPhoneNumber(contact.caller_number, 'Unknown number');
   const getRelationshipLabel = (contact: TrustedContactRow) =>
     contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Trusted Safe Contact';
   const safeList = useMemo(() => {
@@ -634,6 +637,11 @@ export default function TrustedContactsScreen() {
     trayContact &&
     'source' in trayContact &&
     (trayContact as TrustedContactRow).source === 'manual';
+  const isQuickManageContact =
+    trayMode === 'manage' &&
+    trayContact &&
+    'source' in trayContact &&
+    (trayContact as TrustedContactRow).source === 'quick_action';
   const manualManageRow = isManualManageContact ? (trayContact as TrustedContactRow) : null;
   const manualManageNumber = manualManageRow?.caller_number ?? '';
   const manualManageDisplayName =
@@ -920,7 +928,9 @@ export default function TrustedContactsScreen() {
                         </Text>
                         <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
                       </View>
-                      <Text style={styles.trayHint}>Trusted Safe Contact</Text>
+                    <Text style={styles.trayHint}>
+                      {isQuickManageContact ? 'Trusted via quick action' : 'Trusted Safe Contact'}
+                    </Text>
                     </>
                   )}
                 </View>
@@ -1290,12 +1300,12 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: withOpacity(theme.colors.accent, 0.16),
+      backgroundColor: theme.colors.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
     },
     trayAvatarText: {
-      color: theme.colors.surface,
+      color: theme.colors.accent,
       fontSize: 18,
       fontWeight: '700',
     },

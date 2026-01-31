@@ -61,6 +61,13 @@ const formatSectionTitle = (title: string) => {
 
 const handledStatuses = new Set(['marked_safe', 'marked_fraud']);
 
+const formatE164 = (value?: string | null) => {
+  if (!value) return null;
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return null;
+  return `+${digits}`;
+};
+
 const isSameDay = (a: Date, b: Date) =>
   a.getFullYear() === b.getFullYear() &&
   a.getMonth() === b.getMonth() &&
@@ -261,7 +268,9 @@ export default function CallsScreen({
   const [isTrayMounted, setIsTrayMounted] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
   const [trayProcessing, setTrayProcessing] = useState(false);
-  const [activeTrayAction, setActiveTrayAction] = useState<'archive' | 'unarchive' | 'delete' | null>(null);
+  const [activeTrayAction, setActiveTrayAction] = useState<
+    'archive' | 'unarchive' | 'delete' | 'block' | 'trust' | null
+  >(null);
 
   const loadCalls = useCallback(async (silent = false) => {
     setError(null);
@@ -358,17 +367,10 @@ export default function CallsScreen({
     });
   }, [trayAnim]);
 
-  const canOpenTray = useCallback((call: CallRow) => {
-    const feedback = (call.feedback_status ?? '').toLowerCase();
-    return handledStatuses.has(feedback) || feedback === 'archived';
-  }, []);
+  const canOpenTray = useCallback(() => true, []);
 
   const handleTrayLongPress = useCallback(
     (call: CallRow) => {
-      const feedback = (call.feedback_status ?? '').toLowerCase();
-      if (!handledStatuses.has(feedback) && feedback !== 'archived') {
-        return;
-      }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
       showTray(call);
     },
@@ -412,6 +414,72 @@ export default function CallsScreen({
       setActiveTrayAction(null);
     }
   }, [trayCall, hideTray, loadCalls]);
+
+  const quickBlockNumber = useCallback(async () => {
+    if (!trayCall || !activeProfile) return;
+    const callerNumber = formatE164(trayCall.caller_number);
+    if (!callerNumber) {
+      Alert.alert('Block number', 'Caller number unavailable.');
+      return;
+    }
+    setTrayProcessing(true);
+    setActiveTrayAction('block');
+    try {
+      await authorizedFetch('/fraud/blocked-callers', {
+        method: 'POST',
+        body: JSON.stringify({
+          profileId: activeProfile.id,
+          callerNumber,
+          reason: 'quick_action',
+        }),
+      });
+      await authorizedFetch(`/calls/${trayCall.id}/feedback`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'marked_fraud' }),
+      });
+      await loadCalls(true);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      hideTray();
+    } catch (err: any) {
+      Alert.alert('Block failed', err?.message || 'Could not block that number.');
+    } finally {
+      setTrayProcessing(false);
+      setActiveTrayAction(null);
+    }
+  }, [activeProfile, trayCall, loadCalls, hideTray]);
+
+  const quickTrustContact = useCallback(async () => {
+    if (!trayCall || !activeProfile) return;
+    const callerNumber = formatE164(trayCall.caller_number);
+    if (!callerNumber) {
+      Alert.alert('Trust contact', 'Caller number unavailable.');
+      return;
+    }
+    setTrayProcessing(true);
+    setActiveTrayAction('trust');
+    try {
+      await authorizedFetch('/fraud/trusted-contacts', {
+        method: 'POST',
+        body: JSON.stringify({
+          profileId: activeProfile.id,
+          callerNumbers: [callerNumber],
+          source: 'quick_action',
+        }),
+      });
+      await authorizedFetch(`/calls/${trayCall.id}/feedback`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'marked_safe' }),
+      });
+      await loadCalls(true);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hideTray();
+    } catch (err: any) {
+      Alert.alert('Trust failed', err?.message || 'Could not add that call to trusted contacts.');
+    } finally {
+      setTrayProcessing(false);
+      setActiveTrayAction(null);
+    }
+  }, [activeProfile, trayCall, loadCalls, hideTray]);
 
   const filteredCalls = useMemo(() => {
     if (filter === 'all') {
@@ -536,7 +604,7 @@ const sections = useMemo<CallSection[]>(() => {
               statusColor={status.color}
               hasTranscript={Boolean(item.transcript)}
               onPress={() => handleCallPress(item)}
-              onLongPress={canOpenTray(item) ? () => handleTrayLongPress(item) : undefined}
+              onLongPress={canOpenTray() ? () => handleTrayLongPress(item) : undefined}
               isMuted={isMuted}
               styles={styles}
             />
@@ -585,6 +653,15 @@ const sections = useMemo<CallSection[]>(() => {
     : 'Archive this call';
   const deleteActionLabel =
     trayProcessing && activeTrayAction === 'delete' ? 'Working…' : 'Delete this call';
+  const trayFeedback = (trayCall?.feedback_status ?? '').toLowerCase();
+  const trayIsHandled = handledStatuses.has(trayFeedback) || trayFeedback === 'archived';
+  const hasCallerNumber = Boolean(formatE164(trayCall?.caller_number));
+  const blockActionLabel =
+    trayProcessing && activeTrayAction === 'block' ? 'Working…' : 'Quick block number';
+  const trustActionLabel =
+    trayProcessing && activeTrayAction === 'trust'
+      ? 'Working…'
+      : 'Add to trusted contacts';
 
   return (
     <SafeAreaView
@@ -684,35 +761,66 @@ const sections = useMemo<CallSection[]>(() => {
                   {formatTime(trayCall.created_at)}
                   {formatDateLabel(trayCall.created_at) ? ` · ${formatDateLabel(trayCall.created_at)}` : ''}
                 </Text>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.trayAction,
-                    pressed && styles.trayActionPressed,
-                    trayProcessing && styles.trayActionDisabled,
-                  ]}
-                  onPress={toggleArchiveCall}
-                  disabled={trayProcessing}
-                >
-                  <Text style={styles.trayActionText}>{primaryActionLabel}</Text>
-                  <Text style={styles.trayActionHint}>
-                    {isTrayArchived
-                      ? 'Restores it to the main feed.'
-                      : 'Moves it to archived section.'}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.trayAction,
-                    styles.trayDanger,
-                    pressed && styles.trayActionPressed,
-                    trayProcessing && styles.trayActionDisabled,
-                  ]}
-                  onPress={deleteCall}
-                  disabled={trayProcessing}
-                >
-                  <Text style={[styles.trayActionText, styles.trayDangerText]}>{deleteActionLabel}</Text>
-                  <Text style={styles.trayActionHint}>Removes the call permanently.</Text>
-                </Pressable>
+                {trayIsHandled ? (
+                  <>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.trayAction,
+                        pressed && styles.trayActionPressed,
+                        trayProcessing && styles.trayActionDisabled,
+                      ]}
+                      onPress={toggleArchiveCall}
+                      disabled={trayProcessing}
+                    >
+                      <Text style={styles.trayActionText}>{primaryActionLabel}</Text>
+                      <Text style={styles.trayActionHint}>
+                        {isTrayArchived ? 'Restores it to the main feed.' : 'Moves it to archived section.'}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.trayAction,
+                        styles.trayDanger,
+                        pressed && styles.trayActionPressed,
+                        trayProcessing && styles.trayActionDisabled,
+                      ]}
+                      onPress={deleteCall}
+                      disabled={trayProcessing}
+                    >
+                      <Text style={[styles.trayActionText, styles.trayDangerText]}>{deleteActionLabel}</Text>
+                      <Text style={styles.trayActionHint}>Removes the call permanently.</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.trayAction,
+                        styles.trayDanger,
+                        pressed && styles.trayActionPressed,
+                        (trayProcessing || !hasCallerNumber) && styles.trayActionDisabled,
+                      ]}
+                      onPress={quickBlockNumber}
+                      disabled={trayProcessing || !hasCallerNumber}
+                    >
+                      <Text style={[styles.trayActionText, styles.trayDangerText]}>{blockActionLabel}</Text>
+                      <Text style={styles.trayActionHint}>Quickly block this caller number.</Text>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.trayAction,
+                        styles.trayActionSuccess,
+                        pressed && styles.trayActionPressed,
+                        (trayProcessing || !hasCallerNumber) && styles.trayActionDisabled,
+                      ]}
+                      onPress={quickTrustContact}
+                      disabled={trayProcessing || !hasCallerNumber}
+                    >
+                      <Text style={[styles.trayActionText, styles.trayActionTextSuccess]}>{trustActionLabel}</Text>
+                      <Text style={styles.trayActionHint}>Adds this call to trusted contacts.</Text>
+                    </Pressable>
+                  </>
+                )}
                 <Pressable
                   style={({ pressed }) => [
                     styles.trayAction,
@@ -967,6 +1075,12 @@ const createCallStyles = (theme: AppTheme) =>
       color: theme.colors.textMuted,
       fontSize: 12,
       marginTop: 4,
+    },
+    trayActionSuccess: {
+      backgroundColor: withOpacity(theme.colors.success, 0.15),
+    },
+    trayActionTextSuccess: {
+      color: theme.colors.success,
     },
     trayDanger: {
       backgroundColor: withOpacity(theme.colors.danger, 0.15),
