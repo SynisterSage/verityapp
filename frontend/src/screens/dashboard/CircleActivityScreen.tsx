@@ -60,28 +60,32 @@ export default function CircleActivityScreen() {
     () => activityList.filter((activity) => CIRCLE_ALERT_TYPES.has(activity.alertRow.alert_type ?? '')),
     [activityList]
   );
+  const circleActivityIdsToDelete = useMemo(
+    () => new Set(circleActivitiesToDelete.map((activity) => activity.alertRow.id)),
+    [circleActivitiesToDelete]
+  );
 
   const deleteAllActivities = useCallback(async () => {
-    if (!circleActivitiesToDelete.length) {
+    if (circleActivityIdsToDelete.size === 0) {
       return;
     }
     setDeletingAll(true);
-    for (const activity of circleActivitiesToDelete) {
+    for (const alertId of Array.from(circleActivityIdsToDelete)) {
       try {
-        await authorizedFetch(`/alerts/${activity.alertRow.id}`, { method: 'DELETE' });
+        await authorizedFetch(`/alerts/${alertId}`, { method: 'DELETE' });
       } catch {
         // ignore individual failures
       }
     }
     setActivityList((prev) =>
-      prev.filter((activity) => !CIRCLE_ALERT_TYPES.has(activity.alertRow.alert_type ?? ''))
+      prev.filter((activity) => !circleActivityIdsToDelete.has(activity.alertRow.id))
     );
     setDeletingAll(false);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [circleActivitiesToDelete]);
+  }, [circleActivityIdsToDelete]);
 
   const confirmDeleteAll = useCallback(() => {
-    if (!circleActivitiesToDelete.length || deletingAll) {
+    if (circleActivityIdsToDelete.size === 0 || deletingAll) {
       return;
     }
     Alert.alert(
@@ -92,7 +96,7 @@ export default function CircleActivityScreen() {
         { text: 'Delete all', style: 'destructive', onPress: deleteAllActivities },
       ]
     );
-  }, [activityList.length, deletingAll, deleteAllActivities]);
+  }, [circleActivityIdsToDelete, deletingAll, deleteAllActivities]);
 
   const showTray = useCallback(
     (alert: AlertRow) => {
@@ -394,7 +398,8 @@ const createCircleStyles = (theme: AppTheme) =>
       justifyContent: 'center',
       alignItems: 'stretch',
       paddingHorizontal: 24,
-      paddingTop: 36,
+      paddingTop: 0,
+      paddingBottom: 34
     },
     trayOverlay: {
       ...StyleSheet.absoluteFillObject,

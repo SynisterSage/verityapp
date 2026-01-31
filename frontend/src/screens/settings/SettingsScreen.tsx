@@ -89,7 +89,7 @@ export default function SettingsScreen({
     if (canManageProfile) {
       rows.push({
         label: 'Automation',
-        subtitle: 'Smart AI screening rules',
+        subtitle: 'Verity smart screening rules',
         icon: 'flash-outline',
         onPress: () => navigation.navigate('Automation'),
       });

@@ -185,17 +185,22 @@ export default function AutomationScreen() {
   const helperItems = useMemo(
     () => [
       {
-        icon: 'speedometer',
-        color: theme.colors.accent,
-        text: 'Sliders set how strict Verity evaluates each call so you can keep the circle calm.',
+        icon: 'alert-circle',
+        color: theme.colors.danger,
+        text: 'Slide the fraud control to decide how easily Verity flags a caller.',
       },
       {
         icon: 'shield-checkmark',
         color: theme.colors.success,
-        text: 'Toggles decide whether to block suspicious calls or trust the gentle ones automatically.',
+        text: 'Toggle here to automatically block high-risk calls or trust gentle ones.',
+      },
+      {
+        icon: 'checkmark-circle',
+        color: theme.colors.accent,
+        text: 'Press "Save preferences" when you are done so the changes stick.',
       },
     ],
-    [theme.colors.accent, theme.colors.success]
+    [theme.colors.accent, theme.colors.danger, theme.colors.success]
   );
 
   const hasChanges = useMemo(() => {
@@ -260,12 +265,12 @@ export default function AutomationScreen() {
 
         <View style={styles.card}>
           <View style={[styles.row, styles.rowTop]}>
-            <View style={styles.rowText}>
-              <Text style={styles.title}>Auto-label calls</Text>
-              <Text style={[styles.subtitle, styles.subtitleSpaced]}>
-                Let Verity filter each call for your loved one so you only get the alerts that matter.
-              </Text>
-            </View>
+          <View style={styles.rowText}>
+            <Text style={styles.title}>Auto-label calls</Text>
+            <Text style={[styles.subtitle, styles.subtitleSimple]}>
+              Verity tags every incoming call so you only see alerts for what truly matters.
+            </Text>
+          </View>
             <AutomationToggle
               value={autoMarkEnabled}
               onValueChange={setAutoMarkEnabled}
@@ -280,7 +285,7 @@ export default function AutomationScreen() {
           <View style={[styles.thresholdRow, !autoMarkEnabled && styles.disabled]}>
             <View style={styles.sliderHeader}>
               <Text style={styles.thresholdLabel}>Mark as fraud at: {fraudThreshold}</Text>
-              <Text style={styles.sliderHint}>Higher = stricter filtering</Text>
+              <Text style={styles.sliderHint}>Move this slider right to catch more suspicious callers.</Text>
             </View>
             <Slider
               value={fraudThreshold}
@@ -293,13 +298,13 @@ export default function AutomationScreen() {
               thumbTintColor={theme.colors.surface}
               disabled={!autoMarkEnabled}
             />
-            <Text style={styles.helper}>Recommended: 85–95 for strict fraud catches.</Text>
+            <Text style={styles.helper}>Recommended range: 85–95 for strict fraud catches.</Text>
           </View>
 
           <View style={[styles.thresholdRow, !autoMarkEnabled && styles.disabled]}>
             <View style={styles.sliderHeader}>
               <Text style={styles.thresholdLabel}>Mark as safe at: {safeThreshold}</Text>
-              <Text style={styles.sliderHint}>Lower = more trust</Text>
+              <Text style={styles.sliderHint}>Move this slider left to trust harmless callers faster.</Text>
             </View>
             <Slider
               value={safeThreshold}
@@ -312,7 +317,7 @@ export default function AutomationScreen() {
               thumbTintColor={theme.colors.surface}
               disabled={!autoMarkEnabled}
             />
-            <Text style={styles.helper}>Recommended: 20–35 for clearly low-risk calls.</Text>
+            <Text style={styles.helper}>Recommended range: 20–35 for clearly low-risk calls.</Text>
           </View>
 
           <View style={[styles.row, styles.toggleRow, !autoMarkEnabled && styles.disabled]}>
@@ -438,6 +443,12 @@ const createAutomationStyles = (theme: AppTheme) =>
       fontSize: 13,
       lineHeight: 18,
     },
+    subtitleSimple: {
+      marginTop: 4,
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      lineHeight: 18,
+    },
     subtitleSpaced: {
       marginTop: 4,
     },
@@ -446,9 +457,9 @@ const createAutomationStyles = (theme: AppTheme) =>
       marginBottom: 6,
     },
     sliderHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      gap: 4,
     },
     sliderHint: {
       color: theme.colors.textDim,
