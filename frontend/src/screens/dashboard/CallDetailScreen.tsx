@@ -1272,7 +1272,7 @@ const createCallDetailStyles = (theme: AppTheme) =>
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 24,
-      backgroundColor: 'rgba(0, 0, 0, 0.35)',
+      backgroundColor: theme.colors.overlay,
     },
     promptBackdrop: {
       ...StyleSheet.absoluteFillObject,
@@ -1314,11 +1314,12 @@ const createCallDetailStyles = (theme: AppTheme) =>
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: withOpacity(theme.colors.text, 0.3),
+      borderColor: withOpacity(theme.colors.border, 0.6),
       backgroundColor: withOpacity(theme.colors.surface, 0.6),
     },
     promptActionMarkOnly: {
-      borderColor: withOpacity(theme.colors.border, 0.4),
+      borderColor: withOpacity(theme.colors.border, 0.9),
+      backgroundColor: theme.colors.surfaceAlt,
     },
     promptActionBlockTrust: {
       borderColor: 'transparent',
