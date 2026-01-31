@@ -25,6 +25,7 @@ import * as Notifications from 'expo-notifications';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ProfileProvider, useProfile } from './src/context/ProfileContext';
+import { AlertProvider } from './src/context/AlertContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { authorizedFetch } from './src/services/backend';
 import SignInScreen from './src/screens/auth/SignInScreen';
@@ -33,6 +34,7 @@ import ConfirmEmailScreen from './src/screens/auth/ConfirmEmailScreen';
 import HomeScreen from './src/screens/dashboard/HomeScreen';
 import CallsScreen from './src/screens/dashboard/CallsScreen';
 import CallDetailScreen from './src/screens/dashboard/CallDetailScreen';
+import CircleActivityScreen from './src/screens/dashboard/CircleActivityScreen';
 import AlertsScreen from './src/screens/dashboard/AlertsScreen';
 import SettingsScreen from './src/screens/settings/SettingsScreen';
 import SafePhrasesScreen from './src/screens/settings/SafePhrasesScreen';
@@ -211,7 +213,8 @@ function AppTabs() {
   }, [redirectToSettings, setRedirectToSettings]);
 
   return (
-    <Tab.Navigator
+    <AlertProvider>
+      <Tab.Navigator
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
@@ -237,7 +240,8 @@ function AppTabs() {
         component={SettingsStackNavigator}
         options={{ title: 'Settings' }}
       />
-    </Tab.Navigator>
+      </Tab.Navigator>
+    </AlertProvider>
   );
 }
 
@@ -317,6 +321,11 @@ function RootNavigator() {
             <RootStack.Screen
               name="CallDetailModal"
               component={CallDetailScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="CircleActivityModal"
+              component={CircleActivityScreen}
               options={{ headerShown: false, presentation: 'modal' }}
             />
           </>

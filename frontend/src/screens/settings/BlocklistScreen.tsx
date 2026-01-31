@@ -86,7 +86,7 @@ export default function BlocklistScreen() {
   const trayAnim = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.65)).current;
 
-  const { theme, mode } = useTheme();
+  const { theme } = useTheme();
   const styles = useMemo(() => createBlocklistStyles(theme), [theme]);
   const placeholderColor = useMemo(
     () => withOpacity(theme.colors.textMuted, 0.65),

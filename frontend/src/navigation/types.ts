@@ -14,6 +14,7 @@ export type RootStackParamList = {
   OnboardingInviteCode: undefined;
   AppTabs: undefined;
   CallDetailModal: { callId: string; compact?: boolean };
+  CircleActivityModal: { activities: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };
 };
 
 export type TabParamList = {

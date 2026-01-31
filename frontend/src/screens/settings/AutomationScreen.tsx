@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -13,6 +13,14 @@ import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
 
+type AutomationToggleProps = {
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  disabled?: boolean;
+  inactiveTrackColor: string;
+  activeTrackColor: string;
+};
+
 export default function AutomationScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile, canManageProfile, setActiveProfile } = useProfile();
@@ -24,6 +32,33 @@ export default function AutomationScreen() {
   const [saving, setSaving] = useState(false);
   const { theme } = useTheme();
   const styles = useMemo(() => createAutomationStyles(theme), [theme]);
+  const AutomationToggle = ({
+    value,
+    onValueChange,
+    disabled = false,
+    inactiveTrackColor,
+    activeTrackColor,
+  }: AutomationToggleProps) => (
+    <TouchableOpacity
+      style={[
+        styles.toggleButton,
+        { backgroundColor: value ? activeTrackColor : inactiveTrackColor },
+        disabled && styles.toggleDisabled,
+      ]}
+      onPress={() => {
+        if (disabled) return;
+        onValueChange(!value);
+      }}
+      activeOpacity={0.85}
+    >
+      <View
+        style={[
+          styles.toggleThumb,
+          value ? styles.toggleThumbActive : styles.toggleThumbInactive,
+        ]}
+      />
+    </TouchableOpacity>
+  );
   const sliderInactiveTrackColor = useMemo(
     () => withOpacity(theme.colors.textMuted, 0.25),
     [theme.colors.textMuted]
@@ -188,11 +223,12 @@ export default function AutomationScreen() {
                 Let Verity filter each call for your loved one so you only get the alerts that matter.
               </Text>
             </View>
-            <Switch
+            <AutomationToggle
               value={autoMarkEnabled}
               onValueChange={setAutoMarkEnabled}
-              trackColor={{ false: switchInactiveTrackColor, true: theme.colors.accent }}
-              thumbColor={theme.colors.surface}
+              disabled={!canManageProfile}
+              inactiveTrackColor={switchInactiveTrackColor}
+              activeTrackColor={theme.colors.accent}
             />
           </View>
 
@@ -241,12 +277,12 @@ export default function AutomationScreen() {
               <Text style={styles.title}>Block high-risk callers</Text>
               <Text style={styles.subtitle}>If auto-marked fraud, block the number.</Text>
             </View>
-            <Switch
+            <AutomationToggle
               value={autoBlockOnFraud}
               onValueChange={setAutoBlockOnFraud}
-              trackColor={{ false: switchInactiveTrackColor, true: theme.colors.accent }}
-              thumbColor={theme.colors.surface}
               disabled={!autoMarkEnabled}
+              inactiveTrackColor={switchInactiveTrackColor}
+              activeTrackColor={theme.colors.accent}
             />
           </View>
 
@@ -255,12 +291,12 @@ export default function AutomationScreen() {
               <Text style={styles.title}>Trust low-risk callers</Text>
               <Text style={styles.subtitle}>If auto-marked safe, add them to Trusted Contacts.</Text>
             </View>
-            <Switch
+            <AutomationToggle
               value={autoTrustOnSafe}
               onValueChange={setAutoTrustOnSafe}
-              trackColor={{ false: switchInactiveTrackColor, true: theme.colors.accent }}
-              thumbColor={theme.colors.surface}
               disabled={!autoMarkEnabled}
+              inactiveTrackColor={switchInactiveTrackColor}
+              activeTrackColor={theme.colors.accent}
             />
           </View>
         </View>
@@ -366,6 +402,30 @@ const createAutomationStyles = (theme: AppTheme) =>
     separator: {
       height: 1,
       backgroundColor: theme.colors.border,
+    },
+    toggleButton: {
+      width: 52,
+      height: 32,
+      borderRadius: 16,
+      padding: 2,
+      justifyContent: 'center',
+    },
+    toggleThumb: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: theme.colors.surface,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+    },
+    toggleThumbActive: {
+      alignSelf: 'flex-end',
+    },
+    toggleThumbInactive: {
+      alignSelf: 'flex-start',
+    },
+    toggleDisabled: {
+      opacity: 0.6,
     },
     helperWrap: {
       paddingHorizontal: 4,

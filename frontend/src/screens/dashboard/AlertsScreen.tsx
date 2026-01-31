@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
@@ -30,30 +31,14 @@ import { withOpacity } from '../../utils/color';
 import { getRiskStyles } from '../../utils/risk';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import type { AppTheme } from '../../theme/tokens';
-type AlertRow = {
-  id: string;
-  alert_type: string;
-  status: string;
-  created_at: string;
-  payload: any;
-  call_id: string | null;
-  risk_label?: string | null;
-  risk_level?: string | null;
-  processed?: boolean;
-  feedback_status?: string | null;
-  feedback_at?: string | null;
-  feedback_by_user_id?: string | null;
-  handled_by_name?: string | null;
-};
-
-type CircleActivity = {
-  id: string;
-  label: string;
-  description: string;
-  timestamp: string;
-  alertRow: AlertRow;
-};
-
+import type { CircleActivityItem } from './circleActivityTypes';
+import { useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import type { RootStackParamList } from '../../navigation/types';
+import { AlertRow } from './alertTypes';
+import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
+import { formatAlertDateLabel, formatAlertTime } from './alertTimeUtils';
+import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
 const capitalizeLabel = (value?: string | null) => {
   if (!value) return '';
   return value
@@ -79,14 +64,6 @@ function formatReason(alert: AlertRow) {
 
 const highRiskLevels = new Set(['critical', 'high', 'medium']);
 const HANDLED_STATUSES = new Set(['acknowledged', 'resolved']);
-const CIRCLE_ALERT_TYPES = new Set([
-  'pin_change',
-  'circle_invite',
-  'security_password',
-  'safe_phrase_added',
-  'trusted_contact_added',
-  'blocked_caller_added',
-]);
 
 function isHandledByStatus(status?: string | null) {
   if (!status) return false;
@@ -97,7 +74,7 @@ function isHandledAlert(alert: AlertRow) {
   return alert.processed || isHandledByStatus(alert.status);
 }
 
-export default function AlertsScreen({ navigation }: { navigation: any }) {
+export default function AlertsScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const { theme } = useTheme();
@@ -129,6 +106,8 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
   const trayAnim = useRef(new Animated.Value(0)).current;
   const [trayProcessing, setTrayProcessing] = useState(false);
   const [activeTrayAction, setActiveTrayAction] = useState<'delete' | null>(null);
+  const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+
   const navigateToCallDetail = useCallback(
     (callId: string) => {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -139,22 +118,6 @@ export default function AlertsScreen({ navigation }: { navigation: any }) {
     },
     [navigation]
   );
-
-const formatAlertTime = (value: string) =>
-  new Date(value).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-const formatAlertDateLabel = (value?: string | null) => {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const now = new Date();
-  const showYear = now.getFullYear() !== date.getFullYear();
-  return date.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    ...(showYear ? { year: 'numeric' } : {}),
-  });
-};
 
 const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 
@@ -467,7 +430,7 @@ const loadMemberNames = useCallback(async () => {
       ),
     [sortedAlerts, priorityIds, shieldIds, isCircleActivityAlert]
   );
-  const circleActivity = useMemo<CircleActivity[]>(() => {
+  const circleActivity = useMemo<CircleActivityItem[]>(() => {
     const now = Date.now();
     const window = 1000 * 60 * 60 * 24; // last 24h
     const cutoff = now - window;
@@ -556,7 +519,7 @@ const loadMemberNames = useCallback(async () => {
     const combined = [...circleActivities, ...processedActivities].sort(
       (a, b) => b.order - a.order
     );
-    return combined.slice(0, 2).map(({ order, ...rest }) => rest);
+    return combined.map(({ order, ...rest }) => rest);
   }, [alerts, callNumberMap, contactNames, memberNames]);
   const pendingAlertCount = useMemo(
     () => alerts.filter((alert) => !isHandledAlert(alert)).length,
@@ -647,8 +610,11 @@ const loadMemberNames = useCallback(async () => {
     [remainingAlerts]
   );
 
-  const renderSectionHeader = (label: string) => (
-    <Text style={styles.sectionLabel}>{label}</Text>
+  const renderSectionHeader = (label: string, right?: ReactNode) => (
+    <View style={styles.sectionHeader}>
+      <Text style={styles.sectionLabel}>{label}</Text>
+      {right ? <View style={styles.sectionHeaderRight}>{right}</View> : null}
+    </View>
   );
 
   const renderPrioritySection = () => {
@@ -789,52 +755,69 @@ const loadMemberNames = useCallback(async () => {
 
   const renderCircleSection = () => {
     if (!circleActivity.length) return null;
+    const preview = circleActivity.slice(0, 2);
+    const hasMore = circleActivity.length > preview.length;
+    const headerRight = hasMore ? (
+      <TouchableOpacity style={styles.circleViewAllButton} onPress={openCircleFeed} activeOpacity={0.7}>
+        <Text style={[styles.circleViewAllText, { color: theme.colors.accent }]}>View all</Text>
+        <Ionicons
+          name="chevron-forward"
+          size={14}
+          color={theme.colors.accent}
+          style={styles.circleViewAllIcon}
+        />
+      </TouchableOpacity>
+    ) : undefined;
     return (
       <View style={[styles.section, styles.circleSection]}>
-        {renderSectionHeader('Circle activity')}
+        {renderSectionHeader('Circle activity', headerRight)}
         <View style={styles.circleGroup}>
-        {circleActivity.map((activity) => (
-          <Pressable
-            key={activity.id}
-            onLongPress={() => showTray(activity.alertRow)}
-            android_ripple={{ color: withOpacity(theme.colors.text, 0.08) }}
-            style={({ pressed }) => [
-              styles.circleCardWrapper,
-              pressed && styles.circleCardPressed,
-            ]}
-          >
-            <View style={styles.circleCard}>
-              <View style={[styles.circleAccentStrip, { backgroundColor: theme.colors.accent }]} />
-              <View style={styles.circleCardContent}>
-                <View style={styles.circleHeaderRow}>
-                  <View
-                    style={[
-                      styles.circleIconWrapper,
-                      { backgroundColor: withOpacity(theme.colors.accent, 0.16) },
-                    ]}
-                  >
-                    <Ionicons name="people-outline" size={16} color={theme.colors.accent} />
+          {preview.map((activity) => (
+            <Pressable
+              key={activity.id}
+              onLongPress={() => showTray(activity.alertRow)}
+              android_ripple={{ color: withOpacity(theme.colors.text, 0.08) }}
+              style={({ pressed }) => [
+                styles.circleCardWrapper,
+                pressed && styles.circleCardPressed,
+              ]}
+            >
+              <View style={styles.circleCard}>
+                <View style={[styles.circleAccentStrip, { backgroundColor: theme.colors.accent }]} />
+                <View style={styles.circleCardContent}>
+                  <View style={styles.circleHeaderRow}>
+                    <View
+                      style={[
+                        styles.circleIconWrapper,
+                        { backgroundColor: withOpacity(theme.colors.accent, 0.16) },
+                      ]}
+                    >
+                      <Ionicons name="people-outline" size={16} color={theme.colors.accent} />
+                    </View>
+                    <Text style={[styles.circleTitle, { color: theme.colors.textMuted }]}>
+                      {activity.label}
+                    </Text>
+                    <View style={styles.circleHeaderSpacer} />
+                    <Ionicons name="time-outline" size={12} color={theme.colors.textDim} />
+                    <Text style={[styles.circleTimestamp, { color: theme.colors.textDim }]}>
+                      {activity.timestamp}
+                    </Text>
                   </View>
-                  <Text style={[styles.circleTitle, { color: theme.colors.textMuted }]}> 
-                    {activity.label}
-                  </Text>
-                  <View style={styles.circleHeaderSpacer} />
-                  <Ionicons name="time-outline" size={12} color={theme.colors.textDim} />
-                  <Text style={[styles.circleTimestamp, { color: theme.colors.textDim }]}> 
-                    {activity.timestamp}
+                  <Text style={[styles.circleDescription, { color: theme.colors.textMuted }]}>
+                    {activity.description}
                   </Text>
                 </View>
-                <Text style={[styles.circleDescription, { color: theme.colors.textMuted }]}> 
-                  {activity.description}
-                </Text>
               </View>
-            </View>
-          </Pressable>
-        ))}
+            </Pressable>
+          ))}
+        </View>
       </View>
-    </View>
-  );
-};
+    );
+  };
+
+  const openCircleFeed = useCallback(() => {
+    navigation.navigate('CircleActivityModal', { activities: circleActivity });
+  }, [circleActivity, navigation]);
 
   const showTray = useCallback(
     (alert: AlertRow) => {
@@ -1001,7 +984,7 @@ const loadMemberNames = useCallback(async () => {
     const sub = AppState.addEventListener('change', handleAppStateChange);
     return () => sub.remove();
   }, []);
-    const bottomGap = Math.max(insets.bottom, 0) + 20;
+  const bottomGap = Math.max(insets.bottom, 0) + 20;
 
   const trayTranslateY = trayAnim.interpolate({
     inputRange: [0, 1],
@@ -1023,37 +1006,14 @@ const loadMemberNames = useCallback(async () => {
       ? formatAlertTime(trayHandledTimestamp)
       : '';
   const circleTrayCopy = useMemo(() => {
-    if (!trayAlert || !CIRCLE_ALERT_TYPES.has(trayAlert.alert_type ?? '')) {
-      return { title: 'Alert options', subtitle: trayAlert?.risk_label ?? 'Handled alert', detail: trayHandledDisplay };
+    if (!trayAlert) {
+      return { title: 'Alert options', subtitle: 'Alert', detail: '' };
     }
-    const actorLabel = trayAlert.payload?.actor_label ?? 'Circle member';
-    const displayTitle = 'Circle activity';
-    let detail = trayAlert.payload?.message ?? trayHandledDisplay;
-    switch (trayAlert.alert_type) {
-      case 'pin_change':
-        detail = trayAlert.payload?.message ?? 'Updated the Safety PIN.';
-        break;
-      case 'circle_invite':
-        detail =
-          trayAlert.payload?.message ??
-          `Shared an invite${trayAlert.payload?.invite_role ? ` for ${trayAlert.payload.invite_role}` : ''}.`;
-        break;
-      case 'security_password':
-        detail = trayAlert.payload?.message ?? 'Updated the account password.';
-        break;
-      case 'safe_phrase_added':
-        detail = trayAlert.payload?.message ?? `Added safe word "${trayAlert.payload?.phrase ?? ''}".`;
-        break;
-      case 'trusted_contact_added':
-        detail =
-          trayAlert.payload?.message ??
-          `Added ${trayAlert.payload?.added ?? 1} trusted contact${(trayAlert.payload?.added ?? 1) === 1 ? '' : 's'}.`;
-        break;
-      case 'blocked_caller_added':
-        detail = trayAlert.payload?.message ?? `Blocked number ${trayAlert.payload?.caller_number ?? ''}.`;
-        break;
+    const detail = trayHandledDisplay;
+    if (!CIRCLE_ALERT_TYPES.has(trayAlert.alert_type ?? '')) {
+      return { title: 'Alert options', subtitle: trayAlert?.risk_label ?? 'Handled alert', detail };
     }
-    return { title: displayTitle, subtitle: actorLabel, detail };
+    return getCircleTrayCopy(trayAlert, detail);
   }, [trayAlert, trayHandledDisplay]);
   const isTrayVisible = isTrayMounted && Boolean(trayAlert);
 
@@ -1231,6 +1191,14 @@ const createAlertStyles = (theme: AppTheme) =>
       textTransform: 'uppercase',
       marginBottom: 8,
     },
+    sectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    sectionHeaderRight: {
+      marginLeft: 12,
+    },
     sectionCards: {
       marginTop: 12,
     },
@@ -1317,6 +1285,19 @@ const createAlertStyles = (theme: AppTheme) =>
       fontSize: 12,
       letterSpacing: 0.2,
       textTransform: 'uppercase',
+    },
+    circleViewAllButton: {
+      marginTop: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    circleViewAllText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    circleViewAllIcon: {
+      marginLeft: 4,
     },
     emptyStateWrap: {
       marginTop: -60,

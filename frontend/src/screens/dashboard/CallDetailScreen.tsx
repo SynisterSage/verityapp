@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import { InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av/build/Audio.types';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -64,6 +65,12 @@ type TranscriptSegment = {
   type: 'fraud' | 'safe' | null;
 };
 
+const BLOCK_TRUST_PROMPT_KEY = 'callDetailBlockTrustPromptDisabled';
+
+type MarkFeedbackOptions = {
+  forceBlock?: boolean;
+  forceTrust?: boolean;
+};
 function collectMatches(text: string, keywords: string[], type: KeywordMatch['type']) {
   const cleanKeywords = Array.from(new Set(keywords.map((keyword) => keyword.trim()).filter(Boolean)));
   const matches: KeywordMatch[] = [];
@@ -155,11 +162,23 @@ export default function CallDetailScreen({
   const [isMarkingSafe, setIsMarkingSafe] = useState(false);
   const [isMarkingFraud, setIsMarkingFraud] = useState(false);
   const [isSubmittingVoiceFeedback, setIsSubmittingVoiceFeedback] = useState(false);
+  const [blockTrustPromptDisabled, setBlockTrustPromptDisabled] = useState(false);
   const highlightAnim = useRef(new Animated.Value(0)).current;
   const riskBarAnim = useRef(new Animated.Value(0)).current;
   const transcriptAnim = useRef(new Animated.Value(0)).current;
   const [audioModeConfigured, setAudioModeConfigured] = useState(false);
   const styles = useMemo(() => createCallDetailStyles(theme), [theme]);
+  useEffect(() => {
+    const loadPromptPref = async () => {
+      const stored = await AsyncStorage.getItem(BLOCK_TRUST_PROMPT_KEY);
+      setBlockTrustPromptDisabled(stored === 'true');
+    };
+    void loadPromptPref();
+  }, []);
+  const disableBlockTrustPrompt = useCallback(() => {
+    setBlockTrustPromptDisabled(true);
+    void AsyncStorage.setItem(BLOCK_TRUST_PROMPT_KEY, 'true');
+  }, []);
 
   const fetchRecordingLink = useCallback(async () => {
     const urlData = await authorizedFetch(`/calls/${callId}/recording-url`);
@@ -338,7 +357,10 @@ export default function CallDetailScreen({
     return true;
   };
 
-  const markFeedback = async (status: 'marked_safe' | 'marked_fraud') => {
+  const markFeedback = async (
+    status: 'marked_safe' | 'marked_fraud',
+    options?: MarkFeedbackOptions
+  ) => {
     const canProceed = await shouldProceedWithMark(status);
     if (!canProceed) {
       return;
@@ -360,12 +382,16 @@ export default function CallDetailScreen({
         automationEnabled && (activeProfile.auto_block_on_fraud ?? true);
       const automationTrustEnabled =
         automationEnabled && (activeProfile.auto_trust_on_safe ?? false);
+      const shouldBlock =
+        options?.forceBlock ?? (status === 'marked_fraud' && automationBlockEnabled);
+      const shouldTrust =
+        options?.forceTrust ?? (status === 'marked_safe' && automationTrustEnabled);
 
       const profileId = callRow?.profile_id;
       const callerNumber = callRow?.caller_number;
 
       if (profileId && callerNumber) {
-        if (status === 'marked_fraud' && automationBlockEnabled) {
+        if (shouldBlock) {
           await authorizedFetch('/fraud/blocked-callers', {
             method: 'POST',
             body: JSON.stringify({
@@ -375,7 +401,7 @@ export default function CallDetailScreen({
             }),
           });
         }
-        if (status === 'marked_safe' && automationTrustEnabled) {
+        if (shouldTrust) {
           await authorizedFetch('/fraud/trusted-contacts', {
             method: 'POST',
             body: JSON.stringify({
@@ -398,6 +424,46 @@ export default function CallDetailScreen({
         setIsMarkingFraud(false);
       }
     }
+  };
+
+  const promptBlockTrustBeforeMark = (status: 'marked_safe' | 'marked_fraud') => {
+    const isFraud = status === 'marked_fraud';
+    if (blockTrustPromptDisabled) {
+      markFeedback(status, { forceBlock: isFraud, forceTrust: !isFraud });
+      return;
+    }
+    const title = isFraud ? 'Block this caller?' : 'Trust this caller?';
+    const message = isFraud
+      ? 'Would you like to block this caller in addition to marking the call as fraud?'
+      : 'Would you like to trust this caller in addition to marking the call as safe?';
+    const actionLabel = isFraud ? 'Block & mark fraud' : 'Trust & mark safe';
+    const persistentLabel = isFraud
+      ? 'Always block & mark fraud'
+      : 'Always trust & mark safe';
+    Alert.alert(
+      title,
+      message,
+      [
+        {
+          text: actionLabel,
+          onPress: () => markFeedback(status, { forceBlock: isFraud, forceTrust: !isFraud }),
+        },
+        {
+          text: `Just mark ${isFraud ? 'fraud' : 'safe'}`,
+          style: 'cancel',
+          onPress: () => markFeedback(status),
+        },
+        {
+          text: persistentLabel,
+          style: 'destructive',
+          onPress: () => {
+            disableBlockTrustPrompt();
+            markFeedback(status, { forceBlock: isFraud, forceTrust: !isFraud });
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   };
 
   const handleVoiceFeedback = useCallback(async () => {
@@ -423,12 +489,12 @@ export default function CallDetailScreen({
 
   const handleMarkFraud = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    markFeedback('marked_fraud');
+    promptBlockTrustBeforeMark('marked_fraud');
   };
 
   const handleMarkSafe = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    markFeedback('marked_safe');
+    promptBlockTrustBeforeMark('marked_safe');
   };
 
   const handleBackPress = () => {

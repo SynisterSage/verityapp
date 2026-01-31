@@ -42,7 +42,7 @@ export default function SettingsScreen({
         onPress: () => navigation.navigate('Account'),
       });
       rows.push({
-        label: 'Members',
+        label: 'My Circle',
         subtitle: 'Family caretakers & guests',
         icon: 'people-outline',
         onPress: () => navigation.navigate('Members'),

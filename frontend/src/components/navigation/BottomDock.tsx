@@ -1,10 +1,11 @@
-import { Animated, View, TouchableOpacity, StyleSheet, Text, ViewStyle } from 'react-native';
+import { Animated, View, TouchableOpacity, StyleSheet, Text, ViewStyle, Easing } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useEffect, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlertContext } from '../../context/AlertContext';
 
 const ICONS: Record<string, { active: keyof typeof Ionicons.glyphMap; inactive: keyof typeof Ionicons.glyphMap; }> = {
   HomeTab: { active: 'home', inactive: 'home-outline' },
@@ -52,6 +53,42 @@ export default function BottomDock({
   const borderColor = theme.colors.border;
   const labelColor = theme.colors.textMuted;
   const labelActiveColor = theme.colors.text;
+  const { unhandledCount } = useAlertContext();
+  const bounceAnim = useRef(new Animated.Value(0)).current;
+  const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+
+  useEffect(() => {
+    if (unhandledCount > 0) {
+      if (!bounceLoopRef.current) {
+        const ySequence = Animated.sequence([
+          Animated.timing(bounceAnim, {
+            toValue: -6,
+            duration: 350,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(bounceAnim, {
+            toValue: 0,
+            duration: 350,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]);
+        bounceLoopRef.current = Animated.loop(ySequence);
+        bounceLoopRef.current.start();
+      }
+    } else if (bounceLoopRef.current) {
+      bounceLoopRef.current.stop();
+      bounceLoopRef.current = null;
+      bounceAnim.setValue(0);
+    }
+    return () => {
+      if (bounceLoopRef.current) {
+        bounceLoopRef.current.stop();
+        bounceLoopRef.current = null;
+      }
+    };
+  }, [unhandledCount, bounceAnim]);
 
   return (
     <View
@@ -69,6 +106,7 @@ export default function BottomDock({
       <View style={styles.bar}>
         {state.routes.map((route, index) => {
           const focused = state.index === index;
+          const isAlertsRoute = route.name === 'AlertsTab';
           const onPress = () => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             const event = navigation.emit({
@@ -87,6 +125,11 @@ export default function BottomDock({
           const iconName = focused ? active : inactive;
           const label = descriptors[route.key].options.title ?? route.name.replace(/Tab$/, '');
 
+          const bounceTransform = isAlertsRoute ? { translateY: bounceAnim } : undefined;
+          const iconTransforms = [
+            { scale: scaleValuesRef.current[index] },
+            ...(bounceTransform ? [bounceTransform] : []),
+          ];
           return (
             <TouchableOpacity
               key={route.key}
@@ -98,12 +141,25 @@ export default function BottomDock({
                 <Animated.View
                   style={[
                     styles.iconWrapper,
-                    { transform: [{ scale: scaleValuesRef.current[index] }] },
+                    { transform: iconTransforms },
                   ]}
                 >
                   <Ionicons name={iconName} size={30} color={focused ? theme.colors.accent : theme.colors.textDim} />
                 </Animated.View>
-                <Text
+                {isAlertsRoute && unhandledCount > 0 && (
+                  <View
+                    style={[
+                      styles.alertBadge,
+                      {
+                        backgroundColor: theme.colors.danger,
+                        borderColor: theme.colors.surface,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.badgeText}>{unhandledCount}</Text>
+                  </View>
+                )}
+              <Text
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
@@ -157,11 +213,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
+    position: 'relative',
   },
 
   iconWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  alertBadge: {
+    position: 'absolute',
+    top: 2,
+    right: 18,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ff4d4f',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
   label: {
     marginTop: 4,
