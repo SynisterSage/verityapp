@@ -4,6 +4,7 @@ import logger from 'jet-logger';
 
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import supabaseAdmin from '@src/services/supabase';
+import { formatShortCode } from '@src/common/helpers/invite';
 
 const SUPABASE_ADMIN_URL = process.env.SUPABASE_URL ?? '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
@@ -59,6 +60,14 @@ function buildDisplayName({
   const metaName = metaFullName ?? (firstLast || undefined);
   const candidate = formatName(fallbackName ?? metaName ?? email) ?? metaName ?? fallbackName ?? email ?? null;
   return candidate;
+}
+
+function normalizeShortCode(input: string) {
+  const cleaned = input.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  if (cleaned.length !== 8) {
+    return null;
+  }
+  return formatShortCode(cleaned);
 }
 
 async function getAuthenticatedUserId(req: Request) {
@@ -413,7 +422,12 @@ async function acceptInvite(req: Request, res: Response) {
 
   let invite = await fetchInvite('id', inviteId);
   if (!invite) {
-    invite = await fetchInvite('short_code', inviteId);
+    const normalizedShortCode = normalizeShortCode(inviteId);
+    if (normalizedShortCode) {
+      invite = await fetchInvite('short_code', normalizedShortCode);
+    } else {
+      invite = await fetchInvite('short_code', inviteId);
+    }
   }
   if (!invite) {
     invite = await fetchInvite('email', inviteId);
