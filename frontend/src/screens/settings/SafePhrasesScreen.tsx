@@ -35,7 +35,7 @@ const normalizePhrase = (value: string) => {
 
 export default function SafePhrasesScreen() {
   const insets = useSafeAreaInsets();
-  const { activeProfile } = useProfile();
+  const { activeProfile, canManageProfile } = useProfile();
   const [phrases, setPhrases] = useState<SafePhrase[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -103,6 +103,10 @@ export default function SafePhrasesScreen() {
   }, [shimmer]);
 
   const addPhrase = async () => {
+    if (!canManageProfile) {
+      setError('Only caretakers or admins can manage safe phrases.');
+      return;
+    }
     if (!input.trim() || !activeProfile || adding) return;
     setError('');
     setAdding(true);
@@ -122,6 +126,10 @@ export default function SafePhrasesScreen() {
   };
 
   const removePhrase = async (phraseId: string) => {
+    if (!canManageProfile) {
+      setError('Only caretakers or admins can manage safe phrases.');
+      return;
+    }
     if (!phraseId || deletingId === phraseId) return;
     setDeletingId(phraseId);
     try {
@@ -167,33 +175,38 @@ export default function SafePhrasesScreen() {
           keyboardShouldPersistTaps="handled"
           contentInsetAdjustmentBehavior="automatic"
         >
-          <Text style={styles.sectionLabel}>Add new phrase</Text>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Doctor Smith"
-              placeholderTextColor={placeholderColor}
-              value={input}
-              onChangeText={setInput}
-              returnKeyType="done"
-              onSubmitEditing={addPhrase}
-            />
-            <Pressable
-              style={({ pressed }) => [
-                styles.addButton,
-                { opacity: pressed || !input.trim() || adding ? 0.3 : 1 },
-              ]}
-              onPress={addPhrase}
-              disabled={!input.trim() || adding}
-            >
-              {adding ? (
-                <ActivityIndicator size="small" color={theme.colors.surface} />
-              ) : (
-                <Ionicons name="add" size={24} color={theme.colors.surface} />
-              )}
-            </Pressable>
-          </View>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+          {canManageProfile ? (
+            <>
+              <Text style={styles.sectionLabel}>Add new phrase</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Doctor Smith"
+                  placeholderTextColor={placeholderColor}
+                  value={input}
+                  onChangeText={setInput}
+                  returnKeyType="done"
+                  onSubmitEditing={addPhrase}
+                />
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.addButton,
+                    (!input.trim() || adding) && styles.addButtonDisabled,
+                    { opacity: pressed || !input.trim() || adding ? 0.4 : 1 },
+                  ]}
+                  onPress={addPhrase}
+                  disabled={!input.trim() || adding}
+                >
+                  {adding ? (
+                    <ActivityIndicator size="small" color={theme.colors.surface} />
+                  ) : (
+                    <Ionicons name="add" size={24} color={theme.colors.surface} />
+                  )}
+                </Pressable>
+              </View>
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+            </>
+          ) : null}
 
           <Text style={styles.sectionLabel}>Active safe phrases</Text>
           {showSkeleton ? (
@@ -224,9 +237,12 @@ export default function SafePhrasesScreen() {
                 </View>
                 <Text style={styles.phraseText}>{item.phrase}</Text>
                 <Pressable
-                  style={styles.deleteButton}
+                  style={[
+                    styles.deleteButton,
+                    (!canManageProfile || deletingId === item.id) && styles.deleteButtonDisabled,
+                  ]}
                   onPress={() => removePhrase(item.id)}
-                  disabled={deletingId === item.id}
+                  disabled={deletingId === item.id || !canManageProfile}
                 >
                   {deletingId === item.id ? (
                     <ActivityIndicator size="small" color={theme.colors.danger} />
@@ -237,6 +253,7 @@ export default function SafePhrasesScreen() {
               </View>
             ))
           )}
+
 
           <HowItWorksCard items={helperItems} />
           {!activeProfile ? (
@@ -281,11 +298,14 @@ const createSafePhrasesStyles = (theme: AppTheme) =>
       gap: 12,
       marginBottom: 16,
     },
-    input: {
-      flex: 1,
-      color: theme.colors.text,
-      fontSize: 16,
-    },
+  input: {
+    flex: 1,
+    color: theme.colors.text,
+    fontSize: 16,
+  },
+  addButtonDisabled: {
+    opacity: 0.4,
+  },
     addButton: {
       width: 44,
       height: 44,
@@ -379,6 +399,12 @@ const createSafePhrasesStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    deleteButtonDisabled: {
+      opacity: 0.4,
+    },
+    inputDisabled: {
+      opacity: 0.6,
     },
     warning: {
       color: theme.colors.warning,

@@ -208,7 +208,7 @@ export default function DataPrivacyScreen() {
     });
   };
 
-  const { activeProfile, canManageProfile, refreshProfiles } = useProfile();
+  const { activeProfile, canManageProfile, canDeleteProfile, refreshProfiles } = useProfile();
   const { signOut } = useAuth();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createDataPrivacyStyles(theme), [theme]);
@@ -378,7 +378,11 @@ export default function DataPrivacyScreen() {
 
   const handleManageAction = (key: ManageActionKey) => {
     if (!canManageProfile) {
-      setManageError('Only caretakers can manage these settings.');
+      setManageError('Only caretakers or admins can manage these settings.');
+      return;
+    }
+    if (key === 'delete' && !canDeleteProfile) {
+      setManageError('Only the circle owner can delete the account.');
       return;
     }
     setManageError('');
@@ -388,7 +392,12 @@ export default function DataPrivacyScreen() {
   };
 
   const manageMessageText =
-    manageError || (!canManageProfile ? 'Only caretakers can manage these settings.' : '');
+    manageError ||
+    (!canManageProfile
+      ? 'Only caretakers or admins can manage these settings.'
+      : !canDeleteProfile
+        ? 'Only the circle owner can delete the account.'
+        : '');
   const pendingActionLabel = pinModalAction
     ? MANAGE_ACTIONS.find((item) => item.key === pinModalAction)?.label ?? ''
     : '';
@@ -463,7 +472,9 @@ export default function DataPrivacyScreen() {
           <View style={styles.manageControls}>
             {MANAGE_ACTIONS.map((action) => {
               const isWorking = manageAction === action.key;
-              const disabled = !canManageProfile || Boolean(manageAction);
+              const isDeleteAction = action.key === 'delete';
+              const disabled =
+                !canManageProfile || Boolean(manageAction) || (isDeleteAction && !canDeleteProfile);
               return (
                 <TouchableOpacity
                   key={action.key}
@@ -497,7 +508,11 @@ export default function DataPrivacyScreen() {
                       {isWorking ? 'Working…' : action.label}
                     </Text>
                     <Text style={styles.rowDescription}>
-                      {action.destructive ? 'This cannot be undone' : 'Tap to manage'}
+                      {isDeleteAction && !canDeleteProfile
+                        ? 'Only the circle owner can delete the account.'
+                        : action.destructive
+                          ? 'This cannot be undone'
+                          : 'Tap to manage'}
                     </Text>
                   </View>
                   {isWorking ? (

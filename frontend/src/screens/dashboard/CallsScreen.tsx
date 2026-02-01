@@ -244,7 +244,7 @@ export default function CallsScreen({
 }) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
-  const { activeProfile } = useProfile();
+  const { activeProfile, canManageProfile } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createCallStyles(theme), [theme]);
   const refreshControlProps = useMemo(
@@ -367,7 +367,7 @@ export default function CallsScreen({
     });
   }, [trayAnim]);
 
-  const canOpenTray = useCallback(() => true, []);
+  const canOpenTray = useCallback(() => canManageProfile, [canManageProfile]);
 
   const handleTrayLongPress = useCallback(
     (call: CallRow) => {

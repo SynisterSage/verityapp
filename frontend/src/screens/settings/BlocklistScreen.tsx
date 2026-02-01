@@ -71,7 +71,7 @@ const formatInputDigits = (digits: string) => {
 
 export default function BlocklistScreen() {
   const insets = useSafeAreaInsets();
-  const { activeProfile } = useProfile();
+  const { activeProfile, canManageProfile } = useProfile();
   const [blockedList, setBlockedList] = useState<BlockedCaller[]>([]);
   const [loading, setLoading] = useState(false);
   const [inputDigits, setInputDigits] = useState('');
@@ -159,6 +159,10 @@ export default function BlocklistScreen() {
   };
 
   const handleAdd = async () => {
+    if (!canManageProfile) {
+      setInputError('Only caretakers or admins can block numbers.');
+      return;
+    }
     if (!inputDigits) {
       setInputError('Enter a phone number.');
       return;
@@ -209,7 +213,7 @@ export default function BlocklistScreen() {
   };
 
   const handleRemove = async () => {
-    if (!trayContact) return;
+    if (!trayContact || !canManageProfile) return;
     setIsRemoving(true);
     try {
       await authorizedFetch(`/fraud/blocked-callers/${trayContact.id}`, { method: 'DELETE' });
@@ -222,34 +226,45 @@ export default function BlocklistScreen() {
     }
   };
 
-  const renderManualCard = () => (
-    <View style={styles.manualEntry}>
-      <Text style={[styles.sectionLabel, styles.sectionLabelSpacing]}>Manual entry</Text>
-      <View style={styles.manualInputRow}>
-        <TextInput
-          style={styles.manualInputField}
-          placeholder="(123) 456-7890"
-          placeholderTextColor={placeholderColor}
-          value={inputValue}
-          onChangeText={handleInputChange}
-          keyboardType="phone-pad"
-          editable={!isAdding}
-        />
-        <TouchableOpacity
-          style={[styles.manualAddButton, (isAdding || !inputDigits) && styles.addButtonDisabled]}
-          onPress={handleAdd}
-          disabled={isAdding || !inputDigits}
-        >
-          {isAdding ? (
-            <ActivityIndicator color={theme.colors.surface} />
-          ) : (
-            <Ionicons name="add" size={24} color={theme.colors.surface} />
-          )}
-        </TouchableOpacity>
+  const renderManualCard = () => {
+    if (!canManageProfile) {
+      return null;
+    }
+    return (
+      <View style={styles.manualEntry}>
+        <Text style={[styles.sectionLabel, styles.sectionLabelSpacing]}>Manual entry</Text>
+        <View style={styles.manualInputRow}>
+          <TextInput
+            style={[
+              styles.manualInputField,
+              (!canManageProfile || isAdding) && styles.manualInputDisabled,
+            ]}
+            placeholder="(123) 456-7890"
+            placeholderTextColor={placeholderColor}
+            value={inputValue}
+            onChangeText={handleInputChange}
+            keyboardType="phone-pad"
+            editable={canManageProfile && !isAdding}
+          />
+          <TouchableOpacity
+            style={[
+              styles.manualAddButton,
+              (!canManageProfile || isAdding || !inputDigits) && styles.addButtonDisabled,
+            ]}
+            onPress={handleAdd}
+            disabled={!canManageProfile || isAdding || !inputDigits}
+          >
+            {isAdding ? (
+              <ActivityIndicator color={theme.colors.surface} />
+            ) : (
+              <Ionicons name="add" size={24} color={theme.colors.surface} />
+            )}
+          </TouchableOpacity>
+        </View>
+        {inputError ? <Text style={styles.inputError}>{inputError}</Text> : null}
       </View>
-      {inputError ? <Text style={styles.inputError}>{inputError}</Text> : null}
-    </View>
-  );
+    );
+  };
 
   const renderHowItWorks = () => (
     <View style={styles.howItWorks}>
@@ -284,8 +299,19 @@ export default function BlocklistScreen() {
         <Text style={styles.blockNumber}>{formatDisplayNumber(caller.caller_number)}</Text>
         <Text style={styles.blockReason}>{getReasonLabel(caller)}</Text>
       </View>
-      <TouchableOpacity onPress={() => openTray(caller)}>
-        <Text style={styles.manageText}>Manage</Text>
+      <TouchableOpacity
+        onPress={() => {
+          if (!canManageProfile) {
+            setInputError('Only caretakers or admins can manage blocked numbers.');
+            return;
+          }
+          openTray(caller);
+        }}
+        disabled={!canManageProfile}
+      >
+        <Text style={[styles.manageText, !canManageProfile && styles.manageTextDisabled]}>
+          Manage
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -384,9 +410,12 @@ export default function BlocklistScreen() {
                 </Text>
               </View>
               <TouchableOpacity
-                style={[styles.trayButton, isRemoving && styles.trayButtonDisabled]}
+                style={[
+                  styles.trayButton,
+                  (isRemoving || !canManageProfile) && styles.trayButtonDisabled,
+                ]}
                 onPress={handleRemove}
-                disabled={isRemoving}
+                disabled={isRemoving || !canManageProfile}
               >
                 {isRemoving ? (
                   <ActivityIndicator color={theme.colors.surface} />
@@ -454,6 +483,9 @@ const createBlocklistStyles = (theme: AppTheme) =>
       alignItems: 'center',
     },
     addButtonDisabled: {
+      opacity: 0.5,
+    },
+    manualInputDisabled: {
       opacity: 0.5,
     },
     inputError: {
@@ -553,6 +585,9 @@ const createBlocklistStyles = (theme: AppTheme) =>
       fontSize: 15,
       color: theme.colors.accent,
       fontWeight: '600',
+    },
+    manageTextDisabled: {
+      color: withOpacity(theme.colors.accent, 0.4),
     },
     howItWorks: {
       borderRadius: 32,

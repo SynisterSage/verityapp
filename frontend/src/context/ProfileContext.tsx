@@ -53,6 +53,9 @@ type ProfileContextValue = {
   activeProfile: Profile | null;
   activeMembership: ProfileMembership | null;
   canManageProfile: boolean;
+  isCaretaker: boolean;
+  isAdmin: boolean;
+  canDeleteProfile: boolean;
   onboardingComplete: boolean;
   isLoading: boolean;
   authInvalid: boolean;
@@ -311,10 +314,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     };
   }, [activeProfile?.id, twilioClientIdentity]);
 
-  const canManageProfile = useMemo(
-    () => Boolean(activeMembership?.is_caretaker || activeMembership?.role === 'admin'),
-    [activeMembership]
-  );
+  const isCaretaker = Boolean(activeMembership?.is_caretaker);
+  const isAdmin = !isCaretaker && activeMembership?.role === 'admin';
+  const canManageProfile = useMemo(() => isCaretaker || isAdmin, [isCaretaker, isAdmin]);
+  const canDeleteProfile = isCaretaker;
 
   const isTwilioClientReady = Boolean(twilioClientToken && twilioClientIdentity);
 
@@ -324,6 +327,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       activeProfile,
       activeMembership,
       canManageProfile,
+      isCaretaker,
+      isAdmin,
+      canDeleteProfile,
+      isCaretaker,
+      isAdmin,
+      canDeleteProfile,
       onboardingComplete,
       isLoading,
       authInvalid,

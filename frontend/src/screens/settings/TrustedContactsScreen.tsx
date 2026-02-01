@@ -100,7 +100,7 @@ async function writeContactMap(profileId: string, map: Record<string, ContactMap
 export default function TrustedContactsScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
-  const { activeProfile } = useProfile();
+  const { activeProfile, canManageProfile } = useProfile();
   const [trustedList, setTrustedList] = useState<TrustedContactRow[]>([]);
   const [contactMap, setContactMap] = useState<Record<string, ContactMapEntry>>({});
   const [importing, setImporting] = useState(false);
@@ -122,6 +122,7 @@ export default function TrustedContactsScreen() {
   const [isRemoving, setIsRemoving] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.65)).current;
+  const manageRestrictedMessage = 'Only caretakers or admins can manage trusted contacts.';
 
   const { theme } = useTheme();
   const styles = useMemo(() => createTrustedContactsStyles(theme), [theme]);
@@ -151,8 +152,8 @@ export default function TrustedContactsScreen() {
     []
   );
   const showSkeleton = loading && trustedList.length === 0;
-  const isImportDisabled = importing || !contactsPermissionEnabled;
-  const isSyncDisabled = syncing || !contactsPermissionEnabled;
+  const isImportDisabled = importing || !contactsPermissionEnabled || !canManageProfile;
+  const isSyncDisabled = syncing || !contactsPermissionEnabled || !canManageProfile;
 
   const refreshContactMap = useCallback(async () => {
     if (!activeProfile) return;
@@ -302,6 +303,10 @@ export default function TrustedContactsScreen() {
   };
 
   const handleImport = async () => {
+    if (!canManageProfile) {
+      setError(manageRestrictedMessage);
+      return;
+    }
     if (!activeProfile) return;
     if (!contactsPermissionEnabled) {
       setError('Allow contacts access in Data & Privacy before importing from your phone.');
@@ -369,6 +374,10 @@ export default function TrustedContactsScreen() {
   };
 
   const openManageTray = (contact: TrustedContactRow) => {
+    if (!canManageProfile) {
+      setError(manageRestrictedMessage);
+      return;
+    }
     setTrayMode('manage');
     setTrayContact(contact);
     const existingTag =
@@ -399,6 +408,10 @@ export default function TrustedContactsScreen() {
 
   const handleTagSave = async () => {
     if (!trayContact || !trayMode || !activeProfile) return;
+    if (!canManageProfile) {
+      setError(manageRestrictedMessage);
+      return;
+    }
     setIsSavingTag(true);
     try {
       setError('');
@@ -468,6 +481,11 @@ export default function TrustedContactsScreen() {
 
   const handleRemoveContact = async () => {
     if (!trayContact || trayMode !== 'manage') return;
+    if (!canManageProfile) {
+      setError(manageRestrictedMessage);
+      closeTray();
+      return;
+    }
     setIsRemoving(true);
     const row = trayContact as TrustedContactRow;
     try {
@@ -527,6 +545,10 @@ export default function TrustedContactsScreen() {
   };
 
   const addManualNumber = async () => {
+    if (!canManageProfile) {
+      setError(manageRestrictedMessage);
+      return;
+    }
     if (!manualNumberDigits || !activeProfile) return;
     const normalized = normalizePhoneNumber(manualNumberDigits);
     if (!normalized) return;
@@ -547,6 +569,10 @@ export default function TrustedContactsScreen() {
   };
 
   const syncContacts = async () => {
+    if (!canManageProfile) {
+      setError(manageRestrictedMessage);
+      return;
+    }
     if (!activeProfile || syncing || !contactsPermissionEnabled) {
       if (!contactsPermissionEnabled) {
         setError('Enable contacts access in Data & Privacy before syncing.');
@@ -680,73 +706,77 @@ export default function TrustedContactsScreen() {
           showsVerticalScrollIndicator={false}
         >
 
-          <Pressable
-            style={({ pressed }) => [
-              styles.importCard,
-              isImportDisabled && styles.importCardDisabled,
-              !isImportDisabled && pressed && styles.importCardPressed,
-            ]}
-            onPress={isImportDisabled ? undefined : handleImport}
-            disabled={isImportDisabled}
-          >
-            <View style={styles.importIcon}>
-              <Ionicons name="person-add" size={24} color={theme.colors.accent} />
-            </View>
-            <View style={styles.importText}>
-              <Text style={styles.importTitle}>Import from Phone</Text>
-              <Text style={styles.importSubtitle}>Add friends &amp; family</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.accent} />
-          </Pressable>
-          {!contactsPermissionEnabled && (
-            <Text style={styles.permissionHint}>
-              Allow contact access in Data & Privacy to import & sync your phonebook.
-            </Text>
-          )}
-
-          <View style={styles.syncRow}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.syncButton,
-                isSyncDisabled && styles.syncButtonDisabled,
-                !isSyncDisabled && pressed && styles.syncButtonPressed,
-              ]}
-              onPress={isSyncDisabled ? undefined : syncContacts}
-              disabled={isSyncDisabled}
-            >
-              {syncing ? (
-                <ActivityIndicator color={theme.colors.surface} />
-              ) : (
-                <Ionicons name="sync-outline" size={18} color={theme.colors.surface} />
+          {canManageProfile && (
+            <>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.importCard,
+                  isImportDisabled && styles.importCardDisabled,
+                  !isImportDisabled && pressed && styles.importCardPressed,
+                ]}
+                onPress={isImportDisabled ? undefined : handleImport}
+                disabled={isImportDisabled}
+              >
+                <View style={styles.importIcon}>
+                  <Ionicons name="person-add" size={24} color={theme.colors.accent} />
+                </View>
+                <View style={styles.importText}>
+                  <Text style={styles.importTitle}>Import from Phone</Text>
+                  <Text style={styles.importSubtitle}>Add friends &amp; family</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={theme.colors.accent} />
+              </Pressable>
+              {!contactsPermissionEnabled && (
+                <Text style={styles.permissionHint}>
+                  Allow contact access in Data & Privacy to import & sync your phonebook.
+                </Text>
               )}
-              <Text style={styles.syncButtonText}>
-                {syncing ? 'Syncing contacts…' : 'Sync contacts'}
-              </Text>
-            </Pressable>
-          </View>
 
-          <Text style={styles.sectionLabel}>Manual Entry</Text>
-          <View style={styles.inputRow}>
-            <TextInput
-              style={styles.input}
-              placeholder="Phone #"
-              placeholderTextColor={placeholderColor}
-              value={manualNumber}
-              onChangeText={handleManualNumberChange}
-              keyboardType="phone-pad"
-            />
-            <Pressable
-              style={({ pressed }) => [
-                styles.addButton,
-                { opacity: pressed || !manualNumberDigits ? 0.4 : 1 },
-              ]}
-              onPress={addManualNumber}
-              disabled={!manualNumberDigits}
-            >
-              <Ionicons name="add" size={20} color={theme.colors.surface} />
-            </Pressable>
-          </View>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
+              <View style={styles.syncRow}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.syncButton,
+                    isSyncDisabled && styles.syncButtonDisabled,
+                    !isSyncDisabled && pressed && styles.syncButtonPressed,
+                  ]}
+                  onPress={isSyncDisabled ? undefined : syncContacts}
+                  disabled={isSyncDisabled}
+                >
+                  {syncing ? (
+                    <ActivityIndicator color={theme.colors.surface} />
+                  ) : (
+                    <Ionicons name="sync-outline" size={18} color={theme.colors.surface} />
+                  )}
+                  <Text style={styles.syncButtonText}>
+                    {syncing ? 'Syncing contacts…' : 'Sync contacts'}
+                  </Text>
+                </Pressable>
+              </View>
+              <Text style={styles.sectionLabel}>Manual Entry</Text>
+              <View style={styles.inputRow}>
+                <TextInput
+                  style={[styles.input]}
+                  placeholder="Phone #"
+                  placeholderTextColor={placeholderColor}
+                  value={manualNumber}
+                  onChangeText={handleManualNumberChange}
+                  keyboardType="phone-pad"
+                />
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.addButton,
+                    !manualNumberDigits && styles.addButtonDisabled,
+                    { opacity: pressed || !manualNumberDigits ? 0.4 : 1 },
+                  ]}
+                  onPress={addManualNumber}
+                  disabled={!manualNumberDigits}
+                >
+                  <Ionicons name="add" size={20} color={theme.colors.surface} />
+                </Pressable>
+              </View>
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+            </>
+          )}
 
           <Text style={styles.sectionLabel}>Current Safe List</Text>
 
@@ -799,8 +829,18 @@ export default function TrustedContactsScreen() {
                       </View>
                       </View>
                     </View>
-                    <TouchableOpacity onPress={() => openManageTray(contact)}>
-                      <Text style={styles.manageLabel}>Manage</Text>
+                    <TouchableOpacity
+                      onPress={() => openManageTray(contact)}
+                      disabled={!canManageProfile}
+                    >
+                      <Text
+                        style={[
+                          styles.manageLabel,
+                          !canManageProfile && styles.manageLabelDisabled,
+                        ]}
+                      >
+                        Manage
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 );
@@ -1097,6 +1137,9 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       color: theme.colors.text,
       fontSize: 16,
     },
+    inputDisabled: {
+      opacity: 0.6,
+    },
     addButton: {
       width: 44,
       height: 44,
@@ -1192,6 +1235,9 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       fontSize: 11,
       letterSpacing: 1,
       fontWeight: '700',
+    },
+    manageLabelDisabled: {
+      color: withOpacity(theme.colors.accent, 0.5),
     },
     emptyCard: {
       borderRadius: 28,

@@ -27,9 +27,11 @@ import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
 import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
 import * as Haptics from 'expo-haptics';
 import EmptyState from '../../components/common/EmptyState';
+import { useProfile } from '../../context/ProfileContext';
 
 export default function CircleActivityScreen() {
   const { theme } = useTheme();
+  const { canManageProfile } = useProfile();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'CircleActivityModal'>>();
@@ -177,7 +179,9 @@ export default function CircleActivityScreen() {
         <TouchableOpacity
           style={styles.headerAction}
           onPress={confirmDeleteAll}
-          disabled={deletingAll || circleActivitiesToDelete.length === 0}
+          disabled={
+            !canManageProfile || deletingAll || circleActivitiesToDelete.length === 0
+          }
           activeOpacity={0.7}
         >
           {deletingAll ? (
@@ -205,7 +209,9 @@ export default function CircleActivityScreen() {
               key={activity.id}
               style={({ pressed }) => [styles.cardWrapper, pressed && styles.cardPressed]}
               android_ripple={{ color: '#00000010' }}
-              onLongPress={() => showTray(activity.alertRow)}
+              onLongPress={
+                canManageProfile ? () => showTray(activity.alertRow) : undefined
+              }
             >
               <View style={styles.card}>
                 <View style={[styles.accentStrip, { backgroundColor: theme.colors.accent }]} />

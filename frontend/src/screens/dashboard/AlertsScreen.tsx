@@ -76,7 +76,7 @@ function isHandledAlert(alert: AlertRow) {
 
 export default function AlertsScreen() {
   const insets = useSafeAreaInsets();
-  const { activeProfile } = useProfile();
+  const { activeProfile, canManageProfile } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createAlertStyles(theme), [theme]);
   const refreshControlProps = useMemo(
@@ -775,7 +775,9 @@ const loadMemberNames = useCallback(async () => {
           {preview.map((activity) => (
             <Pressable
               key={activity.id}
-              onLongPress={() => showTray(activity.alertRow)}
+              onLongPress={
+                canManageProfile ? () => showTray(activity.alertRow) : undefined
+              }
               android_ripple={{ color: withOpacity(theme.colors.text, 0.08) }}
               style={({ pressed }) => [
                 styles.circleCardWrapper,
@@ -885,8 +887,8 @@ const loadMemberNames = useCallback(async () => {
             const scoreLabel =
               typeof alert.payload?.score === 'number' ? `Risk ${Math.round(alert.payload.score)}%` : undefined;
             return (
-              <AlertCard
-                key={`handled-${alert.id}`}
+                <AlertCard
+                  key={`handled-${alert.id}`}
                 categoryLabel="Handled alert"
                 title={formatDetectedTitle('Handled alert', alert.risk_label)}
                  description={reason}
@@ -901,8 +903,10 @@ const loadMemberNames = useCallback(async () => {
                 actionLabel="View details"
                 muted
                 onPress={alert.call_id ? handlePress : undefined}
-                onLongPress={() => showTray(alert)}
-              />
+                  onLongPress={
+                    canManageProfile ? () => showTray(alert) : undefined
+                  }
+                />
             );
           })}
         </View>
