@@ -52,8 +52,16 @@ export default function OnboardingInviteCodeScreen() {
     }
   }, [isCodeComplete, pulse]);
 
-  const sanitizeCode = (value: string) =>
-    value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, CODE_LENGTH);
+  const sanitizeCode = (value: string) => {
+    return value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, CODE_LENGTH);
+  };
+
+  const formatDisplayValue = (value: string) => {
+    if (value.length <= 4) {
+      return value;
+    }
+    return `${value.slice(0, 4)}-${value.slice(4)}`;
+  };
 
   const handleCodeChange = (text: string) => {
     setCode(sanitizeCode(text));
@@ -155,8 +163,8 @@ export default function OnboardingInviteCodeScreen() {
                   ref={codeInputRef}
                   style={styles.codeInput}
                   keyboardType="default"
-                  maxLength={CODE_LENGTH}
-                  value={code}
+                maxLength={CODE_LENGTH + 1}
+                value={formatDisplayValue(code)}
                   onChangeText={handleCodeChange}
                   autoCapitalize="characters"
                   autoCorrect={false}

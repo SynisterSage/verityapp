@@ -1,4 +1,5 @@
-import { Response, Request, ParamsDictionary } from 'express';
+import { Response, Request } from 'express';
+import { ParamsDictionary } from 'express-serve-static-core';
 import { ParsedQs } from 'qs';
 
 /******************************************************************************

@@ -53,6 +53,13 @@ export default function EnterInviteCodeScreen() {
   const sanitizeCode = (value: string) =>
     value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, CODE_LENGTH);
 
+  const formatDisplayValue = (value: string) => {
+    if (value.length <= 4) {
+      return value;
+    }
+    return `${value.slice(0, 4)}-${value.slice(4)}`;
+  };
+
   const handleCodeChange = (text: string) => {
     setCode(sanitizeCode(text));
   };
@@ -154,12 +161,12 @@ export default function EnterInviteCodeScreen() {
                 ref={codeInputRef}
                 style={styles.codeInput}
                 keyboardType="default"
-                maxLength={CODE_LENGTH}
-                value={code}
+                maxLength={CODE_LENGTH + 1}
+                value={formatDisplayValue(code)}
                 onChangeText={handleCodeChange}
                 autoCapitalize="characters"
                 autoCorrect={false}
-                placeholder="AB12CD34"
+                placeholder="AB12-CD34"
                 placeholderTextColor={withOpacity(theme.colors.textMuted, 0.45)}
                 textAlign="center"
                 returnKeyType="done"
