@@ -214,8 +214,8 @@ async function setPasscode(req: Request, res: Response) {
   }
 
   const isCaretaker = await userIsCaretaker(userId, profileId);
-  const isEditor = await userHasRole(userId, profileId, 'editor');
-  if (!isCaretaker && !isEditor) {
+  const isAdmin = await userHasRole(userId, profileId, 'admin');
+  if (!isCaretaker && !isAdmin) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -554,7 +554,9 @@ async function exportProfileData(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
   }
 
-  const allowed = await userCanAccessProfile(userId, profileId);
+  const isCaretaker = await userIsCaretaker(userId, profileId);
+  const isAdmin = await userHasRole(userId, profileId, 'admin');
+  const allowed = isCaretaker || isAdmin;
   if (!allowed) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
@@ -623,7 +625,9 @@ async function clearProfileRecords(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
   }
 
-  const allowed = await userIsCaretaker(userId, profileId);
+  const isCaretaker = await userIsCaretaker(userId, profileId);
+  const isAdmin = await userHasRole(userId, profileId, 'admin');
+  const allowed = isCaretaker || isAdmin;
   if (!allowed) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }

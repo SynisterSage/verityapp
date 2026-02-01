@@ -72,6 +72,23 @@ async function userIsCaretaker(userId: string, profileId: string) {
   return profileRow?.caretaker_id === userId;
 }
 
+async function userHasRole(
+  userId: string,
+  profileId: string,
+  role: 'admin' | 'editor'
+) {
+  if (role === 'admin' && (await userIsCaretaker(userId, profileId))) {
+    return true;
+  }
+  const { data: membership } = await supabaseAdmin
+    .from('profile_members')
+    .select('role')
+    .eq('profile_id', profileId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  return membership?.role === role;
+}
+
 async function logCircleActivity(
   profileId: string,
   alertType: string,
@@ -391,7 +408,9 @@ async function addTrustedContacts(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
   }
 
-  const allowed = await userIsCaretaker(userId, profileId);
+  const allowed =
+    (await userIsCaretaker(userId, profileId)) ||
+    (await userHasRole(userId, profileId, 'admin'));
   if (!allowed) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
@@ -506,7 +525,9 @@ async function updateTrustedContact(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId, callerNumber, or relationshipTag' });
   }
 
-  const allowed = await userIsCaretaker(userId, profileId);
+  const allowed =
+    (await userIsCaretaker(userId, profileId)) ||
+    (await userHasRole(userId, profileId, 'admin'));
   if (!allowed) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
@@ -627,7 +648,9 @@ async function deleteTrustedContact(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Trusted contact not found' });
   }
 
-  const allowed = await userIsCaretaker(userId, row.profile_id);
+  const allowed =
+    (await userIsCaretaker(userId, row.profile_id)) ||
+    (await userHasRole(userId, row.profile_id, 'admin'));
   if (!allowed) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
