@@ -19,7 +19,7 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
 
-const CODE_LENGTH = 6;
+const CODE_LENGTH = 8;
 
 export default function EnterInviteCodeScreen() {
   const navigation = useNavigation();
@@ -31,15 +31,15 @@ export default function EnterInviteCodeScreen() {
   const [lastName, setLastName] = useState('');
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [codeDigits, setCodeDigits] = useState(Array(CODE_LENGTH).fill(''));
+  const [code, setCode] = useState('');
   const firstNameRef = useRef<TextInput | null>(null);
   const lastNameRef = useRef<TextInput | null>(null);
-  const codeRefs = useRef<Array<TextInput | null>>(Array(CODE_LENGTH).fill(null));
+  const codeInputRef = useRef<TextInput | null>(null);
   const pulse = useRef(new Animated.Value(1)).current;
 
-  const codeValue = useMemo(() => codeDigits.join(''), [codeDigits]);
-  const isCodeComplete = codeDigits.every((digit) => digit.length === 1);
-  const areNamesEntered = firstName.trim() && lastName.trim();
+  const codeValue = code;
+  const isCodeComplete = code.length === CODE_LENGTH;
+  const areNamesEntered = firstName.trim().length > 0 && lastName.trim().length > 0;
 
   useEffect(() => {
     if (isCodeComplete) {
@@ -50,27 +50,11 @@ export default function EnterInviteCodeScreen() {
     }
   }, [isCodeComplete, pulse]);
 
-  const handleDigitChange = (text: string, index: number) => {
-    const digit = text.replace(/\D/g, '').slice(-1);
-    setCodeDigits((prev) => {
-      const next = [...prev];
-      next[index] = digit;
-      return next;
-    });
-    if (digit && index < CODE_LENGTH - 1) {
-      codeRefs.current[index + 1]?.focus();
-    }
-  };
+  const sanitizeCode = (value: string) =>
+    value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, CODE_LENGTH);
 
-  const handleKeyPress = ({ nativeEvent }: any, index: number) => {
-    if (nativeEvent.key === 'Backspace' && !codeDigits[index] && index > 0) {
-      codeRefs.current[index - 1]?.focus();
-      setCodeDigits((prev) => {
-        const next = [...prev];
-        next[index - 1] = '';
-        return next;
-      });
-    }
+  const handleCodeChange = (text: string) => {
+    setCode(sanitizeCode(text));
   };
 
   const acceptCode = async () => {
@@ -79,7 +63,7 @@ export default function EnterInviteCodeScreen() {
       return;
     }
     if (!isCodeComplete) {
-      setMessage('Fill the 6-digit code.');
+      setMessage('Fill the 8-character code.');
       return;
     }
     setMessage('');
@@ -153,34 +137,33 @@ export default function EnterInviteCodeScreen() {
                 autoCapitalize="words"
                 ref={lastNameRef}
                 returnKeyType="next"
-                onSubmitEditing={() => codeRefs.current[0]?.focus()}
+                onSubmitEditing={() => codeInputRef.current?.focus()}
               />
             </View>
           </View>
 
           <View style={styles.codeSection}>
-            <Text style={styles.codeLabel}>6-digit invite code</Text>
-            <Animated.View style={[styles.codeRow, { transform: [{ scale: pulse }] }]}>
-              {codeDigits.map((digit, index) => (
-                <TextInput
-                  key={`digit-${index}`}
-                  ref={(ref) => {
-                    codeRefs.current[index] = ref;
-                  }}
-                style={[
-                  styles.codeBox,
-                  {
-                    borderColor: digit ? theme.colors.accent : withOpacity(theme.colors.text, 0.15),
-                  },
-                ]}
-                  keyboardType="number-pad"
-                  maxLength={1}
-                  value={digit}
-                  onChangeText={(value) => handleDigitChange(value, index)}
-                  onKeyPress={(event) => handleKeyPress(event, index)}
-                  textAlign="center"
-                />
-              ))}
+            <Text style={styles.codeLabel}>8-character invite code</Text>
+            <Animated.View
+              style={[
+                styles.codeInputWrapper,
+                { transform: [{ scale: pulse }] },
+              ]}
+            >
+              <TextInput
+                ref={codeInputRef}
+                style={styles.codeInput}
+                keyboardType="default"
+                maxLength={CODE_LENGTH}
+                value={code}
+                onChangeText={handleCodeChange}
+                autoCapitalize="characters"
+                autoCorrect={false}
+                placeholder="AB12CD34"
+                placeholderTextColor={withOpacity(theme.colors.textMuted, 0.45)}
+                textAlign="center"
+                returnKeyType="done"
+              />
             </Animated.View>
           </View>
 
@@ -252,22 +235,22 @@ const createEnterInviteCodeStyles = (theme: AppTheme) =>
       marginBottom: 12,
       textTransform: 'uppercase',
     },
-    codeRow: {
-      flexDirection: 'row',
-      gap: 6,
-      justifyContent: 'flex-start',
+    codeInputWrapper: {
       width: '100%',
-    },
-    codeBox: {
-      width: 52,
-      height: 52,
+      height: 64,
       borderRadius: 18,
-      borderWidth: 2,
+      borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
-      color: theme.colors.text,
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+    },
+    codeInput: {
       fontSize: 24,
+      letterSpacing: 2,
       fontWeight: '700',
+      color: theme.colors.text,
+      textAlign: 'center',
     },
     message: {
       color: theme.colors.danger,
