@@ -5,6 +5,13 @@ import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { hashCallerNumber } from '@src/services/fraud';
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
+import {
+  getAuthenticatedUserId,
+  logProfileAccessDenied,
+  userCanAccessProfile,
+  userHasRole,
+  userIsCaretaker,
+} from '@src/common/util/auth';
 
 function normalizeCallerNumber(input?: string | null) {
   if (!input) {
@@ -23,71 +30,6 @@ function normalizeCallerNumber(input?: string | null) {
   return `+${digits}`;
 }
 
-async function getAuthenticatedUserId(req: Request) {
-  const authHeader = req.header('authorization') ?? '';
-  const token = authHeader.toLowerCase().startsWith('bearer ')
-    ? authHeader.slice('bearer '.length)
-    : '';
-  if (!token) {
-    return '';
-  }
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !data?.user) {
-    return '';
-  }
-  return data.user.id;
-}
-
-async function userCanAccessProfile(userId: string, profileId: string) {
-  const { data: profileRow } = await supabaseAdmin
-    .from('profiles')
-    .select('caretaker_id')
-    .eq('id', profileId)
-    .maybeSingle();
-
-  if (!profileRow) {
-    return false;
-  }
-
-  if (profileRow.caretaker_id === userId) {
-    return true;
-  }
-
-  const { data: memberRow } = await supabaseAdmin
-    .from('profile_members')
-    .select('id')
-    .eq('profile_id', profileId)
-    .eq('user_id', userId)
-    .maybeSingle();
-
-  return !!memberRow;
-}
-
-async function userIsCaretaker(userId: string, profileId: string) {
-  const { data: profileRow } = await supabaseAdmin
-    .from('profiles')
-    .select('caretaker_id')
-    .eq('id', profileId)
-    .maybeSingle();
-  return profileRow?.caretaker_id === userId;
-}
-
-async function userHasRole(
-  userId: string,
-  profileId: string,
-  role: 'admin' | 'editor'
-) {
-  if (role === 'admin' && (await userIsCaretaker(userId, profileId))) {
-    return true;
-  }
-  const { data: membership } = await supabaseAdmin
-    .from('profile_members')
-    .select('role')
-    .eq('profile_id', profileId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  return membership?.role === role;
-}
 
 async function logCircleActivity(
   profileId: string,
@@ -115,6 +57,7 @@ async function listSafePhrases(req: Request, res: Response) {
 
   const allowed = await userCanAccessProfile(userId, profileId);
   if (!allowed) {
+    logProfileAccessDenied('listSafePhrases', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -145,6 +88,7 @@ async function addSafePhrase(req: Request, res: Response) {
 
   const allowed = await userCanAccessProfile(userId, profileId);
   if (!allowed) {
+    logProfileAccessDenied('addSafePhrase', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -200,6 +144,7 @@ async function deleteSafePhrase(req: Request, res: Response) {
 
   const allowed = await userCanAccessProfile(userId, row.profile_id);
   if (!allowed) {
+    logProfileAccessDenied('deleteSafePhrase', userId, row.profile_id);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -229,6 +174,7 @@ async function listBlockedCallers(req: Request, res: Response) {
 
   const allowed = await userCanAccessProfile(userId, profileId);
   if (!allowed) {
+    logProfileAccessDenied('listBlockedCallers', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -265,6 +211,7 @@ async function addBlockedCaller(req: Request, res: Response) {
 
   const allowed = await userCanAccessProfile(userId, profileId);
   if (!allowed) {
+    logProfileAccessDenied('addBlockedCaller', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -330,6 +277,7 @@ async function deleteBlockedCaller(req: Request, res: Response) {
 
   const allowed = await userCanAccessProfile(userId, row.profile_id);
   if (!allowed) {
+    logProfileAccessDenied('deleteBlockedCaller', userId, row.profile_id);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -359,6 +307,7 @@ async function listTrustedContacts(req: Request, res: Response) {
 
   const allowed = await userCanAccessProfile(userId, profileId);
   if (!allowed) {
+    logProfileAccessDenied('listTrustedContacts', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -412,6 +361,7 @@ async function addTrustedContacts(req: Request, res: Response) {
     (await userIsCaretaker(userId, profileId)) ||
     (await userHasRole(userId, profileId, 'admin'));
   if (!allowed) {
+    logProfileAccessDenied('addTrustedContacts', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -529,6 +479,7 @@ async function updateTrustedContact(req: Request, res: Response) {
     (await userIsCaretaker(userId, profileId)) ||
     (await userHasRole(userId, profileId, 'admin'));
   if (!allowed) {
+    logProfileAccessDenied('updateTrustedContact', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -599,6 +550,7 @@ async function getCallerStatus(req: Request, res: Response) {
 
   const allowed = await userCanAccessProfile(userId, profileId);
   if (!allowed) {
+    logProfileAccessDenied('getCallerStatus', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -652,6 +604,7 @@ async function deleteTrustedContact(req: Request, res: Response) {
     (await userIsCaretaker(userId, row.profile_id)) ||
     (await userHasRole(userId, row.profile_id, 'admin'));
   if (!allowed) {
+    logProfileAccessDenied('deleteTrustedContact', userId, row.profile_id);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 

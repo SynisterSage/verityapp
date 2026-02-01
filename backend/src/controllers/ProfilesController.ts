@@ -7,6 +7,13 @@ import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { generateUniqueShortCode } from '@src/common/helpers/invite';
 import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
+import {
+  getAuthenticatedUserId,
+  logProfileAccessDenied,
+  userCanAccessProfile,
+  userHasRole,
+  userIsCaretaker,
+} from '@src/common/util/auth';
 
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];
@@ -47,59 +54,6 @@ async function insertCircleAlert({
   });
 }
 
-async function getAuthenticatedUserId(req: Request) {
-  const authHeader = req.header('authorization') ?? '';
-  const token = authHeader.toLowerCase().startsWith('bearer ')
-    ? authHeader.slice('bearer '.length)
-    : null;
-  if (!token) {
-    return null;
-  }
-  const { data, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !data?.user) {
-    return null;
-  }
-  return data.user.id;
-}
-
-async function userIsCaretaker(userId: string, profileId: string) {
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('caretaker_id')
-    .eq('id', profileId)
-    .single();
-  return profile?.caretaker_id === userId;
-}
-
-async function userCanAccessProfile(userId: string, profileId: string) {
-  if (await userIsCaretaker(userId, profileId)) {
-    return true;
-  }
-  const { data: member } = await supabaseAdmin
-    .from('profile_members')
-    .select('id')
-    .eq('profile_id', profileId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  return Boolean(member);
-}
-
-async function userHasRole(
-  userId: string,
-  profileId: string,
-  role: 'admin' | 'editor'
-) {
-  if (role === 'admin' && (await userIsCaretaker(userId, profileId))) {
-    return true;
-  }
-  const { data: membership } = await supabaseAdmin
-    .from('profile_members')
-    .select('role')
-    .eq('profile_id', profileId)
-    .eq('user_id', userId)
-    .maybeSingle();
-  return membership?.role === role;
-}
 
 async function listProfiles(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
@@ -389,6 +343,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
   const isAdmin = await userHasRole(userId, profileId, 'admin');
   const allowed = isCaretaker || isAdmin;
   if (!allowed) {
+    logProfileAccessDenied('exportProfileData', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -467,6 +422,7 @@ async function updateProfile(req: Request, res: Response) {
   const isAdmin = await userHasRole(userId, profileId, 'admin');
   const allowed = isCaretaker || isAdmin;
   if (!allowed) {
+    logProfileAccessDenied('clearProfileRecords', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -660,6 +616,7 @@ async function deleteProfile(req: Request, res: Response) {
 
   const allowed = await userIsCaretaker(userId, profileId);
   if (!allowed) {
+    logProfileAccessDenied('deleteProfile', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
