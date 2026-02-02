@@ -6,10 +6,12 @@ import {
   Modal,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  Pressable,
 } from 'react-native';
 import { Audio } from 'expo-av';
 import { InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av/build/Audio.types';
@@ -452,6 +454,12 @@ export default function CallDetailScreen({
 
   const handlePromptClose = () => {
     setPromptState(null);
+  };
+
+  const promptToggleValue = promptState?.isFraud ? autoBlockManual : autoTrustManual;
+  const handlePromptToggle = (value: boolean) => {
+    if (!promptState) return;
+    void setManualPromptPreference(promptState.isFraud, value);
   };
 
   const handlePromptMarkOnly = () => {
@@ -1078,52 +1086,89 @@ export default function CallDetailScreen({
             <TouchableWithoutFeedback onPress={handlePromptClose}>
               <View style={styles.promptBackdrop} />
             </TouchableWithoutFeedback>
-            <View style={styles.promptContainer}>
-              <Text style={styles.promptHeadline}>
-                {promptState.isFraud ? 'Mark fraud' : 'Mark safe'}
-              </Text>
-              <Text style={styles.promptMessage}>{promptState.message}</Text>
-              <View style={styles.promptActions}>
-                <TouchableOpacity
+            <View style={styles.promptCard}>
+              <View style={styles.promptHeader}>
+                <View
                   style={[
-                    styles.promptActionButton,
-                    styles.promptActionMarkOnly,
-                  ]}
-                  onPress={handlePromptMarkOnly}
-                  activeOpacity={0.85}
-                >
-                  <Text style={[styles.promptActionText, styles.promptActionMarkText]}>
-                    {promptState.isFraud ? 'Mark fraud' : 'Mark safe'}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.promptActionButton,
-                    styles.promptActionBlockTrust,
+                    styles.promptHeaderIcon,
                     {
                       backgroundColor: promptState.isFraud
-                        ? theme.colors.danger
-                        : theme.colors.success,
+                        ? withOpacity(theme.colors.danger, 0.16)
+                        : withOpacity(theme.colors.success, 0.16),
                     },
                   ]}
-                  onPress={() => handlePromptConfirm(promptState.status, false)}
-                  activeOpacity={0.85}
                 >
-                  <Text style={[styles.promptActionText, styles.promptActionBlockText]} numberOfLines={2}>
-                    {promptState.actionLabel}
+                  <Ionicons
+                    name={promptState.isFraud ? 'ban-outline' : 'shield-checkmark-outline'}
+                    size={20}
+                    color={promptState.isFraud ? theme.colors.danger : theme.colors.success}
+                  />
+                </View>
+                <View style={styles.promptHeaderText}>
+                  <Text style={styles.promptHeadline}>
+                    {promptState.isFraud ? 'Mark as fraud?' : 'Mark as safe?'}
                   </Text>
-                </TouchableOpacity>
+                  <Text style={styles.promptMessage}>{promptState.message}</Text>
+                </View>
+                <Pressable onPress={handlePromptClose} style={styles.promptClose}>
+                  <Ionicons name="close" size={18} color={theme.colors.text} />
+                </Pressable>
+              </View>
+              <View style={styles.promptToggle}>
+                <View>
+                  <Text style={styles.promptToggleLabel}>
+                    {promptState.isFraud ? 'Always block number' : 'Always trust number'}
+                  </Text>
+                  <Text style={styles.promptToggleSubLabel}>
+                    {promptState.isFraud
+                      ? 'Set as a permanent block rule'
+                      : 'Set as permanent rule'}
+                  </Text>
+                </View>
+                <Switch
+                  value={promptToggleValue}
+                  onValueChange={handlePromptToggle}
+                  thumbColor={
+                    promptToggleValue
+                      ? promptState.isFraud
+                        ? theme.colors.danger
+                        : theme.colors.success
+                      : theme.colors.surface
+                  }
+                  trackColor={{
+                    true: promptState.isFraud
+                      ? withOpacity(theme.colors.danger, 0.4)
+                      : withOpacity(theme.colors.success, 0.4),
+                    false: withOpacity(theme.colors.text, 0.1),
+                  }}
+                />
               </View>
               <TouchableOpacity
-                style={styles.promptNevermindButton}
-                onPress={handlePromptClose}
-                activeOpacity={0.7}
+                style={[
+                  styles.promptPrimaryButton,
+                  {
+                    backgroundColor: promptState.isFraud
+                      ? theme.colors.danger
+                      : theme.colors.success,
+                  },
+                ]}
+                onPress={() => handlePromptConfirm(promptState.status, false)}
+                activeOpacity={0.85}
               >
-                <Text style={styles.promptNevermindText}>Nevermind</Text>
+                <Text style={styles.promptPrimaryText}>
+                  {promptState.isFraud ? 'Mark & Block' : 'Mark & Trust'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.promptSecondaryButton}
+                onPress={handlePromptClose}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.promptSecondaryText}>Nevermind</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => handlePromptConfirm(promptState.status, true)}
-                activeOpacity={0.7}
+                activeOpacity={0.85}
               >
                 <Text style={styles.promptPersistentText}>{promptState.persistentLabel}</Text>
               </TouchableOpacity>
@@ -1272,87 +1317,107 @@ const createCallDetailStyles = (theme: AppTheme) =>
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 24,
-      backgroundColor: theme.colors.overlay,
+      paddingVertical: 40,
     },
     promptBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'transparent',
+      backgroundColor: theme.colors.overlay,
     },
     promptBlur: {
       ...StyleSheet.absoluteFillObject,
+      borderRadius: theme.radii.lg,
     },
-    promptContainer: {
+    promptCard: {
       width: '100%',
-      borderRadius: 24,
+      borderRadius: 32,
+      padding: 24,
       backgroundColor: theme.colors.surface,
-      padding: 28,
-      shadowColor: theme.colors.border,
-      shadowOpacity: 0.3,
-      shadowRadius: 30,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.08),
+      shadowColor: '#000',
+      shadowOpacity: 0.25,
       shadowOffset: { width: 0, height: 12 },
-    },
-    promptHeadline: {
-      color: theme.colors.text,
-      fontSize: 18,
-      fontWeight: '700',
-      marginBottom: 8,
-    },
-    promptMessage: {
-      color: theme.colors.textMuted,
-      fontSize: 14,
-      marginBottom: 18,
-    },
-    promptActions: {
-      flexDirection: 'row',
+      shadowRadius: 30,
+      elevation: 20,
       gap: 12,
-      marginBottom: 12,
     },
-    promptActionButton: {
-      flex: 1,
-      paddingVertical: 14,
-      borderRadius: 16,
+    promptHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    promptHeaderIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.border, 0.6),
-      backgroundColor: withOpacity(theme.colors.surface, 0.6),
     },
-    promptActionMarkOnly: {
-      borderColor: withOpacity(theme.colors.border, 0.9),
-      backgroundColor: theme.colors.surfaceAlt,
+    promptHeaderText: {
+      flex: 1,
     },
-    promptActionBlockTrust: {
-      borderColor: 'transparent',
+    promptClose: {
+      width: 32,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
-    promptActionText: {
-      fontWeight: '600',
-      textAlign: 'center',
-      lineHeight: 20,
-    },
-    promptActionMarkText: {
+    promptHeadline: {
+      fontSize: 20,
+      fontWeight: '700',
       color: theme.colors.text,
     },
-    promptActionBlockText: {
+    promptMessage: {
+      fontSize: 14,
+      color: theme.colors.textMuted,
+      marginTop: 4,
+    },
+    promptToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 14,
+      borderRadius: 20,
+      backgroundColor: withOpacity(theme.colors.text, 0.04),
+    },
+    promptToggleLabel: {
+      fontWeight: '600',
+      color: theme.colors.text,
+      fontSize: 14,
+    },
+    promptToggleSubLabel: {
+      fontSize: 12,
+      color: theme.colors.textMuted,
+    },
+    promptPrimaryButton: {
+      borderRadius: 18,
+      paddingVertical: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    promptPrimaryText: {
+      fontWeight: '600',
+      fontSize: 16,
       color: theme.colors.surface,
     },
-    promptNevermindButton: {
-      marginBottom: 12,
-      paddingVertical: 14,
-      borderRadius: 16,
+    promptSecondaryButton: {
+      borderRadius: 18,
       borderWidth: 1,
-      borderColor: withOpacity(theme.colors.text, 0.3),
+      borderColor: withOpacity(theme.colors.text, 0.2),
+      paddingVertical: 15,
       alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: 'transparent',
     },
-    promptNevermindText: {
-      color: theme.colors.textMuted,
+    promptSecondaryText: {
       fontWeight: '600',
+      fontSize: 15,
+      color: theme.colors.text,
     },
     promptPersistentText: {
-      color: theme.colors.accent,
-      fontSize: 13,
       textAlign: 'center',
-      fontWeight: '600',
+      marginTop: 8,
+      fontSize: 12,
+      color: theme.colors.textMuted,
     },
     recordingBadge: {
       borderRadius: 999,

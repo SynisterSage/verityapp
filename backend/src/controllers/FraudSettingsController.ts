@@ -12,6 +12,7 @@ import {
   userHasRole,
   userIsCaretaker,
 } from '@src/common/util/auth';
+import { recordCircleAlert } from '@src/services/circleAlerts';
 
 function normalizeCallerNumber(input?: string | null) {
   if (!input) {
@@ -30,19 +31,6 @@ function normalizeCallerNumber(input?: string | null) {
   return `+${digits}`;
 }
 
-
-async function logCircleActivity(
-  profileId: string,
-  alertType: string,
-  payload: Record<string, unknown>
-) {
-  await supabaseAdmin.from('alerts').insert({
-    profile_id: profileId,
-    alert_type: alertType,
-    status: 'resolved',
-    payload,
-  });
-}
 
 async function listSafePhrases(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
@@ -107,12 +95,16 @@ async function addSafePhrase(req: Request, res: Response) {
 
   try {
     const isCaretakerUser = await userIsCaretaker(userId, profileId);
-    await logCircleActivity(profileId, 'safe_phrase_added', {
-      actor_user_id: userId,
-      actor_role: isCaretakerUser ? 'caretaker' : 'member',
-      actor_label: isCaretakerUser ? 'Circle owner' : 'Circle member',
-      phrase: phrase.trim(),
-      message: `Added safe word "${phrase.trim()}".`,
+    await recordCircleAlert({
+      profileId,
+      alertType: 'safe_phrase_added',
+      payload: {
+        actor_user_id: userId,
+        actor_role: isCaretakerUser ? 'caretaker' : 'member',
+        actor_label: isCaretakerUser ? 'Circle owner' : 'Circle member',
+        phrase: phrase.trim(),
+        message: `Added safe word "${phrase.trim()}".`,
+      },
     });
   } catch (alertError) {
     logger.err(alertError);
@@ -239,13 +231,17 @@ async function addBlockedCaller(req: Request, res: Response) {
 
   try {
     const isCaretakerUser = await userIsCaretaker(userId, profileId);
-    await logCircleActivity(profileId, 'blocked_caller_added', {
-      actor_user_id: userId,
-      actor_role: isCaretakerUser ? 'caretaker' : 'member',
-      actor_label: isCaretakerUser ? 'Circle owner' : 'Circle member',
-      caller_number: callerNumber,
-      reason: reason ?? null,
-      message: `Blocked number ${callerNumber}.`,
+    await recordCircleAlert({
+      profileId,
+      alertType: 'blocked_caller_added',
+      payload: {
+        actor_user_id: userId,
+        actor_role: isCaretakerUser ? 'caretaker' : 'member',
+        actor_label: isCaretakerUser ? 'Circle owner' : 'Circle member',
+        caller_number: callerNumber,
+        reason: reason ?? null,
+        message: `Blocked number ${callerNumber}.`,
+      },
     });
   } catch (alertError) {
     logger.err(alertError);
@@ -443,13 +439,17 @@ async function addTrustedContacts(req: Request, res: Response) {
 
   try {
     const isCaretakerUser = await userIsCaretaker(userId, profileId);
-    await logCircleActivity(profileId, 'trusted_contact_added', {
-      actor_user_id: userId,
-      actor_role: isCaretakerUser ? 'caretaker' : 'member',
-      actor_label: isCaretakerUser ? 'Circle owner' : 'Circle member',
-      added: rows.length,
-      numbers: filteredNumbers,
-      message: `Added ${rows.length} trusted contact${rows.length === 1 ? '' : 's'}.`,
+    await recordCircleAlert({
+      profileId,
+      alertType: 'trusted_contact_added',
+      payload: {
+        actor_user_id: userId,
+        actor_role: isCaretakerUser ? 'caretaker' : 'member',
+        actor_label: isCaretakerUser ? 'Circle owner' : 'Circle member',
+        added: rows.length,
+        numbers: filteredNumbers,
+        message: `Added ${rows.length} trusted contact${rows.length === 1 ? '' : 's'}.`,
+      },
     });
   } catch (alertError) {
     logger.err(alertError);

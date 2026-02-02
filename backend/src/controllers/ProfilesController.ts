@@ -14,6 +14,7 @@ import {
   userHasRole,
   userIsCaretaker,
 } from '@src/common/util/auth';
+import { recordCircleAlert } from '@src/services/circleAlerts';
 
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];
@@ -34,26 +35,6 @@ function sanitizeProfileRow(row: Record<string, any>): Record<string, any> {
   } as Record<string, any>;
   return sanitized;
 }
-
-async function insertCircleAlert({
-  profileId,
-  alertType,
-  payload = {},
-  status = 'resolved',
-}: {
-  profileId: string;
-  alertType: string;
-  payload?: Record<string, unknown>;
-  status?: string;
-}) {
-  await supabaseAdmin.from('alerts').insert({
-    profile_id: profileId,
-    alert_type: alertType,
-    status,
-    payload,
-  });
-}
-
 
 async function listProfiles(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
@@ -207,7 +188,7 @@ async function setPasscode(req: Request, res: Response) {
       actor_label: actorLabel,
       message: 'Updated the Safety PIN',
     };
-    await insertCircleAlert({
+    await recordCircleAlert({
       profileId,
       alertType: 'pin_change',
       payload,
@@ -317,7 +298,7 @@ async function recordActivity(req: Request, res: Response) {
   };
 
   try {
-    await insertCircleAlert({
+    await recordCircleAlert({
       profileId,
       alertType,
       payload: enrichedPayload,
@@ -358,6 +339,14 @@ async function updateAlertPrefs(req: Request, res: Response) {
     auto_trust_on_safe,
     auto_block_on_fraud,
   } = req.body as Record<string, number | boolean | undefined>;
+
+  const { data: existingProfile } = await supabaseAdmin
+    .from('profiles')
+    .select(
+      'auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud'
+    )
+    .eq('id', profileId)
+    .maybeSingle();
 
   const updates: Record<string, number | boolean> = {};
   if (typeof alert_threshold_score === 'number') {
@@ -400,6 +389,56 @@ async function updateAlertPrefs(req: Request, res: Response) {
   if (error || !data) {
     logger.err(error ?? new Error('Failed to update alert prefs'));
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update alert prefs' });
+  }
+
+  const automationChanges: string[] = [];
+  if (typeof auto_mark_enabled === 'boolean') {
+    const prev = Boolean(existingProfile?.auto_mark_enabled);
+    if (auto_mark_enabled !== prev) {
+      automationChanges.push(
+        auto_mark_enabled ? 'Automation filtering enabled' : 'Automation filtering disabled'
+      );
+    }
+  }
+  if (typeof auto_mark_fraud_threshold === 'number' && auto_mark_fraud_threshold !== existingProfile?.auto_mark_fraud_threshold) {
+    automationChanges.push(`Fraud threshold set to ${auto_mark_fraud_threshold}`);
+  }
+  if (typeof auto_mark_safe_threshold === 'number' && auto_mark_safe_threshold !== existingProfile?.auto_mark_safe_threshold) {
+    automationChanges.push(`Safe threshold set to ${auto_mark_safe_threshold}`);
+  }
+  if (typeof auto_trust_on_safe === 'boolean') {
+    const prev = Boolean(existingProfile?.auto_trust_on_safe);
+    if (auto_trust_on_safe !== prev) {
+      automationChanges.push(
+        auto_trust_on_safe ? 'Auto-trust when safe enabled' : 'Auto-trust when safe disabled'
+      );
+    }
+  }
+  if (typeof auto_block_on_fraud === 'boolean') {
+    const prev = Boolean(existingProfile?.auto_block_on_fraud ?? true);
+    if (auto_block_on_fraud !== prev) {
+      automationChanges.push(
+        auto_block_on_fraud ? 'Auto-block high risk calls enabled' : 'Auto-block high risk calls disabled'
+      );
+    }
+  }
+
+  if (automationChanges.length > 0) {
+    try {
+      await recordCircleAlert({
+        profileId,
+        alertType: 'automation_settings_updated',
+        payload: {
+          actor_user_id: userId,
+          actor_role: isCaretaker ? 'caretaker' : 'admin',
+          actor_label: isCaretaker ? 'Circle owner' : 'Circle member',
+          changes: automationChanges,
+          message: automationChanges.join(' · '),
+        },
+      });
+    } catch (alertError) {
+      logger.err(alertError);
+    }
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({
@@ -716,7 +755,7 @@ async function inviteMember(req: Request, res: Response) {
   }
 
   try {
-    await insertCircleAlert({
+    await recordCircleAlert({
       profileId,
       alertType: 'circle_invite',
       payload: {

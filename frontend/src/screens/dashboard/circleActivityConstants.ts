@@ -7,4 +7,8 @@ export const CIRCLE_ALERT_TYPES = new Set<string>([
   'trusted_contact_added',
   'blocked_caller_added',
   'security_password',
+  'member_joined',
+  'member_role_changed',
+  'member_removed',
+  'automation_settings_updated',
 ]);

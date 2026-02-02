@@ -502,8 +502,26 @@ const loadMemberNames = useCallback(async () => {
           } else if (alert.alert_type === 'blocked_caller_added') {
             description = `Blocked number ${alert.payload?.caller_number ?? 'a caller'}.`;
           } else {
+            const memberRoleLabel = alert.payload?.target_role === 'admin' ? 'Caretaker' : 'Family member';
+            if (alert.alert_type === 'member_joined') {
+              const memberLabel = alert.payload?.member_display_name ?? 'A member';
+              description = `${memberLabel} joined the circle.`;
+            } else if (alert.alert_type === 'member_role_changed') {
+              const targetLabel = alert.payload?.target_display_name ?? 'A member';
+              description = `Set ${targetLabel} as ${memberRoleLabel}.`;
+            } else if (alert.alert_type === 'member_removed') {
+              const targetLabel = alert.payload?.target_display_name ?? 'A member';
+              description = `Removed ${targetLabel} from the circle.`;
+          } else if (alert.alert_type === 'automation_settings_updated') {
+            const fallback =
+              Array.isArray(alert.payload?.changes) && alert.payload?.changes.length > 0
+                ? alert.payload?.changes.join(' · ')
+                : undefined;
+            description = alert.payload?.message ?? fallback ?? 'Updated automation settings.';
+          } else {
             description = 'Updated the Safety PIN.';
           }
+        }
         }
         const timestamp = formatAlertTime(alert.created_at);
         return {

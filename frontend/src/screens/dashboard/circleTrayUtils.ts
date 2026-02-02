@@ -2,6 +2,13 @@ import { AlertRow } from './alertTypes';
 import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
 import { formatAlertDateLabel, formatAlertTime } from './alertTimeUtils';
 
+function joinChanges(changes?: string[]) {
+  if (!Array.isArray(changes) || changes.length === 0) {
+    return undefined;
+  }
+  return changes.join(' · ');
+}
+
 type CircleTrayCopy = {
   title: string;
   subtitle: string;
@@ -36,6 +43,30 @@ export function getCircleTrayCopy(alert: AlertRow, fallbackDisplay?: string): Ci
       case 'blocked_caller_added':
         detail = alert.payload?.message ?? `Blocked number ${alert.payload?.caller_number ?? ''}.`;
         break;
+      case 'member_joined': {
+        const label = alert.payload?.actor_label ?? 'A member';
+        detail = alert.payload?.message ?? `${label} joined the circle.`;
+        break;
+      }
+      case 'member_role_changed': {
+        const targetLabel = alert.payload?.target_display_name ?? 'A member';
+        const targetRole = alert.payload?.target_role === 'admin' ? 'Caretaker' : 'Family member';
+        detail = alert.payload?.message ?? `Set ${targetLabel} as ${targetRole}.`;
+        break;
+      }
+      case 'member_removed': {
+        const targetLabel = alert.payload?.target_display_name ?? 'a member';
+        detail = alert.payload?.message ?? `Removed ${targetLabel} from the circle.`;
+        break;
+      }
+      case 'automation_settings_updated': {
+        const changeText =
+          joinChanges(alert.payload?.changes) ??
+          alert.payload?.message ??
+          'Updated automation settings.';
+        detail = changeText;
+        break;
+      }
     }
   }
   return { title: displayTitle, subtitle: actorLabel, detail };

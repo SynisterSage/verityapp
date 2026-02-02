@@ -12,6 +12,7 @@ import {
   userHasRole,
   userIsCaretaker,
 } from '@src/common/util/auth';
+import { recordCircleAlert } from '@src/services/circleAlerts';
 
 const SUPABASE_ADMIN_URL = process.env.SUPABASE_URL ?? '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
@@ -240,7 +241,7 @@ async function changeMemberRole(req: Request, res: Response) {
 
   const { data: member } = await supabaseAdmin
     .from('profile_members')
-    .select('id, user_id, role')
+    .select('id, user_id, role, display_name')
     .eq('id', memberId)
     .eq('profile_id', profileId)
     .maybeSingle();
@@ -271,6 +272,28 @@ async function changeMemberRole(req: Request, res: Response) {
   if (error) {
     logger.err(error);
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update role' });
+  }
+
+  try {
+    const actorRole = isCaretakerRequester ? 'caretaker' : 'admin';
+    const actorLabel = isCaretakerRequester ? 'Circle owner' : 'Circle member';
+    const targetLabel = member.display_name ?? 'Circle member';
+    const roleLabel = role === 'admin' ? 'Caretaker' : 'Family member';
+    await recordCircleAlert({
+      profileId,
+      alertType: 'member_role_changed',
+      payload: {
+        actor_user_id: userId,
+        actor_role: actorRole,
+        actor_label: actorLabel,
+        target_user_id: member.user_id,
+        target_display_name: targetLabel,
+        target_role: role,
+        message: `Set ${targetLabel} as ${roleLabel}.`,
+      },
+    });
+  } catch (alertError) {
+    logger.err(alertError);
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ memberId, role });
@@ -304,7 +327,7 @@ async function removeMember(req: Request, res: Response) {
 
   const { data: member } = await supabaseAdmin
     .from('profile_members')
-    .select('id, profile_id, user_id, role')
+    .select('id, profile_id, user_id, role, display_name')
     .eq('id', memberId)
     .eq('profile_id', profileId)
     .maybeSingle();
@@ -350,6 +373,26 @@ async function removeMember(req: Request, res: Response) {
       .eq('profile_id', member.profile_id)
       .eq('email', userRow.user.email)
       .eq('status', 'accepted');
+  }
+
+  try {
+    const actorRole = isCaretakerRequester ? 'caretaker' : 'admin';
+    const actorLabel = isCaretakerRequester ? 'Circle owner' : 'Circle member';
+    const targetLabel = member.display_name ?? 'Circle member';
+    await recordCircleAlert({
+      profileId,
+      alertType: 'member_removed',
+      payload: {
+        actor_user_id: userId,
+        actor_role: actorRole,
+        actor_label: actorLabel,
+        target_user_id: member.user_id,
+        target_display_name: targetLabel,
+        message: `Removed ${targetLabel} from the circle.`,
+      },
+    });
+  } catch (alertError) {
+    logger.err(alertError);
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ removed: member });
@@ -405,6 +448,7 @@ async function acceptInvite(req: Request, res: Response) {
     email: userRow?.user?.email ?? null,
     metadata: userRow?.user?.user_metadata ?? null,
   });
+  const actorLabel = displayName ?? 'Circle member';
   const { data: member, error: memberError } = await supabaseAdmin
     .from('profile_members')
     .upsert(
@@ -445,6 +489,24 @@ async function acceptInvite(req: Request, res: Response) {
       accepted_by: userId,
     })
     .eq('id', invite.id);
+
+  try {
+    const targetLabel = actorLabel;
+    await recordCircleAlert({
+      profileId: invite.profile_id,
+      alertType: 'member_joined',
+      payload: {
+        actor_user_id: userId,
+        actor_role: 'member',
+        actor_label: actorLabel,
+        member_user_id: userId,
+        member_display_name: targetLabel,
+        message: `${targetLabel} joined the circle.`,
+      },
+    });
+  } catch (alertError) {
+    logger.err(alertError);
+  }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ member });
 }
