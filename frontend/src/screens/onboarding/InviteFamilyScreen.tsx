@@ -3,6 +3,7 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  Easing,
   Linking,
   ScrollView,
   Share,
@@ -85,6 +86,11 @@ export default function InviteFamilyScreen({ navigation }: Props) {
   const [inviteRole, setInviteRole] = useState<MemberRole>('editor');
   const [inviteError, setInviteError] = useState('');
   const [isInviting, setIsInviting] = useState(false);
+  const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+  const [memberTrayMember, setMemberTrayMember] = useState<Member | null>(null);
+  const [isMemberTrayMounted, setIsMemberTrayMounted] = useState(false);
+  const memberTrayAnim = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.6)).current;
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `member-skeleton-${i}`), []);
   const inviteSkeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `invite-skeleton-${i}`), []);
@@ -101,6 +107,11 @@ export default function InviteFamilyScreen({ navigation }: Props) {
     [currentUserIsAdmin]
   );
   const canCreateInvite = currentUserIsAdmin;
+  const canManageMember = (member: Member) =>
+    currentUserIsAdmin &&
+    !member.is_caretaker &&
+    member.role !== 'admin' &&
+    member.user_id !== sessionUserId;
   const roleHelperItems = useMemo(
     () => [
       {
@@ -283,6 +294,45 @@ export default function InviteFamilyScreen({ navigation }: Props) {
     });
   }, [actionAnim]);
 
+  const showMemberTray = useCallback(() => {
+    setIsMemberTrayMounted(true);
+    memberTrayAnim.setValue(0);
+    Animated.timing(memberTrayAnim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [memberTrayAnim]);
+
+  const hideMemberTray = useCallback(
+    (callback?: () => void) => {
+      Animated.timing(memberTrayAnim, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        setIsMemberTrayMounted(false);
+        setMemberTrayMember(null);
+        callback?.();
+      });
+    },
+    [memberTrayAnim]
+  );
+
+  const openMemberTray = useCallback(
+    (member: Member) => {
+      setMemberTrayMember(member);
+      showMemberTray();
+    },
+    [showMemberTray]
+  );
+
+  const closeMemberTray = useCallback(() => {
+    hideMemberTray();
+  }, [hideMemberTray]);
+
   const shareInvite = async (invite: Invite) => {
     const message = buildInviteMessage(invite);
     try {
@@ -348,6 +398,68 @@ export default function InviteFamilyScreen({ navigation }: Props) {
     );
   };
 
+  const updateMemberRole = async (member: Member, role: MemberRole) => {
+    if (!activeProfile) return;
+    setUpdatingMemberId(member.id);
+    try {
+      await authorizedFetch(`/profiles/${activeProfile.id}/members/${member.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role }),
+      });
+      await fetchMembers();
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Unable to update role', 'Try again later.');
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  };
+
+  const confirmChangeRole = (member: Member, role: MemberRole) => {
+    if (member.role === role) return;
+    const name = resolveDisplayName(member);
+    Alert.alert(
+      'Change role',
+      `Set ${name} as ${role}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: () => hideMemberTray(() => updateMemberRole(member, role)),
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const handleRemoveMember = async (member: Member) => {
+    if (!activeProfile) return;
+    setRemovingMemberId(member.id);
+    try {
+      await authorizedFetch(`/profiles/${activeProfile.id}/members/${member.id}`, {
+        method: 'DELETE',
+      });
+      await fetchMembers();
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Unable to remove member', 'Try again later.');
+    } finally {
+      setRemovingMemberId(null);
+    }
+  };
+
+  const confirmRemoveMember = (member: Member) => {
+    Alert.alert(
+      'Remove member',
+      `Remove ${member.display_name ?? 'this member'}?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => hideMemberTray(() => handleRemoveMember(member)) },
+      ],
+      { cancelable: true }
+    );
+  };
+
   const renderMemberRow = () => (
     <View>
       {members.map((member) => {
@@ -370,6 +482,11 @@ export default function InviteFamilyScreen({ navigation }: Props) {
               </View>
               <Text style={styles.memberMeta}>{member.is_caretaker ? 'Account Owner' : 'Family'}</Text>
             </View>
+            {canManageMember(member) && (
+              <TouchableOpacity style={styles.menuButton} onPress={() => openMemberTray(member)} activeOpacity={0.7}>
+                <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.accent} />
+              </TouchableOpacity>
+            )}
           </View>
         );
       })}
@@ -586,6 +703,67 @@ export default function InviteFamilyScreen({ navigation }: Props) {
           </Animated.View>
         </View>
       )}
+      {isMemberTrayMounted && memberTrayMember && (
+        <View style={styles.memberTrayOverlay} pointerEvents="box-none">
+          <TouchableWithoutFeedback onPress={closeMemberTray}>
+            <View style={styles.memberTrayBackdrop} />
+          </TouchableWithoutFeedback>
+          <Animated.View
+            style={[
+              styles.memberTray,
+              {
+                opacity: memberTrayAnim,
+                transform: [
+                  {
+                    translateY: memberTrayAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [260, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <View style={styles.trayHandle} />
+            <View style={styles.memberTrayHeader}>
+              <View>
+                <Text style={styles.memberTrayTitle}>Manage member</Text>
+                <Text style={styles.memberTraySubtitle}>{resolveDisplayName(memberTrayMember)}</Text>
+              </View>
+              <Pressable onPress={closeMemberTray} style={styles.actionClose}>
+                <Ionicons name="close" size={20} color={theme.colors.text} />
+              </Pressable>
+            </View>
+            {memberTrayMember.role !== 'editor' && !memberTrayMember.is_caretaker && (
+              <TouchableOpacity
+                style={[
+                  styles.memberTrayButton,
+                  updatingMemberId === memberTrayMember.id && styles.memberTrayButtonDisabled,
+                ]}
+                onPress={() => confirmChangeRole(memberTrayMember, 'editor')}
+                disabled={updatingMemberId === memberTrayMember.id}
+              >
+                {updatingMemberId === memberTrayMember.id ? (
+                  <ActivityIndicator size="small" color={theme.colors.accent} />
+                ) : (
+                  <Text style={styles.memberTrayButtonText}>Set as Family</Text>
+                )}
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={styles.memberTrayDanger}
+              onPress={() => confirmRemoveMember(memberTrayMember)}
+              disabled={removingMemberId === memberTrayMember.id}
+            >
+              {removingMemberId === memberTrayMember.id ? (
+                <ActivityIndicator size="small" color={theme.colors.danger} />
+              ) : (
+                <Text style={styles.memberTrayDangerText}>Remove member</Text>
+              )}
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -630,6 +808,14 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       borderWidth: 1,
       borderColor: theme.colors.border,
       marginBottom: 12,
+    },
+    menuButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 12,
     },
     avatar: {
       width: 40,
@@ -897,7 +1083,6 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.colors.surfaceAlt,
     },
     actionButton: {
       backgroundColor: theme.colors.surfaceAlt,
@@ -919,6 +1104,73 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
     actionDangerText: {
       color: theme.colors.danger,
       fontWeight: '700',
+    },
+    memberTrayOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      zIndex: 30,
+    },
+    memberTrayBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme.colors.overlay,
+    },
+    memberTray: {
+      backgroundColor: theme.colors.surface,
+      borderTopLeftRadius: theme.radii.lg,
+      borderTopRightRadius: theme.radii.lg,
+      padding: 24,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      shadowColor: '#000',
+      shadowOpacity: 0.35,
+      shadowOffset: { width: 0, height: -12 },
+      shadowRadius: 30,
+      elevation: 20,
+      width: '100%',
+    },
+    memberTrayHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    memberTrayTitle: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    memberTraySubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      marginTop: 4,
+    },
+    memberTrayButton: {
+      marginBottom: 12,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    memberTrayButtonDisabled: {
+      opacity: 0.6,
+    },
+    memberTrayButtonText: {
+      color: theme.colors.text,
+      fontWeight: '600',
+    },
+    memberTrayDanger: {
+      backgroundColor: withOpacity(theme.colors.danger, 0.16),
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+    },
+    memberTrayDangerText: {
+      color: theme.colors.danger,
+      fontWeight: '600',
     },
     inviteSkeletonRow: {
       borderRadius: 16,

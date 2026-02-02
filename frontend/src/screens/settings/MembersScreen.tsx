@@ -3,7 +3,7 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
-  Dimensions,
+  Easing,
   Linking,
   Pressable,
   ScrollView,
@@ -52,9 +52,6 @@ type Invite = {
   short_code?: string | null;
   invited_by?: string | null;
 };
-
-const MENU_WIDTH = 140;
-const MENU_HEIGHT = 90;
 
 const avatarColors = ['#4c7dff', '#6e60f8', '#00c2ff', '#47d6a5'];
 const ROLE_DISPLAY_NAMES: Record<MemberRole, string> = {
@@ -111,13 +108,12 @@ export default function MembersScreen() {
   const [inviteError, setInviteError] = useState('');
   const [isInviting, setIsInviting] = useState(false);
   const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
-  const [activeMemberMenuId, setActiveMemberMenuId] = useState<string | null>(null);
   const [updatingMemberId, setUpdatingMemberId] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
-  const [menuMember, setMenuMember] = useState<Member | null>(null);
-  const [menuAnchor, setMenuAnchor] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [memberTrayMember, setMemberTrayMember] = useState<Member | null>(null);
+  const [isMemberTrayMounted, setIsMemberTrayMounted] = useState(false);
+  const trayAnim = useRef(new Animated.Value(0)).current;
   const [selectedInvite, setSelectedInvite] = useState<Invite | null>(null);
-  const rowRefs = useRef<Map<string, View>>(new Map());
   const shimmer = useRef(new Animated.Value(0.6)).current;
   const actionAnim = useRef(new Animated.Value(0)).current;
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `member-${i}`), []);
@@ -139,37 +135,50 @@ export default function MembersScreen() {
   const styles = useMemo(() => createMembersStyles(theme), [theme]);
   const roleHelperItems = useMemo(() => createRoleHelperItems(theme), [theme]);
 
-  const closeMemberMenu = useCallback(() => {
-    setActiveMemberMenuId(null);
-    setMenuAnchor(null);
-    setMenuMember(null);
-  }, []);
-
   const canManageMember = (member: Member) =>
     currentUserIsAdmin &&
     !member.is_caretaker &&
     member.role !== 'admin' &&
     member.user_id !== sessionUserId;
 
-  const toggleMemberMenu = useCallback(
-    (member: Member) => {
-      if (activeMemberMenuId === member.id) {
-        closeMemberMenu();
-        return;
-      }
-      setActiveMemberMenuId(member.id);
-      setMenuMember(member);
-      const ref = rowRefs.current.get(member.id);
-      if (!ref) {
-        setMenuAnchor(null);
-        return;
-      }
-      ref.measureInWindow((x, y, width, height) => {
-        setMenuAnchor({ x, y, width, height });
+  const showMemberTray = useCallback(() => {
+    setIsMemberTrayMounted(true);
+    trayAnim.setValue(0);
+    Animated.timing(trayAnim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [trayAnim]);
+
+  const hideMemberTray = useCallback(
+    (callback?: () => void) => {
+      Animated.timing(trayAnim, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }).start(() => {
+        setIsMemberTrayMounted(false);
+        setMemberTrayMember(null);
+        callback?.();
       });
     },
-    [activeMemberMenuId, closeMemberMenu]
+    [trayAnim]
   );
+
+  const openMemberTray = useCallback(
+    (member: Member) => {
+      setMemberTrayMember(member);
+      showMemberTray();
+    },
+    [showMemberTray]
+  );
+
+  const closeMemberTray = useCallback(() => {
+    hideMemberTray();
+  }, [hideMemberTray]);
 
   const fetchMembers = useCallback(async () => {
     if (!activeProfile) {
@@ -180,7 +189,6 @@ export default function MembersScreen() {
     try {
       const data = await authorizedFetch(`/profiles/${activeProfile.id}/members`);
       setMembers(data?.members ?? []);
-      setActiveMemberMenuId(null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -255,25 +263,6 @@ export default function MembersScreen() {
       return () => clearInterval(interval);
     }, [activeProfile, fetchMembers, fetchInvites])
   );
-
-  const windowWidth = Dimensions.get('window').width;
-  const windowHeight = Dimensions.get('window').height;
-  const menuPosition =
-    menuAnchor === null
-      ? null
-      : {
-          top: Math.min(
-            Math.max(16, menuAnchor.y + menuAnchor.height / 2 - 60),
-            windowHeight - 90 - 16
-          ),
-          left: Math.max(
-            16,
-            Math.min(
-              menuAnchor.x + menuAnchor.width - 140,
-              Math.max(16, windowWidth - 140 - 16)
-            )
-          ),
-        };
 
   const shareInvite = async (invite: Invite) => {
     const message = `Join my Verity Protect Circle.\nTap verityprotect://invite/${invite.id} or use code ${
@@ -418,7 +407,6 @@ export default function MembersScreen() {
       Alert.alert('Unable to update role', 'Try again later.');
     } finally {
       setUpdatingMemberId(null);
-      closeMemberMenu();
     }
   };
 
@@ -432,7 +420,7 @@ export default function MembersScreen() {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Confirm',
-          onPress: () => updateMemberRole(member, role),
+          onPress: () => hideMemberTray(() => updateMemberRole(member, role)),
         },
       ],
       { cancelable: true }
@@ -452,7 +440,6 @@ export default function MembersScreen() {
       Alert.alert('Unable to remove member', 'Try again later.');
     } finally {
       setRemovingMemberId(null);
-      closeMemberMenu();
     }
   };
 
@@ -462,21 +449,25 @@ export default function MembersScreen() {
       `Remove ${member.display_name ?? 'this member'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => handleRemoveMember(member) },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => hideMemberTray(() => handleRemoveMember(member)),
+        },
       ],
       { cancelable: true }
     );
   };
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('blur', () => closeMemberMenu());
+    const unsubscribe = navigation.addListener('blur', () => closeMemberTray());
     return unsubscribe;
-  }, [navigation, closeMemberMenu]);
+  }, [navigation, closeMemberTray]);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', () => closeMemberMenu());
+    const unsubscribe = navigation.addListener('beforeRemove', () => closeMemberTray());
     return unsubscribe;
-  }, [navigation, closeMemberMenu]);
+  }, [navigation, closeMemberTray]);
 
   return (
     <View style={styles.outer}>
@@ -485,7 +476,7 @@ export default function MembersScreen() {
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 32), paddingTop: Math.max(insets.top, 12 + 0) }]}
           showsVerticalScrollIndicator={false}
-          scrollEnabled={!menuMember}
+          scrollEnabled={!memberTrayMember}
           keyboardShouldPersistTaps="handled"
         >
 
@@ -526,17 +517,7 @@ export default function MembersScreen() {
                 const avatarColor = avatarColors[index % avatarColors.length];
                 const isCurrentUser = sessionUserId === member.user_id;
                 return (
-                  <View
-                    key={`${member.id}-${member.user_id}`}
-                    ref={(element) => {
-                      if (element) {
-                        rowRefs.current.set(member.id, element);
-                      } else {
-                        rowRefs.current.delete(member.id);
-                      }
-                    }}
-                    collapsable={false}
-                  >
+                  <View key={`${member.id}-${member.user_id}`}>
                     <View style={styles.memberCard}>
                       <View style={styles.memberRow}>
                         <View style={[styles.memberAvatar, { backgroundColor: avatarColor }]}>
@@ -554,7 +535,7 @@ export default function MembersScreen() {
                         {canManageMember(member) && (
                           <TouchableOpacity
                             style={styles.menuButton}
-                            onPress={() => toggleMemberMenu(member)}
+                            onPress={() => openMemberTray(member)}
                             activeOpacity={0.7}
                           >
                             <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.accent} />
@@ -740,51 +721,65 @@ export default function MembersScreen() {
           </Animated.View>
         </View>
       )}
-      {menuMember && menuPosition && (
-        <View style={styles.menuPortal} pointerEvents="box-none">
-          <TouchableWithoutFeedback onPress={closeMemberMenu}>
-            <View style={styles.overlay} />
+      {isMemberTrayMounted && memberTrayMember && (
+        <View style={styles.memberTrayOverlay} pointerEvents="box-none">
+          <TouchableWithoutFeedback onPress={closeMemberTray}>
+            <View style={styles.memberTrayBackdrop} />
           </TouchableWithoutFeedback>
-          <View
+          <Animated.View
             style={[
-              styles.memberMenu,
-              styles.memberMenuPortal,
-              { top: menuPosition.top, left: menuPosition.left },
+              styles.memberTray,
+              {
+                opacity: trayAnim,
+                transform: [
+                  {
+                    translateY: trayAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [260, 0],
+                    }),
+                  },
+                ],
+              },
             ]}
           >
-            {(['editor'] as MemberRole[]).map((option) => {
-              const optionLabel =
-                ROLE_DISPLAY_NAMES[option] ?? option.charAt(0).toUpperCase() + option.slice(1);
-              return (
-                <TouchableOpacity
-                  key={option}
-                  style={[
-                    styles.menuItem,
-                    menuMember.role === option && styles.menuItemDisabled,
-                  ]}
-                  onPress={() => confirmChangeRole(menuMember, option)}
-                  disabled={menuMember.role === option || updatingMemberId === menuMember.id}
-                >
-                  <Text
-                    style={[
-                      styles.menuItemText,
-                      menuMember.role === option && styles.menuItemTextDisabled,
-                    ]}
-                  >
-                    Set as {optionLabel}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-            <View style={styles.menuDivider} />
+            <View style={styles.trayHandle} />
+            <View style={styles.memberTrayHeader}>
+              <View>
+                <Text style={styles.memberTrayTitle}>Manage member</Text>
+                <Text style={styles.memberTraySubtitle}>{resolveDisplayName(memberTrayMember)}</Text>
+              </View>
+              <Pressable onPress={closeMemberTray} style={styles.actionClose}>
+                <Ionicons name="close" size={20} color={theme.colors.text} />
+              </Pressable>
+            </View>
+            {memberTrayMember.role !== 'editor' && !memberTrayMember.is_caretaker && (
+              <TouchableOpacity
+                style={[
+                  styles.memberTrayButton,
+                  updatingMemberId === memberTrayMember.id && styles.memberTrayButtonDisabled,
+                ]}
+                onPress={() => confirmChangeRole(memberTrayMember, 'editor')}
+                disabled={updatingMemberId === memberTrayMember.id}
+              >
+                {updatingMemberId === memberTrayMember.id ? (
+                  <ActivityIndicator size="small" color={theme.colors.accent} />
+                ) : (
+                  <Text style={styles.memberTrayButtonText}>Set as Family</Text>
+                )}
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => menuMember && confirmRemoveMember(menuMember)}
-              disabled={removingMemberId === menuMember?.id}
+              style={styles.memberTrayDanger}
+              onPress={() => confirmRemoveMember(memberTrayMember)}
+              disabled={removingMemberId === memberTrayMember.id}
             >
-              <Text style={styles.menuItemText}>Remove member</Text>
+              {removingMemberId === memberTrayMember.id ? (
+                <ActivityIndicator size="small" color={theme.colors.danger} />
+              ) : (
+                <Text style={styles.memberTrayDangerText}>Remove member</Text>
+              )}
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </View>
       )}
     </View>
@@ -865,7 +860,7 @@ const createMembersStyles = (theme: AppTheme) =>
       paddingVertical: 16,
       paddingHorizontal: 18,
       backgroundColor: theme.colors.surface,
-      marginBottom: 2,
+      marginBottom: 8,
       elevation: 4,
     },
     memberRow: {
@@ -884,7 +879,6 @@ const createMembersStyles = (theme: AppTheme) =>
       borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.text, 0.05),
     },
     memberAvatar: {
       width: 38,
@@ -923,42 +917,72 @@ const createMembersStyles = (theme: AppTheme) =>
       letterSpacing: 0.5,
       textTransform: 'uppercase',
     },
-    memberMenu: {
-      paddingVertical: 8,
-      paddingHorizontal: 12,
+    memberTrayOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      zIndex: 30,
+    },
+    memberTrayBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme.colors.overlay,
+    },
+    memberTray: {
       backgroundColor: theme.colors.surface,
-      borderRadius: 14,
+      borderTopLeftRadius: theme.radii.lg,
+      borderTopRightRadius: theme.radii.lg,
+      padding: 24,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
+      shadowColor: '#000',
+      shadowOpacity: 0.35,
+      shadowOffset: { width: 0, height: -12 },
+      shadowRadius: 30,
+      elevation: 20,
+      width: '100%',
+    },
+    memberTrayHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    memberTrayTitle: {
+      color: theme.colors.text,
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    memberTraySubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      marginTop: 4,
+    },
+    memberTrayButton: {
+      marginBottom: 12,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      elevation: 8,
-      zIndex: 2,
+      backgroundColor: theme.colors.surfaceAlt,
     },
-    memberMenuPortal: {
-      position: 'absolute',
-      minWidth: MENU_WIDTH,
-      maxWidth: MENU_WIDTH,
-      zIndex: 2,
+    memberTrayButtonDisabled: {
+      opacity: 0.6,
     },
-    menuItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingVertical: 10,
-    },
-    menuItemText: {
+    memberTrayButtonText: {
       color: theme.colors.text,
-      fontWeight: '500',
+      fontWeight: '600',
     },
-    menuItemDisabled: {
-      opacity: 0.5,
+    memberTrayDanger: {
+      backgroundColor: withOpacity(theme.colors.danger, 0.16),
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
     },
-    menuItemTextDisabled: {
-      color: theme.colors.textMuted,
-    },
-    menuDivider: {
-      height: 1,
-      backgroundColor: theme.colors.border,
-      marginVertical: 6,
+    memberTrayDangerText: {
+      color: theme.colors.danger,
+      fontWeight: '600',
     },
     placeholder: {
       color: withOpacity(theme.colors.text, 0.6),
@@ -1208,7 +1232,6 @@ const createMembersStyles = (theme: AppTheme) =>
       borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.text, 0.08),
     },
     actionButton: {
       borderRadius: 16,
