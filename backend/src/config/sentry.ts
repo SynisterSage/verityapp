@@ -10,6 +10,8 @@ export function initSentryEarly() {
     return;
   }
 
+  console.log("🔧 Initializing Sentry with DSN:", process.env.SENTRY_DSN?.substring(0, 30) + "...");
+  
   // Initialize Sentry
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
@@ -19,6 +21,9 @@ export function initSentryEarly() {
     
     // Release version
     release: process.env.APP_VERSION || "1.0.0-beta",
+    
+    // Debug mode to see what's happening
+    debug: true,
     
     // Integrations (v8+ uses direct imports)
     // Removed nodeProfilingIntegration due to Node.js version compatibility

@@ -28,8 +28,12 @@ router.get("/test-error", async (req, res) => {
     console.log("🧪 Sentry event ID:", eventId);
     
     // IMPORTANT: Flush Sentry to ensure event is sent before response
-    await Sentry.flush(2000); // Wait up to 2 seconds for Sentry to send
-    console.log("🧪 Sentry flushed");
+    try {
+      const flushed = await Sentry.flush(2000); // Wait up to 2 seconds for Sentry to send
+      console.log("🧪 Sentry flush result:", flushed);
+    } catch (flushError) {
+      console.error("🧪 Sentry flush error:", flushError);
+    }
     
     res.json({ 
       success: true,
