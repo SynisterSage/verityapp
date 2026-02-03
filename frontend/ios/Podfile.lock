@@ -1920,6 +1920,30 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNSentry (7.11.0):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Sentry/HybridSDK (= 8.58.0)
+    - Yoga
   - RNSVG (15.15.1):
     - hermes-engine
     - RCTRequired
@@ -1968,6 +1992,7 @@ PODS:
   - RNTwilioVoice (4.4.0):
     - React-Core
     - TwilioVoice (~> 5.2.0)
+  - Sentry/HybridSDK (8.58.0)
   - TwilioVoice (5.2.1)
   - Yoga (0.0.0)
 
@@ -2063,12 +2088,14 @@ DEPENDENCIES:
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNScreens (from `../node_modules/react-native-screens`)
+  - "RNSentry (from `../node_modules/@sentry/react-native`)"
   - RNSVG (from `../node_modules/react-native-svg`)
   - RNTwilioVoice (from `../node_modules/react-native-twilio-programmable-voice`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
   trunk:
+    - Sentry
     - TwilioVoice
 
 EXTERNAL SOURCES:
@@ -2253,6 +2280,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-gesture-handler"
   RNScreens:
     :path: "../node_modules/react-native-screens"
+  RNSentry:
+    :path: "../node_modules/@sentry/react-native"
   RNSVG:
     :path: "../node_modules/react-native-svg"
   RNTwilioVoice:
@@ -2351,8 +2380,10 @@ SPEC CHECKSUMS:
   RNCAsyncStorage: 3a4f5e2777dae1688b781a487923a08569e27fe4
   RNGestureHandler: 2914750df066d89bf9d8f48a10ad5f0051108ac3
   RNScreens: d8d6f1792f6e7ac12b0190d33d8d390efc0c1845
+  RNSentry: fbdf0705a341b40f9c78cce0cb3adf7fdcc895cf
   RNSVG: cf9ae78f2edf2988242c71a6392d15ff7dd62522
   RNTwilioVoice: c4ff2fb267f4bc01da1ac75d279d8e46b8ad2b20
+  Sentry: d587a8fe91ca13503ecd69a1905f3e8a0fcf61be
   TwilioVoice: 99f69686a0962873114534ce561436117ed9ea35
   Yoga: 5934998fbeaef7845dbf698f698518695ab4cd1a
 
