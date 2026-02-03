@@ -42,11 +42,16 @@ export function initSentryEarly() {
     
     // Filter sensitive data before sending to Sentry
     beforeSend(event, hint) {
+      console.log("🐛 Sentry beforeSend called - Environment:", process.env.NODE_ENV);
+      console.log("🐛 Event type:", event.type, "Level:", event.level);
+      
       // Don't send in development (just log locally)
       if (process.env.NODE_ENV === "development") {
         console.log("🐛 Sentry Event (dev mode - not sent):", event);
         return null;
       }
+      
+      console.log("🐛 Sending event to Sentry...");
       
       // Strip sensitive data from requests
       if (event.request) {

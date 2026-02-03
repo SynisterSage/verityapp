@@ -7,11 +7,14 @@ const router = Router();
  * Test error capture
  * GET /sentry-test/test-error
  */
-router.get("/test-error", (req, res) => {
+router.get("/test-error", async (req, res) => {
+  console.log("🧪 Test error endpoint hit");
+  
   try {
     throw new Error("🧪 Test error from SafeCall - this is intentional!");
   } catch (error) {
-    Sentry.captureException(error, {
+    console.log("🧪 Capturing exception to Sentry...");
+    const eventId = Sentry.captureException(error, {
       tags: { 
         test: true,
         endpoint: "test-error" 
@@ -22,10 +25,17 @@ router.get("/test-error", (req, res) => {
       }
     });
     
+    console.log("🧪 Sentry event ID:", eventId);
+    
+    // IMPORTANT: Flush Sentry to ensure event is sent before response
+    await Sentry.flush(2000); // Wait up to 2 seconds for Sentry to send
+    console.log("🧪 Sentry flushed");
+    
     res.json({ 
       success: true,
       message: "Error captured! Check your Sentry dashboard in ~10 seconds",
-      instructions: "Go to Sentry Issues page to see this error"
+      instructions: "Go to Sentry Issues page to see this error",
+      eventId
     });
   }
 });
@@ -85,8 +95,10 @@ router.get("/test-performance", async (req, res) => {
  * Test info message/breadcrumb
  * GET /sentry-test/test-message
  */
-router.get("/test-message", (req, res) => {
-  Sentry.captureMessage("🧪 Test message from SafeCall", {
+router.get("/test-message", async (req, res) => {
+  console.log("🧪 Test message endpoint hit");
+  
+  const eventId = Sentry.captureMessage("🧪 Test message from SafeCall", {
     level: "info",
     tags: { 
       test: true,
@@ -99,10 +111,17 @@ router.get("/test-message", (req, res) => {
     }
   });
   
+  console.log("🧪 Sentry message event ID:", eventId);
+  
+  // Flush to ensure event is sent
+  await Sentry.flush(2000);
+  console.log("🧪 Sentry flushed");
+  
   res.json({ 
     success: true,
     message: "Message captured! Check Sentry Issues tab",
-    instructions: "Go to Sentry to see this info message"
+    instructions: "Go to Sentry to see this info message",
+    eventId
   });
 });
 
@@ -154,7 +173,7 @@ router.get("/test-async-error", async (req, res, next) => {
  * Test with custom context
  * GET /sentry-test/test-context
  */
-router.get("/test-context", (req, res) => {
+router.get("/test-context", async (req, res) => {
   Sentry.captureMessage("🧪 Test with custom context", {
     level: "warning",
     tags: {
@@ -179,6 +198,9 @@ router.get("/test-context", (req, res) => {
       voiceSynthetic: 0.92
     }
   });
+  
+  // Flush to ensure event is sent
+  await Sentry.flush(2000);
   
   res.json({
     success: true,
