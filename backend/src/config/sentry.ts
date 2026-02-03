@@ -33,8 +33,8 @@ export function initSentryEarly() {
     ],
     
     // Performance monitoring
-    // Sample 10% of transactions in production, 100% in dev
-    tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
+    // Sample 100% for now (can reduce to 0.1 later once confirmed working)
+    tracesSampleRate: 1.0,
     
     // Ignore noisy errors that don't need tracking
     ignoreErrors: [
