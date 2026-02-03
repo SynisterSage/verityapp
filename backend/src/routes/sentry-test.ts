@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Sentry } from "../config/sentry";
+import * as Sentry from "@sentry/node";
 
 const router = Router();
 
@@ -41,7 +41,7 @@ router.get("/test-performance", async (req, res) => {
       op: "http.test",
       name: "test_performance_endpoint"
     },
-    async (span) => {
+    async (span: any) => {
       const startTime = Date.now();
       
       // Simulate database query

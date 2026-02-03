@@ -1,3 +1,8 @@
+// Initialize Sentry BEFORE any other imports
+// This MUST be first to properly instrument express
+import { initSentryEarly, setupSentryMiddleware, sentryErrorHandler } from '@src/config/sentry';
+initSentryEarly();
+
 import morgan from 'morgan';
 import path from 'path';
 import helmet from 'helmet';
@@ -15,7 +20,6 @@ import HTTP_STATUS_CODES, {
 } from '@src/common/constants/HTTP_STATUS_CODES';
 import { RouteError } from '@src/common/util/route-errors';
 import { NODE_ENVS } from '@src/common/constants';
-import { initSentry, sentryErrorHandler } from '@src/config/sentry';
 
 
 /******************************************************************************
@@ -24,8 +28,8 @@ import { initSentry, sentryErrorHandler } from '@src/config/sentry';
 
 const app = express();
 
-// Initialize Sentry FIRST (before any other middleware)
-initSentry(app);
+// Setup Sentry Express middleware
+setupSentryMiddleware(app);
 
 // Allow express-rate-limit to respect X-Forwarded-For behind proxies (ngrok, prod LB).
 app.set('trust proxy', 1);

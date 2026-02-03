@@ -1,8 +1,9 @@
 import * as Sentry from "@sentry/node";
-import { nodeProfilingIntegration } from "@sentry/profiling-node";
-import type { Express, RequestHandler } from "express";
+import type { Express } from "express";
 
-export function initSentry(app: Express) {
+// Initialize Sentry BEFORE any other imports
+// This must be called before express is imported
+export function initSentryEarly() {
   // Only initialize if DSN is provided
   if (!process.env.SENTRY_DSN) {
     console.log("⚠️  Sentry DSN not found - skipping initialization");
@@ -20,18 +21,15 @@ export function initSentry(app: Express) {
     release: process.env.APP_VERSION || "1.0.0-beta",
     
     // Integrations (v8+ uses direct imports)
+    // Removed nodeProfilingIntegration due to Node.js version compatibility
     integrations: [
       Sentry.httpIntegration(),
-      Sentry.expressIntegration(),
-      nodeProfilingIntegration()
+      Sentry.expressIntegration()
     ],
     
     // Performance monitoring
     // Sample 10% of transactions in production, 100% in dev
     tracesSampleRate: process.env.NODE_ENV === "production" ? 0.1 : 1.0,
-    
-    // Profiling sample rate
-    profilesSampleRate: 0.1,
     
     // Ignore noisy errors that don't need tracking
     ignoreErrors: [
@@ -61,10 +59,19 @@ export function initSentry(app: Express) {
     }
   });
   
+  console.log("✅ Sentry initialized (early)");
+}
+
+// Setup Express-specific Sentry handlers after app is created
+export function setupSentryMiddleware(app: Express) {
+  if (!process.env.SENTRY_DSN) {
+    return;
+  }
+  
   // Setup Express error handler for Sentry (v8+)
   Sentry.setupExpressErrorHandler(app);
   
-  console.log("✅ Sentry initialized");
+  console.log("✅ Sentry Express middleware attached");
 }
 
 // Error handler middleware (attach after all routes)
@@ -78,4 +85,5 @@ export function sentryErrorHandler() {
   };
 }
 
+// Export Sentry for use in other files
 export { Sentry };
