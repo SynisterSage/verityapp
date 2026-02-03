@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import logger from 'jet-logger';
 
 import BaseRouter from '@src/routes';
+import sentryTestRoutes from '@src/routes/sentry-test';
 
 import Paths from '@src/common/constants/PATHS';
 import ENV from '@src/common/constants/ENV';
@@ -14,6 +15,7 @@ import HTTP_STATUS_CODES, {
 } from '@src/common/constants/HTTP_STATUS_CODES';
 import { RouteError } from '@src/common/util/route-errors';
 import { NODE_ENVS } from '@src/common/constants';
+import { initSentry, sentryErrorHandler } from '@src/config/sentry';
 
 
 /******************************************************************************
@@ -21,6 +23,9 @@ import { NODE_ENVS } from '@src/common/constants';
 ******************************************************************************/
 
 const app = express();
+
+// Initialize Sentry FIRST (before any other middleware)
+initSentry(app);
 
 // Allow express-rate-limit to respect X-Forwarded-For behind proxies (ngrok, prod LB).
 app.set('trust proxy', 1);
@@ -53,6 +58,12 @@ app.use(helmet());
 
 // Add APIs, must be after middleware
 app.use(Paths._, apiLimiter, BaseRouter);
+
+// Add Sentry test routes
+app.use('/sentry-test', sentryTestRoutes);
+
+// Add Sentry error handler (must be before other error handlers)
+app.use(sentryErrorHandler());
 
 // Add error handler
 app.use((err: Error, _: Request, res: Response, next: NextFunction) => {

@@ -13,7 +13,11 @@ describe('fraud analysis heuristics', () => {
 
     expect(baseline.notes.callbackHits).toBeGreaterThanOrEqual(1);
     expect(safeMatchResult.notes.callbackHits).toBeGreaterThanOrEqual(1);
-    expect(baseline.notes.comboBoost - safeMatchResult.notes.comboBoost).toBe(8);
+    expect(safeMatchResult.notes.safePhraseDampening).toBeGreaterThan(0);
+    const callbackReduction = baseline.notes.callbackHits >= 1 ? 8 : 0;
+    expect(baseline.notes.comboBoost - safeMatchResult.notes.comboBoost).toBe(
+      safeMatchResult.notes.safePhraseDampening + callbackReduction
+    );
     expect(safeMatchResult.score).toBeLessThanOrEqual(baseline.score);
   });
 
@@ -109,5 +113,34 @@ describe('fraud analysis heuristics', () => {
     expect(result.notes.romanceHits).toBeGreaterThan(0);
     expect(result.notes.secrecyHits).toBeGreaterThan(0);
     expect(result.score).toBeGreaterThanOrEqual(60);
+  });
+
+  describe('English scam transcripts', () => {
+    it('flags Social Security verification for PII harvesting', () => {
+      const transcript =
+        'Greetings, I am calling from the Social Security Administration. We noticed suspicious activity tied to your Social Security number and need you to verify your full name, date of birth, and SSN to avoid legal consequences.';
+      const result = analyzeTranscript(transcript);
+      expect(result.notes.piiHarvestHits).toBeGreaterThan(0);
+      expect(result.notes.hardBlockHits).toBeGreaterThan(0);
+      expect(result.score).toBeGreaterThanOrEqual(90);
+    });
+
+    it('scores an investment scheme that demands bank details up front', () => {
+      const transcript =
+        'This is an exclusive invite to invest in a once-in-a-lifetime investment opportunity. Send us your bank account details and phone number so we can lock in twice the profit you put in after the fast deposit.';
+      const result = analyzeTranscript(transcript);
+      expect(result.notes.investmentHits).toBeGreaterThan(0);
+      expect(result.notes.hardBlockHits).toBeGreaterThan(0);
+      expect(result.score).toBeGreaterThanOrEqual(90);
+    });
+
+    it('detects kidnappers threatening a loved one to extract payment', () => {
+      const transcript =
+        'Greetings, this is the local police. We have reason to believe your daughter is kidnapped and require an immediate payment to a specialized task force. Transfer the funds to the bank account we provided to keep her safe.';
+      const result = analyzeTranscript(transcript);
+      expect(result.notes.threatHits).toBeGreaterThan(0);
+      expect(result.notes.hardBlockHits).toBeGreaterThan(0);
+      expect(result.score).toBeGreaterThanOrEqual(90);
+    });
   });
 });

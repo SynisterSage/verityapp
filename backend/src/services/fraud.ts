@@ -77,6 +77,7 @@ export type FraudNotes = {
   investmentHits: number;
   medicalHits: number;
   deviceHits: number;
+  travelPromoHits: number;
   remoteAccessHits: number;
   voiceSyntheticScore: number | null;
   voiceBoost: number;
@@ -807,6 +808,14 @@ const URGENCY_TERMS = [
   'service interruption',
   'power cut',
   'act before',
+  'press 1',
+  'press one',
+  'press 2',
+  'press two',
+  'press 5',
+  'press five',
+  'press 9',
+  'press nine',
 ];
 
 const SECRECY_TERMS = [
@@ -830,6 +839,7 @@ const THREAT_TERMS = [
   'warrant',
   'lawsuit',
   'legal action',
+  'money laundering',
   'court',
   'jail',
   'police',
@@ -921,6 +931,11 @@ const GOVERNMENT_IMPERSONATION_TERMS = [
   'treasury department',
   'social security fraud unit',
   'special investigation team',
+  'fraud prevention unit',
+  'financial security bureau',
+  'financial crimes unit',
+  'anti financial crime unit',
+  'financial irregularities',
 ];
 
 const REMOTE_ACCESS_TERMS = [
@@ -1103,6 +1118,15 @@ const SWEEPSTAKES_TERMS = [
   'foreign lottery',
   'processing check',
   'customs clearance',
+  'vacation package',
+  'travel package',
+  'luxury vacation',
+  'guided tour',
+  'travel retreat',
+  'discount for the first bookings',
+  'unlock a discount',
+  'first bookings',
+  'country adventure',
   'visa gift',
   'prize processing fee',
   'winning confirmation',
@@ -1111,6 +1135,23 @@ const SWEEPSTAKES_TERMS = [
   'cash reward',
   'prize auditor',
   'reward notice',
+];
+
+const TRAVEL_PROMO_TERMS = [
+  'travel package',
+  'vacation package',
+  'luxury vacation',
+  'guided tour',
+  'travel retreat',
+  'country adventure',
+  'product tour',
+  'first bookings',
+  'first to grab',
+  'first to book',
+  'unlock a discount',
+  'discount for the first bookings',
+  'discover the enchantment',
+  'seize a discount',
 ];
 
 const ROMANCE_TERMS = [
@@ -1156,6 +1197,65 @@ const JOB_LOAN_TERMS = [
   'check cashing job',
   'mystery shopper payout',
   'work from anywhere job',
+  'personal loan',
+  'loan application',
+  'loan approval',
+  'part-time job',
+  'part time job',
+  'paid opportunity',
+  'paid position',
+  'paid surveys',
+  'paid survey',
+  'paid mobile app review',
+  'mobile app review',
+  'data entry job',
+  'resume',
+  'cv',
+  'system trial',
+  'paid system trial',
+  'beta tester',
+  'product review program',
+  'affiliate marketing',
+  'sales gig',
+  'commission',
+  'fund transfer',
+  'fund transfers',
+  'fund transfers program',
+  'assistant purchaser',
+  'stock taker',
+  'investment community',
+  'investment group',
+  'apply for personal loan',
+  'apply for a personal loan',
+  'earn money',
+  'making money',
+  'came across your profile',
+  'your profile caught my eye',
+  'profile stood out',
+  'profile caught your eye',
+  'reached out to you',
+  'unique opportunity',
+  'special opportunity',
+  'opportunity for you',
+  'gig',
+  'game changer',
+  'game-changer',
+  'high profit',
+  'high-profit',
+  'assistant purchasers',
+  'stock takers',
+  'social media influencer',
+  'social media influencers',
+  'job seekers',
+  'writer',
+  'writers',
+  'program for you',
+  'this program',
+  'with this program',
+  'with this company program',
+  'make around',
+  'in this program',
+  'consistently making',
 ];
 
 const BRAND_IMPERSONATION_TERMS = [
@@ -1543,6 +1643,18 @@ const INVESTMENT_TERMS = [
   'funds release',
   'remittance',
   'transaction reversal',
+  'investment community',
+  'investment group',
+  'financial acumen',
+  'financial prosperity',
+  'financial success',
+  'elite investors',
+  'investment club',
+  'investment scheme',
+  'high profit',
+  'high-profit',
+  'investors',
+  'financial manager',
 ];
 
 const MEDICAL_TERMS = [
@@ -1651,6 +1763,11 @@ const PII_TERMS = [
   'four digit pin',
   'password reset',
   'one time passcode',
+  'salary slip',
+  'salary slips',
+  'salary statement',
+  'e filing',
+  'efiling',
 ];
 
 const HARD_BLOCK_TERMS = [
@@ -1825,6 +1942,16 @@ const HARD_BLOCK_TERMS = [
   'windows activation',
   'server patch',
   'remote vpn access',
+  'credit card',
+  'escort',
+  'escorts',
+  'male companion',
+  'male companions',
+  'secure account',
+  'salary slip',
+  'salary slips',
+  'efiling',
+  'warranty',
 ];
 
 const PAYMENT_REQUEST_PATTERNS = [
@@ -2232,6 +2359,7 @@ function heuristicBoosts(text: string, safePhraseMatches: string[] = []) {
   const investmentHits = countPhraseHits(text, INVESTMENT_TERMS);
   const medicalHits = countPhraseHits(text, MEDICAL_TERMS);
   const deviceHits = countPhraseHits(text, DEVICE_TERMS);
+  const travelPromoHits = countPhraseHits(text, TRAVEL_PROMO_TERMS);
   const emailHits = countPhraseHits(text, EMAIL_PHISHING_TERMS);
   const medicalScamHits = countPhraseHits(text, MEDICAL_SCAM_TERMS);
   const utilityHits = countPhraseHits(text, UTILITY_TERMS);
@@ -2323,6 +2451,7 @@ function heuristicBoosts(text: string, safePhraseMatches: string[] = []) {
   if (deviceHits >= 2) boost += 6;
   if (deviceHits >= 1 && remoteAccessHits >= 1) boost += 12;
   if (deviceHits >= 1 && commandSensitiveHits > 0) boost += 8;
+  if (travelPromoHits >= 1) boost += Math.min(24, travelPromoHits * 12);
 
   if (secrecyHits >= 1 && paymentAppHits >= 1) boost += 12;
   if (urgencyHits >= 1 && paymentAppHits >= 1) boost += 8;
@@ -2388,6 +2517,7 @@ function heuristicBoosts(text: string, safePhraseMatches: string[] = []) {
     investmentHits,
     medicalHits,
     deviceHits,
+    travelPromoHits,
     grandchildHits,
     sweepstakesHits,
     romanceHits,
@@ -2520,6 +2650,7 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         investmentHits: 0,
         medicalHits: 0,
         deviceHits: 0,
+        travelPromoHits: 0,
         remoteAccessHits: 0,
         voiceSyntheticScore,
         voiceBoost,
@@ -2596,6 +2727,27 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   }
   if (matches.length >= 3) {
     score = Math.max(score, 80);
+  }
+  if (heuristic.jobLoanHits >= 1) {
+    score = Math.max(score, 85);
+  }
+  if (heuristic.sweepstakesHits >= 1) {
+    score = Math.max(score, 70);
+  }
+  if (heuristic.governmentImpersonationHits >= 1) {
+    score = Math.max(score, 85);
+  }
+  if (heuristic.threatHits >= 1) {
+    score = Math.max(score, 70);
+  }
+  if (heuristic.threatHits >= 2) {
+    score = Math.max(score, 90);
+  }
+  if (heuristic.travelPromoHits >= 1) {
+    score = Math.max(score, 70);
+  }
+  if (heuristic.investmentHits >= 1) {
+    score = Math.max(score, 70);
   }
   if (heuristic.paymentRequestHits >= 1 || heuristic.codeRequestHits >= 1) {
     score = Math.max(score, 70);
@@ -2688,6 +2840,7 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         investmentHits: heuristic.investmentHits,
         medicalHits: heuristic.medicalHits,
         deviceHits: heuristic.deviceHits,
+        travelPromoHits: heuristic.travelPromoHits,
         voiceSyntheticScore,
         voiceBoost,
         voiceAnalysis: metadata.voiceAnalysis ?? null,
