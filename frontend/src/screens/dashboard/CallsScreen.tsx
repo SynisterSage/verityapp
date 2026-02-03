@@ -35,7 +35,6 @@ import DashboardHeader from '../../components/common/DashboardHeader';
 import { getRiskStyles, getRiskSeverity } from '../../utils/risk';
 import type { AppTheme } from '../../theme/tokens';
 import type { CallsStackParamList } from '../../navigation/types';
-import { logEvent } from '../../services/sentry';
 
 type CallRow = {
   id: string;
@@ -569,14 +568,6 @@ const sections = useMemo<CallSection[]>(() => {
 
   const handleCallPress = useCallback(
     (call: CallRow) => {
-      logEvent('view_call_detail', {
-        screen: 'Calls',
-        extra: {
-          callId: call.id,
-          riskLevel: call.fraud_risk_level ?? undefined,
-          score: call.fraud_score ?? undefined,
-        },
-      });
       const rootNavigator = navigation.getParent()?.getParent();
       if (rootNavigator?.navigate) {
         rootNavigator.navigate('CallDetailModal', { callId: call.id, compact: false });

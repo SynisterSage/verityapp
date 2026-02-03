@@ -94,24 +94,12 @@ export default function NotificationsScreen() {
   const handleToggle = useCallback((key: NotificationChannel['key']) => {
     if (key === 'email') {
       setEmailAlerts((prev) => !prev);
-      logEvent('notification_prefs_changed', {
-        screen: 'Notifications',
-        extra: { channel: 'email', enabled: !emailAlerts },
-      });
     } else if (key === 'phone') {
       setPushAlerts((prev) => !prev);
-      logEvent('notification_prefs_changed', {
-        screen: 'Notifications',
-        extra: { channel: 'push', enabled: !pushAlerts },
-      });
     } else if (key === 'sms') {
       setSmsAlerts((prev) => !prev);
-      logEvent('notification_prefs_changed', {
-        screen: 'Notifications',
-        extra: { channel: 'sms', enabled: !smsAlerts },
-      });
     }
-  }, [emailAlerts, pushAlerts, smsAlerts]);
+  }, []);
 
   const hasChanges = useMemo(() => {
     if (!activeProfile) return false;

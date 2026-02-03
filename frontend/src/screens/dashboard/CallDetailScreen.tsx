@@ -223,16 +223,6 @@ export default function CallDetailScreen({
         .eq('id', callId)
         .single();
       setCallRow(data ?? null);
-      if (data) {
-        logEvent('view_call_detail', {
-          screen: 'CallDetail',
-          extra: {
-            callId: data.id,
-            riskLevel: data.fraud_risk_level ?? undefined,
-            score: data.fraud_score ?? undefined,
-          },
-        });
-      }
       setRecordingStatus('loading');
       try {
         await fetchRecordingLink();
@@ -398,7 +388,6 @@ export default function CallDetailScreen({
     const isSafe = status === 'marked_safe';
     if (isSafe) {
       setIsMarkingSafe(true);
-      logEvent('mark_call_safe', { screen: 'CallDetail', extra: { callId } });
     } else {
       setIsMarkingFraud(true);
       logEvent('mark_call_fraud', { screen: 'CallDetail', extra: { callId } });
@@ -436,10 +425,6 @@ export default function CallDetailScreen({
           });
         }
         if (shouldTrust) {
-          logEvent('trust_caller', {
-            screen: 'CallDetail',
-            extra: { callId, callerNumber, source: 'auto_or_prompt' },
-          });
           await authorizedFetch('/fraud/trusted-contacts', {
             method: 'POST',
             body: JSON.stringify({
