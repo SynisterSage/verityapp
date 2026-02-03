@@ -38,6 +38,7 @@ import {
   setAutoBlockManual,
   setAutoTrustManual,
 } from '../../utils/blockTrustPrompt';
+import { logError, logEvent } from '../../services/sentry';
 
 type CallRow = {
   id: string;
@@ -222,11 +223,25 @@ export default function CallDetailScreen({
         .eq('id', callId)
         .single();
       setCallRow(data ?? null);
+      if (data) {
+        logEvent('view_call_detail', {
+          screen: 'CallDetail',
+          extra: {
+            callId: data.id,
+            riskLevel: data.fraud_risk_level ?? undefined,
+            score: data.fraud_score ?? undefined,
+          },
+        });
+      }
       setRecordingStatus('loading');
       try {
         await fetchRecordingLink();
       } catch (err) {
         console.warn('Failed to prefetch recording URL', err);
+        logError(err, {
+          screen: 'CallDetail',
+          extra: { callId, reason: 'recording_url_prefetch_failed' },
+        });
         setRecordingStatus('error');
       }
     };
@@ -383,8 +398,10 @@ export default function CallDetailScreen({
     const isSafe = status === 'marked_safe';
     if (isSafe) {
       setIsMarkingSafe(true);
+      logEvent('mark_call_safe', { screen: 'CallDetail', extra: { callId } });
     } else {
       setIsMarkingFraud(true);
+      logEvent('mark_call_fraud', { screen: 'CallDetail', extra: { callId } });
     }
     try {
       await authorizedFetch(`/calls/${callId}/feedback`, {
@@ -405,6 +422,10 @@ export default function CallDetailScreen({
 
       if (profileId && callerNumber) {
         if (shouldBlock) {
+          logEvent('block_caller', {
+            screen: 'CallDetail',
+            extra: { callId, callerNumber, source: 'auto_or_prompt' },
+          });
           await authorizedFetch('/fraud/blocked-callers', {
             method: 'POST',
             body: JSON.stringify({
@@ -415,6 +436,10 @@ export default function CallDetailScreen({
           });
         }
         if (shouldTrust) {
+          logEvent('trust_caller', {
+            screen: 'CallDetail',
+            extra: { callId, callerNumber, source: 'auto_or_prompt' },
+          });
           await authorizedFetch('/fraud/trusted-contacts', {
             method: 'POST',
             body: JSON.stringify({
@@ -429,6 +454,10 @@ export default function CallDetailScreen({
       Alert.alert('Saved', `Marked as ${status.replace('_', ' ')}`);
     } catch (err) {
       Alert.alert('Error', 'Failed to save feedback');
+      logError(err, {
+        screen: 'CallDetail',
+        extra: { callId, status },
+      });
     }
     finally {
       if (isSafe) {
@@ -513,11 +542,16 @@ export default function CallDetailScreen({
         body: JSON.stringify({ feedback: 'real_voice' }),
       });
       setCallRow((prev) => (prev ? { ...prev, voice_feedback: 'real_voice' } : prev));
+      logEvent('voice_feedback_real', { screen: 'CallDetail', extra: { callId } });
     } catch (error) {
       Alert.alert(
         'Feedback',
         'We could not save that note. Please try again in a moment.'
       );
+      logError(error, {
+        screen: 'CallDetail',
+        extra: { callId, reason: 'voice_feedback_failed' },
+      });
     } finally {
       setIsSubmittingVoiceFeedback(false);
     }

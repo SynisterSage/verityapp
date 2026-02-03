@@ -18,6 +18,7 @@ import {
   setAutoTrustManual,
 } from '../../utils/blockTrustPrompt';
 import type { AppTheme } from '../../theme/tokens';
+import { logError, logEvent } from '../../services/sentry';
 
 type AutomationToggleProps = {
   value: boolean;
@@ -175,8 +176,24 @@ export default function AutomationScreen() {
       setPersistedManualBlock(manualBlockEnabled);
       setPersistedManualTrust(manualTrustEnabled);
       Alert.alert('Saved', 'Automation preferences updated.');
+      logEvent('automation_prefs_changed', {
+        screen: 'Automation',
+        extra: {
+          autoMarkEnabled,
+          fraudThreshold: Math.round(fraudThreshold),
+          safeThreshold: Math.round(safeThreshold),
+          autoTrustOnSafe,
+          autoBlockOnFraud,
+          manualBlockEnabled,
+          manualTrustEnabled,
+        },
+      });
     } catch (err: any) {
       Alert.alert('Error', err?.message ?? 'Failed to save preferences.');
+      logError(err, {
+        screen: 'Automation',
+        extra: { reason: err?.message ?? 'Failed to save preferences.' },
+      });
     } finally {
       setSaving(false);
     }

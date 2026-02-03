@@ -19,6 +19,7 @@ import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { registerProfileDeviceToken } from '../services/notifications';
+import { logError, logEvent } from '../services/sentry';
 
 export type Profile = {
   id: string;
@@ -198,11 +199,21 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         finalStatus = status;
       }
       if (finalStatus !== 'granted') {
+        logEvent('push_permission_denied', {
+          level: 'warning',
+          screen: 'ProfileContext',
+          extra: { initialStatus, finalStatus },
+        });
         return;
       }
       const tokenResult = await Notifications.getExpoPushTokenAsync();
       const pushToken = tokenResult?.data;
       if (!pushToken) {
+        logEvent('push_token_error', {
+          level: 'warning',
+          screen: 'ProfileContext',
+          extra: { reason: 'missing_token' },
+        });
         return;
       }
       const alreadyRegistered = pushRegistrationRef.current;
@@ -225,6 +236,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       pushRegistrationRef.current = { profileId: activeProfile.id, token: pushToken };
     } catch (err) {
       console.warn('Failed to register push token', err);
+      logError(err, {
+        screen: 'ProfileContext',
+        extra: { reason: 'register_push_token_failed' },
+      });
     } finally {
       isRegisteringPushRef.current = false;
     }
@@ -327,9 +342,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       activeProfile,
       activeMembership,
       canManageProfile,
-      isCaretaker,
-      isAdmin,
-      canDeleteProfile,
       isCaretaker,
       isAdmin,
       canDeleteProfile,

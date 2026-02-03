@@ -26,6 +26,7 @@ import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import type { AppTheme } from '../../theme/tokens';
+import { logError, logEvent } from '../../services/sentry';
 
 const PIN_LENGTH = 6;
 
@@ -140,10 +141,20 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
   const handleContinue = async () => {
     if (!activeProfile) {
       setError('Profile not found.');
+      logEvent('passcode_setup_failed', {
+        level: 'warning',
+        screen: 'Passcode',
+        extra: { reason: 'missing_profile' },
+      });
       return;
     }
     if (!canActivate) {
       setError('Complete matching 6-digit PINs.');
+      logEvent('passcode_setup_failed', {
+        level: 'warning',
+        screen: 'Passcode',
+        extra: { reason: 'pin_incomplete_or_mismatch' },
+      });
       return;
     }
     setError('');
@@ -154,9 +165,14 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
         body: JSON.stringify({ pin: createValue }),
       });
       setActiveProfile({ ...activeProfile, has_passcode: true });
+      logEvent('passcode_setup_completed', { screen: 'Passcode' });
       navigation.navigate('OnboardingTrustedContacts');
     } catch (err: any) {
       setError(err?.message || 'Failed to save passcode.');
+      logError(err, {
+        screen: 'Passcode',
+        extra: { reason: err?.message || 'Failed to save passcode.' },
+      });
     } finally {
       setIsSubmitting(false);
     }

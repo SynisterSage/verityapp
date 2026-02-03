@@ -7,6 +7,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { SignUpResult, useAuth } from '../../context/AuthContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
+import { logEvent } from '../../services/sentry';
 
 type AlertState = {
   message: string;
@@ -49,11 +50,21 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         message: 'Please agree to the terms of service and privacy policy before creating an account.',
         type: 'warning',
       });
+      logEvent('signup_validation_failed', {
+        level: 'warning',
+        screen: 'SignUp',
+        extra: { reason: 'legal_not_accepted' },
+      });
       return;
     }
 
     if (password !== confirmPassword) {
       setAlert({ message: 'Passwords must match.', type: 'warning' });
+      logEvent('signup_validation_failed', {
+        level: 'warning',
+        screen: 'SignUp',
+        extra: { reason: 'password_mismatch' },
+      });
       return;
     }
 
@@ -66,21 +77,39 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
           'Password must be at least 8 characters and include a letter and a special character.',
         type: 'warning',
       });
+      logEvent('signup_validation_failed', {
+        level: 'warning',
+        screen: 'SignUp',
+        extra: { reason: 'password_policy' },
+      });
       return;
     }
 
     setIsSubmitting(true);
+    logEvent('signup_attempt', { screen: 'SignUp' });
     const result = await signUp(email.trim(), password);
     setIsSubmitting(false);
 
     if (result.error) {
       setAlert({ message: result.error, type: 'danger' });
+      logEvent('signup_failed', {
+        level: 'warning',
+        screen: 'SignUp',
+        extra: { reason: result.error },
+      });
       return;
     }
     if (result.needsConfirmation) {
+      logEvent('signup_needs_confirmation', { screen: 'SignUp' });
       navigation.navigate('ConfirmEmail', { email: email.trim() });
       return;
     }
+    logEvent('signup_success', { screen: 'SignUp' });
+  };
+
+  const handleGoogleSignUp = async () => {
+    logEvent('signup_google_attempt', { screen: 'SignUp' });
+    await signInWithGoogle();
   };
 
   const renderEye = (visible: boolean) => (
@@ -300,7 +329,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         primaryLoading={isSubmitting}
         primaryDisabled={!acceptedLegal}
         secondaryLabel="Continue with Google"
-        onSecondaryPress={signInWithGoogle}
+        onSecondaryPress={handleGoogleSignUp}
         helperPrefix="Already have an account?"
         helperActionLabel="Sign In"
         onHelperPress={() => navigation.navigate('SignIn')}

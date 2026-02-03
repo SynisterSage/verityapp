@@ -20,6 +20,7 @@ import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
+import { logError, logEvent } from '../../services/sentry';
 
 type SafePhrase = {
   id: string;
@@ -105,6 +106,11 @@ export default function SafePhrasesScreen() {
   const addPhrase = async () => {
     if (!canManageProfile) {
       setError('Only caretakers or admins can manage safe phrases.');
+      logEvent('safe_phrase_add_denied', {
+        level: 'warning',
+        screen: 'SafePhrases',
+        extra: { reason: 'insufficient_permissions' },
+      });
       return;
     }
     if (!input.trim() || !activeProfile || adding) return;
@@ -118,8 +124,16 @@ export default function SafePhrasesScreen() {
       });
       setInput('');
       await loadPhrases();
+      logEvent('safe_phrase_added', {
+        screen: 'SafePhrases',
+        extra: { phrase },
+      });
     } catch (err: any) {
       setError(err?.message || 'Failed to add phrase.');
+      logError(err, {
+        screen: 'SafePhrases',
+        extra: { reason: err?.message || 'Failed to add phrase.' },
+      });
     } finally {
       setAdding(false);
     }
@@ -128,6 +142,11 @@ export default function SafePhrasesScreen() {
   const removePhrase = async (phraseId: string) => {
     if (!canManageProfile) {
       setError('Only caretakers or admins can manage safe phrases.');
+      logEvent('safe_phrase_remove_denied', {
+        level: 'warning',
+        screen: 'SafePhrases',
+        extra: { reason: 'insufficient_permissions' },
+      });
       return;
     }
     if (!phraseId || deletingId === phraseId) return;
@@ -135,6 +154,10 @@ export default function SafePhrasesScreen() {
     try {
       await authorizedFetch(`/fraud/safe-phrases/${phraseId}`, { method: 'DELETE' });
       loadPhrases();
+      logEvent('safe_phrase_removed', {
+        screen: 'SafePhrases',
+        extra: { phraseId },
+      });
     } finally {
       setDeletingId((current) => (current === phraseId ? null : current));
     }

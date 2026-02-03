@@ -39,6 +39,7 @@ import { AlertRow } from './alertTypes';
 import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
 import { formatAlertDateLabel, formatAlertTime } from './alertTimeUtils';
 import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
+import { logError, logEvent } from '../../services/sentry';
 const capitalizeLabel = (value?: string | null) => {
   if (!value) return '';
   return value
@@ -549,9 +550,17 @@ const loadMemberNames = useCallback(async () => {
     try {
       await authorizedFetch(`/alerts/${alertId}`, { method: 'DELETE' });
       setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
+      logEvent('fraud_alert_dismissed', {
+        screen: 'Alerts',
+        extra: { alertId },
+      });
       return true;
     } catch (err) {
       Alert.alert('Delete failed', 'Could not delete the alert right now.');
+      logError(err, {
+        screen: 'Alerts',
+        extra: { alertId, reason: 'delete_failed' },
+      });
       return false;
     }
   }, []);
@@ -649,6 +658,14 @@ const loadMemberNames = useCallback(async () => {
             const riskStyles = getRiskStyles(alert.risk_level ?? alert.payload?.riskLevel);
             const handlePress = () => {
               if (!alert.call_id) return;
+              logEvent('fraud_alert_opened', {
+                screen: 'Alerts',
+                extra: {
+                  alertId: alert.id,
+                  callId: alert.call_id,
+                  riskLevel: alert.risk_level ?? alert.payload?.riskLevel,
+                },
+              });
               navigateToCallDetail(alert.call_id);
             };
             return (
@@ -693,6 +710,14 @@ const loadMemberNames = useCallback(async () => {
             const riskStyles = getRiskStyles(alert.risk_level ?? alert.payload?.riskLevel);
             const handlePress = () => {
               if (!alert.call_id) return;
+              logEvent('fraud_alert_opened', {
+                screen: 'Alerts',
+                extra: {
+                  alertId: alert.id,
+                  callId: alert.call_id,
+                  riskLevel: alert.risk_level ?? alert.payload?.riskLevel,
+                },
+              });
               navigateToCallDetail(alert.call_id);
             };
             return (
@@ -745,6 +770,14 @@ const loadMemberNames = useCallback(async () => {
             const statusLabel = alert.status ?? 'Trusted call';
             const handlePress = () => {
               if (!alert.call_id) return;
+              logEvent('fraud_alert_opened', {
+                screen: 'Alerts',
+                extra: {
+                  alertId: alert.id,
+                  callId: alert.call_id,
+                  riskLevel: alert.risk_level ?? alert.payload?.riskLevel,
+                },
+              });
               navigateToCallDetail(alert.call_id);
             };
             return (

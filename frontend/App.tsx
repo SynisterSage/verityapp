@@ -68,6 +68,7 @@ import {
 } from './src/navigation/types';
 import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientManager';
 import * as Sentry from '@sentry/react-native';
+import { logEvent } from './src/services/sentry';
 
 const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
 
@@ -419,6 +420,10 @@ function NavigationHost() {
         if (!payload.callId && !payload.alertId) {
           return;
         }
+        logEvent('notification_opened', {
+          screen: 'App',
+          extra: { callId: payload.callId, alertId: payload.alertId },
+        });
         pendingNotificationRef.current = payload;
         resolvePendingNotification();
       }

@@ -6,6 +6,7 @@ import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
 import { useTheme } from '../../context/ThemeContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { supabase } from '../../services/supabase';
+import { logEvent } from '../../services/sentry';
 import type { AppTheme } from '../../theme/tokens';
 import type { RootStackParamList } from '../../navigation/types';
 import type { RouteProp, NavigationProp } from '@react-navigation/native';
@@ -32,6 +33,7 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
   const handleResendEmail = useCallback(async () => {
     setIsResending(true);
     setResendState(null);
+    logEvent('confirm_email_resend_requested', { screen: 'ConfirmEmail' });
     const { error } = await supabase.auth.resend({
       email,
       type: 'signup',
@@ -41,14 +43,25 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
     });
     if (error) {
       setResendState({ type: 'error', message: error.message });
+      logEvent('confirm_email_resend_failed', {
+        level: 'warning',
+        screen: 'ConfirmEmail',
+        extra: { reason: error.message },
+      });
     } else {
       setResendState({
         type: 'success',
         message: `We just sent another confirmation link to ${email}.`,
       });
+      logEvent('confirm_email_resend_success', { screen: 'ConfirmEmail' });
     }
     setIsResending(false);
   }, [email]);
+
+  const handleContinue = useCallback(() => {
+    logEvent('confirm_email_continue_to_sign_in', { screen: 'ConfirmEmail' });
+    navigation.navigate('SignIn');
+  }, [navigation]);
 
   return (
     <View style={styles.outer}>
@@ -120,7 +133,7 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
         </ScrollView>
         <ActionFooter
           primaryLabel="Continue to sign in"
-          onPrimaryPress={() => navigation.navigate('SignIn')}
+          onPrimaryPress={handleContinue}
         />
       </SafeAreaView>
     </View>

@@ -20,6 +20,7 @@ import type { AppTheme } from '../../theme/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
+import { logError, logEvent } from '../../services/sentry';
 
 const CODE_LENGTH = 8;
 
@@ -70,10 +71,20 @@ export default function OnboardingInviteCodeScreen() {
   const acceptCode = async () => {
     if (!areNamesEntered) {
       setMessage('Add your first and last name.');
+      logEvent('invite_code_invalid', {
+        level: 'warning',
+        screen: 'OnboardingInviteCode',
+        extra: { reason: 'missing_name' },
+      });
       return;
     }
     if (!isCodeComplete) {
       setMessage('Fill the 8-character code.');
+      logEvent('invite_code_invalid', {
+        level: 'warning',
+        screen: 'OnboardingInviteCode',
+        extra: { reason: 'code_incomplete' },
+      });
       return;
     }
     setMessage('');
@@ -88,8 +99,14 @@ export default function OnboardingInviteCodeScreen() {
       });
       await refreshProfiles();
       setOnboardingComplete(true);
+      logEvent('invite_code_accepted', { screen: 'OnboardingInviteCode' });
+      logEvent('onboarding_completed', { screen: 'OnboardingInviteCode' });
     } catch (err: any) {
       setMessage(err?.message || 'Unable to redeem invite code.');
+      logError(err, {
+        screen: 'OnboardingInviteCode',
+        extra: { reason: err?.message || 'Unable to redeem invite code.' },
+      });
     } finally {
       setIsSubmitting(false);
     }

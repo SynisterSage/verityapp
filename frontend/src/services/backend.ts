@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { logError, logEvent } from './sentry';
 
 const baseUrl = process.env.EXPO_PUBLIC_API_URL ?? '';
 
@@ -12,6 +13,7 @@ async function getAccessToken() {
 }
 
 export async function authorizedFetch(path: string, options: AuthorizedFetchOptions = {}) {
+  const startTime = Date.now();
   const token = await getAccessToken();
   const headers: Record<string, string> = {
     ...(options.headers as Record<string, string>),
@@ -24,10 +26,26 @@ export async function authorizedFetch(path: string, options: AuthorizedFetchOpti
   }
 
   const { skipUnauthorizedSignOut, ...rest } = options;
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...rest,
-    headers,
-  });
+  const url = `${baseUrl}${path}`;
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...rest,
+      headers,
+    });
+  } catch (err) {
+    const durationMs = Date.now() - startTime;
+    logError(err, {
+      screen: 'network',
+      extra: {
+        reason: 'network_error',
+        url,
+        method: rest.method ?? 'GET',
+        durationMs,
+      },
+    });
+    throw err;
+  }
 
   if (!response.ok) {
     if (response.status === 401 && !skipUnauthorizedSignOut) {
@@ -52,10 +70,45 @@ export async function authorizedFetch(path: string, options: AuthorizedFetchOpti
         message = text;
       }
     }
+    const durationMs = Date.now() - startTime;
+    logEvent('api_error', {
+      level: response.status >= 500 ? 'error' : 'warning',
+      screen: 'network',
+      extra: {
+        url,
+        method: rest.method ?? 'GET',
+        status: response.status,
+        durationMs,
+        message: message || 'Request failed',
+      },
+    });
     throw new Error(message || 'Request failed');
   }
+  const durationMs = Date.now() - startTime;
   if (response.status === 204) {
+    if (durationMs > 8000) {
+      logEvent('api_timeout', {
+        level: 'warning',
+        screen: 'network',
+        extra: {
+          url,
+          method: rest.method ?? 'GET',
+          durationMs,
+        },
+      });
+    }
     return null;
+  }
+  if (durationMs > 8000) {
+    logEvent('api_timeout', {
+      level: 'warning',
+      screen: 'network',
+      extra: {
+        url,
+        method: rest.method ?? 'GET',
+        durationMs,
+      },
+    });
   }
   return response.json();
 }

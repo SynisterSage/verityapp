@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { View, StyleSheet, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
+import { logEvent } from '../../services/sentry';
 
 type OnboardingChoiceTarget = 'OnboardingProfile' | 'OnboardingInviteCode';
 
@@ -38,7 +39,15 @@ export default function OnboardingChoiceScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createChoiceStyles(theme), [theme]);
 
+  useEffect(() => {
+    logEvent('onboarding_started', { screen: 'OnboardingChoice' });
+  }, []);
+
   const handlePress = (target: OnboardingChoiceTarget) => {
+    logEvent('onboarding_choice_selected', {
+      screen: 'OnboardingChoice',
+      extra: { target },
+    });
     navigation.navigate(target);
   };
 

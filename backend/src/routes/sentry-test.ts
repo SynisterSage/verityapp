@@ -8,12 +8,9 @@ const router = Router();
  * GET /sentry-test/test-error
  */
 router.get("/test-error", async (req, res) => {
-  console.log("🧪 Test error endpoint hit");
-  
   try {
     throw new Error("🧪 Test error from SafeCall - this is intentional!");
   } catch (error) {
-    console.log("🧪 Capturing exception to Sentry...");
     const eventId = Sentry.captureException(error, {
       tags: { 
         test: true,
@@ -24,17 +21,8 @@ router.get("/test-error", async (req, res) => {
         testType: "error_capture"
       }
     });
-    
-    console.log("🧪 Sentry event ID:", eventId);
-    
-    // IMPORTANT: Flush Sentry to ensure event is sent before response
-    try {
-      const flushed = await Sentry.flush(2000); // Wait up to 2 seconds for Sentry to send
-      console.log("🧪 Sentry flush result:", flushed);
-    } catch (flushError) {
-      console.error("🧪 Sentry flush error:", flushError);
-    }
-    
+    // Flush to ensure event is sent before response
+    await Sentry.flush(2000);
     res.json({ 
       success: true,
       message: "Error captured! Check your Sentry dashboard in ~10 seconds",
@@ -100,8 +88,6 @@ router.get("/test-performance", async (req, res) => {
  * GET /sentry-test/test-message
  */
 router.get("/test-message", async (req, res) => {
-  console.log("🧪 Test message endpoint hit");
-  
   const eventId = Sentry.captureMessage("🧪 Test message from SafeCall", {
     level: "error",
     tags: { 
@@ -114,13 +100,8 @@ router.get("/test-message", async (req, res) => {
       userAgent: req.headers["user-agent"]
     }
   });
-  
-  console.log("🧪 Sentry message event ID:", eventId);
-  
   // Flush to ensure event is sent
   await Sentry.flush(2000);
-  console.log("🧪 Sentry flushed");
-  
   res.json({ 
     success: true,
     message: "Message captured! Check Sentry Issues tab",

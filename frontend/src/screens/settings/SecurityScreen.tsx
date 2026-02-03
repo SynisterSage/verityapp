@@ -30,6 +30,7 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
+import { logError, logEvent } from '../../services/sentry';
 
 type ModalAction = 'password' | 'pin' | null;
 
@@ -189,8 +190,13 @@ export default function SecurityScreen() {
       Alert.alert('Saved', 'Your password has been updated.');
       setSuccessMessage('Password updated.');
       clearFields();
+      logEvent('password_changed', { screen: 'Security' });
     } catch (err: any) {
       setError(err?.message || 'Failed to update password.');
+      logError(err, {
+        screen: 'Security',
+        extra: { reason: err?.message || 'Failed to update password.' },
+      });
     } finally {
       setIsSaving(false);
     }
@@ -236,6 +242,11 @@ export default function SecurityScreen() {
           ? 'Passcode not recognized.'
           : raw;
       setPinError(normalized);
+      logEvent('passcode_verification_failed', {
+        level: 'warning',
+        screen: 'Security',
+        extra: { reason: normalized },
+      });
     } finally {
       setIsPinVerifying(false);
     }

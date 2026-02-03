@@ -13,6 +13,7 @@ import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
+import { logEvent } from '../../services/sentry';
 
 export default function SignInScreen({ navigation }: { navigation: any }) {
   const { signIn, signInWithGoogle, sendPasswordReset } = useAuth();
@@ -29,9 +30,17 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
   const handleSubmit = async () => {
     setLoginError('');
     setIsSubmitting(true);
+    logEvent('login_attempt', { screen: 'SignIn' });
     const message = await signIn(email.trim(), password);
     if (message) {
       setLoginError(message);
+      logEvent('login_failed', {
+        level: 'warning',
+        screen: 'SignIn',
+        extra: { reason: message },
+      });
+    } else {
+      logEvent('login_success', { screen: 'SignIn' });
     }
     setIsSubmitting(false);
   };
@@ -39,19 +48,36 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
   const handlePasswordReset = async () => {
     if (!email.trim()) {
       setResetMessage({ text: 'Enter your email to reset the password.', type: 'error' });
+      logEvent('password_reset_failed', {
+        level: 'warning',
+        screen: 'SignIn',
+        extra: { reason: 'missing_email' },
+      });
       return;
     }
     setIsResetting(true);
+    logEvent('password_reset_requested', { screen: 'SignIn' });
     const error = await sendPasswordReset(email.trim());
     if (error) {
       setResetMessage({ text: error, type: 'error' });
+      logEvent('password_reset_failed', {
+        level: 'warning',
+        screen: 'SignIn',
+        extra: { reason: error },
+      });
     } else {
       setResetMessage({
         text: `We just sent password reset instructions to ${email.trim()}.`,
         type: 'info',
       });
+      logEvent('password_reset_success', { screen: 'SignIn' });
     }
     setIsResetting(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    logEvent('login_google_attempt', { screen: 'SignIn' });
+    await signInWithGoogle();
   };
 
   const inputBorderColor = (field: 'email' | 'password') =>
@@ -207,7 +233,7 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
         onPrimaryPress={handleSubmit}
         primaryLoading={isSubmitting}
         secondaryLabel="Continue with Google"
-        onSecondaryPress={signInWithGoogle}
+        onSecondaryPress={handleGoogleSignIn}
         helperPrefix="New to Verity?"
         helperActionLabel="Join Now"
         onHelperPress={() => navigation.navigate('SignUp')}

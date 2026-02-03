@@ -10,8 +10,6 @@ export function initSentryEarly() {
     return;
   }
 
-  console.log("🔧 Initializing Sentry with DSN:", process.env.SENTRY_DSN?.substring(0, 30) + "...");
-  
   // Initialize Sentry
   Sentry.init({
     dsn: process.env.SENTRY_DSN,
@@ -22,8 +20,8 @@ export function initSentryEarly() {
     // Release version
     release: process.env.APP_VERSION || "1.0.0-beta",
     
-    // Debug mode to see what's happening
-    debug: true,
+    // Debug mode disabled for production
+    debug: false,
     
     // Integrations (v8+ uses direct imports)
     // Removed nodeProfilingIntegration due to Node.js version compatibility
@@ -33,8 +31,7 @@ export function initSentryEarly() {
     ],
     
     // Performance monitoring
-    // Sample 100% for now (can reduce to 0.1 later once confirmed working)
-    tracesSampleRate: 1.0,
+    tracesSampleRate: 0.1,
     
     // Ignore noisy errors that don't need tracking
     ignoreErrors: [
@@ -46,25 +43,17 @@ export function initSentryEarly() {
     ],
     
     // Filter sensitive data before sending to Sentry
-    beforeSend(event, hint) {
-      console.log("🐛 Sentry beforeSend called - Environment:", process.env.NODE_ENV);
-      console.log("🐛 Event type:", event.type, "Level:", event.level);
-      
-      // Don't send in development (just log locally)
+    beforeSend(event) {
+      // Don't send in development
       if (process.env.NODE_ENV === "development") {
-        console.log("🐛 Sentry Event (dev mode - not sent):", event);
         return null;
       }
-      
-      console.log("🐛 Sending event to Sentry...");
-      
       // Strip sensitive data from requests
       if (event.request) {
         delete event.request.cookies;
         delete event.request.headers?.["authorization"];
         delete event.request.headers?.["x-api-key"];
       }
-      
       return event;
     }
   });
