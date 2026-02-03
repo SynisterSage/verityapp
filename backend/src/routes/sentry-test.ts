@@ -96,21 +96,21 @@ router.get("/test-performance", async (req, res) => {
 });
 
 /**
- * Test info message/breadcrumb
+ * Test message (error level so it appears in Issues)
  * GET /sentry-test/test-message
  */
 router.get("/test-message", async (req, res) => {
   console.log("🧪 Test message endpoint hit");
   
   const eventId = Sentry.captureMessage("🧪 Test message from SafeCall", {
-    level: "info",
+    level: "error",
     tags: { 
       test: true,
       endpoint: "test-message"
     },
     extra: { 
       timestamp: new Date().toISOString(),
-      testType: "info_message",
+      testType: "error_message",
       userAgent: req.headers["user-agent"]
     }
   });
@@ -124,7 +124,7 @@ router.get("/test-message", async (req, res) => {
   res.json({ 
     success: true,
     message: "Message captured! Check Sentry Issues tab",
-    instructions: "Go to Sentry to see this info message",
+    instructions: "Go to Sentry to see this error-level message",
     eventId
   });
 });
