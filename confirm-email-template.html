@@ -1,0 +1,33 @@
+<table width="100%" cellpadding="0" cellspacing="0" style="font-family:'Inter',system-ui,sans-serif;background:#030712;color:#f8fafc;padding:40px 0;min-height:100vh;">
+  <tr>
+    <td align="center" style="padding:40px 0;">
+      <table width="480" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:28px;padding:40px;border:1px solid rgba(255,255,255,0.06);">
+        <tr>
+          <td align="center">
+            <p style="margin:0;font-size:18px;font-weight:600;letter-spacing:1px;color:#e2e8f0;">Verity Protect</p>
+            <h1 style="margin:12px 0 18px;font-size:26px;color:#f8fafc;">Almost there</h1>
+            <p style="margin:0 0 24px;font-size:16px;line-height:1.7;color:#cbd5f5;">
+              An email is on its way to <strong>{{ .Email }}</strong>. Tap the button once you open the message.
+            </p>
+            <a href="{{ .ConfirmationURL }}" style="display:inline-flex;align-items:center;justify-content:center;min-width:220px;background:#2563eb;color:#fff;text-decoration:none;padding:14px 42px;border-radius:999px;font-weight:600;">
+              Continue to sign in
+            </a>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-top:32px;font-size:14px;line-height:1.6;color:#cbd5f5;text-align:center;">
+            Having trouble with the button? Copy and paste this link:
+            <div style="margin-top:8px;font-size:12px;line-height:1.4;color:#82a9ff;word-break:break-all;">
+              <a href="{{ .ConfirmationURL }}" style="color:#82a9ff;text-decoration:none;">{{ .ConfirmationURL }}</a>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-top:18px;font-size:12px;color:#94a3b8;text-align:center;">
+            Sent with care by Verity Protect · {{ .SiteURL }}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>

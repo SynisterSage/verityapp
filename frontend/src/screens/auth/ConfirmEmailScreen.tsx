@@ -19,18 +19,43 @@ type Props = {
   navigation: ConfirmEmailNavigationProp;
 };
 
+const RESEND_LIMIT = 3;
+const RESEND_WINDOW_MS = 60 * 60 * 1000;
+
 export default function ConfirmEmailScreen({ route, navigation }: Props) {
   const { email } = route.params;
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const styles = useMemo(() => createConfirmEmailStyles(theme), [theme]);
   const topInset = Math.max(insets.top + theme.spacing.md, theme.spacing.xl);
-  const bottomInset = Math.max(insets.bottom, theme.spacing.lg);
-  const footerBuffer = bottomInset + theme.spacing.xxl + theme.spacing.xxl + 80;
+  const bottomInset = Math.max(insets.bottom, theme.spacing.sm);
+  const footerBuffer = bottomInset + theme.spacing.xxl + theme.spacing.xxl + 60;
   const [resendState, setResendState] = useState<null | { type: 'success' | 'error'; message: string }>(null);
   const [isResending, setIsResending] = useState(false);
+  const [resendHistory, setResendHistory] = useState<number[]>([]);
+
+  const cleanHistory = (timestamps: number[], now = Date.now()) =>
+    timestamps.filter((ts) => now - ts < RESEND_WINDOW_MS);
+  const isRateLimited = useMemo(
+    () => cleanHistory(resendHistory).length >= RESEND_LIMIT,
+    [resendHistory]
+  );
 
   const handleResendEmail = useCallback(async () => {
+    const now = Date.now();
+    const recent = cleanHistory(resendHistory, now);
+    setResendHistory(recent);
+    if (recent.length >= RESEND_LIMIT) {
+      setResendState({
+        type: 'error',
+        message: 'You can request up to 3 resends per hour. Please try again later.',
+      });
+      logEvent('confirm_email_resend_rate_limited', {
+        level: 'warning',
+        screen: 'ConfirmEmail',
+      });
+      return;
+    }
     setIsResending(true);
     setResendState(null);
     logEvent('confirm_email_resend_requested', { screen: 'ConfirmEmail' });
@@ -53,10 +78,11 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
         type: 'success',
         message: `We just sent another confirmation link to ${email}.`,
       });
+      setResendHistory((prev) => [...recent, now]);
       logEvent('confirm_email_resend_success', { screen: 'ConfirmEmail' });
     }
     setIsResending(false);
-  }, [email]);
+  }, [email, resendHistory]);
 
   const handleContinue = useCallback(() => {
     logEvent('confirm_email_continue_to_sign_in', { screen: 'ConfirmEmail' });
@@ -93,11 +119,11 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
             </View>
             <View style={styles.stepRow}>
               <Text style={styles.stepBullet}>•</Text>
-              <Text style={styles.stepText}>Tap the “Confirm email” link—this will bring you back here.</Text>
+              <Text style={styles.stepText}>Tap the “Confirm email” link. It will bring you back here.</Text>
             </View>
             <View style={styles.stepRow}>
               <Text style={styles.stepBullet}>•</Text>
-              <Text style={styles.stepText}>When you see this page again, tap “Continue to sign in.”</Text>
+              <Text style={styles.stepText}>After the page reloads, tap “Continue to sign in.”</Text>
             </View>
           </View>
           <View style={styles.helpCard}>
@@ -115,7 +141,7 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
                 isResending && styles.resendButtonLoading,
               ]}
               onPress={handleResendEmail}
-              disabled={isResending}
+              disabled={isResending || isRateLimited}
             >
               <Text style={styles.resendButtonText}>{isResending ? 'Resending…' : 'Resend email'}</Text>
             </Pressable>
@@ -181,19 +207,23 @@ const createConfirmEmailStyles = (theme: AppTheme) =>
       fontSize: 16,
       color: theme.colors.textDim,
       textAlign: 'center',
+      marginTop: -10,
     },
     email: {
       marginTop: 0,
       color: theme.colors.text,
       fontWeight: '600',
       fontSize: 16,
+      marginBottom: 20,
     },
     stepCard: {
       width: '100%',
-      backgroundColor: theme.colors.surfaceAlt,
+      backgroundColor: theme.colors.surface,
       borderRadius: theme.radii.md,
-      padding: theme.spacing.md,
+      padding: theme.spacing.lg,
       gap: theme.spacing.sm,
+      borderColor: theme.colors.border,
+      borderWidth: 1,
     },
     stepTitle: {
       fontSize: 16,
