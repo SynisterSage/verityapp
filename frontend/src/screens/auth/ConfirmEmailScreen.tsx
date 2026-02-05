@@ -23,7 +23,7 @@ const RESEND_LIMIT = 5;
 const RESEND_WINDOW_MS = 30 * 60 * 1000;
 
 export default function ConfirmEmailScreen({ route, navigation }: Props) {
-  const { email } = route.params;
+  const { email: routeEmail, confirmed } = route.params;
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const styles = useMemo(() => createConfirmEmailStyles(theme), [theme]);
@@ -33,6 +33,8 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
   const [resendState, setResendState] = useState<null | { type: 'success' | 'error'; message: string }>(null);
   const [isResending, setIsResending] = useState(false);
   const [resendHistory, setResendHistory] = useState<number[]>([]);
+  const email = routeEmail ?? '';
+  const showSuccess = confirmed ?? false;
 
   const cleanHistory = (timestamps: number[], now = Date.now()) =>
     timestamps.filter((ts) => now - ts < RESEND_WINDOW_MS);
@@ -108,60 +110,79 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
         >
           <View style={styles.header}>
             <View style={styles.badge}>
-              <Ionicons name="mail-open-outline" size={60} color={theme.colors.surface} />
+              <Ionicons
+                name={showSuccess ? 'checkmark-circle-outline' : 'mail-open-outline'}
+                size={60}
+                color={theme.colors.surface}
+              />
             </View>
-            <Text style={styles.title}>Almost there</Text>
-            <Text style={styles.subtitle}>An email is on its way to:</Text>
-            <Text style={styles.email}>{email}</Text>
-          </View>
-          <View style={styles.stepCard}>
-            <Text style={styles.stepTitle}>Next steps</Text>
-            <View style={styles.stepRow}>
-              <Text style={styles.stepBullet}>•</Text>
-              <Text style={styles.stepText}>Open your inbox and find the message we just sent.</Text>
-            </View>
-            <View style={styles.stepRow}>
-              <Text style={styles.stepBullet}>•</Text>
-              <Text style={styles.stepText}>Tap the “Confirm email” link. It will bring you back here.</Text>
-            </View>
-            <View style={styles.stepRow}>
-              <Text style={styles.stepBullet}>•</Text>
-              <Text style={styles.stepText}>After the page reloads, tap “Continue to sign in.”</Text>
-            </View>
-          </View>
-          <View style={styles.helpCard}>
-            <Text style={styles.helpTitle}>Need a hand?</Text>
-            <Text style={styles.helpText}>
-              Confirmation emails usually appear within a minute. Keep this screen open while you check your inbox and spam folder.
+            <Text style={styles.title}>{showSuccess ? 'Email confirmed' : 'Almost there'}</Text>
+            <Text style={styles.subtitle}>
+              {showSuccess
+                ? 'Your email is verified. Head back to sign in and finish setting up your secure account.'
+                : 'An email is on its way to:'}
             </Text>
-            <Text style={styles.helpText}>
-              Still nothing? Tap “Resend email” and we’ll send a fresh link right away.
-            </Text>
-            <Pressable
-              style={({ pressed }) => [
-                styles.resendButton,
-                pressed && styles.resendButtonPressed,
-                isResending && styles.resendButtonLoading,
-              ]}
-              onPress={handleResendEmail}
-              disabled={isResending || isRateLimited}
-            >
-              <Text style={styles.resendButtonText}>{isResending ? 'Resending…' : 'Resend email'}</Text>
-            </Pressable>
-            {resendState ? (
-              <Text
-                style={[
-                  styles.resendFeedback,
-                  resendState.type === 'error' ? styles.feedbackError : styles.feedbackSuccess,
-                ]}
-              >
-                {resendState.message}
+            {!showSuccess && <Text style={styles.email}>{email}</Text>}
+          </View>
+          {showSuccess ? (
+            <View style={styles.stepCard}>
+              <Text style={styles.stepTitle}>You’re all set</Text>
+              <Text style={styles.stepText}>
+                Thanks for confirming your email. Tap “Return to sign in” to complete your login.
               </Text>
-            ) : null}
-          </View>
+            </View>
+          ) : (
+            <>
+              <View style={styles.stepCard}>
+                <Text style={styles.stepTitle}>Next steps</Text>
+                <View style={styles.stepRow}>
+                  <Text style={styles.stepBullet}>•</Text>
+                  <Text style={styles.stepText}>Open your inbox and find the message we just sent.</Text>
+                </View>
+                <View style={styles.stepRow}>
+                  <Text style={styles.stepBullet}>•</Text>
+                  <Text style={styles.stepText}>Tap the “Confirm email” link. It will bring you back here.</Text>
+                </View>
+                <View style={styles.stepRow}>
+                  <Text style={styles.stepBullet}>•</Text>
+                  <Text style={styles.stepText}>After the page reloads, tap “Continue to sign in.”</Text>
+                </View>
+              </View>
+              <View style={styles.helpCard}>
+                <Text style={styles.helpTitle}>Need a hand?</Text>
+                <Text style={styles.helpText}>
+                  Confirmation emails usually appear within a minute. Keep this screen open while you check your inbox and spam folder.
+                </Text>
+                <Text style={styles.helpText}>
+                  Still nothing? Tap “Resend email” and we’ll send a fresh link right away.
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.resendButton,
+                    pressed && styles.resendButtonPressed,
+                    isResending && styles.resendButtonLoading,
+                  ]}
+                  onPress={handleResendEmail}
+                  disabled={isResending || isRateLimited}
+                >
+                  <Text style={styles.resendButtonText}>{isResending ? 'Resending…' : 'Resend email'}</Text>
+                </Pressable>
+                {resendState ? (
+                  <Text
+                    style={[
+                      styles.resendFeedback,
+                      resendState.type === 'error' ? styles.feedbackError : styles.feedbackSuccess,
+                    ]}
+                  >
+                    {resendState.message}
+                  </Text>
+                ) : null}
+              </View>
+            </>
+          )}
         </ScrollView>
         <ActionFooter
-          primaryLabel="Continue to sign in"
+          primaryLabel={showSuccess ? 'Return to sign in' : 'Continue to sign in'}
           onPrimaryPress={handleContinue}
         />
       </SafeAreaView>

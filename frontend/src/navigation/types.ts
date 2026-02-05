@@ -1,7 +1,7 @@
 export type RootStackParamList = {
   SignIn: undefined;
   SignUp: undefined;
-  ConfirmEmail: { email: string };
+  ConfirmEmail: { email?: string; confirmed?: boolean };
   OnboardingChoice: undefined;
   OnboardingProfile: undefined;
   OnboardingPasscode: undefined;

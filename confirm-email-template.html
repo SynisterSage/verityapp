@@ -1,36 +1,48 @@
-<table width="100%" cellpadding="0" cellspacing="0" style="font-family:'Inter',system-ui,sans-serif;background:#030712;color:#f8fafc;padding:24px 0;min-height:100vh;">
+<table width="100%" cellpadding="0" cellspacing="0" style="font-family:'Inter', system-ui, sans-serif; background:#030712; color:#f8fafc; padding:40px 0; min-height:100vh;">
   <tr>
     <td align="center" style="padding:0 12px;">
-      <table width="100%" cellpadding="0" cellspacing="0" style="background:#0f172a;border-radius:28px;padding:40px;border:1px solid rgba(255,255,255,0.06);max-width:480px;">
+      <table
+        width="100%"
+        cellpadding="0"
+        cellspacing="0"
+        role="presentation"
+        style="background:#0b1220; border-radius:36px; padding:40px; border:1px solid rgba(255,255,255,0.08); max-width:520px; box-shadow:0 30px 60px rgba(15,23,42,0.45);"
+      >
         <tr>
-          <td align="center">
-            <p style="margin:0;font-size:18px;font-weight:600;letter-spacing:1px;color:#e2e8f0;">Verity Protect</p>
-            <h1 style="margin:12px 0 18px;font-size:26px;color:#f8fafc;">Confirm your email</h1>
-            <p style="margin:0 0 24px;font-size:16px;line-height:1.7;color:#cbd5f5;">
-              Welcome to Verity Protect. To keep your account secure, click the confirmation link we just sent to <strong>{{ .Email }}</strong>.
+          <td align="center" style="padding:0 12px;">
+            <p style="margin:0;font-size:14px;font-weight:600;letter-spacing:1px;color:#94a3b8;text-transform:uppercase;">Verity Protect</p>
+            <h1 style="margin:10px 0 14px;font-size:32px;color:#f8fafc;line-height:1.2;">Confirm your email</h1>
+            <p style="margin:0 0 28px;font-size:17px;line-height:1.6;color:#cbd5f5;">
+              Welcome to Verity Protect. Keeping your account secure starts with verifying <strong>{{ .Email }}</strong>. Tap the button below to continue.
             </p>
-            <a href="{{ .ConfirmationURL }}" style="display:inline-flex;align-items:center;justify-content:center;width:100%;max-width:260px;background:#2563eb;color:#fff;text-decoration:none;padding:14px 42px;border-radius:999px;font-weight:600;margin:0 auto;">
-              Confirm my email
-            </a>
+            <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:4px;">
+              <tr>
+                <td align="center">
+                  <a
+                    href="{{ .ConfirmationURL }}"
+                    style="background:#2d7cff; border-radius:999px; padding:16px 0; min-width:260px; width:100%; max-width:360px; color:#fff; text-decoration:none; font-weight:700; font-size:17px; text-align:center; display:inline-block; box-shadow:0 18px 30px rgba(45,124,255,0.15);"
+                  >
+                    Confirm my email
+                  </a>
+                </td>
+              </tr>
+            </table>
           </td>
         </tr>
         <tr>
-          <td style="padding-top:32px;font-size:14px;line-height:1.6;color:#cbd5f5;text-align:center;">
-            Having trouble with the button? <span style="display:block;margin-top:4px;">Copy and paste this link:</span>
-            <div style="margin-top:8px;font-size:12px;line-height:1.4;color:#82a9ff;">
-              <a
-                href="{{ .ConfirmationURL }}"
-                style="color:#82a9ff;text-decoration:none;font-weight:600;"
-                title="{{ .ConfirmationURL }}"
-              >
-                Open link
-              </a>
-            </div>
+          <td style="padding-top:40px; font-size:14px; line-height:1.6; color:#a1aebf; text-align:center;">
+            <p style="margin:0;">We’ll redirect you automatically; if that doesn’t happen, tap the button again.</p>
           </td>
         </tr>
         <tr>
-          <td style="padding-top:18px;font-size:12px;color:#94a3b8;text-align:center;">
-            Sent with care by Verity Protect · <a href="https://verityprotect.com" style="color:#94a3b8;text-decoration:underline;">verityprotect.com</a>
+          <td style="padding-top:36px; text-align:center; font-size:11px; line-height:1.4; letter-spacing:0.08em; text-transform:uppercase; color:#5b6173;">
+            Protected by Verity Cloud · Global security mesh active
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-top:16px; text-align:center; font-size:12px; line-height:1.6; color:#94a3b8;">
+            Sent with care by Verity Protect ·
+            <a href="https://verityprotect.com" style="color:#94a3b8; text-decoration:underline; margin-left:4px;">verityprotect.com</a>
           </td>
         </tr>
       </table>

@@ -376,6 +376,44 @@ function RootNavigator() {
   );
 }
 
+function AuthCallbackHandler() {
+  const handleUrl = useCallback((url: string) => {
+    if (!url) {
+      return;
+    }
+    const parsed = Linking.parse(url);
+    if (parsed.path?.endsWith('auth/callback') || parsed.path?.includes('auth/callback')) {
+      const params = parsed.queryParams ?? {};
+      const toStringParam = (val?: string | string[]) => {
+        if (typeof val === 'string') return val;
+        if (Array.isArray(val)) return val[0];
+        return undefined;
+      };
+      const isConfirmation = params.type === 'signup' || !!params.token || params.source === 'confirmation';
+      const payload = {
+        confirmed: isConfirmation,
+        email: toStringParam(params.email),
+      };
+      const currentRoute = navigationRef.current?.getCurrentRoute();
+      if (currentRoute?.name === 'ConfirmEmail') {
+        navigationRef.current?.dispatch(CommonActions.setParams(payload));
+      } else {
+        navigationRef.current?.navigate('ConfirmEmail', payload);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const subscription = Linking.addEventListener('url', (event) => handleUrl(event.url));
+    Linking.getInitialURL().then((initialUrl) => {
+      handleUrl(initialUrl ?? '');
+    });
+    return () => subscription.remove();
+  }, [handleUrl]);
+
+  return null;
+}
+
 function NavigationHost() {
   const { mode, theme } = useTheme();
   const { session, isLoading } = useAuth();
@@ -498,6 +536,7 @@ function AppContent() {
       <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <NavigationHost />
+          <AuthCallbackHandler />
         </GestureHandlerRootView>
       </SafeAreaProvider>
     </ProfileProvider>
