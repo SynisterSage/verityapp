@@ -113,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return error ? error.message : null;
       },
       signInWithGoogle: async () => {
-        const redirectTo = 'exp://192.168.1.174:8081/--/auth/callback';
+        const redirectTo = 'verityprotect://auth/callback';
         console.log('OAuth redirectTo', redirectTo);
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',

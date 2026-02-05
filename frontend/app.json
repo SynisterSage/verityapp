@@ -2,7 +2,7 @@
   "expo": {
     "name": "Verity Protect",
     "slug": "Verity-Protect",
-    "scheme": "verity-protect",
+    "scheme": "verityprotect",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

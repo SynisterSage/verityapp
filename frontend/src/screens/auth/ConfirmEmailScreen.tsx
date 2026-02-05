@@ -19,8 +19,8 @@ type Props = {
   navigation: ConfirmEmailNavigationProp;
 };
 
-const RESEND_LIMIT = 3;
-const RESEND_WINDOW_MS = 60 * 60 * 1000;
+const RESEND_LIMIT = 5;
+const RESEND_WINDOW_MS = 30 * 60 * 1000;
 
 export default function ConfirmEmailScreen({ route, navigation }: Props) {
   const { email } = route.params;
@@ -41,19 +41,22 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
     [resendHistory]
   );
 
+  const handleRateLimit = useCallback(() => {
+    setResendState({
+      type: 'error',
+      message: 'You can request up to 5 resends per 30 minutes. Please try again later.',
+    });
+    logEvent('confirm_email_resend_rate_limited', {
+      level: 'warning',
+      screen: 'ConfirmEmail',
+    });
+  }, []);
   const handleResendEmail = useCallback(async () => {
     const now = Date.now();
     const recent = cleanHistory(resendHistory, now);
     setResendHistory(recent);
     if (recent.length >= RESEND_LIMIT) {
-      setResendState({
-        type: 'error',
-        message: 'You can request up to 3 resends per hour. Please try again later.',
-      });
-      logEvent('confirm_email_resend_rate_limited', {
-        level: 'warning',
-        screen: 'ConfirmEmail',
-      });
+      handleRateLimit();
       return;
     }
     setIsResending(true);
@@ -82,7 +85,7 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
       logEvent('confirm_email_resend_success', { screen: 'ConfirmEmail' });
     }
     setIsResending(false);
-  }, [email, resendHistory]);
+  }, [email, handleRateLimit, resendHistory]);
 
   const handleContinue = useCallback(() => {
     logEvent('confirm_email_continue_to_sign_in', { screen: 'ConfirmEmail' });
