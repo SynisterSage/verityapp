@@ -27,7 +27,7 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>verity-protect</string>
+          <string>verityprotect</string>
           <string>com.lexferguson.verityprotect.com</string>
         </array>
       </dict>
