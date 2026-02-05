@@ -12,6 +12,8 @@
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E42D475140FD759215B196 /* ExpoModulesProvider.swift */; };
+		A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2C0D1E4F5A6B7C8D9E0F12 /* ContactPickerModule.swift */; };
+		B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B3D1E2F4A5B6C7D8E9F0012 /* ContactPickerModuleBridge.m */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		FA64FEB802DA64B19DC4BEDD /* libPods-VerityProtect.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E22F18D7E3530F0B8CEAA00C /* libPods-VerityProtect.a */; };
 /* End PBXBuildFile section */
@@ -30,6 +32,8 @@
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = VerityProtect/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "VerityProtect-Bridging-Header.h"; path = "VerityProtect/VerityProtect-Bridging-Header.h"; sourceTree = "<group>"; };
+		1A2C0D1E4F5A6B7C8D9E0F12 /* ContactPickerModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContactPickerModule.swift; path = "VerityProtect/ContactPickerModule.swift"; sourceTree = "<group>"; };
+		2B3D1E2F4A5B6C7D8E9F0012 /* ContactPickerModuleBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objcpp; name = ContactPickerModuleBridge.m; path = "VerityProtect/ContactPickerModuleBridge.m"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -168,6 +172,8 @@
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
 						LastSwiftMigration = 1250;
+						DevelopmentTeam = "J3Z4NQLDA3";
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -348,6 +354,8 @@
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */,
+				A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */,
+				B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -387,6 +395,9 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+				DEVELOPMENT_TEAM = "J3Z4NQLDA3";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 			};
 			name = Debug;
 		};
@@ -417,6 +428,9 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+				DEVELOPMENT_TEAM = "J3Z4NQLDA3";
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 			};
 			name = Release;
 		};
