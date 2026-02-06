@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +28,54 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [acceptedLegal, setAcceptedLegal] = useState(false);
+  const [emailCheckLoading, setEmailCheckLoading] = useState(false);
+  const [emailExists, setEmailExists] = useState(false);
+  const emailCheckTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  // Check if email exists in real-time
+  useEffect(() => {
+    if (!email || email.length < 5) {
+      setEmailExists(false);
+      return;
+    }
+
+    // Clear previous timeout
+    if (emailCheckTimeout.current) {
+      clearTimeout(emailCheckTimeout.current);
+    }
+
+    // Set new timeout for debounced check
+    setEmailCheckLoading(true);
+    emailCheckTimeout.current = setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `${process.env.EXPO_PUBLIC_API_BASE_URL}/auth/check-email?email=${encodeURIComponent(email)}`,
+          {
+            method: 'GET',
+          }
+        );
+        const data = await response.json();
+        if (data.exists) {
+          setEmailExists(true);
+          logEvent('email_exists_detected', { screen: 'SignUp', extra: { email } });
+        } else {
+          setEmailExists(false);
+        }
+      } catch (err) {
+        console.warn('Email check failed', err);
+        setEmailExists(false);
+      } finally {
+        setEmailCheckLoading(false);
+      }
+    }, 800); // Wait 800ms after user stops typing
+
+    return () => {
+      if (emailCheckTimeout.current) {
+        clearTimeout(emailCheckTimeout.current);
+      }
+    };
+  }, [email]);
+
   const inputBorderColor = (field: 'email' | 'password' | 'confirm') =>
     focusField === field ? theme.colors.accent : theme.colors.border;
   const isLengthValid = password.length >= 8;
@@ -44,6 +92,19 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
 
   const handleSubmit = async () => {
     setAlert(null);
+
+    if (emailExists) {
+      setAlert({
+        message: 'An account with this email already exists. Please sign in instead.',
+        type: 'danger',
+      });
+      logEvent('signup_validation_failed', {
+        level: 'warning',
+        screen: 'SignUp',
+        extra: { reason: 'email_exists' },
+      });
+      return;
+    }
 
     if (!acceptedLegal) {
       setAlert({
@@ -91,11 +152,14 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
     setIsSubmitting(false);
 
     if (result.error) {
+      // Check if it's an "account already exists" error
+      const isAccountExists = result.error.toLowerCase().includes('already exists');
+      
       setAlert({ message: result.error, type: 'danger' });
       logEvent('signup_failed', {
         level: 'warning',
         screen: 'SignUp',
-        extra: { reason: result.error },
+        extra: { reason: result.error, accountExists: isAccountExists },
       });
       return;
     }
@@ -306,6 +370,29 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         </View>
         </View>
 
+          {emailExists && !alert ? (
+            <View
+              style={[
+                styles.loginError,
+                {
+                  borderColor: theme.colors.danger,
+                  backgroundColor: 'rgba(225, 29, 72, 0.08)',
+                  marginTop: 14,
+                },
+              ]}
+            >
+              <Text style={[styles.loginErrorText, { color: theme.colors.danger }]}>
+                An account with this email already exists.{' '}
+                <Text
+                  style={[styles.linkText, { color: theme.colors.danger, fontWeight: '700' }]}
+                  onPress={() => navigation.navigate('SignIn')}
+                >
+                  Sign in instead
+                </Text>
+              </Text>
+            </View>
+          ) : null}
+
           {alert ? (
             <View
               style={[
@@ -317,7 +404,20 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
                 },
               ]}
             >
-              <Text style={[styles.loginErrorText, { color: alertColor }]}>{alert.message}</Text>
+              <Text style={[styles.loginErrorText, { color: alertColor }]}>
+                {alert.message}
+                {alert.message.toLowerCase().includes('already exists') && (
+                  <>
+                    {' '}
+                    <Text
+                      style={[styles.linkText, { color: alertColor, fontWeight: '700' }]}
+                      onPress={() => navigation.navigate('SignIn')}
+                    >
+                      Sign in instead
+                    </Text>
+                  </>
+                )}
+              </Text>
             </View>
           ) : null}
         </View>

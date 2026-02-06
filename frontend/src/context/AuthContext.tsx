@@ -101,6 +101,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       signUp: async (email, password) => {
         const { data, error } = await supabase.auth.signUp({ email, password });
+        
+        // Check if user already exists (Supabase returns success but no session/user when email is taken)
+        if (!error && !data?.session && !data?.user) {
+          return {
+            error: 'An account with this email already exists. Please sign in instead.',
+            needsConfirmation: false,
+          };
+        }
+        
         return {
           error: error ? error.message : null,
           needsConfirmation: !error && !data?.session,

@@ -40,43 +40,49 @@ const POLICY_SECTIONS = [
   {
     title: 'Overview',
     body:
-      'Verity helps you and your circle monitor calls for potential fraud. We collect only what we need to provide the service and keep it strictly secure.',
+      'Verity Protect helps you and your circle monitor calls for potential fraud. We collect only what we need to provide the service and keep it strictly secure. We never sell your data or use it for advertising.',
   },
   {
     title: 'What we collect',
     bullets: [
-      'Account metadata (name, phone number, relationships).',
-      'Call metadata (caller number, timestamps, duration).',
-      'Recordings and transcripts tied to your profile.',
-      'Fraud analysis signals (keywords, risk score, feedback).',
+      'Account metadata (name, email, phone number, relationships).',
+      'Call metadata (caller number, timestamps, duration, fraud scores).',
+      'Call recordings and transcripts for calls routed through your Verity Protect number.',
+      'Fraud analysis signals (keywords, risk patterns, feedback).',
+      'Device and usage data for diagnostics and service improvement.',
     ],
   },
   {
     title: 'How we use it',
     bullets: [
-      'Power call playback, transcripts, and activity history.',
-      'Detect scam patterns and highlight high-risk calls.',
-      'Share alerts by email or SMS (when enabled) and improve accuracy with your feedback.',
+      'Process and route calls to detect potential fraud in real-time.',
+      'Provide call playback, transcripts, and activity history.',
+      'Generate fraud risk scores and send alerts to your circle.',
+      'Improve fraud detection algorithms using anonymized data.',
+      'Send account notifications and security updates.',
     ],
   },
   {
     title: 'Who can access it',
     bullets: [
-      'Caretaker and invited family members on the protected profile.',
-      'Row-level security enforces profile-based access.',
+      'You and your authorized circle members (caretaker, family).',
+      'Circle members see calls only for profiles they have permission to access.',
+      'Row-level security and encryption protect all data.',
+      'Trusted service providers (Twilio, Supabase, Resend) under strict contracts.',
     ],
   },
   {
     title: 'Data retention',
     body:
-      'Call logs, recordings, and alerts remain available while your profile is active so you can review them at any time. You can delete a profile to remove its data immediately.',
+      'Call logs, recordings, and alerts remain available while your profile is active. Account deletion removes all data within 30 days, with backups purged within 90 days. You can delete individual calls or clear all records anytime.',
   },
   {
     title: 'Third-party partners',
     bullets: [
-      'Twilio powers voice & SMS delivery.',
-      'Supabase secures authentication and storage.',
-      'Resend delivers transactional email.',
+      'Twilio: Powers call routing, recording, and transcription.',
+      'Supabase: Secures authentication, database, and access control.',
+      'Resend: Delivers account verification and alert emails.',
+      'Sentry: Monitors errors and performance (no personal data).',
     ],
   },
 ];
