@@ -54,7 +54,7 @@ const createStyles = (theme: AppTheme) =>
     screen: { flex: 1, paddingHorizontal: theme.spacing.lg },
     card: {
       backgroundColor: theme.colors.surface,
-      borderRadius: theme.radii.xl,
+      borderRadius: theme.radii.md,
       padding: theme.spacing.xl,
       alignItems: 'center',
     },

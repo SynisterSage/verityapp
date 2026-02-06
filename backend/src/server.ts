@@ -8,6 +8,7 @@ import path from 'path';
 import helmet from 'helmet';
 import express, { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
+import cors from 'cors';
 import logger from 'jet-logger';
 
 import BaseRouter from '@src/routes';
@@ -37,9 +38,26 @@ app.set('trust proxy', 1);
 
 // **** Middleware **** //
 
+const corsOrigin = (process.env.CORS_ORIGIN ?? '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, cb) => {
+    if (!origin || corsOrigin.length === 0 || corsOrigin.includes(origin)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+};
+
 // Basic middleware
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 app.use(express.json());
-app.use(express.urlencoded({extended: true}));
+app.use(express.urlencoded({ extended: true }));
 
 const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
