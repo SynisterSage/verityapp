@@ -44,6 +44,7 @@ import TrustedContactsScreen from './src/screens/settings/TrustedContactsScreen'
 import AccountScreen from './src/screens/settings/AccountScreen';
 import SecurityScreen from './src/screens/settings/SecurityScreen';
 import ChangePasscodeScreen from './src/screens/settings/ChangePasscodeScreen';
+import ResetPasswordScreen from './src/screens/auth/ResetPasswordScreen';
 import NotificationsScreen from './src/screens/settings/NotificationsScreen';
 import AutomationScreen from './src/screens/settings/AutomationScreen';
 import EnterInviteCodeScreen from './src/screens/settings/EnterInviteCodeScreen';
@@ -370,6 +371,11 @@ function RootNavigator() {
             component={ConfirmEmailScreen}
             options={{ headerShown: false, animation: 'none' }}
           />
+          <RootStack.Screen
+            name="ResetPassword"
+            component={ResetPasswordScreen}
+            options={{ headerShown: false, animation: 'none' }}
+          />
         </>
       )}
     </RootStack.Navigator>
@@ -389,6 +395,11 @@ function AuthCallbackHandler() {
         if (Array.isArray(val)) return val[0];
         return undefined;
       };
+      const isReset = params.mode === 'reset' || params.source === 'password';
+      if (isReset) {
+        navigationRef.current?.navigate('ResetPassword');
+        return;
+      }
       const isConfirmation = params.type === 'signup' || !!params.token || params.source === 'confirmation';
       const payload = {
         confirmed: isConfirmation,

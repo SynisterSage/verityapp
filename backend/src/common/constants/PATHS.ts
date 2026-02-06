@@ -18,6 +18,10 @@ const PATHS = {
     _: '/alerts',
     Update: '/:alertId',
   },
+  Auth: {
+    _: '/auth',
+    ResetPassword: '/reset-password',
+  },
   Fraud: {
     _: '/fraud',
     SafePhrases: '/safe-phrases',

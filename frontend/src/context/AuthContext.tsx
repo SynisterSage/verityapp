@@ -108,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       sendPasswordReset: async (email) => {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: 'exp://192.168.1.174:8081/--/auth/callback',
+          redirectTo: 'https://verityprotect.com/auth/callback?mode=reset&source=password',
         });
         return error ? error.message : null;
       },
