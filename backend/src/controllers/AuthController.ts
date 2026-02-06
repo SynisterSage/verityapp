@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import fetch from 'node-fetch';
 
+import logger from 'jet-logger';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, '') ?? '';
@@ -12,6 +13,11 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 
 export async function resetPassword(req: Request, res: Response) {
   const { token, new_password: password, email } = req.body ?? {};
+  logger.info({
+    message: 'resetPassword request',
+    tokenPresent: Boolean(token),
+    email,
+  });
   if (!token || !password) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({
       error: 'token and new_password are required',
