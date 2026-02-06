@@ -48,18 +48,24 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
     setEmailCheckLoading(true);
     emailCheckTimeout.current = setTimeout(async () => {
       try {
-        const response = await fetch(
-          `${process.env.EXPO_PUBLIC_API_BASE_URL}/auth/check-email?email=${encodeURIComponent(email)}`,
-          {
-            method: 'GET',
-          }
-        );
+        const url = `${process.env.EXPO_PUBLIC_API_BASE_URL}/auth/check-email?email=${encodeURIComponent(email)}`;
+        console.log('Checking email availability:', url);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+        });
+        
+        console.log('Response status:', response.status);
         const data = await response.json();
+        console.log('Response data:', data);
+        
         if (data.exists) {
           setEmailExists(true);
+          console.log('Email exists - showing alert');
           logEvent('email_exists_detected', { screen: 'SignUp', extra: { email } });
         } else {
           setEmailExists(false);
+          console.log('Email is available');
         }
       } catch (err) {
         console.warn('Email check failed', err);
@@ -92,6 +98,8 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
 
   const handleSubmit = async () => {
     setAlert(null);
+
+    console.log('handleSubmit - emailExists:', emailExists, 'email:', email);
 
     if (emailExists) {
       setAlert({
