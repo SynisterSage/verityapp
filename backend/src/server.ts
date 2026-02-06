@@ -13,7 +13,6 @@ import logger from 'jet-logger';
 
 import BaseRouter from '@src/routes';
 import sentryTestRoutes from '@src/routes/sentry-test';
-import { resetPassword } from '@src/controllers/AuthController';
 
 import Paths from '@src/common/constants/PATHS';
 import ENV from '@src/common/constants/ENV';
@@ -80,9 +79,6 @@ app.use(helmet());
 
 // Add APIs, must be after middleware
 app.use(Paths._, apiLimiter, BaseRouter);
-
-// Expose reset-password for browsers hitting the API host directly (backward compatible).
-app.post(`${Paths._}${Paths.Auth._}${Paths.Auth.ResetPassword}`, resetPassword);
 
 // Add Sentry test routes
 app.use('/sentry-test', sentryTestRoutes);
