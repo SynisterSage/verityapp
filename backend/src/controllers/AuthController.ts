@@ -25,7 +25,7 @@ export async function checkEmailExists(req: Request, res: Response) {
     // Query Supabase auth users to check if email exists
     const { data, error } = await supabaseAdmin.auth.admin.listUsers();
     
-    if (error) {
+    if (error !== null && error !== undefined) {
       logger.err('checkEmailExists error', error);
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({
         error: 'Unable to check email availability',
