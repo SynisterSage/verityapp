@@ -8,7 +8,7 @@ import path from 'path';
 import helmet from 'helmet';
 import express, { Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
-import cors from 'cors';
+import cors, { CorsOptions } from 'cors';
 import logger from 'jet-logger';
 
 import BaseRouter from '@src/routes';
@@ -42,13 +42,13 @@ const corsOrigin = (process.env.CORS_ORIGIN ?? '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
-const corsOptions: cors.CorsOptions = {
-  origin: (origin, cb) => {
-    if (!origin || corsOrigin.length === 0 || corsOrigin.includes(origin)) {
+const corsOptions: CorsOptions = {
+  origin: (requestOrigin, cb) => {
+    if (!requestOrigin || corsOrigin.length === 0 || corsOrigin.includes(requestOrigin)) {
       cb(null, true);
       return;
     }
-    cb(new Error('Not allowed by CORS'));
+    cb(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
 };
