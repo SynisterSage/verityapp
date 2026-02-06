@@ -14,9 +14,12 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 export async function resetPassword(req: Request, res: Response) {
   const { token, new_password: password, email } = req.body ?? {};
   logger.info({
-    message: 'resetPassword request',
+    message: 'resetPassword request received',
     tokenPresent: Boolean(token),
+    passwordPresent: Boolean(password),
     email,
+    path: req.path,
+    method: req.method,
   });
   if (!token || !password) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({
