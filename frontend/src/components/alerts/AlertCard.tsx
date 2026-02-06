@@ -48,12 +48,10 @@ export default function AlertCard({
   const { theme } = useTheme();
   const styles = useMemo(() => createAlertCardStyles(theme), [theme]);
   const accentColor = iconColor ?? theme.colors.accent;
-  const iconBg = iconBackgroundColor ?? withOpacity(accentColor, 0.16);
-  const stripBg = stripColor ?? accentColor;
-  const pillBackground = scoreBackgroundColor ?? withOpacity(theme.colors.textDim, 0.12);
-  const scoreBackground = pillBackground;
-  const scoreTextColor = scoreColor ?? theme.colors.text;
-  const mutedStyle = muted ? { opacity: 0.75 } : null;
+  const iconBg = iconBackgroundColor ?? withOpacity(accentColor, 0.18);
+  const scoreBackground = scoreBackgroundColor ?? withOpacity(accentColor, 0.15);
+  const scoreTextColor = scoreColor ?? accentColor;
+  const mutedStyle = muted ? { opacity: 0.7 } : null;
 
   return (
     <TouchableOpacity
@@ -65,58 +63,30 @@ export default function AlertCard({
       activeOpacity={0.85}
       onPress={onPress}
       onLongPress={onLongPress}
-      disabled={!onPress}
+      disabled={!onPress && !onLongPress}
     >
-      <View style={[styles.leftStrip, { backgroundColor: stripBg }]} />
       <View style={styles.content}>
-        <View style={styles.topRow}>
-          <View style={styles.iconBlock}>
-            <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
-              <Ionicons name={iconName} size={16} color={accentColor} />
-            </View>
-            <View style={styles.categoryRow}>
-              <Text style={[styles.category, { color: theme.colors.textMuted }]}>
-                {(categoryLabel ?? 'Alert').toUpperCase()}
-              </Text>
-              <Text style={[styles.timestamp, { color: theme.colors.textDim }]}>
-                · {timestamp}
-              </Text>
-            </View>
-          </View>
-          {scoreLabel ? (
-            <View style={[styles.scoreBadge, { backgroundColor: scoreBackground }]}>
-              <Text style={[styles.scoreText, { color: scoreTextColor }]}>{scoreLabel.toUpperCase()}</Text>
-            </View>
-          ) : null}
+        <View style={[styles.iconWrapper, { backgroundColor: iconBg }]}>
+          <Ionicons name={iconName} size={20} color={accentColor} />
         </View>
-        <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
-          {title}
-        </Text>
-        {description ? (
-          <Text style={[styles.description, { color: theme.colors.textMuted }]} numberOfLines={2}>
-            {description}
+        <View style={styles.textContent}>
+          <Text style={[styles.title, { color: theme.colors.text }]} numberOfLines={1}>
+            {title}
           </Text>
-        ) : null}
-        <View style={styles.actionRow}>
-          <View style={[styles.metaBadge, { backgroundColor: withOpacity(theme.colors.textDim, 0.12) }]}>
-            <Text style={[styles.meta, { color: theme.colors.textDim }]}>
-              {metaLabel?.toUpperCase() ?? 'STATUS'}
+          {description ? (
+            <Text style={[styles.description, { color: theme.colors.textMuted }]} numberOfLines={2}>
+              {description}
             </Text>
-          </View>
-          {actionLabel ? (
-            <View
-              style={[
-                styles.actionButton,
-                { backgroundColor: theme.colors.surfaceAlt, borderColor: withOpacity(theme.colors.textDim, 0.25) },
-              ]}
-            >
-              <Text style={[styles.actionButtonText, { color: theme.colors.text }]}>
-                {actionLabel.toUpperCase()}
-              </Text>
-              <Ionicons name={actionIcon} size={12} color={theme.colors.text} style={styles.actionIcon} />
-            </View>
           ) : null}
+          <Text style={[styles.timestamp, { color: theme.colors.textDim }]} numberOfLines={1}>
+            {timestamp}
+          </Text>
         </View>
+        {scoreLabel ? (
+          <View style={[styles.scorePill, { backgroundColor: scoreBackground }]}>
+            <Text style={[styles.scoreText, { color: scoreTextColor }]}>{scoreLabel}</Text>
+          </View>
+        ) : null}
       </View>
     </TouchableOpacity>
   );
@@ -125,115 +95,50 @@ export default function AlertCard({
 const createAlertCardStyles = (theme: AppTheme) =>
   StyleSheet.create({
     card: {
-      borderRadius: 28,
-      paddingVertical: 20,
-      paddingRight: 24,
-      paddingLeft: 10,
+      borderRadius: 32,
+      padding: 20,
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: withOpacity(theme.colors.text, 0.1),
-      marginBottom: 16,
-      overflow: 'hidden',
-    },
-    leftStrip: {
-      position: 'absolute',
-      left: 0,
-      top: 12,
-      bottom: 12,
-      width: 3,
-      borderRadius: 999,
+      marginBottom: 12,
     },
     content: {
-      marginLeft: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
     },
     iconWrapper: {
-      width: 32,
-      height: 32,
-      borderRadius: 12,
+      width: 44,
+      height: 44,
+      borderRadius: 18,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    category: {
-      fontSize: 13,
-      letterSpacing: 0.4,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-    },
-    timestamp: {
-      fontSize: 12,
-    },
-    categoryRow: {
-      flexDirection: 'row',
-      alignItems: 'baseline',
-      gap: 6,
-    },
-    topRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-      marginBottom: 10,
-    },
-    topText: {
+    textContent: {
       flex: 1,
-      alignItems: 'flex-end',
+      gap: 2,
     },
     title: {
-      fontSize: 18,
+      fontSize: 16,
       fontWeight: '700',
-      letterSpacing: -0.02,
+      letterSpacing: 0,
     },
-    scoreBadge: {
-      paddingVertical: 4,
-      paddingHorizontal: 12,
+    description: {
+      fontSize: 13,
+      fontWeight: '400',
+      lineHeight: 18,
+    },
+    timestamp: {
+      fontSize: 14,
+      fontWeight: '400',
+    },
+    scorePill: {
+      paddingVertical: 6,
+      paddingHorizontal: 14,
       borderRadius: 999,
     },
     scoreText: {
-      fontSize: 10,
+      fontSize: 13,
       fontWeight: '700',
-      letterSpacing: 0.2,
-    },
-    description: {
-      fontSize: 15,
-      lineHeight: 20,
-      marginTop: 4,
-    },
-    actionRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginTop: 20,
-    },
-    meta: {
-      fontSize: 12,
-      letterSpacing: 0.2,
-      fontWeight: '600',
-    },
-    metaBadge: {
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 999,
-    },
-    iconBlock: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    actionButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 999,
-      gap: 6,
-      borderWidth: 1,
-    },
-    actionButtonText: {
-      fontSize: 11,
-      fontWeight: '700',
-      letterSpacing: 0.2,
-      marginRight: 6,
-    },
-    actionIcon: {
-      marginLeft: 2,
+      letterSpacing: 0.3,
     },
   });

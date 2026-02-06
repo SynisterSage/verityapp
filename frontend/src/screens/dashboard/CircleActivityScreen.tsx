@@ -27,6 +27,7 @@ import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
 import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
 import * as Haptics from 'expo-haptics';
 import EmptyState from '../../components/common/EmptyState';
+import AlertCard from '../../components/alerts/AlertCard';
 import { useProfile } from '../../context/ProfileContext';
 
 export default function CircleActivityScreen() {
@@ -204,34 +205,22 @@ export default function CircleActivityScreen() {
           contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
           showsVerticalScrollIndicator={false}
         >
-          {activityList.map((activity) => (
-            <Pressable
-              key={activity.id}
-              style={({ pressed }) => [styles.cardWrapper, pressed && styles.cardPressed]}
-              android_ripple={{ color: '#00000010' }}
-              onLongPress={
-                canManageProfile ? () => showTray(activity.alertRow) : undefined
-              }
-            >
-              <View style={styles.card}>
-                <View style={[styles.accentStrip, { backgroundColor: theme.colors.accent }]} />
-                <View style={styles.cardContent}>
-                  <View style={styles.cardHeader}>
-                    <View style={[styles.iconCircle, { backgroundColor: `${theme.colors.accent}20` }]}>
-                      <Ionicons name="people-outline" size={16} color={theme.colors.accent} />
-                    </View>
-                    <Text style={[styles.cardTitle, { color: theme.colors.textMuted }]}>{activity.label}</Text>
-                    <View style={styles.cardSpacer} />
-                    <Ionicons name="time-outline" size={12} color={theme.colors.textDim} />
-                    <Text style={[styles.cardTimestamp, { color: theme.colors.textDim }]}>{activity.timestamp}</Text>
-                  </View>
-                  <Text style={[styles.cardDescription, { color: theme.colors.textMuted }]}>
-                    {activity.description}
-                  </Text>
-                </View>
-              </View>
-            </Pressable>
-          ))}
+          <View style={styles.cardList}>
+            {activityList.map((activity) => (
+              <AlertCard
+                key={activity.id}
+                title={activity.label}
+                description={activity.description}
+                timestamp={activity.timestamp}
+                iconName="people-outline"
+                iconColor={theme.colors.accent}
+                iconBackgroundColor={withOpacity(theme.colors.accent, 0.18)}
+                onLongPress={
+                  canManageProfile ? () => showTray(activity.alertRow) : undefined
+                }
+              />
+            ))}
+          </View>
         </ScrollView>
       )}
       <Modal visible={isTrayVisible} transparent animationType="none" onRequestClose={hideTray}>
@@ -337,67 +326,9 @@ const createCircleStyles = (theme: AppTheme) =>
     scrollContent: {
       paddingHorizontal: 24,
       paddingTop: 26,
-      gap: 12,
     },
-    cardWrapper: {
-      borderRadius: 22,
-      overflow: 'hidden',
-    },
-    cardPressed: {
-      opacity: 0.7,
-    },
-    card: {
-      borderRadius: 22,
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.text, 0.08),
-      padding: 16,
-      paddingLeft: 20,
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    accentStrip: {
-      position: 'absolute',
-      left: 0,
-      top: 12,
-      bottom: 12,
-      width: 3,
-      borderRadius: 999,
-    },
-    cardContent: {
-      flex: 1,
-    },
-    cardHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 4,
-    },
-    iconCircle: {
-      width: 32,
-      height: 32,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 10,
-    },
-    cardTitle: {
-      fontSize: 14,
-      fontWeight: '600',
-      letterSpacing: 0.2,
-      textTransform: 'uppercase',
-    },
-    cardSpacer: {
-      flex: 1,
-    },
-    cardTimestamp: {
-      fontSize: 12,
-      letterSpacing: 0.2,
-      textTransform: 'uppercase',
-      marginLeft: 6,
-    },
-    cardDescription: {
-      fontSize: 13,
-      lineHeight: 20,
+    cardList: {
+      gap: 0,
     },
     emptyContainer: {
       flex: 1,

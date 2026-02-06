@@ -28,6 +28,7 @@ import { ProfileProvider, useProfile } from './src/context/ProfileContext';
 import { AlertProvider } from './src/context/AlertContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { authorizedFetch } from './src/services/backend';
+import { supabase } from './src/services/supabase';
 import SignInScreen from './src/screens/auth/SignInScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
 import ConfirmEmailScreen from './src/screens/auth/ConfirmEmailScreen';
@@ -383,13 +384,23 @@ function RootNavigator() {
 }
 
 function AuthCallbackHandler() {
-  const handleUrl = useCallback((url: string) => {
+  const handleUrl = useCallback(async (url: string) => {
     if (!url) {
       return;
     }
+    console.log('=== AuthCallbackHandler START ===');
+    console.log('Full URL received:', url);
+    
     const parsed = Linking.parse(url);
+    console.log('Parsed path:', parsed.path);
+    console.log('Parsed hostname:', parsed.hostname);
+    console.log('Parsed queryParams:', JSON.stringify(parsed.queryParams, null, 2));
+    
     if (parsed.path?.endsWith('auth/callback') || parsed.path?.includes('auth/callback')) {
       const params = parsed.queryParams ?? {};
+      console.log('Auth callback detected!');
+      console.log('All params keys:', Object.keys(params));
+      
       const toStringParam = (val?: string | string[]) => {
         if (typeof val === 'string') return val;
         if (Array.isArray(val)) return val[0];
@@ -397,20 +408,70 @@ function AuthCallbackHandler() {
       };
       const isReset = params.mode === 'reset' || params.source === 'password';
       if (isReset) {
+        console.log('Reset password flow detected');
         navigationRef.current?.navigate('ResetPassword');
         return;
       }
-      const isConfirmation = params.type === 'signup' || !!params.token || params.source === 'confirmation';
-      const payload = {
-        confirmed: isConfirmation,
+      
+      // Check if we have an auth code to exchange (PKCE flow)
+      const code = toStringParam(params.code);
+      const codeVerifier = toStringParam(params.code_verifier);
+      
+      console.log('=== PKCE EXTRACTION ===');
+      console.log('code:', code ? `${code.substring(0, 20)}...` : 'MISSING');
+      console.log('code_verifier:', codeVerifier ? `${codeVerifier.substring(0, 20)}...` : 'MISSING');
+      console.log('code length:', code?.length ?? 0);
+      console.log('verifier length:', codeVerifier?.length ?? 0);
+      
+      // Only attempt exchange if we have both code AND verifier (proper PKCE flow)
+      if (code && codeVerifier) {
+        try {
+          console.log('=== ATTEMPTING CODE EXCHANGE ===');
+          
+          // Supabase needs the URL in a specific format - reconstruct as https callback URL
+          const callbackUrl = new URL('https://verityprotect.com/auth/callback');
+          callbackUrl.searchParams.set('code', code);
+          callbackUrl.searchParams.set('code_verifier', codeVerifier);
+          
+          console.log('Calling exchangeCodeForSession...');
+          
+          const { data, error } = await supabase.auth.exchangeCodeForSession(callbackUrl.toString());
+          if (error) {
+            console.error('=== EXCHANGE FAILED ===');
+            console.error('Error:', error.message);
+            console.error('Error details:', error);
+          } else {
+            console.log('=== EXCHANGE SUCCESS ===');
+            console.log('Has session:', !!data.session);
+            console.log('User email:', data.session?.user?.email);
+            console.log('Email confirmed:', !!data.session?.user?.email_confirmed_at);
+          }
+        } catch (error) {
+          console.error('=== EXCHANGE EXCEPTION ===');
+          console.error('Exception:', error);
+        }
+      } else {
+        console.warn('=== SKIPPING EXCHANGE ===');
+        console.warn('Missing required params - code:', !!code, 'verifier:', !!codeVerifier);
+      }
+      
+      const isConfirmation = params.type === 'signup' || !!params.token || params.source === 'confirmation' || (code && codeVerifier);
+      const payload: { confirmed?: boolean; email?: string } = {
+        confirmed: !!isConfirmation,
         email: toStringParam(params.email),
       };
+      console.log('=== NAVIGATING ===');
+      console.log('Payload:', payload);
+      
       const currentRoute = navigationRef.current?.getCurrentRoute();
       if (currentRoute?.name === 'ConfirmEmail') {
+        console.log('Updating existing ConfirmEmail screen params');
         navigationRef.current?.dispatch(CommonActions.setParams(payload));
       } else {
+        console.log('Navigating to ConfirmEmail screen');
         navigationRef.current?.navigate('ConfirmEmail', payload);
       }
+      console.log('=== AuthCallbackHandler END ===');
     }
   }, []);
 

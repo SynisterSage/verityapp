@@ -873,11 +873,9 @@ export default function CallDetailScreen({
                           segment.type === 'safe' && styles.safeKeywordHighlight,
                           segment.type === 'fraud'
                             ? {
-                                backgroundColor: highlightBackground,
                                 color: fraudRiskStyle.accent,
                               }
                             : {
-                                backgroundColor: safeHighlightBackground,
                                 color: safeRiskStyle.accent,
                               },
                         ]}
@@ -1171,19 +1169,26 @@ export default function CallDetailScreen({
                       : theme.colors.success,
                   },
                 ]}
+                onPress={handlePromptMarkOnly}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.promptPrimaryText}>Just Mark</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.promptSecondaryButton}
                 onPress={() => handlePromptConfirm(promptState.status, false)}
                 activeOpacity={0.85}
               >
-                <Text style={styles.promptPrimaryText}>
+                <Text style={styles.promptSecondaryText}>
                   {promptState.isFraud ? 'Mark & Block' : 'Mark & Trust'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.promptSecondaryButton}
+                style={styles.promptTertiaryButton}
                 onPress={handlePromptClose}
                 activeOpacity={0.85}
               >
-                <Text style={styles.promptSecondaryText}>Nevermind</Text>
+                <Text style={styles.promptTertiaryText}>Nevermind</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => handlePromptConfirm(promptState.status, true)}
@@ -1431,6 +1436,20 @@ const createCallDetailStyles = (theme: AppTheme) =>
       fontWeight: '600',
       fontSize: 15,
       color: theme.colors.text,
+    },
+    promptTertiaryButton: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.1),
+      paddingVertical: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'transparent',
+    },
+    promptTertiaryText: {
+      fontWeight: '500',
+      fontSize: 15,
+      color: theme.colors.textMuted,
     },
     promptPersistentText: {
       textAlign: 'center',

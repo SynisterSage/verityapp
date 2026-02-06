@@ -1,7 +1,7 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, AppState, AppStateStatus } from 'react-native';
 
 import { useTheme } from '../../context/ThemeContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
@@ -34,7 +34,62 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
   const [isResending, setIsResending] = useState(false);
   const [resendHistory, setResendHistory] = useState<number[]>([]);
   const email = routeEmail ?? '';
-  const showSuccess = confirmed ?? false;
+  const [emailConfirmed, setEmailConfirmed] = useState(confirmed ?? false);
+  const appState = useRef(AppState.currentState);
+
+  const showSuccess = emailConfirmed;
+
+  // Update confirmed state when route params change
+  useEffect(() => {
+    console.log('ConfirmEmailScreen: confirmed param changed to:', confirmed);
+    if (confirmed) {
+      setEmailConfirmed(true);
+    }
+  }, [confirmed]);
+
+  // Check session when app comes to foreground or after a delay
+  useEffect(() => {
+    const checkEmailConfirmation = async () => {
+      try {
+        console.log('Checking email confirmation status...');
+        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Session check:', { 
+          hasSession: !!session, 
+          emailConfirmed: !!session?.user?.email_confirmed_at,
+          email: session?.user?.email 
+        });
+        if (session?.user?.email_confirmed_at) {
+          console.log('Email confirmed! Setting state...');
+          setEmailConfirmed(true);
+          logEvent('confirm_email_detected_confirmed', { screen: 'ConfirmEmail' });
+        }
+      } catch (error) {
+        console.warn('Failed to check email confirmation:', error);
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        // App came to foreground, check if email is confirmed after short delay
+        console.log('App came to foreground, checking confirmation...');
+        setTimeout(() => {
+          void checkEmailConfirmation();
+        }, 500);
+      }
+      appState.current = nextAppState;
+    });
+
+    // Check immediately on mount if confirmed param is true
+    if (confirmed) {
+      setTimeout(() => {
+        void checkEmailConfirmation();
+      }, 500);
+    }
+
+    return () => {
+      subscription.remove();
+    };
+  }, [confirmed]);
 
   const cleanHistory = (timestamps: number[], now = Date.now()) =>
     timestamps.filter((ts) => now - ts < RESEND_WINDOW_MS);

@@ -653,7 +653,7 @@ const loadMemberNames = useCallback(async () => {
           {priorityAlerts.map((alert) => {
             const reason = formatReason(alert) ?? alert.payload?.reason ?? 'Matched high-risk behavior.';
             const scoreLabel =
-              typeof alert.payload?.score === 'number' ? `Risk ${Math.round(alert.payload.score)}%` : undefined;
+              typeof alert.payload?.score === 'number' ? `${Math.round(alert.payload.score)}%` : undefined;
             const metaLabel = alert.status ?? 'Pending';
             const riskStyles = getRiskStyles(alert.risk_level ?? alert.payload?.riskLevel);
             const handlePress = () => {
@@ -706,6 +706,8 @@ const loadMemberNames = useCallback(async () => {
         <View style={styles.sectionCards}>
           {systemHealthAlerts.map((alert) => {
             const reason = formatReason(alert) ?? alert.payload?.reason ?? 'Automated protection triggered.';
+            const scoreLabel =
+              typeof alert.payload?.score === 'number' ? `${Math.round(alert.payload.score)}%` : undefined;
             const metaLabel = alert.status ?? 'System';
             const riskStyles = getRiskStyles(alert.risk_level ?? alert.payload?.riskLevel);
             const handlePress = () => {
@@ -725,15 +727,13 @@ const loadMemberNames = useCallback(async () => {
                 key={`system-${alert.id}`}
                 categoryLabel="System shield"
                 title={alert.risk_label ? capitalizeLabel(alert.risk_label) : 'System event'}
-                description={reason}
                 timestamp={formatRecencyLabel(alert.created_at)}
-                metaLabel={metaLabel}
-                actionLabel="View details"
+                scoreLabel={scoreLabel}
+                scoreColor={riskStyles.accent}
+                scoreBackgroundColor={riskStyles.background}
                 iconName="shield-checkmark-outline"
                 iconColor={riskStyles.accent}
-                stripColor={riskStyles.accent}
                 muted={Boolean(alert.processed)}
-                scoreColor={riskStyles.accent}
                 onPress={alert.call_id ? handlePress : undefined}
               />
             );
@@ -764,9 +764,8 @@ const loadMemberNames = useCallback(async () => {
               (alert.call_id ? callNumberMap[alert.call_id] : undefined);
             const callerName = callerNumber ? contactNames[callerNumber] : '';
             const resolvedName = callerName || formatPhoneNumber(callerNumber, 'Trusted contact');
-            const description =
-              alert.payload?.reason ??
-              `${resolvedName} was bridged directly because they are on your trusted list.`;
+            const scoreLabel =
+              typeof alert.payload?.score === 'number' ? `${Math.round(alert.payload.score)}%` : undefined;
             const statusLabel = alert.status ?? 'Trusted call';
             const handlePress = () => {
               if (!alert.call_id) return;
@@ -785,16 +784,12 @@ const loadMemberNames = useCallback(async () => {
                 key={`trusted-${alert.id}`}
                 categoryLabel="Trusted circle"
                 title={resolvedName}
-                description={description}
                 timestamp={formatRecencyLabel(alert.created_at)}
-                metaLabel={statusLabel}
-                scoreLabel="Safe"
+                scoreLabel={scoreLabel}
                 scoreColor={successColor}
                 scoreBackgroundColor={successBackground}
-                actionLabel="View details"
                 iconName="person-circle-outline"
                 iconColor={successColor}
-                stripColor={successColor}
                 onPress={alert.call_id ? handlePress : undefined}
               />
             );
@@ -822,46 +817,20 @@ const loadMemberNames = useCallback(async () => {
     return (
       <View style={[styles.section, styles.circleSection]}>
         {renderSectionHeader('Circle activity', headerRight)}
-        <View style={styles.circleGroup}>
+        <View style={styles.sectionCards}>
           {preview.map((activity) => (
-            <Pressable
+            <AlertCard
               key={activity.id}
+              title={activity.label}
+              description={activity.description}
+              timestamp={activity.timestamp}
+              iconName="people-outline"
+              iconColor={theme.colors.accent}
+              iconBackgroundColor={withOpacity(theme.colors.accent, 0.18)}
               onLongPress={
                 canManageProfile ? () => showTray(activity.alertRow) : undefined
               }
-              android_ripple={{ color: withOpacity(theme.colors.text, 0.08) }}
-              style={({ pressed }) => [
-                styles.circleCardWrapper,
-                pressed && styles.circleCardPressed,
-              ]}
-            >
-              <View style={styles.circleCard}>
-                <View style={[styles.circleAccentStrip, { backgroundColor: theme.colors.accent }]} />
-                <View style={styles.circleCardContent}>
-                  <View style={styles.circleHeaderRow}>
-                    <View
-                      style={[
-                        styles.circleIconWrapper,
-                        { backgroundColor: withOpacity(theme.colors.accent, 0.16) },
-                      ]}
-                    >
-                      <Ionicons name="people-outline" size={16} color={theme.colors.accent} />
-                    </View>
-                    <Text style={[styles.circleTitle, { color: theme.colors.textMuted }]}>
-                      {activity.label}
-                    </Text>
-                    <View style={styles.circleHeaderSpacer} />
-                    <Ionicons name="time-outline" size={12} color={theme.colors.textDim} />
-                    <Text style={[styles.circleTimestamp, { color: theme.colors.textDim }]}>
-                      {activity.timestamp}
-                    </Text>
-                  </View>
-                  <Text style={[styles.circleDescription, { color: theme.colors.textMuted }]}>
-                    {activity.description}
-                  </Text>
-                </View>
-              </View>
-            </Pressable>
+            />
           ))}
         </View>
       </View>
@@ -936,7 +905,7 @@ const loadMemberNames = useCallback(async () => {
             };
             const statusLabel = alert.processed ? 'Handled' : alert.status ?? 'Handled';
             const scoreLabel =
-              typeof alert.payload?.score === 'number' ? `Risk ${Math.round(alert.payload.score)}%` : undefined;
+              typeof alert.payload?.score === 'number' ? `${Math.round(alert.payload.score)}%` : undefined;
             return (
                 <AlertCard
                   key={`handled-${alert.id}`}
@@ -988,7 +957,7 @@ const loadMemberNames = useCallback(async () => {
               const callerName = callerNumber ? contactNames[callerNumber] : '';
               const nameOrNumber = callerName || formatPhoneNumber(callerNumber) || 'Unknown caller';
               const scoreLabel =
-                typeof item.payload?.score === 'number' ? `Risk ${Math.round(item.payload.score)}%` : undefined;
+                typeof item.payload?.score === 'number' ? `${Math.round(item.payload.score)}%` : undefined;
               const riskStyles = getRiskStyles(item.risk_level ?? item.payload?.riskLevel);
               const statusLabel = item.processed && item.status === 'pending' ? 'Resolved' : item.status ?? 'Pending';
               const iconName =
@@ -1276,70 +1245,6 @@ const createAlertStyles = (theme: AppTheme) =>
     handledSection: {
       borderWidth: 0,
       backgroundColor: theme.colors.bg,
-    },
-    circleGroup: {
-      marginTop: 12,
-    },
-    circleCard: {
-      borderRadius: 20,
-      padding: 16,
-      marginBottom: 12,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withOpacity(theme.colors.text, 0.08),
-      position: 'relative',
-      paddingLeft: 20,
-      overflow: 'hidden',
-      backgroundColor: theme.colors.surface,
-    },
-    circleCardWrapper: {
-      borderRadius: 20,
-      overflow: 'hidden',
-    },
-    circleCardPressed: {
-      opacity: 0.7,
-    },
-    circleAccentStrip: {
-      position: 'absolute',
-      left: 0,
-      top: 8,
-      bottom: 8,
-      width: 3,
-      borderRadius: 999,
-    },
-    circleHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      marginBottom: 6,
-    },
-    circleIconWrapper: {
-      width: 32,
-      height: 32,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: theme.colors.surfaceAlt,
-    },
-    circleHeaderSpacer: {
-      flex: 1,
-    },
-    circleTitle: {
-      fontSize: 14,
-      fontWeight: '600',
-      letterSpacing: 0.2,
-      textTransform: 'uppercase',
-    },
-    circleDescription: {
-      fontSize: 13,
-      lineHeight: 20,
-    },
-    circleCardContent: {
-      flex: 1,
-    },
-    circleTimestamp: {
-      fontSize: 12,
-      letterSpacing: 0.2,
-      textTransform: 'uppercase',
     },
     circleViewAllButton: {
       marginTop: 12,
