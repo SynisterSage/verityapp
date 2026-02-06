@@ -42,18 +42,25 @@ export async function resetPassword(req: Request, res: Response) {
   }
 
   try {
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/reset-password`, {
-      method: 'POST',
+    // Use Supabase Admin API to update user password
+    // The token is a recovery token that contains the user's identity
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         apikey: SUPABASE_SERVICE_KEY,
-        Authorization: `Bearer ${SUPABASE_SERVICE_KEY}`,
+        Authorization: `Bearer ${token}`, // Use the recovery token from the email
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ password }),
     });
 
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
+      logger.err({
+        message: 'Supabase password reset failed',
+        status: response.status,
+        body,
+      });
       const message =
         typeof body?.msg === 'string'
           ? body.msg
@@ -67,7 +74,7 @@ export async function resetPassword(req: Request, res: Response) {
       message: 'Password reset successful',
     });
   } catch (error) {
-    console.error('resetPassword error', error);
+    logger.err('resetPassword error', error);
     return res
       .status(HTTP_STATUS_CODES.InternalServerError)
       .json({ error: 'Unable to reset password at this time' });
