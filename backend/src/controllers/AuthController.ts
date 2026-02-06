@@ -26,7 +26,7 @@ export async function checkEmailExists(req: Request, res: Response) {
     const { data, error } = await supabaseAdmin.auth.admin.listUsers();
     
     if (error !== null && error !== undefined) {
-      logger.err('checkEmailExists error', error);
+      logger.err(`checkEmailExists error: ${error.message}`);
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({
         error: 'Unable to check email availability',
       });
@@ -39,7 +39,7 @@ export async function checkEmailExists(req: Request, res: Response) {
       exists,
     });
   } catch (error) {
-    logger.err('checkEmailExists error', error);
+    logger.err(`checkEmailExists error: ${error instanceof Error ? error.message : 'unknown error'}`);
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({
       error: 'Unable to check email availability',
     });
