@@ -57,7 +57,7 @@ export const updateAlertPrefsSchema = z.object({
 
 export const inviteMemberSchema = z.object({
   email: z.string().email('Invalid email format').optional(),
-  role: z.enum(['viewer', 'admin']).optional(),
+  role: z.enum(['editor', 'admin']).optional(),
 });
 
 export const acceptInviteSchema = z.object({
@@ -66,7 +66,7 @@ export const acceptInviteSchema = z.object({
 
 export const changeMemberRoleSchema = z.object({
   member_id: z.string().uuid('Invalid member ID'),
-  role: z.enum(['viewer', 'admin']),
+  role: z.enum(['editor', 'admin']),
 });
 
 export const registerDeviceTokenSchema = z.object({

@@ -69,6 +69,15 @@ SET caretaker_id = p.caretaker_id
 FROM profiles p
 WHERE pdt.profile_id = p.id AND pdt.caretaker_id IS NULL;
 
+-- 7. Add caretaker_id to profile_members table (needed for profile_members_read policy)
+ALTER TABLE profile_members ADD COLUMN IF NOT EXISTS caretaker_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
+
+-- Populate caretaker_id from profiles
+UPDATE profile_members pm
+SET caretaker_id = p.caretaker_id
+FROM profiles p
+WHERE pm.profile_id = p.id AND pm.caretaker_id IS NULL;
+
 -- ============================================================================
 -- Now update RLS policies to use denormalized caretaker_id
 -- ============================================================================
@@ -151,6 +160,15 @@ CREATE POLICY profile_device_tokens_read ON profile_device_tokens
       WHERE pm.profile_id = profile_device_tokens.profile_id
         AND pm.user_id = auth.uid()
     )
+  );
+
+-- Fix profile_members_read - use denormalized caretaker_id instead of reading from profiles
+DROP POLICY IF EXISTS profile_members_read ON profile_members;
+CREATE POLICY profile_members_read ON profile_members
+  FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR caretaker_id = auth.uid()
   );
 
 -- ============================================================================
