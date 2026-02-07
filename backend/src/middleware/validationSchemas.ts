@@ -56,7 +56,7 @@ export const updateAlertPrefsSchema = z.object({
 }).strict();
 
 export const inviteMemberSchema = z.object({
-  email: z.string().email('Invalid email format'),
+  email: z.string().email('Invalid email format').optional(),
   role: z.enum(['viewer', 'admin']).optional(),
 });
 
@@ -81,7 +81,7 @@ export const createClientTokenSchema = z.object({
 });
 
 export const recordClientHeartbeatSchema = z.object({
-  timestamp: z.number().int().positive(),
+  timestamp: z.number().int().positive().optional(),
   status: z.enum(['active', 'idle', 'away']).optional(),
 });
 
