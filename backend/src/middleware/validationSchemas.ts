@@ -53,6 +53,11 @@ export const updateAlertPrefsSchema = z.object({
   enable_sms_alerts: z.boolean().optional(),
   enable_push_alerts: z.boolean().optional(),
   alert_threshold_score: z.number().min(0).max(100).optional(),
+  auto_mark_enabled: z.boolean().optional(),
+  auto_mark_fraud_threshold: z.number().min(0).max(100).optional(),
+  auto_mark_safe_threshold: z.number().min(0).max(100).optional(),
+  auto_trust_on_safe: z.boolean().optional(),
+  auto_block_on_fraud: z.boolean().optional(),
 }).strict();
 
 export const inviteMemberSchema = z.object({

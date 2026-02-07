@@ -212,6 +212,13 @@ async function addBlockedCaller(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid callerNumber' });
   }
 
+  // Get caretaker_id for RLS policy
+  const { data: profileData } = await supabaseAdmin
+    .from('profiles')
+    .select('caretaker_id')
+    .eq('id', profileId)
+    .single();
+
   const { error } = await supabaseAdmin
     .from('blocked_callers')
     .upsert({
@@ -220,6 +227,7 @@ async function addBlockedCaller(req: Request, res: Response) {
       caller_number: callerNumber,
       reason: reason ?? null,
       blocked_until: blockedUntil ?? null,
+      caretaker_id: profileData?.caretaker_id,
     }, { onConflict: 'profile_id,caller_hash' });
 
   await removeTrustedContact(profileId, callerHash);
@@ -400,6 +408,14 @@ async function addTrustedContacts(req: Request, res: Response) {
   if (filteredNumbers.length === 0) {
     return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true, added: 0 });
   }
+
+  // Get caretaker_id for RLS policy
+  const { data: profileData } = await supabaseAdmin
+    .from('profiles')
+    .select('caretaker_id')
+    .eq('id', profileId)
+    .single();
+
   const rows = filteredNumbers.map((normalizedNumber) => {
     const callerHash = hashCallerNumber(normalizedNumber);
     if (!callerHash) {
@@ -412,6 +428,7 @@ async function addTrustedContacts(req: Request, res: Response) {
       caller_number: normalizedNumber,
       source: normalizedSource,
       contact_name: contactName?.trim() || null,
+      caretaker_id: profileData?.caretaker_id,
     };
   })
     .filter(Boolean) as {
