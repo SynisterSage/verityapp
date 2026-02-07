@@ -451,8 +451,34 @@ async function updateAlertPrefs(req: Request, res: Response) {
     }
   }
 
+  // Fetch the profile to return (frontend expects profile object with notification fields)
+  const { data: profileData, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('id, first_name, last_name, phone_number, twilio_virtual_number, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at')
+    .eq('id', profileId)
+    .single();
+
+  if (profileError || !profileData) {
+    logger.err(profileError ?? new Error('Failed to fetch profile'));
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update alert prefs' });
+  }
+
+  // Merge notification_preferences from profile_members into profile response
+  const profileWithPrefs = {
+    ...profileData,
+    alert_threshold_score: updatedPrefs.alert_threshold_score,
+    enable_email_alerts: updatedPrefs.enable_email_alerts,
+    enable_sms_alerts: updatedPrefs.enable_sms_alerts,
+    enable_push_alerts: updatedPrefs.enable_push_alerts,
+    auto_mark_enabled: updatedPrefs.auto_mark_enabled,
+    auto_mark_fraud_threshold: updatedPrefs.auto_mark_fraud_threshold,
+    auto_mark_safe_threshold: updatedPrefs.auto_mark_safe_threshold,
+    auto_trust_on_safe: updatedPrefs.auto_trust_on_safe,
+    auto_block_on_fraud: updatedPrefs.auto_block_on_fraud,
+  };
+
   return res.status(HTTP_STATUS_CODES.Ok).json({
-    notification_preferences: updatedMember.notification_preferences,
+    profile: sanitizeProfileRow(profileWithPrefs),
   });
 }
 
