@@ -163,7 +163,13 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
       
       // Handle specific error cases
       const errorMessage = err?.message || '';
-      if (errorMessage.toLowerCase().includes('no available') || errorMessage.toLowerCase().includes('no numbers')) {
+      const statusCode = err?.status;
+      
+      if (statusCode === 429 || errorMessage.includes('Too many')) {
+        setError(
+          'Too many assignment attempts. Please wait an hour before trying again.'
+        );
+      } else if (errorMessage.toLowerCase().includes('no available') || errorMessage.toLowerCase().includes('no numbers')) {
         setError(
           'No phone numbers available in the pool. Please contact Verity Support to add more numbers to your account.'
         );
