@@ -155,7 +155,7 @@ export default function NotificationsScreen() {
       {
         icon: 'notifications-outline',
         color: theme.colors.accent,
-        text: 'Choose which alerts your trusted circle receives.',
+        text: 'Choose which channels you want to receive alerts through.',
       },
     ],
     [theme.colors.accent, theme.colors.success]
@@ -163,7 +163,7 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <SettingsHeader title="Notifications" subtitle="Manage how we alert you" />
+      <SettingsHeader title="Notifications" subtitle="Manage your personal alert preferences" />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -176,7 +176,7 @@ export default function NotificationsScreen() {
         <View style={styles.headerSection}>
           <Text style={styles.title}>Safety Level</Text>
           <Text style={styles.subtitle}>
-            Choose how strictly Verity filters your calls and how we notify your circle.
+            Choose how strictly Verity filters calls and when you receive alerts.
           </Text>
         </View>
 

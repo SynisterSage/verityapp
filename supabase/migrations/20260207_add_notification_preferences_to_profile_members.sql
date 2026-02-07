@@ -46,32 +46,33 @@ SET notification_preferences = jsonb_build_object(
 FROM profiles p
 WHERE pm.profile_id = p.id;
 
--- Update RLS policy to allow users to update their own notification_preferences
-DROP POLICY IF EXISTS profile_members_manage ON profile_members;
-CREATE POLICY profile_members_manage ON profile_members
-  FOR UPDATE
-  USING (
-    user_id = auth.uid() OR
-    (SELECT caretaker_id FROM profiles WHERE id = profile_id) = auth.uid()
-  )
-  WITH CHECK (
-    user_id = auth.uid() OR
-    (SELECT caretaker_id FROM profiles WHERE id = profile_id) = auth.uid()
-  );
+-- Update RLS policies to allow users to update their own notification_preferences
+-- IMPORTANT: No nested SELECTs and separate policies for different operations!
 
--- Create policy to allow selecting profile_members for viewing notification prefs
+-- Drop existing policies
+DROP POLICY IF EXISTS profile_members_read ON profile_members;
 DROP POLICY IF EXISTS profile_members_select ON profile_members;
+DROP POLICY IF EXISTS profile_members_manage ON profile_members;
+DROP POLICY IF EXISTS profile_members_update_self ON profile_members;
+DROP POLICY IF EXISTS profile_members_manage_caretaker ON profile_members;
+
+-- SELECT: Users can read their own profile_members rows only
 CREATE POLICY profile_members_select ON profile_members
   FOR SELECT
-  USING (
-    user_id = auth.uid() OR
-    (SELECT caretaker_id FROM profiles WHERE id = profile_id) = auth.uid()
-  );
+  USING (user_id = auth.uid());
 
--- Optional: Create policy for admins to view members in their profiles
-DROP POLICY IF EXISTS profile_members_admin_select ON profile_members;
-CREATE POLICY profile_members_admin_select ON profile_members
-  FOR SELECT
-  USING (
-    (SELECT caretaker_id FROM profiles WHERE id = profile_id) = auth.uid()
-  );
+-- UPDATE: Users can update their own rows (for notification_preferences)
+CREATE POLICY profile_members_update ON profile_members
+  FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- INSERT: Only caretakers can add new members
+CREATE POLICY profile_members_insert ON profile_members
+  FOR INSERT
+  WITH CHECK (caretaker_id = auth.uid());
+
+-- DELETE: Only caretakers can remove members
+CREATE POLICY profile_members_delete ON profile_members
+  FOR DELETE
+  USING (caretaker_id = auth.uid());

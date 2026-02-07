@@ -142,7 +142,7 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
       {
         icon: 'notifications-outline',
         color: theme.colors.success,
-        text: 'Choose which alerts your trusted circle receives.',
+        text: 'Choose which channels you want to receive alerts through.',
       },
     ],
     [theme.colors.accent, theme.colors.success]
@@ -163,7 +163,7 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
         <View style={styles.headerSection}>
           <Text style={styles.title}>Safety Level</Text>
           <Text style={styles.subtitle}>
-            Choose how strictly Verity filters your calls and how we notify your circle.
+            Choose how strictly Verity filters calls and when you receive alerts.
           </Text>
         </View>
 

@@ -384,7 +384,7 @@ export default function DataPrivacyScreen() {
 
   const handleManageAction = (key: ManageActionKey) => {
     if (!canManageProfile) {
-      setManageError('Only caretakers or admins can manage these settings.');
+      setManageError('');
       return;
     }
     if (key === 'delete' && !canDeleteProfile) {
@@ -397,9 +397,7 @@ export default function DataPrivacyScreen() {
     setPinModalAction(key);
   };
 
-  const manageMessageText =
-    manageError ||
-    (!canManageProfile ? 'Only caretakers or admins can manage these settings.' : '');
+  const manageMessageText = manageError;
   const pendingActionLabel = pinModalAction
     ? MANAGE_ACTIONS.find((item) => item.key === pinModalAction)?.label ?? ''
     : '';
@@ -471,6 +469,11 @@ export default function DataPrivacyScreen() {
           </View>
 
           <Text style={styles.sectionLabel}>Manage data</Text>
+          {!canManageProfile ? (
+            <Text style={[styles.manageMessage, styles.manageMessageInline]}>
+              Only caretakers or admins can manage these settings.
+            </Text>
+          ) : null}
           <View style={styles.manageControls}>
             {MANAGE_ACTIONS.map((action) => {
               const isWorking = manageAction === action.key;
@@ -798,6 +801,10 @@ const createDataPrivacyStyles = (theme: AppTheme) =>
       color: theme.colors.danger,
       fontSize: 12,
       marginTop: 12,
+    },
+    manageMessageInline: {
+      marginTop: 4,
+      marginBottom: 4,
     },
     modalOverlay: {
       ...StyleSheet.absoluteFillObject,
