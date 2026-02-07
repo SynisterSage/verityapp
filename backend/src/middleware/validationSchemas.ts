@@ -66,7 +66,8 @@ export const inviteMemberSchema = z.object({
 });
 
 export const acceptInviteSchema = z.object({
-  invite_id: z.string().uuid('Invalid invite ID'),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
 });
 
 export const changeMemberRoleSchema = z.object({

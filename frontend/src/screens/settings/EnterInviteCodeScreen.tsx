@@ -26,7 +26,7 @@ export default function EnterInviteCodeScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createEnterInviteCodeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const { refreshProfiles, setOnboardingComplete } = useProfile();
+  const { activeProfile, refreshProfiles, setOnboardingComplete } = useProfile();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [message, setMessage] = useState('');
@@ -35,6 +35,7 @@ export default function EnterInviteCodeScreen() {
   const firstNameRef = useRef<TextInput | null>(null);
   const lastNameRef = useRef<TextInput | null>(null);
   const codeInputRef = useRef<TextInput | null>(null);
+  const prefilledProfileIdRef = useRef<string | null>(null);
   const pulse = useRef(new Animated.Value(1)).current;
 
   const codeValue = code;
@@ -49,6 +50,22 @@ export default function EnterInviteCodeScreen() {
       ]).start();
     }
   }, [isCodeComplete, pulse]);
+
+  useEffect(() => {
+    if (
+      !activeProfile ||
+      !activeProfile.first_name ||
+      !activeProfile.last_name ||
+      prefilledProfileIdRef.current === activeProfile.id ||
+      firstName.length > 0 ||
+      lastName.length > 0
+    ) {
+      return;
+    }
+    setFirstName(activeProfile.first_name);
+    setLastName(activeProfile.last_name);
+    prefilledProfileIdRef.current = activeProfile.id;
+  }, [activeProfile, firstName, lastName]);
 
   const sanitizeCode = (value: string) =>
     value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, CODE_LENGTH);
