@@ -15,8 +15,6 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
 export async function checkEmailExists(req: Request, res: Response) {
   const { email } = req.query ?? {};
 
-  logger.info(`checkEmailExists called with email: ${email}`);
-
   if (!email || typeof email !== 'string') {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({
       error: 'email query parameter is required',
@@ -36,8 +34,6 @@ export async function checkEmailExists(req: Request, res: Response) {
 
     const emailLower = email.toLowerCase();
     const exists = data.users.some((user) => user.email?.toLowerCase() === emailLower);
-    
-    logger.info(`Email check result - email: ${email}, exists: ${exists}, total users: ${data.users.length}`);
     
     return res.status(HTTP_STATUS_CODES.Ok).json({
       email,

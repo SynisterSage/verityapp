@@ -164,7 +164,7 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
         method: 'POST',
         body: JSON.stringify({ pin: createValue }),
       });
-      setActiveProfile({ ...activeProfile, has_passcode: true });
+      setActiveProfile({ ...activeProfile, has_passcode: true, safety_pin: createValue });
       logEvent('passcode_setup_completed', { screen: 'Passcode' });
       navigation.navigate('OnboardingTrustedContacts');
     } catch (err: any) {

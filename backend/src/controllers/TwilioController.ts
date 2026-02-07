@@ -17,7 +17,7 @@ import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLi
 import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
 import { notifyProfileForAlert } from '@src/services/pushNotifications';
 
-const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call may be recorded for safety.';
+const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call is being recorded for safety purposes.';
 const PUBLIC_API_URL = process.env.PUBLIC_API_URL?.replace(/\/+$/, '');
 
 function getPublicBaseUrl(req: Request) {

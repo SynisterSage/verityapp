@@ -843,7 +843,7 @@ const createMembersStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'baseline',
-      marginBottom: 6,
+      marginBottom: -2,
     },
     pendingCount: {
       color: theme.colors.accent,
@@ -994,7 +994,7 @@ const createMembersStyles = (theme: AppTheme) =>
 
     },
     skeletonWrapper: {
-      gap: 12,
+      gap: 2,
       marginBottom: 8,
     },
     skeletonAvatar: {

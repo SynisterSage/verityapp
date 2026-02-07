@@ -5,9 +5,12 @@ import {
   Text,
   TextInput,
   View,
+  Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
@@ -47,12 +50,11 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
-  const [twilioDigits, setTwilioDigits] = useState('');
+  const [assignedNumber, setAssignedNumber] = useState('');
+  const [isAssigningNumber, setIsAssigningNumber] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
-  const lastTwilioKey = useRef<string | null>(null);
   const lastNameRef = useRef<TextInput | null>(null);
   const phoneRef = useRef<TextInput | null>(null);
-  const twilioRef = useRef<TextInput | null>(null);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { theme } = useTheme();
@@ -60,8 +62,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const placeholderColor = withOpacity(theme.colors.textMuted, 0.7);
 
   const formattedPhone = useMemo(() => formatPhone(phoneDigits), [phoneDigits]);
-  const formattedTwilio = useMemo(() => formatPhone(twilioDigits), [twilioDigits]);
-  const isFormValid = Boolean(firstName.trim() && lastName.trim() && phoneDigits.length === 10);
+  const isProfileInfoComplete = Boolean(firstName.trim() && lastName.trim() && phoneDigits.length === 10);
+  const isFormValid = isProfileInfoComplete && Boolean(assignedNumber);
   const primaryDisabled = activeProfile ? isSubmitting : !isFormValid || isSubmitting;
 
   const handlePhoneChange = (value: string) => {
@@ -74,22 +76,41 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
     lastPhoneKey.current = null;
   };
 
-  const handleTwilioChange = (value: string) => {
-    const digits = value.replace(/\D/g, '').slice(0, 10);
-    if (lastTwilioKey.current === 'Backspace' && digits.length === twilioDigits.length) {
-      setTwilioDigits((prev) => prev.slice(0, -1));
-    } else {
-      setTwilioDigits(digits);
-    }
-    lastTwilioKey.current = null;
-  };
-
   const handlePhoneKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
     lastPhoneKey.current = nativeEvent.key;
   };
 
-  const handleTwilioKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
-    lastTwilioKey.current = nativeEvent.key;
+  const handleAssignNumber = async () => {
+    if (!activeProfile?.id) {
+      setError('Profile must be created first. Please fill in all fields.');
+      return;
+    }
+    
+    setError('');
+    setIsAssigningNumber(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+
+    try {
+      const response = await authorizedFetch(`/profiles/${activeProfile.id}/assign-number`, {
+        method: 'POST',
+      });
+      
+      if (response?.phoneNumber) {
+        setAssignedNumber(response.phoneNumber);
+        setActiveProfile({
+          ...activeProfile,
+          twilio_virtual_number: response.phoneNumber,
+        });
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
+      } else {
+        throw new Error('No phone number returned');
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to assign number. Please try again.');
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => null);
+    } finally {
+      setIsAssigningNumber(false);
+    }
   };
 
   const handleContinue = async () => {
@@ -97,33 +118,46 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
       navigation.navigate('OnboardingPasscode');
       return;
     }
+    
+    // First create profile if not created yet
+    if (!activeProfile && isProfileInfoComplete && !assignedNumber) {
+      setError('');
+      setIsSubmitting(true);
+      try {
+        const payload = {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          phone_number: phoneDigits ? `+1${phoneDigits}` : null,
+          twilio_virtual_number: null,
+        };
+        const data = await authorizedFetch('/profiles', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        if (data?.profile) {
+          setActiveProfile(data.profile);
+          setOnboardingComplete(false);
+          setError('Now assign a Verity number to continue.');
+        }
+      } catch (err: any) {
+        setError(err?.message || 'Failed to create profile.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+    
+    // Continue to next step if everything is complete
+    if (!assignedNumber) {
+      setError('Please assign a Verity number first.');
+      return;
+    }
     if (!isFormValid) {
       setError('Complete all required fields.');
       return;
     }
-    setError('');
-    setIsSubmitting(true);
-    try {
-      const payload = {
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        phone_number: phoneDigits ? `+1${phoneDigits}` : null,
-        twilio_virtual_number: twilioDigits ? `+1${twilioDigits}` : null,
-      };
-      const data = await authorizedFetch('/profiles', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      });
-      if (data?.profile) {
-        setActiveProfile(data.profile);
-        setOnboardingComplete(false);
-        navigation.navigate('OnboardingPasscode');
-      }
-    } catch (err: any) {
-      setError(err?.message || 'Failed to create profile.');
-    } finally {
-      setIsSubmitting(false);
-    }
+    
+    navigation.navigate('OnboardingPasscode');
   };
 
   const renderScrollContent = () => (
@@ -192,26 +226,36 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
             onChangeText={handlePhoneChange}
             onKeyPress={handlePhoneKeyPress}
             ref={phoneRef}
-            returnKeyType="next"
-            onSubmitEditing={() => twilioRef.current?.focus()}
+            returnKeyType="done"
           />
         </View>
 
         <Text style={styles.inputLabel}>Verity number</Text>
-        <View style={styles.inputContainer}>
-          <Ionicons name="call-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
-          <Text style={styles.prefix}>+1</Text>
-          <TextInput
-            style={[styles.input, styles.phoneInput]}
-            placeholder="(000) 000-0000"
-            placeholderTextColor={placeholderColor}
-            keyboardType="phone-pad"
-            value={formattedTwilio}
-            onChangeText={handleTwilioChange}
-            onKeyPress={handleTwilioKeyPress}
-            ref={twilioRef}
-          />
-        </View>
+        {!assignedNumber ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.assignButton,
+              pressed && { opacity: 0.7 },
+              isAssigningNumber && styles.assignButtonLoading,
+            ]}
+            onPress={handleAssignNumber}
+            disabled={isAssigningNumber}
+          >
+            {isAssigningNumber ? (
+              <ActivityIndicator size="small" color={theme.colors.bg} />
+            ) : (
+              <>
+                <Ionicons name="add-circle-outline" size={20} color={theme.colors.bg} />
+                <Text style={styles.assignButtonText}>Assign Verity Number</Text>
+              </>
+            )}
+          </Pressable>
+        ) : (
+          <View style={styles.assignedNumberCard}>
+            <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
+            <Text style={styles.assignedNumberText}>{assignedNumber}</Text>
+          </View>
+        )}
             <HowItWorksCard
               caption="HOW IT WORKS"
               items={[
@@ -283,7 +327,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         <OnboardingHeader chapter="Identity" activeStep={3} totalSteps={9} />
         <View style={styles.keyboardAvoiding}>{renderScrollContent()}</View>
         <ActionFooter
-          primaryLabel="Continue"
+          primaryLabel={!activeProfile && isProfileInfoComplete ? 'Create Profile' : 'Continue'}
           primaryLoading={isSubmitting}
           onPrimaryPress={handleContinue}
           primaryDisabled={primaryDisabled}
@@ -357,6 +401,41 @@ const createProfileStyles = (theme: AppTheme) =>
     prefix: {
       color: theme.colors.textMuted,
       fontWeight: '600',
+    },
+    assignButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 60,
+      borderRadius: 32,
+      backgroundColor: theme.colors.accent,
+      gap: 8,
+      paddingHorizontal: 24,
+    },
+    assignButtonLoading: {
+      opacity: 0.6,
+    },
+    assignButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.bg,
+    },
+    assignedNumberCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      height: 60,
+      borderRadius: 32,
+      borderWidth: 1,
+      borderColor: theme.colors.success,
+      backgroundColor: withOpacity(theme.colors.success, 0.1),
+      paddingHorizontal: 20,
+      gap: 12,
+    },
+    assignedNumberText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      letterSpacing: 1,
     },
     error: {
       color: theme.colors.danger,

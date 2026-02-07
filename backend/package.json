@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "start": "NODE_ENV=production node -r ./config.js ./dist",
     "test": "NODE_ENV=test vitest",
-    "type-check": "tsc -b --noEmit"
+    "type-check": "tsc -b --noEmit",
+    "sync-twilio-numbers": "ts-node ./scripts/syncTwilioNumbers.ts"
   },
   "engines": {
     "node": ">=16.0.0"
