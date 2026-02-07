@@ -180,12 +180,12 @@ export default function OnboardingInviteCodeScreen() {
                   ref={codeInputRef}
                   style={styles.codeInput}
                   keyboardType="default"
-                maxLength={CODE_LENGTH + 1}
-                value={formatDisplayValue(code)}
+                  maxLength={CODE_LENGTH + 1}
+                  value={formatDisplayValue(code)}
                   onChangeText={handleCodeChange}
                   autoCapitalize="characters"
                   autoCorrect={false}
-                  placeholder="AB12CD34"
+                  placeholder="AB12-CD34"
                   placeholderTextColor={withOpacity(theme.colors.textMuted, 0.45)}
                   textAlign="center"
                   returnKeyType="done"

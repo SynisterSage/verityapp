@@ -641,6 +641,11 @@ export default function TrustedContactsScreen() {
     contact.contact_name ??
     contactMap[contact.caller_number]?.name ??
     formatPhoneNumber(contact.caller_number, 'Unknown number');
+  const getAvatarInitial = (label?: string, fallback = 'T') => {
+    if (!label) return fallback;
+    const match = label.match(/[A-Za-z0-9]/);
+    return (match ? match[0] : fallback).toUpperCase();
+  };
   const getRelationshipLabel = (contact: TrustedContactRow) =>
     contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Trusted Safe Contact';
   const safeList = useMemo(() => {
@@ -679,18 +684,13 @@ export default function TrustedContactsScreen() {
 
   const manualTrayNumber =
     trayMode === 'manual' && trayContact ? (trayContact as DeviceContact).numbers[0] : '';
-  const manualAvatarDisplayName =
-    trayMode === 'manual'
-      ? getManualContactDisplayName(manualTrayNumber)
-      : manualManageDisplayName;
-  const manualAvatarInitial = (
-    (
-      manualAvatarDisplayName ||
-      'T'
-    )
-      .charAt(0)
-      .toUpperCase()
-  );
+  const manualAvatarInitialSource =
+    manualContactName.trim() ||
+    (trayMode === 'manual'
+      ? manualTrayNumber.replace(/\D/g, '')
+      : manualManageDisplayName) ||
+    'T';
+  const manualAvatarInitial = getAvatarInitial(manualAvatarInitialSource, 'T');
 
   return (
     <KeyboardAvoidingView
@@ -823,7 +823,7 @@ export default function TrustedContactsScreen() {
                         <Text
                           style={[styles.avatarText, { color: relationshipColor }]}
                         >
-                          {getContactDisplayName(contact)?.charAt(0).toUpperCase()}
+                          {getAvatarInitial(getContactDisplayName(contact), 'T')}
                         </Text>
                       </View>
                       <View style={styles.identityText}>
@@ -1154,6 +1154,9 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    addButtonDisabled: {
+      backgroundColor: withOpacity(theme.colors.accent, 0.45),
     },
     error: {
       color: theme.colors.danger,

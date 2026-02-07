@@ -408,8 +408,17 @@ export default function AccountScreen() {
           {SAFETY_ACTIONS.map((action) => {
             const isWorking =
               action.key === 'logout' ? isSigningOut : action.key === 'delete' ? isPinVerifying : false;
-            const disabled = action.key === 'logout' ? isSigningOut : isPinVerifying;
-            const iconColor = action.destructive ? theme.colors.danger : theme.colors.accent;
+            const isDeleteDisabled = action.key === 'delete' && isReadOnly;
+            const disabled =
+              isDeleteDisabled || (action.key === 'logout' ? isSigningOut : isPinVerifying);
+            const iconColor = action.destructive
+              ? isDeleteDisabled
+                ? withOpacity(theme.colors.danger, 0.55)
+                : theme.colors.danger
+              : theme.colors.accent;
+            const rowDescription = isDeleteDisabled
+              ? 'Only caretakers can delete this profile.'
+              : action.description;
               return (
                 <TouchableOpacity
                   key={action.key}
@@ -448,7 +457,7 @@ export default function AccountScreen() {
                     >
                       {isWorking ? 'Working…' : action.label}
                     </Text>
-                    <Text style={styles.rowDescription}>{action.description}</Text>
+                    <Text style={styles.rowDescription}>{rowDescription}</Text>
                   </View>
                   {isWorking ? (
                     <ActivityIndicator color={theme.colors.textMuted} />

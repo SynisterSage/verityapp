@@ -1,6 +1,6 @@
 import supabaseAdmin from '@src/services/supabase';
 
-const PIN_ATTEMPT_LIMIT = 3;
+const PIN_ATTEMPT_LIMIT = 5;
 const LOCKBACKOFF_SECONDS = [900, 900, 900];
 
 export interface PinLockState {

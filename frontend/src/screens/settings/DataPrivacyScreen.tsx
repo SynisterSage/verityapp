@@ -388,7 +388,7 @@ export default function DataPrivacyScreen() {
       return;
     }
     if (key === 'delete' && !canDeleteProfile) {
-      setManageError('Only the circle owner can delete the account.');
+      setManageError('');
       return;
     }
     setManageError('');
@@ -399,11 +399,7 @@ export default function DataPrivacyScreen() {
 
   const manageMessageText =
     manageError ||
-    (!canManageProfile
-      ? 'Only caretakers or admins can manage these settings.'
-      : !canDeleteProfile
-        ? 'Only the circle owner can delete the account.'
-        : '');
+    (!canManageProfile ? 'Only caretakers or admins can manage these settings.' : '');
   const pendingActionLabel = pinModalAction
     ? MANAGE_ACTIONS.find((item) => item.key === pinModalAction)?.label ?? ''
     : '';
@@ -560,7 +556,7 @@ export default function DataPrivacyScreen() {
             </View>
             {linkError ? <Text style={[styles.manageMessage]}>{linkError}</Text> : null}
           </View>
-          <Text style={styles.footnote}>By using Verity Protect, you acknowledge our privacy and data processing terms. {"\n"} {"\n"}  Last Updated Jan 26th, 2026</Text>
+          <Text style={styles.footnote}>By using Verity Protect, you acknowledge our privacy and data processing terms. {"\n"} {"\n"}  Last Updated Feb 6th, 2026</Text>
         </ScrollView>
         {pinModalAction ? (
           <Modal

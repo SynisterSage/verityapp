@@ -26,7 +26,7 @@ export default function EnterInviteCodeScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createEnterInviteCodeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
-  const { activeProfile, refreshProfiles, setOnboardingComplete } = useProfile();
+  const { activeProfile, profiles, refreshProfiles, setActiveProfile, setOnboardingComplete } = useProfile();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [message, setMessage] = useState('');
@@ -101,6 +101,17 @@ export default function EnterInviteCodeScreen() {
         }),
       });
       await refreshProfiles();
+      
+      // Find and switch to the newly joined profile
+      // It should be one that the user is a member of but not the caretaker
+      if (profiles && profiles.length > 0) {
+        // Look for a profile that's not the currently active one
+        const joinedProfile = profiles.find((p) => p.id !== activeProfile?.id && p.id);
+        if (joinedProfile) {
+          setActiveProfile(joinedProfile);
+        }
+      }
+      
       setOnboardingComplete(true);
     } catch (err: any) {
       setMessage(err?.message || 'Unable to redeem invite code.');

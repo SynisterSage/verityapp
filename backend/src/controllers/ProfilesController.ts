@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { Request, Response } from 'express';
 import logger from 'jet-logger';
 
-import { hashPasscode, verifyCurrentPasscode, verifyLegacyPasscode } from '@src/services/passcode';
+import { CURRENT_PEPPER_VERSION, hashPasscode, verifyCurrentPasscode, verifyLegacyPasscode } from '@src/services/passcode';
 import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { generateUniqueShortCode } from '@src/common/helpers/invite';
@@ -241,10 +241,10 @@ async function verifyPasscode(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to load profile' });
   }
 
+  const pepperVersion = profileRow.pin_pepper_version ?? CURRENT_PEPPER_VERSION;
   const isValidPin =
     (profileRow.pin_hash &&
-      profileRow.pin_pepper_version &&
-      (await verifyCurrentPasscode(pin, profileRow.pin_hash, profileRow.pin_pepper_version))) ||
+      (await verifyCurrentPasscode(pin, profileRow.pin_hash, pepperVersion))) ||
     verifyLegacyPasscode(pin, profileRow.passcode_hash ?? null);
 
   await recordPinAttempt(profileId, clientIp, isValidPin);
@@ -321,11 +321,12 @@ async function updateAlertPrefs(req: Request, res: Response) {
   }
   const { profileId } = req.params as { profileId: string };
 
+  // Allow if caretaker OR if user is a member of the profile
   const isCaretaker = await userIsCaretaker(userId, profileId);
-  const isAdmin = await userHasRole(userId, profileId, 'admin');
-  const allowed = isCaretaker || isAdmin;
-  if (!allowed) {
-    logProfileAccessDenied('exportProfileData', userId, profileId);
+  const isMember = isCaretaker || await userHasRole(userId, profileId, 'editor') || await userHasRole(userId, profileId, 'admin');
+  
+  if (!isMember) {
+    logProfileAccessDenied('updateAlertPrefs', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -341,74 +342,82 @@ async function updateAlertPrefs(req: Request, res: Response) {
     auto_block_on_fraud,
   } = req.body as Record<string, number | boolean | undefined>;
 
-  const { data: existingProfile } = await supabaseAdmin
-    .from('profiles')
-    .select(
-      'auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud'
-    )
-    .eq('id', profileId)
+  // Get existing notification preferences from profile_members
+  const { data: memberData, error: memberError } = await supabaseAdmin
+    .from('profile_members')
+    .select('notification_preferences')
+    .eq('profile_id', profileId)
+    .eq('user_id', userId)
     .maybeSingle();
 
-  const updates: Record<string, number | boolean> = {};
+  if (memberError || !memberData) {
+    logger.err(memberError ?? new Error('Failed to get member notification preferences'));
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update alert prefs' });
+  }
+
+  const existingPrefs = memberData.notification_preferences || {};
+
+  // Build updated notification_preferences object
+  const updatedPrefs: Record<string, number | boolean> = { ...existingPrefs };
   if (typeof alert_threshold_score === 'number') {
-    updates.alert_threshold_score = alert_threshold_score;
+    updatedPrefs.alert_threshold_score = alert_threshold_score;
   }
   if (typeof enable_email_alerts === 'boolean') {
-    updates.enable_email_alerts = enable_email_alerts;
+    updatedPrefs.enable_email_alerts = enable_email_alerts;
   }
   if (typeof enable_sms_alerts === 'boolean') {
-    updates.enable_sms_alerts = enable_sms_alerts;
+    updatedPrefs.enable_sms_alerts = enable_sms_alerts;
   }
   if (typeof enable_push_alerts === 'boolean') {
-    updates.enable_push_alerts = enable_push_alerts;
+    updatedPrefs.enable_push_alerts = enable_push_alerts;
   }
   if (typeof auto_mark_enabled === 'boolean') {
-    updates.auto_mark_enabled = auto_mark_enabled;
+    updatedPrefs.auto_mark_enabled = auto_mark_enabled;
   }
   if (typeof auto_mark_fraud_threshold === 'number') {
-    updates.auto_mark_fraud_threshold = auto_mark_fraud_threshold;
+    updatedPrefs.auto_mark_fraud_threshold = auto_mark_fraud_threshold;
   }
   if (typeof auto_mark_safe_threshold === 'number') {
-    updates.auto_mark_safe_threshold = auto_mark_safe_threshold;
+    updatedPrefs.auto_mark_safe_threshold = auto_mark_safe_threshold;
   }
   if (typeof auto_trust_on_safe === 'boolean') {
-    updates.auto_trust_on_safe = auto_trust_on_safe;
+    updatedPrefs.auto_trust_on_safe = auto_trust_on_safe;
   }
   if (typeof auto_block_on_fraud === 'boolean') {
-    updates.auto_block_on_fraud = auto_block_on_fraud;
+    updatedPrefs.auto_block_on_fraud = auto_block_on_fraud;
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .update(updates)
-    .eq('id', profileId)
-    .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
-    )
+  // Update profile_members with new notification_preferences
+  const { data: updatedMember, error: updateError } = await supabaseAdmin
+    .from('profile_members')
+    .update({ notification_preferences: updatedPrefs })
+    .eq('profile_id', profileId)
+    .eq('user_id', userId)
+    .select('notification_preferences')
     .single();
 
-  if (error || !data) {
-    logger.err(error ?? new Error('Failed to update alert prefs'));
+  if (updateError || !updatedMember) {
+    logger.err(updateError ?? new Error('Failed to update alert prefs'));
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update alert prefs' });
   }
 
   const automationChanges: string[] = [];
   if (typeof auto_mark_enabled === 'boolean') {
-    const prev = Boolean(existingProfile?.auto_mark_enabled);
+    const prev = Boolean(existingPrefs?.auto_mark_enabled);
     if (auto_mark_enabled !== prev) {
       automationChanges.push(
         auto_mark_enabled ? 'Automation filtering enabled' : 'Automation filtering disabled'
       );
     }
   }
-  if (typeof auto_mark_fraud_threshold === 'number' && auto_mark_fraud_threshold !== existingProfile?.auto_mark_fraud_threshold) {
+  if (typeof auto_mark_fraud_threshold === 'number' && auto_mark_fraud_threshold !== existingPrefs?.auto_mark_fraud_threshold) {
     automationChanges.push(`Fraud threshold set to ${auto_mark_fraud_threshold}`);
   }
-  if (typeof auto_mark_safe_threshold === 'number' && auto_mark_safe_threshold !== existingProfile?.auto_mark_safe_threshold) {
+  if (typeof auto_mark_safe_threshold === 'number' && auto_mark_safe_threshold !== existingPrefs?.auto_mark_safe_threshold) {
     automationChanges.push(`Safe threshold set to ${auto_mark_safe_threshold}`);
   }
   if (typeof auto_trust_on_safe === 'boolean') {
-    const prev = Boolean(existingProfile?.auto_trust_on_safe);
+    const prev = Boolean(existingPrefs?.auto_trust_on_safe);
     if (auto_trust_on_safe !== prev) {
       automationChanges.push(
         auto_trust_on_safe ? 'Auto-trust when safe enabled' : 'Auto-trust when safe disabled'
@@ -416,7 +425,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
     }
   }
   if (typeof auto_block_on_fraud === 'boolean') {
-    const prev = Boolean(existingProfile?.auto_block_on_fraud ?? true);
+    const prev = Boolean(existingPrefs?.auto_block_on_fraud ?? true);
     if (auto_block_on_fraud !== prev) {
       automationChanges.push(
         auto_block_on_fraud ? 'Auto-block high risk calls enabled' : 'Auto-block high risk calls disabled'
@@ -431,7 +440,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
         alertType: 'automation_settings_updated',
         payload: {
           actor_user_id: userId,
-          actor_role: isCaretaker ? 'caretaker' : 'admin',
+          actor_role: isCaretaker ? 'caretaker' : 'member',
           actor_label: isCaretaker ? 'Circle owner' : 'Circle member',
           changes: automationChanges,
           message: automationChanges.join(' · '),
@@ -443,7 +452,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({
-    profile: sanitizeProfileRow(data),
+    notification_preferences: updatedMember.notification_preferences,
   });
 }
 

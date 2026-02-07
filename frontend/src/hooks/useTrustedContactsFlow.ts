@@ -16,5 +16,3 @@ const relationshipTags = [
   'Caretaker',
   'Neighbor',
 ];
-
-typing?EOF

@@ -34,13 +34,13 @@ export default function SettingsScreen({
 
   const accountRows: SettingsRowItem[] = useMemo(() => {
     const rows: SettingsRowItem[] = [];
+    rows.push({
+      label: 'Account',
+      subtitle: canManageProfile ? 'Profile & safety options' : 'View profile & safety',
+      icon: 'person-outline',
+      onPress: () => navigation.navigate('Account'),
+    });
     if (canManageProfile) {
-      rows.push({
-        label: 'Account',
-        subtitle: 'Profile & safety options',
-        icon: 'person-outline',
-        onPress: () => navigation.navigate('Account'),
-      });
       rows.push({
         label: 'My Circle',
         subtitle: 'Family caretakers & guests',

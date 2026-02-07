@@ -440,6 +440,7 @@ export default function InviteFamilyScreen({ navigation }: Props) {
         method: 'DELETE',
       });
       await fetchMembers();
+      closeMemberTray();
     } catch (err) {
       console.error(err);
       Alert.alert('Unable to remove member', 'Try again later.');
@@ -454,7 +455,7 @@ export default function InviteFamilyScreen({ navigation }: Props) {
       `Remove ${member.display_name ?? 'this member'}?`,
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Remove', style: 'destructive', onPress: () => hideMemberTray(() => handleRemoveMember(member)) },
+        { text: 'Remove', style: 'destructive', onPress: () => handleRemoveMember(member) },
       ],
       { cancelable: true }
     );
@@ -478,10 +479,12 @@ export default function InviteFamilyScreen({ navigation }: Props) {
             <View style={styles.memberInfo}>
               <View style={styles.memberNameRow}>
                 <Text style={styles.memberName}>{name}</Text>
-                {isCurrentUser && <Text style={styles.youBadge}>YOU</Text>}
               </View>
               <Text style={styles.memberMeta}>{member.is_caretaker ? 'Account Owner' : 'Family'}</Text>
             </View>
+            {isCurrentUser && (
+              <Text style={[styles.youBadge, styles.youBadgeRight]}>YOU</Text>
+            )}
             {canManageMember(member) && (
               <TouchableOpacity style={styles.menuButton} onPress={() => openMemberTray(member)} activeOpacity={0.7}>
                 <Ionicons name="ellipsis-vertical" size={18} color={theme.colors.accent} />
@@ -695,7 +698,7 @@ export default function InviteFamilyScreen({ navigation }: Props) {
               disabled={revokingInviteId === selectedInvite.id}
             >
               {revokingInviteId === selectedInvite.id ? (
-                <ActivityIndicator size="small" color={theme.colors.warning} />
+                <ActivityIndicator size="small" color={theme.colors.danger} />
               ) : (
                 <Text style={styles.actionDangerText}>Revoke invite</Text>
               )}
@@ -859,6 +862,10 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       fontWeight: '600',
       letterSpacing: 0.5,
       textTransform: 'uppercase',
+    },
+    youBadgeRight: {
+      alignSelf: 'center',
+      marginLeft: 12,
     },
     sectionCard: {
       backgroundColor: theme.colors.surface,

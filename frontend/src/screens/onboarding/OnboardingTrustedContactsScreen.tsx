@@ -409,6 +409,11 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
 
   const getContactDisplayName = (contact: TrustedContactRow) =>
     contact.contact_name ?? contactMap[contact.caller_number]?.name ?? contact.caller_number;
+  const getAvatarInitial = (label?: string, fallback = 'T') => {
+    if (!label) return fallback;
+    const match = label.match(/[A-Za-z0-9]/);
+    return (match ? match[0] : fallback).toUpperCase();
+  };
 
   const getRelationshipLabel = (contact: TrustedContactRow) =>
     contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Trusted Safe Contact';
@@ -512,7 +517,7 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
                         ]}
                       >
                         <Text style={[styles.avatarText, { color: relationshipColor }]}>
-                          {getContactDisplayName(contact).charAt(0).toUpperCase()}
+                          {getAvatarInitial(getContactDisplayName(contact), 'T')}
                         </Text>
                       </View>
                       <View style={styles.identityText}>
@@ -593,9 +598,7 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
                   <Text style={styles.trayAvatarText}>
                     {trayMode === 'import'
                       ? (trayContact as DeviceContact).name.charAt(0).toUpperCase()
-                      : getContactDisplayName(trayContact as TrustedContactRow)
-                          .charAt(0)
-                          .toUpperCase()}
+                      : getAvatarInitial(getContactDisplayName(trayContact as TrustedContactRow), 'T')}
                   </Text>
                 </View>
                 <View>

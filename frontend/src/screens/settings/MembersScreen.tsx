@@ -435,6 +435,7 @@ export default function MembersScreen() {
         method: 'DELETE',
       });
       await fetchMembers();
+      closeMemberTray();
     } catch (err) {
       console.error(err);
       Alert.alert('Unable to remove member', 'Try again later.');
@@ -452,7 +453,7 @@ export default function MembersScreen() {
         {
           text: 'Remove',
           style: 'destructive',
-          onPress: () => hideMemberTray(() => handleRemoveMember(member)),
+          onPress: () => handleRemoveMember(member),
         },
       ],
       { cancelable: true }
@@ -528,10 +529,12 @@ export default function MembersScreen() {
                         <View style={styles.memberContent}>
                           <View style={styles.memberNameRow}>
                             <Text style={styles.memberName}>{safeName}</Text>
-                            {isCurrentUser && <Text style={styles.youBadge}>You</Text>}
                           </View>
                           <Text style={styles.memberRole}>{roleLabel}</Text>
                         </View>
+                        {isCurrentUser && (
+                          <Text style={[styles.youBadge, styles.youBadgeRight]}>You</Text>
+                        )}
                         {canManageMember(member) && (
                           <TouchableOpacity
                             style={styles.menuButton}
@@ -713,7 +716,7 @@ export default function MembersScreen() {
               disabled={revokingInviteId === selectedInvite?.id}
             >
               {revokingInviteId === selectedInvite?.id ? (
-                <ActivityIndicator size="small" color={theme.colors.accent} />
+                <ActivityIndicator size="small" color={theme.colors.danger} />
               ) : (
                 <Text style={styles.actionDangerText}>Revoke invite</Text>
               )}
@@ -916,6 +919,9 @@ const createMembersStyles = (theme: AppTheme) =>
       fontWeight: '600',
       letterSpacing: 0.5,
       textTransform: 'uppercase',
+    },
+    youBadgeRight: {
+      alignSelf: 'center',
     },
     memberTrayOverlay: {
       ...StyleSheet.absoluteFillObject,
