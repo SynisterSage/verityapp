@@ -4,9 +4,12 @@ import { BlurView } from 'expo-blur';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import SupportButton from '../common/SupportButton';
 
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
+import { useSupportContext } from '../../context/SupportContext';
+import { navigateToSupportModal } from '../../navigation/rootNavigator';
 
 type Props = {
   chapter: string;
@@ -49,6 +52,7 @@ export default function OnboardingHeader({
 
   const progressActiveColor = theme.colors.accent;
   const progressInactiveColor = withOpacity(theme.colors.accent, 0.15);
+  const { unreadAgentCount } = useSupportContext();
 
   return (
     <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: theme.colors.bg }]}>
@@ -90,25 +94,32 @@ export default function OnboardingHeader({
             </Text>
           </View>
 
-          <View style={styles.progress}>
-            {steps.map((step) => {
-              const isActive = step < activeStep;
-              const width = animatedWidths[step];
-              return (
-              <Animated.View
-                key={step}
-                style={[
-                  styles.pill,
-                  step !== steps.length - 1 && styles.pillSpacing,
-                  {
-                    width,
-                    backgroundColor: isActive ? progressActiveColor : progressInactiveColor,
-                  },
-                ]}
-              />
-            );
-          })}
-        </View>
+          <View style={styles.progressRow}>
+            <View style={styles.progress}>
+              {steps.map((step) => {
+                const isActive = step < activeStep;
+                const width = animatedWidths[step];
+                return (
+                <Animated.View
+                  key={step}
+                  style={[
+                    styles.pill,
+                    step !== steps.length - 1 && styles.pillSpacing,
+                    {
+                      width,
+                      backgroundColor: isActive ? progressActiveColor : progressInactiveColor,
+                    },
+                  ]}
+                />
+              );
+            })}
+            </View>
+            <SupportButton
+              onPress={navigateToSupportModal}
+              unreadCount={unreadAgentCount}
+              style={styles.supportButton}
+            />
+          </View>
         </View>
       </BlurView>
     </SafeAreaView>
@@ -163,6 +174,7 @@ const styles = StyleSheet.create({
     marginLeft: 0,
   },
   progress: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -172,5 +184,13 @@ const styles = StyleSheet.create({
   },
   pillSpacing: {
     marginRight: 4,
+  },
+  progressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  supportButton: {
+    marginLeft: 12,
   },
 });

@@ -97,6 +97,12 @@ export const assignNumberSchema = z.object({
   source: z.enum(['onboarding', 'manual']).optional(),
 });
 
+export const createSupportMessageSchema = z.object({
+  content: z.string().min(1, 'Message is required').max(2000, 'Message is too long'),
+  category: z.string().max(100, 'Category too long').optional(),
+  metadata: z.record(z.any(), z.string()).optional(),
+});
+
 // Type exports for use in controllers
 export type ResetPasswordRequest = z.infer<typeof resetPasswordSchema>;
 export type CreateProfileRequest = z.infer<typeof createProfileSchema>;
@@ -112,3 +118,4 @@ export type RegisterDeviceTokenRequest = z.infer<typeof registerDeviceTokenSchem
 export type CreateClientTokenRequest = z.infer<typeof createClientTokenSchema>;
 export type RecordClientHeartbeatRequest = z.infer<typeof recordClientHeartbeatSchema>;
 export type AssignNumberRequest = z.infer<typeof assignNumberSchema>;
+export type CreateSupportMessageRequest = z.infer<typeof createSupportMessageSchema>;

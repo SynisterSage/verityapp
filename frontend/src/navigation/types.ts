@@ -16,6 +16,7 @@ export type RootStackParamList = {
   OnboardingSuccess: undefined;
   AppTabs: undefined;
   CallDetailModal: { callId: string; compact?: boolean };
+  SupportModal: undefined;
   CircleActivityModal: { activities: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };
 };
 
@@ -44,4 +45,5 @@ export type SettingsStackParamList = {
   Automation: undefined;
   EnterInviteCode: undefined;
   Members: { highlightInviteEntry?: boolean } | undefined;
+  SupportInfo: undefined;
 };

@@ -8,6 +8,7 @@ import AlertsRoutes from './AlertsRoutes';
 import FraudRoutes from './FraudRoutes';
 import ProfilesRoutes from './ProfilesRoutes';
 import AuthRoutes from './AuthRoutes';
+import SupportRoutes from './SupportRoutes';
 import TwilioNumberPoolController from '@src/controllers/TwilioNumberPoolController';
 import { validateRequest } from '@src/middleware/validateRequest';
 import { assignNumberSchema } from '@src/middleware/validationSchemas';
@@ -48,6 +49,7 @@ apiRouter.use(PATHS.Calls._, CallsRoutes);
 apiRouter.use(PATHS.Alerts._, AlertsRoutes);
 apiRouter.use(PATHS.Fraud._, FraudRoutes);
 apiRouter.use(PATHS.Profiles._, ProfilesRoutes);
+apiRouter.use(PATHS.Profiles.Support, SupportRoutes);
 apiRouter.use(PATHS.Auth._, AuthRoutes);
 
 // Twilio number pool endpoints

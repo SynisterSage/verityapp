@@ -31,6 +31,8 @@ import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import { withOpacity } from '../../utils/color';
 import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
+import { useSupportContext } from '../../context/SupportContext';
+import { navigateToSupportModal } from '../../navigation/rootNavigator';
 
 type CallRow = {
   id: string;
@@ -91,6 +93,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const { activeProfile } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  const { unreadAgentCount } = useSupportContext();
   const refreshControlProps = useMemo(
     () => ({
       tintColor: theme.colors.text,
@@ -369,9 +372,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     },
   ];
 
-  const triggerLightHaptic = () => {
+  const triggerLightHaptic = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-  };
+  }, []);
+
+  const handleSupportPress = useCallback(() => {
+    triggerLightHaptic();
+    navigateToSupportModal();
+  }, [triggerLightHaptic]);
 
   const hasHeroCall = Boolean(recentCall?.caller_number);
   const heroTitle = hasHeroCall
@@ -410,11 +418,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       style={[styles.container, { paddingTop: Math.max(28, insets.top + 12), paddingBottom: bottomGap }]}
       edges={['bottom']}
     >
-      <View style={{}}>
+      <View>
         <DashboardHeader
-            title="Welcome Back"
-            subtitle={activeProfile?.first_name ?? email}
-          />
+          title="Welcome Back"
+          subtitle={activeProfile?.first_name ?? email}
+          supportAction={{
+            onPress: handleSupportPress,
+            unreadCount: unreadAgentCount,
+          }}
+        />
       </View>
 
         <ScrollView

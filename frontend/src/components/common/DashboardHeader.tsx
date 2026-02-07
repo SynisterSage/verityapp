@@ -3,15 +3,26 @@ import { StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
+import SupportButton from './SupportButton';
 
 type DashboardHeaderProps = {
   title: string;
   subtitle?: string;
   right?: ReactNode;
   align?: 'left' | 'center';
+  supportAction?: {
+    onPress: () => void;
+    unreadCount?: number;
+  };
 };
 
-export default function DashboardHeader({ title, subtitle, right, align = 'left' }: DashboardHeaderProps) {
+export default function DashboardHeader({
+  title,
+  subtitle,
+  right,
+  align = 'left',
+  supportAction,
+}: DashboardHeaderProps) {
   const { theme } = useTheme();
   const gradientColors = useMemo(
     () =>
@@ -47,7 +58,29 @@ export default function DashboardHeader({ title, subtitle, right, align = 'left'
             </Text>
           ) : null}
         </View>
-        {right ? <View style={styles.right}>{right}</View> : <View style={styles.spacer} />}
+        {right ? (
+          <View style={styles.rightActions}>
+            {right}
+            {supportAction ? (
+              <SupportButton
+                style={styles.supportActionSpacing}
+                onPress={supportAction.onPress}
+                unreadCount={supportAction.unreadCount}
+                accessibilityLabel="Open support chat"
+              />
+            ) : (
+              <View style={styles.spacer} />
+            )}
+          </View>
+        ) : supportAction ? (
+          <SupportButton
+            onPress={supportAction.onPress}
+            unreadCount={supportAction.unreadCount}
+            accessibilityLabel="Open support chat"
+          />
+        ) : (
+          <View style={styles.spacer} />
+        )}
       </View>
       <LinearGradient colors={gradientColors} style={styles.gradient} pointerEvents="none" />
     </View>
@@ -113,12 +146,15 @@ const styles = StyleSheet.create({
   subtitleLeft: {
     textAlign: 'left',
   },
-  right: {
-    minWidth: 60,
-    alignItems: 'flex-end',
-  },
   spacer: {
     width: 40,
     height: 40,
+  },
+  rightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  supportActionSpacing: {
+    marginLeft: 12,
   },
 });

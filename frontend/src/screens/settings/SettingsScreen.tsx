@@ -1,4 +1,4 @@
-import { Linking, ScrollView, StyleSheet, Switch, Text, View, Pressable, ActivityIndicator } from 'react-native';
+import { ScrollView, StyleSheet, Switch, Text, View, Pressable, ActivityIndicator } from 'react-native';
 import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,6 +11,8 @@ import { useProfile } from '../../context/ProfileContext';
 import { withOpacity } from '../../utils/color';
 import type { RouteProp } from '@react-navigation/native';
 import type { SettingsStackParamList } from '../../navigation/types';
+import { useSupportContext } from '../../context/SupportContext';
+import { navigateToSupportModal } from '../../navigation/rootNavigator';
 type SettingsRowItem = {
   label: string;
   subtitle?: string;
@@ -31,6 +33,7 @@ export default function SettingsScreen({
   const { canManageProfile } = useProfile();
   const { theme, mode, setMode } = useTheme();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const { unreadAgentCount } = useSupportContext();
 
   const accountRows: SettingsRowItem[] = useMemo(() => {
     const rows: SettingsRowItem[] = [];
@@ -139,6 +142,11 @@ export default function SettingsScreen({
     []
   );
 
+  const handleSupportPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    navigateToSupportModal();
+  }, []);
+
   const sections = useMemo(
     () => [
       { title: 'Account', rows: accountRows },
@@ -166,17 +174,14 @@ export default function SettingsScreen({
     }),
     [handleLogout]
   );
-  const openSupport = useCallback(() => {
-    Linking.openURL('mailto:support@verityprotect.com').catch(() => null);
-  }, []);
   const supportRow = useMemo<SettingsRowItem>(
     () => ({
       label: 'Support',
       subtitle: 'Contact the Verity Protect team',
       icon: 'help-circle-outline',
-      onPress: openSupport,
+      onPress: () => navigation.navigate('SupportInfo'),
     }),
-    [openSupport]
+    [navigation]
   );
   const appearanceRow = useMemo<SettingsRowItem>(
     () => ({
@@ -218,7 +223,15 @@ export default function SettingsScreen({
       ]}
       edges={['bottom']}
     >
-      <DashboardHeader title="Settings" subtitle="Manage your preferences" align="left" />
+      <DashboardHeader
+        title="Settings"
+        subtitle="Manage your preferences"
+        align="left"
+        supportAction={{
+          onPress: handleSupportPress,
+          unreadCount: unreadAgentCount,
+        }}
+      />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={[

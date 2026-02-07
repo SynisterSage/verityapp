@@ -40,6 +40,8 @@ import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
 import { formatAlertDateLabel, formatAlertTime } from './alertTimeUtils';
 import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
 import { logError, logEvent } from '../../services/sentry';
+import { useSupportContext } from '../../context/SupportContext';
+import { navigateToSupportModal } from '../../navigation/rootNavigator';
 const capitalizeLabel = (value?: string | null) => {
   if (!value) return '';
   return value
@@ -80,6 +82,7 @@ export default function AlertsScreen() {
   const { activeProfile, canManageProfile } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createAlertStyles(theme), [theme]);
+  const { unreadAgentCount } = useSupportContext();
   const refreshControlProps = useMemo(
     () => ({
       tintColor: theme.colors.text,
@@ -108,6 +111,11 @@ export default function AlertsScreen() {
   const [trayProcessing, setTrayProcessing] = useState(false);
   const [activeTrayAction, setActiveTrayAction] = useState<'delete' | null>(null);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+
+  const handleSupportPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    navigateToSupportModal();
+  }, []);
 
   const navigateToCallDetail = useCallback(
     (callId: string) => {
@@ -1054,6 +1062,10 @@ const loadMemberNames = useCallback(async () => {
         <DashboardHeader
           title="Alerts"
           subtitle={`You have ${newAlertsCount} new alert${newAlertsCount === 1 ? '' : 's'}`}
+          supportAction={{
+            onPress: handleSupportPress,
+            unreadCount: unreadAgentCount,
+          }}
         />
       </View>
       <View style={styles.listWrapper}>

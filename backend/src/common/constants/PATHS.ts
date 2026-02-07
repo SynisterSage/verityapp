@@ -45,6 +45,7 @@ const PATHS = {
     Records: '/:profileId/records',
     Export: '/:profileId/export',
     DeviceTokens: '/:profileId/device-tokens',
+    Support: '/:profileId/support',
   },
 } as const;
 

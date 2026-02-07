@@ -32,6 +32,8 @@ import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import { withOpacity } from '../../utils/color';
 import { useTheme } from '../../context/ThemeContext';
 import DashboardHeader from '../../components/common/DashboardHeader';
+import { useSupportContext } from '../../context/SupportContext';
+import { navigateToSupportModal } from '../../navigation/rootNavigator';
 import { getRiskStyles, getRiskSeverity } from '../../utils/risk';
 import type { AppTheme } from '../../theme/tokens';
 import type { CallsStackParamList } from '../../navigation/types';
@@ -247,6 +249,7 @@ export default function CallsScreen({
   const { activeProfile, canManageProfile } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createCallStyles(theme), [theme]);
+  const { unreadAgentCount } = useSupportContext();
   const refreshControlProps = useMemo(
     () => ({
       tintColor: theme.colors.text,
@@ -271,6 +274,10 @@ export default function CallsScreen({
   const [activeTrayAction, setActiveTrayAction] = useState<
     'archive' | 'unarchive' | 'delete' | 'block' | 'trust' | null
   >(null);
+  const handleSupportPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    navigateToSupportModal();
+  }, []);
 
   const loadCalls = useCallback(async (silent = false) => {
     setError(null);
@@ -679,6 +686,10 @@ const sections = useMemo<CallSection[]>(() => {
         title="Recent Calls"
         subtitle={`${headerCount} calls logged`}
         align="left"
+        supportAction={{
+          onPress: handleSupportPress,
+          unreadCount: unreadAgentCount,
+        }}
       />
       <View style={styles.filterBar}>
         <CallFilter value={filter} onChange={setFilter} />

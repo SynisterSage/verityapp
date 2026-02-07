@@ -8,7 +8,6 @@ import {
   NavigationProp,
   useNavigation,
   CommonActions,
-  createNavigationContainerRef,
 } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -26,6 +25,7 @@ import * as Notifications from 'expo-notifications';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ProfileProvider, useProfile } from './src/context/ProfileContext';
 import { AlertProvider } from './src/context/AlertContext';
+import { SupportProvider } from './src/context/SupportContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { authorizedFetch } from './src/services/backend';
 import { supabase } from './src/services/supabase';
@@ -50,6 +50,8 @@ import NotificationsScreen from './src/screens/settings/NotificationsScreen';
 import AutomationScreen from './src/screens/settings/AutomationScreen';
 import EnterInviteCodeScreen from './src/screens/settings/EnterInviteCodeScreen';
 import MembersScreen from './src/screens/settings/MembersScreen';
+import SupportInfoScreen from './src/screens/settings/SupportInfoScreen';
+import SupportScreen from './src/screens/support/SupportScreen';
 import CreateProfileScreen from './src/screens/onboarding/CreateProfileScreen';
 import PasscodeScreen from './src/screens/onboarding/PasscodeScreen';
 import OnboardingSafePhrasesScreen from './src/screens/onboarding/OnboardingSafePhrasesScreen';
@@ -69,6 +71,7 @@ import {
   CallsStackParamList,
   SettingsStackParamList,
 } from './src/navigation/types';
+import { rootNavigationRef } from './src/navigation/rootNavigator';
 import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientManager';
 import * as Sentry from '@sentry/react-native';
 import { logEvent } from './src/services/sentry';
@@ -96,7 +99,6 @@ Sentry.init({
 
 enableScreens(true);
 
-const navigationRef = createNavigationContainerRef<RootStackParamList>();
 type PendingNotificationData = {
   callId?: string;
   alertId?: string;
@@ -151,6 +153,7 @@ function SettingsStackNavigator() {
         component={EnterInviteCodeScreen}
       />
       <SettingsStack.Screen name="Members" component={MembersScreen} />
+      <SettingsStack.Screen name="SupportInfo" component={SupportInfoScreen} />
     </SettingsStack.Navigator>
   );
 }
@@ -350,6 +353,11 @@ function RootNavigator() {
               options={{ headerShown: false, presentation: 'modal' }}
             />
             <RootStack.Screen
+              name="SupportModal"
+              component={SupportScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
               name="CircleActivityModal"
               component={CircleActivityScreen}
               options={{ headerShown: false, presentation: 'modal' }}
@@ -416,7 +424,7 @@ function AuthCallbackHandler() {
       const isReset = params.mode === 'reset' || params.source === 'password';
       if (isReset) {
         console.log('Reset password flow detected');
-        navigationRef.current?.navigate('ResetPassword');
+        rootNavigationRef.current?.navigate('ResetPassword');
         return;
       }
       
@@ -470,13 +478,13 @@ function AuthCallbackHandler() {
       console.log('=== NAVIGATING ===');
       console.log('Payload:', payload);
       
-      const currentRoute = navigationRef.current?.getCurrentRoute();
+      const currentRoute = rootNavigationRef.current?.getCurrentRoute();
       if (currentRoute?.name === 'ConfirmEmail') {
         console.log('Updating existing ConfirmEmail screen params');
-        navigationRef.current?.dispatch(CommonActions.setParams(payload));
+        rootNavigationRef.current?.dispatch(CommonActions.setParams(payload));
       } else {
         console.log('Navigating to ConfirmEmail screen');
-        navigationRef.current?.navigate('ConfirmEmail', payload);
+        rootNavigationRef.current?.navigate('ConfirmEmail', payload);
       }
       console.log('=== AuthCallbackHandler END ===');
     }
@@ -508,16 +516,16 @@ function NavigationHost() {
     if (!session) {
       return;
     }
-    if (!navigationRef.current?.isReady()) {
+    if (!rootNavigationRef.current?.isReady()) {
       return;
     }
     pendingNotificationRef.current = null;
     if (payload.callId) {
-      navigationRef.current.navigate('CallDetailModal', { callId: payload.callId });
+      rootNavigationRef.current.navigate('CallDetailModal', { callId: payload.callId });
       return;
     }
     if (payload.alertId) {
-      navigationRef.current.dispatch(
+      rootNavigationRef.current.dispatch(
         CommonActions.navigate({
           name: 'AppTabs',
           params: { screen: 'AlertsTab' },
@@ -594,7 +602,7 @@ function NavigationHost() {
   return (
     <NavigationContainer
       theme={navTheme}
-      ref={navigationRef}
+      ref={rootNavigationRef}
       onReady={() => {
         if (pendingNotificationRef.current) {
           resolvePendingNotification();
@@ -610,14 +618,16 @@ function NavigationHost() {
 function AppContent() {
   return (
     <ProfileProvider>
-      <TwilioVoiceClientManager />
-      <InviteLinkHandler />
-      <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <NavigationHost />
-          <AuthCallbackHandler />
-        </GestureHandlerRootView>
-      </SafeAreaProvider>
+      <SupportProvider>
+        <TwilioVoiceClientManager />
+        <InviteLinkHandler />
+        <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
+          <GestureHandlerRootView style={{ flex: 1 }}>
+            <NavigationHost />
+            <AuthCallbackHandler />
+          </GestureHandlerRootView>
+        </SafeAreaProvider>
+      </SupportProvider>
     </ProfileProvider>
   );
 }
