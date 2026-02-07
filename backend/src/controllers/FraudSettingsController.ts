@@ -80,12 +80,20 @@ async function addSafePhrase(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
+  // Get caretaker_id for RLS policy
+  const { data: profileData } = await supabaseAdmin
+    .from('profiles')
+    .select('caretaker_id')
+    .eq('id', profileId)
+    .single();
+
   const { error } = await supabaseAdmin
     .from('fraud_safe_phrases')
     .upsert({
       profile_id: profileId,
       phrase: phrase.trim().toLowerCase(),
       created_by_user_id: userId,
+      caretaker_id: profileData?.caretaker_id,
     }, { onConflict: 'profile_id,phrase' });
 
   if (error) {
