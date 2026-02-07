@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 
 import PATHS from '@src/common/constants/PATHS';
 import TwilioRoutes from './TwilioRoutes';
@@ -24,12 +24,14 @@ const assignNumberLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 3, // 3 requests per hour
   keyGenerator: (req) => {
-    // Rate limit by user ID from auth token, fallback to IP (using ipKeyGenerator for IPv6 support)
+    // Rate limit by user ID from auth token, fallback to IP
     const authHeader = req.header('authorization') ?? '';
     const token = authHeader.toLowerCase().startsWith('bearer ')
       ? authHeader.slice('bearer '.length)
       : '';
-    return token || ipKeyGenerator(req);
+    // Get client IP (supports IPv4 and IPv6)
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+    return token || clientIp;
   },
   handler: (req, res) => {
     res.status(429).json({
