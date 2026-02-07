@@ -74,7 +74,7 @@ const POLICY_SECTIONS = [
   {
     title: 'Data retention',
     body:
-      'Call logs, recordings, and alerts remain available while your profile is active. Account deletion removes all data within 30 days, with backups purged within 90 days. You can delete individual calls or clear all records anytime.',
+      'Call logs, recordings, and alerts are kept for 90 days, then deleted automatically. You can export your data or clear records anytime, and account deletion purges remaining data.',
   },
   {
     title: 'Third-party partners',
