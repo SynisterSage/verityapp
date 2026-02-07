@@ -18,17 +18,35 @@ async function assignNumber(req: Request, res: Response) {
   const { profileId } = req.params;
 
   // Verify user has permission to modify this profile
-  const { data: membership } = await supabaseAdmin
-    .from('profile_members')
-    .select('role, is_caretaker')
-    .eq('profile_id', profileId)
-    .eq('user_id', userId)
+  // Check if user is the caretaker OR a member
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('caretaker_id')
+    .eq('id', profileId)
     .maybeSingle();
 
-  if (!membership) {
-    return res.status(HTTP_STATUS_CODES.Forbidden).json({ 
-      error: 'You do not have access to this profile' 
+  if (!profile) {
+    return res.status(HTTP_STATUS_CODES.NotFound).json({ 
+      error: 'Profile not found' 
     });
+  }
+
+  const isCaretaker = profile.caretaker_id === userId;
+
+  if (!isCaretaker) {
+    // If not caretaker, check if they're a member
+    const { data: membership } = await supabaseAdmin
+      .from('profile_members')
+      .select('role, is_caretaker')
+      .eq('profile_id', profileId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (!membership) {
+      return res.status(HTTP_STATUS_CODES.Forbidden).json({ 
+        error: 'You do not have access to this profile' 
+      });
+    }
   }
 
   try {

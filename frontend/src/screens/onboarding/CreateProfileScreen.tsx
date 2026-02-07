@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -50,7 +50,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
-  const [assignedNumber, setAssignedNumber] = useState('');
+  const [assignedNumber, setAssignedNumber] = useState(activeProfile?.twilio_virtual_number || '');
   const [isAssigningNumber, setIsAssigningNumber] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
   const lastNameRef = useRef<TextInput | null>(null);
@@ -63,8 +63,15 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
 
   const formattedPhone = useMemo(() => formatPhone(phoneDigits), [phoneDigits]);
   const isProfileInfoComplete = Boolean(firstName.trim() && lastName.trim() && phoneDigits.length === 10);
-  const isFormValid = isProfileInfoComplete && Boolean(assignedNumber);
-  const primaryDisabled = activeProfile ? isSubmitting : !isFormValid || isSubmitting;
+  const isFormValid = Boolean(assignedNumber); // Continue only enabled after number assigned
+  const primaryDisabled = !isFormValid || isSubmitting;
+
+  // Sync assignedNumber when profile loads/changes
+  useEffect(() => {
+    if (activeProfile?.twilio_virtual_number && !assignedNumber) {
+      setAssignedNumber(activeProfile.twilio_virtual_number);
+    }
+  }, [activeProfile?.twilio_virtual_number, assignedNumber]);
 
   const handlePhoneChange = (value: string) => {
     const digits = value.replace(/\D/g, '').slice(0, 10);
@@ -81,8 +88,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   };
 
   const handleAssignNumber = async () => {
-    if (!activeProfile?.id) {
-      setError('Profile must be created first. Please fill in all fields.');
+    if (!isProfileInfoComplete) {
+      setError('Please fill in all fields first.');
       return;
     }
     
@@ -91,21 +98,52 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
 
     try {
-      const response = await authorizedFetch(`/profiles/${activeProfile.id}/assign-number`, {
+      // Create profile first if it doesn't exist
+      let profileId = activeProfile?.id;
+      
+      if (!profileId) {
+        const payload = {
+          first_name: firstName.trim(),
+          last_name: lastName.trim(),
+          phone_number: phoneDigits ? `+1${phoneDigits}` : null,
+          twilio_virtual_number: null,
+        };
+        const profileData = await authorizedFetch('/profiles', {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
+        
+        if (!profileData?.profile?.id) {
+          throw new Error('Failed to create profile');
+        }
+        
+        profileId = profileData.profile.id;
+        setActiveProfile(profileData.profile);
+        setOnboardingComplete(false);
+      }
+      
+      // Now assign number
+      console.log('🔄 Assigning number to profile:', profileId);
+      const response = await authorizedFetch(`/profiles/${profileId}/assign-number`, {
         method: 'POST',
       });
+      console.log('✅ Assign response:', response);
       
       if (response?.phoneNumber) {
         setAssignedNumber(response.phoneNumber);
-        setActiveProfile({
-          ...activeProfile,
-          twilio_virtual_number: response.phoneNumber,
-        });
+        if (activeProfile) {
+          setActiveProfile({
+            ...activeProfile,
+            twilio_virtual_number: response.phoneNumber,
+          });
+        }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
       } else {
         throw new Error('No phone number returned');
       }
     } catch (err: any) {
+      console.error('❌ Assign number error:', err);
+      console.error('Error details:', JSON.stringify(err, null, 2));
       setError(err?.message || 'Failed to assign number. Please try again.');
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => null);
     } finally {
@@ -114,46 +152,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   };
 
   const handleContinue = async () => {
-    if (activeProfile) {
-      navigation.navigate('OnboardingPasscode');
-      return;
-    }
-    
-    // First create profile if not created yet
-    if (!activeProfile && isProfileInfoComplete && !assignedNumber) {
-      setError('');
-      setIsSubmitting(true);
-      try {
-        const payload = {
-          first_name: firstName.trim(),
-          last_name: lastName.trim(),
-          phone_number: phoneDigits ? `+1${phoneDigits}` : null,
-          twilio_virtual_number: null,
-        };
-        const data = await authorizedFetch('/profiles', {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        });
-        if (data?.profile) {
-          setActiveProfile(data.profile);
-          setOnboardingComplete(false);
-          setError('Now assign a Verity number to continue.');
-        }
-      } catch (err: any) {
-        setError(err?.message || 'Failed to create profile.');
-      } finally {
-        setIsSubmitting(false);
-      }
-      return;
-    }
-    
-    // Continue to next step if everything is complete
     if (!assignedNumber) {
       setError('Please assign a Verity number first.');
-      return;
-    }
-    if (!isFormValid) {
-      setError('Complete all required fields.');
       return;
     }
     
@@ -236,10 +236,10 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
             style={({ pressed }) => [
               styles.assignButton,
               pressed && { opacity: 0.7 },
-              isAssigningNumber && styles.assignButtonLoading,
+              (isAssigningNumber || !isProfileInfoComplete) && styles.assignButtonLoading,
             ]}
             onPress={handleAssignNumber}
-            disabled={isAssigningNumber}
+            disabled={isAssigningNumber || !isProfileInfoComplete}
           >
             {isAssigningNumber ? (
               <ActivityIndicator size="small" color={theme.colors.bg} />
@@ -327,7 +327,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         <OnboardingHeader chapter="Identity" activeStep={3} totalSteps={9} />
         <View style={styles.keyboardAvoiding}>{renderScrollContent()}</View>
         <ActionFooter
-          primaryLabel={!activeProfile && isProfileInfoComplete ? 'Create Profile' : 'Continue'}
+          primaryLabel="Continue"
           primaryLoading={isSubmitting}
           onPrimaryPress={handleContinue}
           primaryDisabled={primaryDisabled}
