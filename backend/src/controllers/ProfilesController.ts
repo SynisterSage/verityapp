@@ -15,6 +15,7 @@ import {
   userIsCaretaker,
 } from '@src/common/util/auth';
 import { recordCircleAlert } from '@src/services/circleAlerts';
+import { sanitizeProfile, sanitizeProfiles, sanitizeErrorResponse } from '@src/middleware/dataSanitizer';
 
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];

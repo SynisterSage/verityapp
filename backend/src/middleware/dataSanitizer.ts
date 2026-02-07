@@ -175,23 +175,35 @@ export function sanitizeErrorResponse(error: any, context?: string): string {
 }
 
 /**
- * Alert response sanitizer - don't expose full phone numbers in alerts
+ * Alert response sanitizer - redact PII from alerts but preserve safe data
+ * Used by AlertsController to sanitize enriched alerts before returning to clients
  */
 export function sanitizeAlert(alert: any): Record<string, any> {
   if (!alert) return {};
 
+  // Redact PII from payload if present
+  let sanitizedPayload = alert.payload;
+  if (sanitizedPayload && typeof sanitizedPayload === 'object') {
+    sanitizedPayload = { ...sanitizedPayload };
+    // Redact caller numbers to last 4 digits only
+    if (sanitizedPayload.caller_number) {
+      sanitizedPayload.caller_number = sanitizedPayload.caller_number.slice(-4);
+    }
+    if (sanitizedPayload.callerNumber) {
+      sanitizedPayload.callerNumber = sanitizedPayload.callerNumber.slice(-4);
+    }
+    // Remove full transcripts - they can contain PII
+    delete sanitizedPayload.transcript;
+    delete sanitizedPayload.full_transcript;
+  }
+
+  // Return all alert fields but with redacted payload
   return {
-    id: alert.id,
-    profile_id: alert.profile_id,
-    alert_type: alert.alert_type,
-    fraud_score: alert.fraud_score,
-    fraud_category: alert.fraud_category,
-    from_number_last_four: alert.from_number
-      ? alert.from_number.slice(-4)
-      : null,
-    created_at: alert.created_at,
-    is_resolved: alert.is_resolved,
-    // ❌ Never: from_number (raw), transcript, caller details beyond last 4
+    ...alert,
+    payload: sanitizedPayload,
+    // Explicitly redact any direct phone number fields if present
+    ...(alert.from_number && { from_number: alert.from_number.slice(-4) }),
+    ...(alert.to_number && { to_number: alert.to_number.slice(-4) }),
   };
 }
 
