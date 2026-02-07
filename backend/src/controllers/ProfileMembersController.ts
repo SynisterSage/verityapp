@@ -111,9 +111,20 @@ async function listMembers(req: Request, res: Response) {
     .eq('profile_id', profileId)
     .order('created_at', { ascending: true });
 
+  type MemberRow = NonNullable<typeof members>[number];
+  const uniqueMembersMap = new Map<string, MemberRow>();
+  (members ?? []).forEach((member) => {
+    if (!uniqueMembersMap.has(member.user_id)) {
+      uniqueMembersMap.set(member.user_id, member);
+    }
+  });
+  const filteredMembers = Array.from(uniqueMembersMap.values()).filter(
+    (member) => member.user_id !== profile.caretaker_id
+  );
+
   const userIds = new Set<string>();
   userIds.add(profile.caretaker_id);
-  (members ?? []).forEach((member) => userIds.add(member.user_id));
+  filteredMembers.forEach((member) => userIds.add(member.user_id));
 
   const { data: users } = await supabaseAdmin
     .from('auth.users')
@@ -182,7 +193,7 @@ async function listMembers(req: Request, res: Response) {
       display_name: resolveName(profile.caretaker_id, userMap.get(profile.caretaker_id)),
       user: hydrateUser(profile.caretaker_id, userMap.get(profile.caretaker_id) ?? null),
     },
-    ...(members ?? []).map((member) => {
+    ...filteredMembers.map((member) => {
       const entry = userMap.get(member.user_id);
       const resolvedName = resolveName(member.user_id, entry);
       if (!member.display_name && resolvedName) {
