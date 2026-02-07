@@ -345,7 +345,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
   // Get existing notification preferences from profile_members
   let { data: memberData, error: memberError } = await supabaseAdmin
     .from('profile_members')
-    .select('notification_preferences, caretaker_id')
+    .select('notification_preferences')
     .eq('profile_id', profileId)
     .eq('user_id', userId)
     .maybeSingle();

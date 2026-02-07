@@ -54,8 +54,25 @@ type AlertRow = {
 };
 
 type ActivityItem =
-  | { type: 'call'; id: string; created_at: string; label: string; badge: string; badgeLevel?: string; callId: string }
-  | { type: 'alert'; id: string; created_at: string; label: string; badge: string; badgeLevel?: string };
+  | {
+      type: 'call';
+      id: string;
+      created_at: string;
+      label: string;
+      badge: string;
+      badgeLevel?: string;
+      callId: string;
+      muted?: boolean;
+    }
+  | {
+      type: 'alert';
+      id: string;
+      created_at: string;
+      label: string;
+      badge: string;
+      badgeLevel?: string;
+      muted?: boolean;
+    };
 
 type StatTile = {
   key: string;
@@ -198,6 +215,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       const activityItems: ActivityItem[] = [
         ...callRows.map((call) => {
           const feedback = call.feedback_status ?? '';
+          const isHandled = feedback === 'marked_fraud' || feedback === 'marked_safe';
           const badgeLabel =
             feedback === 'marked_fraud'
               ? 'FRAUD'
@@ -220,6 +238,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             badge: badgeLabel,
             badgeLevel,
             callId: call.id,
+            muted: isHandled,
           };
         }),
         ...alertRows.map((alert) => {
@@ -228,6 +247,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           const callerNumber = alert.payload?.callerNumber as string | undefined;
           const callerName = callerNumber ? contactNameMap[callerNumber] : '';
           const feedback = alert.call_id ? alertFeedbackMap.get(alert.call_id)?.feedback_status ?? '' : '';
+          const isHandled = feedback === 'marked_fraud' || feedback === 'marked_safe';
           const label =
             isTrusted
               ? callerName || callerNumber || 'Trusted contact'
@@ -261,6 +281,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             label: isTrusted ? 'Trusted call' : isPinChange ? 'Pin change' : 'Fraud alert',
             badge,
             badgeLevel,
+            muted: isHandled,
           };
         }),
       ]
@@ -546,6 +567,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                       label={item.label}
                       createdAt={item.created_at}
                       badge={item.badge}
+                      muted={item.muted}
                       badgeLevel={
                         item.badge === 'FRAUD'
                           ? 'critical'

@@ -16,6 +16,7 @@ type ActivityRowProps = {
   createdAt: string;
   badge: string;
   badgeLevel?: string;
+  muted?: boolean;
   onPress: () => void;
 };
 
@@ -30,13 +31,19 @@ export default function ActivityRow({
   createdAt,
   badge,
   badgeLevel,
+  muted = false,
   onPress,
 }: ActivityRowProps) {
   const { theme } = useTheme();
   const riskStyles = getRiskStyles(badgeLevel ?? badge);
-  const badgeBackground = riskStyles.background;
-  const badgeTextColor = riskStyles.accent;
-  const iconBg = withOpacity(riskStyles.accent, 0.12);
+  const mutedAccent = theme.colors.textDim;
+  const mutedBackground = withOpacity(theme.colors.text, 0.08);
+  const badgeBackground = muted ? mutedBackground : riskStyles.background;
+  const badgeTextColor = muted ? mutedAccent : riskStyles.accent;
+  const iconBg = muted ? mutedBackground : withOpacity(riskStyles.accent, 0.12);
+  const iconColor = muted ? mutedAccent : riskStyles.accent;
+  const labelColor = muted ? theme.colors.textMuted : theme.colors.text;
+  const metaColor = muted ? theme.colors.textDim : theme.colors.textMuted;
   const digitsOnly = label.replace(/\D/g, '');
   const shouldFormatPhone = digitsOnly.length >= 10 && !/[A-Za-z]/.test(label);
   const formattedLabel = shouldFormatPhone ? formatPhoneNumber(label, label) : label;
@@ -58,13 +65,13 @@ export default function ActivityRow({
     >
       <View style={styles.rowLeft}>
         <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
-          <Ionicons name={ICONS[type]} size={18} color={riskStyles.accent} />
+          <Ionicons name={ICONS[type]} size={18} color={iconColor} />
         </View>
         <View style={styles.metaGroup}>
-          <Text style={[styles.label, { color: theme.colors.text }]} numberOfLines={1}>
+          <Text style={[styles.label, { color: labelColor }]} numberOfLines={1}>
             {formattedLabel}
           </Text>
-          <Text style={[styles.meta, { color: theme.colors.textMuted }]} numberOfLines={1}>
+          <Text style={[styles.meta, { color: metaColor }]} numberOfLines={1}>
             {formatTimestamp(createdAt)}
           </Text>
         </View>
