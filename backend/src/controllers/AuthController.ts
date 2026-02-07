@@ -4,6 +4,8 @@ import fetch from 'node-fetch';
 import logger from 'jet-logger';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import supabaseAdmin from '@src/services/supabase';
+import { createRefreshToken, validateAndRotateRefreshToken } from '@src/services/refreshTokens';
+import { clearLoginAttempts, checkAccountLock, recordFailedLoginAttempt } from '@src/services/loginLockout';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, '') ?? '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
@@ -117,4 +119,109 @@ export async function resetPassword(req: Request, res: Response) {
   }
 }
 
-export default { resetPassword, checkEmailExists };
+export async function refreshToken(req: Request, res: Response) {
+  const { refreshToken: token } = req.body ?? {};
+
+  if (!token || typeof token !== 'string') {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({
+      error: 'refreshToken is required in request body',
+    });
+  }
+
+  try {
+    // Validate and rotate the refresh token
+    const { accessToken, refreshToken: newRefreshToken, expiresIn } = await validateAndRotateRefreshToken(token);
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({
+      accessToken,
+      refreshToken: newRefreshToken,
+      expiresIn,
+      tokenType: 'Bearer',
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.warn(`Token refresh failed: ${errorMessage}`);
+
+    // Return 401 for any token validation error
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({
+      error: 'Invalid or expired refresh token. Please log in again.',
+    });
+  }
+}
+
+export async function login(req: Request, res: Response) {
+  const { email, password } = req.body ?? {};
+
+  if (!email || typeof email !== 'string' || !password || typeof password !== 'string') {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({
+      error: 'email and password are required',
+    });
+  }
+
+  try {
+    // Attempt to sign in with Supabase
+    const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (signInError || !signInData?.session || !signInData?.user) {
+      // Sign in failed - return generic error
+      // (We don't track failed attempts here because we don't know the user ID yet)
+      logger.warn(`Failed login attempt for email ${email}: ${signInError?.message ?? 'invalid credentials'}`);
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({
+        error: 'Invalid email or password',
+      });
+    }
+
+    const userId = signInData.user.id;
+
+    // ✅ Sign in successful - get user's profile to check account lock status
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select('caretaker_id, login_attempts, locked_until')
+      .eq('caretaker_id', userId)
+      .maybeSingle();
+
+    // Check if account is locked
+    if (profile?.locked_until) {
+      const lockedUntil = new Date(profile.locked_until);
+      const now = new Date();
+
+      if (now < lockedUntil) {
+        const minutesRemaining = Math.ceil((lockedUntil.getTime() - now.getTime()) / 60000);
+        logger.warn(`Login attempt for locked account ${userId}`);
+        return res.status(HTTP_STATUS_CODES.Unauthorized).json({
+          error: `Account locked. Try again in ${minutesRemaining} minute${minutesRemaining !== 1 ? 's' : ''}.`,
+        });
+      }
+    }
+
+    // Clear any previous failed attempts on successful login
+    await clearLoginAttempts(userId);
+
+    // Create refresh token for this session
+    const refreshToken = await createRefreshToken(userId);
+
+    logger.info(`User ${userId} logged in successfully`);
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({
+      accessToken: signInData.session.access_token,
+      refreshToken,
+      expiresIn: 3600, // 1 hour
+      tokenType: 'Bearer',
+      user: {
+        id: signInData.user.id,
+        email: signInData.user.email,
+      },
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    logger.err(`Login endpoint error: ${errorMessage}`);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({
+      error: 'An error occurred during login. Please try again.',
+    });
+  }
+}
+
+export default { resetPassword, checkEmailExists, refreshToken, login };
