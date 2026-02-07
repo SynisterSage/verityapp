@@ -449,6 +449,14 @@ async function acceptInvite(req: Request, res: Response) {
     metadata: userRow?.user?.user_metadata ?? null,
   });
   const actorLabel = displayName ?? 'Circle member';
+
+  // Get caretaker_id for RLS policy
+  const { data: profileData } = await supabaseAdmin
+    .from('profiles')
+    .select('caretaker_id')
+    .eq('id', invite.profile_id)
+    .single();
+
   const { data: member, error: memberError } = await supabaseAdmin
     .from('profile_members')
     .upsert(
@@ -457,6 +465,7 @@ async function acceptInvite(req: Request, res: Response) {
         user_id: userId,
         role: invite.role,
         display_name: displayName,
+        caretaker_id: profileData?.caretaker_id,
       },
       { onConflict: 'profile_id,user_id' }
     )

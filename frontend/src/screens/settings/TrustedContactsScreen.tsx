@@ -679,8 +679,15 @@ export default function TrustedContactsScreen() {
 
   const manualTrayNumber =
     trayMode === 'manual' && trayContact ? (trayContact as DeviceContact).numbers[0] : '';
+  const manualAvatarDisplayName =
+    trayMode === 'manual'
+      ? getManualContactDisplayName(manualTrayNumber)
+      : manualManageDisplayName;
   const manualAvatarInitial = (
-    (manualContactName.trim() || manualTrayNumber.replace(/\D/g, '') || 'T')
+    (
+      manualAvatarDisplayName ||
+      'T'
+    )
       .charAt(0)
       .toUpperCase()
   );
