@@ -465,7 +465,7 @@ async function recordingReady(req: Request, res: Response) {
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud'
+      'id, caretaker_id, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud'
     )
     .eq('twilio_virtual_number', resolvedTo)
     .single();
@@ -487,6 +487,7 @@ async function recordingReady(req: Request, res: Response) {
     .from('calls')
     .insert({
       profile_id: profile.id,
+      caretaker_id: profile.caretaker_id,
       call_sid: CallSid ?? null,
       recording_sid: RecordingSid,
       recording_url: wavUrl,
@@ -721,6 +722,7 @@ async function recordingReady(req: Request, res: Response) {
         .upsert(
           {
             profile_id: profile.id,
+            caretaker_id: profile.caretaker_id,
             call_id: callRow.id,
             alert_type: 'fraud',
             status: 'pending',
