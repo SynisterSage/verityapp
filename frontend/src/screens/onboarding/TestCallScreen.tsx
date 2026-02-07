@@ -23,14 +23,9 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
   const twilioNumber = activeProfile?.twilio_virtual_number ?? '';
   const passcode = (activeProfile as any)?.safety_pin ?? '';
 
-  const finishOnboarding = async () => {
-    setOnboardingComplete(true);
+  const finishOnboarding = () => {
     setRedirectToSettings(false);
-    await refreshProfiles();
-    navigation.reset({
-      index: 0,
-      routes: [{ name: 'AppTabs' }],
-    });
+    navigation.navigate('OnboardingSuccess');
   };
 
   const handleCopyNumber = async () => {

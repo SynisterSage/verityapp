@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -46,6 +47,14 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
   const createRefs = useRef<Array<TextInput | null>>(Array(PIN_LENGTH).fill(null));
   const confirmRefs = useRef<Array<TextInput | null>>(Array(PIN_LENGTH).fill(null));
   const mismatchRef = useRef(false);
+
+  // Hide back button during onboarding
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => null,
+      gestureEnabled: false,
+    });
+  }, [navigation]);
 
   const createValue = useMemo(() => formatDigits(createDigits), [createDigits]);
   const confirmValue = useMemo(() => formatDigits(confirmDigits), [confirmDigits]);
@@ -218,7 +227,7 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
   return (
     <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <OnboardingHeader chapter="Security" activeStep={4} totalSteps={9} />
+        <OnboardingHeader chapter="Security" activeStep={4} totalSteps={9} showBack={false} />
         <View style={styles.keyboardAvoiding}>
           <ScrollView
             contentContainerStyle={[

@@ -28,6 +28,7 @@ export type Profile = {
   phone_number: string | null;
   twilio_virtual_number: string | null;
   has_passcode?: boolean | null;
+  safety_pin?: string | null;
   alert_threshold_score?: number | null;
   enable_email_alerts?: boolean | null;
   enable_sms_alerts?: boolean | null;

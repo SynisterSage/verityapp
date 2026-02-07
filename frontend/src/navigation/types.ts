@@ -13,6 +13,7 @@ export type RootStackParamList = {
   OnboardingCallForwarding: undefined;
   OnboardingTestCall: undefined;
   OnboardingInviteCode: undefined;
+  OnboardingSuccess: undefined;
   AppTabs: undefined;
   CallDetailModal: { callId: string; compact?: boolean };
   CircleActivityModal: { activities: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };

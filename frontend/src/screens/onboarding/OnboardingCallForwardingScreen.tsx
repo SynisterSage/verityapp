@@ -26,6 +26,21 @@ const PLATFORM_OPTIONS: { value: 'ios' | 'droid' | 'home'; label: string }[] = [
   { value: 'home', label: 'Home' },
 ];
 
+const formatFullPhone = (phoneNumber: string) => {
+  // Remove all non-digit characters
+  const digits = phoneNumber.replace(/\D/g, '');
+  
+  // Extract parts (assumes 11 digits starting with '1' or 10 digits)
+  const hasCountryCode = digits.length === 11 && digits[0] === '1';
+  const phoneDigits = hasCountryCode ? digits.slice(1) : digits;
+  
+  const area = phoneDigits.slice(0, 3);
+  const prefix = phoneDigits.slice(3, 6);
+  const line = phoneDigits.slice(6, 10);
+  
+  return `+1 (${area}) ${prefix}-${line}`;
+};
+
 export default function OnboardingCallForwardingScreen({ navigation }: { navigation: any }) {
   const { activeProfile, setOnboardingComplete, setRedirectToSettings } = useProfile();
   const { theme } = useTheme();
@@ -34,7 +49,11 @@ export default function OnboardingCallForwardingScreen({ navigation }: { navigat
   const [activePlatform, setActivePlatform] = useState<'ios' | 'droid' | 'home'>(
     Platform.OS === 'ios' ? 'ios' : 'droid'
   );
-  const twilioNumber = activeProfile?.twilio_virtual_number ?? '';
+  // Use useMemo to reactively update when activeProfile changes
+  const twilioNumber = useMemo(
+    () => activeProfile?.twilio_virtual_number ?? '',
+    [activeProfile?.twilio_virtual_number]
+  );
   const isIOS = Platform.OS === 'ios';
   const [copied, setCopied] = useState(false);
 
@@ -157,12 +176,12 @@ home: [
           onPress={handleCopy}
         >
           <View style={[styles.numberIcon, { backgroundColor: theme.colors.accent }]}>
-            <Ionicons name="keypad-outline" size={20} color={theme.colors.surface} />
+            <Ionicons name="keypad-outline" size={18} color={theme.colors.surface} />
           </View>
           <View style={styles.numberText}>
             <Text style={styles.numberLabel}>Your Verity number</Text>
-            <Text style={[styles.numberValue, !twilioNumber && styles.missingValue]}>
-              {twilioNumber || 'Missing #'}
+            <Text style={[styles.numberValue, !twilioNumber && styles.missingValue]} numberOfLines={1}>
+              {twilioNumber ? formatFullPhone(twilioNumber) : 'Missing #'}
             </Text>
             <Text style={styles.numberHint}>
               {twilioNumber ? 'Tap to copy number' : 'Add a Twilio number in profile settings.'}
@@ -231,11 +250,7 @@ home: [
       onPrimaryPress={() => {
         if (!twilioNumber) {
           setRedirectToSettings(true);
-          setOnboardingComplete(true);
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'AppTabs' }],
-          });
+          navigation.navigate('OnboardingSuccess');
           return;
         }
         navigation.navigate('OnboardingTestCall');
@@ -278,7 +293,7 @@ const createCallForwardingStyles = (theme: AppTheme) =>
       padding: 24,
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 16,
+      gap: 12,
       borderWidth: 1,
       borderColor: theme.colors.border,
       shadowColor: theme.colors.border,
@@ -291,9 +306,9 @@ const createCallForwardingStyles = (theme: AppTheme) =>
       opacity: 0.95,
     },
     numberIcon: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -308,8 +323,9 @@ const createCallForwardingStyles = (theme: AppTheme) =>
     },
     numberValue: {
       color: theme.colors.text,
-      fontSize: 18,
+      fontSize: 15,
       fontWeight: '700',
+      letterSpacing: -0.3,
     },
     numberHint: {
       color: theme.colors.textMuted,

@@ -62,6 +62,7 @@ import BottomDock from './src/components/navigation/BottomDock';
 import SplashScreen from './src/components/common/SplashScreen';
 import OnboardingChoiceScreen from './src/screens/onboarding/OnboardingChoiceScreen';
 import OnboardingInviteCodeScreen from './src/screens/onboarding/OnboardingInviteCodeScreen';
+import OnboardingSuccessScreen from './src/screens/onboarding/OnboardingSuccessScreen';
 import {
   RootStackParamList,
   TabParamList,
@@ -379,6 +380,12 @@ function RootNavigator() {
           />
         </>
       )}
+      {/* Success screen available for smooth transition after onboarding */}
+      <RootStack.Screen
+        name="OnboardingSuccess"
+        component={OnboardingSuccessScreen}
+        options={{ headerShown: false, gestureEnabled: false }}
+      />
     </RootStack.Navigator>
   );
 }

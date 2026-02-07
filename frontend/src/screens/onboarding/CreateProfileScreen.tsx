@@ -44,9 +44,24 @@ const formatPhone = (digits: string) => {
   return formatted;
 };
 
+const formatFullPhone = (phoneNumber: string) => {
+  // Remove all non-digit characters
+  const digits = phoneNumber.replace(/\D/g, '');
+  
+  // Extract parts (assumes 11 digits starting with '1' or 10 digits)
+  const hasCountryCode = digits.length === 11 && digits[0] === '1';
+  const phoneDigits = hasCountryCode ? digits.slice(1) : digits;
+  
+  const area = phoneDigits.slice(0, 3);
+  const prefix = phoneDigits.slice(3, 6);
+  const line = phoneDigits.slice(6, 10);
+  
+  return `+1 (${area}) ${prefix}-${line}`;
+};
+
 export default function CreateProfileScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
-  const { activeProfile, setActiveProfile, setOnboardingComplete } = useProfile();
+  const { activeProfile, setActiveProfile, setOnboardingComplete, refreshProfiles } = useProfile();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -131,12 +146,13 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
       
       if (response?.phoneNumber) {
         setAssignedNumber(response.phoneNumber);
-        if (activeProfile) {
-          setActiveProfile({
-            ...activeProfile,
-            twilio_virtual_number: response.phoneNumber,
-          });
-        }
+        // Update activeProfile with the assigned number
+        const updatedProfile = {
+          ...(activeProfile || {}),
+          id: profileId,
+          twilio_virtual_number: response.phoneNumber,
+        } as any;
+        setActiveProfile(updatedProfile);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
       } else {
         throw new Error('No phone number returned');
@@ -144,7 +160,17 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
     } catch (err: any) {
       console.error('❌ Assign number error:', err);
       console.error('Error details:', JSON.stringify(err, null, 2));
-      setError(err?.message || 'Failed to assign number. Please try again.');
+      
+      // Handle specific error cases
+      const errorMessage = err?.message || '';
+      if (errorMessage.toLowerCase().includes('no available') || errorMessage.toLowerCase().includes('no numbers')) {
+        setError(
+          'No phone numbers available in the pool. Please contact Verity Support to add more numbers to your account.'
+        );
+      } else {
+        setError(errorMessage || 'Failed to assign number. Please try again.');
+      }
+      
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => null);
     } finally {
       setIsAssigningNumber(false);
@@ -157,7 +183,11 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
       return;
     }
     
-    navigation.navigate('OnboardingPasscode');
+    // Reset navigation stack to prevent going back to profile creation
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'OnboardingPasscode' }],
+    });
   };
 
   const renderScrollContent = () => (
@@ -253,7 +283,9 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         ) : (
           <View style={styles.assignedNumberCard}>
             <Ionicons name="checkmark-circle" size={20} color={theme.colors.success} />
-            <Text style={styles.assignedNumberText}>{assignedNumber}</Text>
+            <Text style={styles.assignedNumberText} numberOfLines={1}>
+              {formatFullPhone(assignedNumber)}
+            </Text>
           </View>
         )}
             <HowItWorksCard
@@ -283,7 +315,10 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
     </ScrollView>
   );
 
-  if (activeProfile) {
+  // Show "Profile Already Created" screen only if profile exists from a previous session
+  // (has profile but came back without going through the form flow)
+  // If they just created it and assigned a number, keep them on the form
+  if (activeProfile && activeProfile.twilio_virtual_number && !assignedNumber) {
     return (
       <View style={styles.outer}>
         <SafeAreaView style={styles.screen} edges={['bottom']}>
@@ -432,10 +467,10 @@ const createProfileStyles = (theme: AppTheme) =>
       gap: 12,
     },
     assignedNumberText: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: '600',
       color: theme.colors.text,
-      letterSpacing: 1,
+      letterSpacing: 0.5,
     },
     error: {
       color: theme.colors.danger,
