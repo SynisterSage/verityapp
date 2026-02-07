@@ -343,12 +343,58 @@ async function updateAlertPrefs(req: Request, res: Response) {
   } = req.body as Record<string, number | boolean | undefined>;
 
   // Get existing notification preferences from profile_members
-  const { data: memberData, error: memberError } = await supabaseAdmin
+  let { data: memberData, error: memberError } = await supabaseAdmin
     .from('profile_members')
-    .select('notification_preferences')
+    .select('notification_preferences, caretaker_id')
     .eq('profile_id', profileId)
     .eq('user_id', userId)
     .maybeSingle();
+
+  // If no profile_members row exists, create one (e.g., for legacy caretakers)
+  if (!memberData && !memberError) {
+    // Get caretaker_id from profiles
+    const { data: profileData } = await supabaseAdmin
+      .from('profiles')
+      .select('caretaker_id')
+      .eq('id', profileId)
+      .single();
+
+    const caretakerId = profileData?.caretaker_id;
+    if (!caretakerId) {
+      logger.err(new Error('Profile missing caretaker_id'));
+      return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update alert prefs' });
+    }
+
+    // Insert profile_members row with default notification preferences
+    const { data: newMember, error: insertError } = await supabaseAdmin
+      .from('profile_members')
+      .insert({
+        profile_id: profileId,
+        user_id: userId,
+        caretaker_id: caretakerId,
+        role: isCaretaker ? 'admin' : 'editor',
+        notification_preferences: {
+          enable_email_alerts: true,
+          enable_sms_alerts: true,
+          enable_push_alerts: true,
+          alert_threshold_score: 50,
+          auto_mark_enabled: false,
+          auto_mark_fraud_threshold: 80,
+          auto_mark_safe_threshold: 20,
+          auto_trust_on_safe: false,
+          auto_block_on_fraud: false,
+        },
+      })
+      .select('notification_preferences')
+      .single();
+
+    if (insertError || !newMember) {
+      logger.err(insertError ?? new Error('Failed to create profile_members row'));
+      return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to update alert prefs' });
+    }
+
+    memberData = newMember;
+  }
 
   if (memberError || !memberData) {
     logger.err(memberError ?? new Error('Failed to get member notification preferences'));
