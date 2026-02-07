@@ -513,16 +513,20 @@ const loadMemberNames = useCallback(async () => {
             } else if (alert.alert_type === 'member_removed') {
               const targetLabel = alert.payload?.target_display_name ?? 'A member';
               description = `Removed ${targetLabel} from the circle.`;
-          } else if (alert.alert_type === 'automation_settings_updated') {
-            const fallback =
-              Array.isArray(alert.payload?.changes) && alert.payload?.changes.length > 0
-                ? alert.payload?.changes.join(' · ')
-                : undefined;
-            description = alert.payload?.message ?? fallback ?? 'Updated automation settings.';
-          } else {
-            description = 'Updated the Safety PIN.';
+            } else if (alert.alert_type === 'automation_settings_updated') {
+              const fallback =
+                Array.isArray(alert.payload?.changes) && alert.payload?.changes.length > 0
+                  ? alert.payload?.changes.join(' · ')
+                  : undefined;
+              description = alert.payload?.message ?? fallback ?? 'Updated automation settings.';
+            } else if (alert.alert_type === 'data_exported') {
+              description = alert.payload?.message ?? 'Exported the profile data.';
+            } else if (alert.alert_type === 'data_cleared') {
+              description = alert.payload?.message ?? 'Cleared the call and alert history.';
+            } else {
+              description = 'Updated the Safety PIN.';
+            }
           }
-        }
         }
         const timestamp = formatAlertTime(alert.created_at);
         return {

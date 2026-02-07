@@ -11,4 +11,6 @@ export const CIRCLE_ALERT_TYPES = new Set<string>([
   'member_role_changed',
   'member_removed',
   'automation_settings_updated',
+  'data_exported',
+  'data_cleared',
 ]);

@@ -20,11 +20,11 @@ export function getCircleTrayCopy(alert: AlertRow, fallbackDisplay?: string): Ci
   const displayTitle = 'Circle activity';
   let detail = fallbackDisplay ?? alert.payload?.message;
   if (!detail && CIRCLE_ALERT_TYPES.has(alert.alert_type ?? '')) {
-    switch (alert.alert_type) {
-      case 'pin_change':
-        detail = alert.payload?.message ?? 'Updated the Safety PIN.';
-        break;
-      case 'circle_invite':
+      switch (alert.alert_type) {
+        case 'pin_change':
+          detail = alert.payload?.message ?? 'Updated the Safety PIN.';
+          break;
+        case 'circle_invite':
         detail =
           alert.payload?.message ??
           `Shared an invite${alert.payload?.invite_role ? ` for ${alert.payload.invite_role}` : ''}.`;
@@ -39,11 +39,17 @@ export function getCircleTrayCopy(alert: AlertRow, fallbackDisplay?: string): Ci
         detail =
           alert.payload?.message ??
           `Added ${alert.payload?.added ?? 1} trusted contact${(alert.payload?.added ?? 1) === 1 ? '' : 's'}.`;
+          break;
+        case 'blocked_caller_added':
+          detail = alert.payload?.message ?? `Blocked number ${alert.payload?.caller_number ?? ''}.`;
+          break;
+      case 'data_exported':
+        detail = alert.payload?.message ?? 'Downloaded the profile export.';
         break;
-      case 'blocked_caller_added':
-        detail = alert.payload?.message ?? `Blocked number ${alert.payload?.caller_number ?? ''}.`;
+      case 'data_cleared':
+        detail = alert.payload?.message ?? 'Cleared the call and alert history.';
         break;
-      case 'member_joined': {
+        case 'member_joined': {
         const label = alert.payload?.actor_label ?? 'A member';
         detail = alert.payload?.message ?? `${label} joined the circle.`;
         break;

@@ -682,6 +682,21 @@ async function exportProfileData(req: Request, res: Response) {
     });
   }
 
+  try {
+    await recordCircleAlert({
+      profileId,
+      alertType: 'data_exported',
+      payload: {
+        actor_user_id: userId,
+        actor_role: isCaretaker ? 'caretaker' : 'admin',
+        actor_label: isCaretaker ? 'Circle owner' : 'Circle member',
+        message: 'Exported the profile data.',
+      },
+    });
+  } catch (alertError) {
+    logger.err(alertError);
+  }
+
   return res.status(HTTP_STATUS_CODES.Ok).json({
     profile: sanitizeProfileRow(profileRow),
     calls: calls ?? [],
@@ -719,6 +734,21 @@ async function clearProfileRecords(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({
       error: 'Failed to clear records, please try again later',
     });
+  }
+
+  try {
+    await recordCircleAlert({
+      profileId,
+      alertType: 'data_cleared',
+      payload: {
+        actor_user_id: userId,
+        actor_role: isCaretaker ? 'caretaker' : 'admin',
+        actor_label: isCaretaker ? 'Circle owner' : 'Circle member',
+        message: 'Cleared the call and alert history.',
+      },
+    });
+  } catch (alertError) {
+    logger.err(alertError);
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
