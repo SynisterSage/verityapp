@@ -49,7 +49,7 @@ apiRouter.use(PATHS.Calls._, CallsRoutes);
 apiRouter.use(PATHS.Alerts._, AlertsRoutes);
 apiRouter.use(PATHS.Fraud._, FraudRoutes);
 apiRouter.use(PATHS.Profiles._, ProfilesRoutes);
-apiRouter.use(PATHS.Profiles.Support, SupportRoutes);
+apiRouter.use(`${PATHS.Profiles._}${PATHS.Profiles.Support}`, SupportRoutes);
 apiRouter.use(PATHS.Auth._, AuthRoutes);
 
 // Twilio number pool endpoints

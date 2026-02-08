@@ -27,14 +27,14 @@ CREATE POLICY support_messages_read ON support_messages
     OR EXISTS (
       SELECT 1 FROM profiles p
       WHERE p.id = support_messages.profile_id
-        AND (
-          p.caretaker_id = auth.uid()
-          OR EXISTS (
-            SELECT 1 FROM profile_members pm
-            WHERE pm.profile_id = p.id
-              AND pm.user_id = auth.uid()
-          )
+      AND (
+        p.caretaker_id = auth.uid()
+        OR EXISTS (
+          SELECT 1 FROM profile_members pm
+          WHERE pm.profile_id = p.id
+            AND pm.user_id = auth.uid()
         )
+      )
     )
   );
 
@@ -46,7 +46,7 @@ CREATE POLICY support_messages_insert ON support_messages
       sender = 'user'
       AND EXISTS (
         SELECT 1 FROM profiles p
-        WHERE p.id = NEW.profile_id
+        WHERE p.id = profile_id
           AND (
             p.caretaker_id = auth.uid()
             OR EXISTS (

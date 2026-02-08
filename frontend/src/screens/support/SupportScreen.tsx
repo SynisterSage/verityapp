@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Keyboard,
   Platform,
   Pressable,
@@ -8,9 +9,9 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
@@ -55,7 +56,7 @@ export default function SupportScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SupportModal'>>();
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
-  const { theme, mode } = useTheme();
+  const { theme } = useTheme();
   const { refreshUnread } = useSupportContext();
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +90,7 @@ export default function SupportScreen() {
     try {
       if (!soundRef.current) {
         const { sound } = await Audio.Sound.createAsync(
-          require('../../assets/sounds/support-notification.wav'),
+          require('../../../assets/sounds/support-notification.wav'),
           { shouldPlay: false }
         );
         soundRef.current = sound;
@@ -174,97 +175,113 @@ export default function SupportScreen() {
 
   return (
     <SafeAreaView
-      edges={['bottom']}
-      style={[styles.container, { paddingTop: Math.max(0, insets.top + 12), backgroundColor: theme.colors.overlay }]}
+      edges={['bottom', 'top']}
+      style={[styles.container, { backgroundColor: theme.colors.bg }]}
     >
-      <BlurView intensity={90} tint={mode === 'light' ? 'light' : 'dark'} style={StyleSheet.absoluteFill} />
-      <View style={[styles.backdrop, { borderColor: withOpacity(theme.colors.text, 0.08) }]} />
-      <View style={[styles.modal, { backgroundColor: theme.colors.surface }]}>        
-        <View style={styles.header}>
-          <View style={styles.headingCopy}>
-            <Text style={[styles.title, { color: theme.colors.text }]}>Verity Support</Text>
-            <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>{headerSubtitle}</Text>
-          </View>
-          <Pressable onPress={() => navigation.goBack()} style={styles.closeButton} accessibilityLabel="Close support chat">
-            <Ionicons name="close" size={22} color={theme.colors.text} />
-          </Pressable>
-        </View>
-        <View style={[styles.body, { borderColor: withOpacity(theme.colors.text, 0.08) }]}>          
-          {statusMessage && !activeProfile ? (
-            <View style={styles.emptyState}>
-              <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>Support chat is ready</Text>
-              <Text style={[styles.emptyStateBody, { color: theme.colors.textMuted }]}>Finish setting up your profile and the conversation will keep saving in one place.</Text>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoiding}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 70}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <View style={[styles.content, { backgroundColor: theme.colors.surface }]}>
+            <View style={styles.header}>
+              <View style={styles.headingCopy}>
+                <Text style={[styles.title, { color: theme.colors.text }]}>Verity Support</Text>
+                <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>{headerSubtitle}</Text>
+              </View>
+              <Pressable
+                onPress={() => navigation.goBack()}
+                style={styles.closeButton}
+                accessibilityLabel="Close support chat"
+              >
+                <Ionicons name="close" size={22} color={theme.colors.text} />
+              </Pressable>
             </View>
-          ) : null}
-          <ScrollView
-            ref={scrollRef}
-            style={styles.messagesContainer}
-            contentContainerStyle={styles.messagesContent}
-            showsVerticalScrollIndicator={false}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color={theme.colors.accent} />
-            ) : (
-              messages.map((message) => {
-                const isUser = message.sender === 'user';
-                return (
-                  <View key={message.id} style={styles.messageRow}>
-                    <View
-                      style={[
-                        styles.messageBubble,
-                        isUser ? styles.messageRight : styles.messageLeft,
-                        {
-                          backgroundColor: isUser ? theme.colors.accent : theme.colors.surfaceAlt,
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.messageText, { color: isUser ? '#fff' : theme.colors.text }]}>
-                        {message.content}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.messageTimestamp,
-                          { color: isUser ? withOpacity('#fff', 0.8) : theme.colors.textMuted },
+            <View style={[styles.body, { borderColor: withOpacity(theme.colors.text, 0.08) }]}>
+              {statusMessage && !activeProfile ? (
+                <View style={styles.emptyState}>
+                  <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>Support chat is ready</Text>
+                  <Text style={[styles.emptyStateBody, { color: theme.colors.textMuted }]}>
+                    Finish setting up your profile and the conversation will keep saving in one place.
+                  </Text>
+                </View>
+              ) : null}
+              <ScrollView
+                ref={scrollRef}
+                style={styles.messagesContainer}
+                contentContainerStyle={styles.messagesContent}
+                showsVerticalScrollIndicator={false}
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color={theme.colors.accent} />
+                ) : (
+                  messages.map((message) => {
+                    const isUser = message.sender === 'user';
+                    return (
+                      <View key={message.id} style={styles.messageRow}>
+                        <View
+                          style={[
+                            styles.messageBubble,
+                            isUser ? styles.messageRight : styles.messageLeft,
+                            {
+                              backgroundColor: isUser ? theme.colors.accent : theme.colors.surfaceAlt,
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.messageText, { color: isUser ? '#fff' : theme.colors.text }]}>
+                            {message.content}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.messageTimestamp,
+                              { color: isUser ? withOpacity('#fff', 0.8) : theme.colors.textMuted },
+                            ]}
+                          >
+                            {formatTimestamp(message.created_at)}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })
+                )}
+              </ScrollView>
+              <View style={styles.quickPrompts}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.quickPromptsContent}
+                >
+                  {QUICK_PROMPTS.map((prompt) => {
+                    const active = prompt.label === selectedPrompt;
+                    return (
+                      <Pressable
+                        key={prompt.label}
+                        onPress={() => handlePromptPress(prompt)}
+                        style={({ pressed }) => [
+                          styles.promptChip,
+                          {
+                            backgroundColor: active
+                              ? theme.colors.accent
+                              : pressed
+                              ? withOpacity(theme.colors.accent, 0.08)
+                              : theme.colors.surfaceAlt,
+                            borderColor: active ? theme.colors.accent : 'transparent',
+                          },
                         ]}
                       >
-                        {formatTimestamp(message.created_at)}
-                      </Text>
-                    </View>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-          <View style={styles.quickPrompts}>            
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.quickPromptsContent}>
-              {QUICK_PROMPTS.map((prompt) => {
-                const active = prompt.label === selectedPrompt;
-                return (
-                  <Pressable
-                    key={prompt.label}
-                    onPress={() => handlePromptPress(prompt)}
-                    style={({ pressed }) => [
-                      styles.promptChip,
-                      {
-                        backgroundColor: active
-                          ? theme.colors.accent
-                          : pressed
-                          ? withOpacity(theme.colors.accent, 0.08)
-                          : theme.colors.surfaceAlt,
-                        borderColor: active ? theme.colors.accent : 'transparent',
-                      },
-                    ]}
-                  >
-                    <Text style={[styles.promptText, { color: active ? '#fff' : theme.colors.text }]}>
-                      {prompt.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+                        <Text style={[styles.promptText, { color: active ? '#fff' : theme.colors.text }]}>
+                          {prompt.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            </View>
           </View>
-        </View>
-        <View style={[styles.composer, { borderColor: withOpacity(theme.colors.text, 0.1) }]}>          
+        </TouchableWithoutFeedback>
+        <View style={[styles.composerOuter, { borderColor: withOpacity(theme.colors.text, 0.1) }]}>
           <TextInput
             style={[styles.input, { color: theme.colors.text }]}
             placeholder={activeProfile ? 'Send a message' : 'Finish onboarding to open chat'}
@@ -285,7 +302,10 @@ export default function SupportScreen() {
             disabled={isSending || !composerText.trim() || !activeProfile}
             style={({ pressed }) => [
               styles.sendButton,
-              { backgroundColor: pressed ? withOpacity(theme.colors.accent, 0.8) : theme.colors.accent },
+              {
+                backgroundColor: pressed ? withOpacity(theme.colors.accent, 0.85) : theme.colors.accent,
+                opacity: isSending || !composerText.trim() || !activeProfile ? 0.6 : 1,
+              },
             ]}
           >
             {isSending ? (
@@ -295,7 +315,7 @@ export default function SupportScreen() {
             )}
           </Pressable>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -304,24 +324,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#000',
-    opacity: 0.55,
+  keyboardAvoiding: {
+    flex: 1,
   },
-  modal: {
-    position: 'absolute',
-    top: 40,
-    left: 16,
-    right: 16,
-    bottom: 20,
+  content: {
+    flex: 1,
+    marginHorizontal: 12,
     borderRadius: 32,
     padding: 24,
     borderWidth: StyleSheet.hairlineWidth,
     shadowColor: '#000',
-    shadowOpacity: 0.25,
-    shadowRadius: 30,
-    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.12,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 6,
+    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
@@ -416,14 +433,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 13,
   },
-  composer: {
+  composerOuter: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 24,
-    paddingHorizontal: 14,
+    borderRadius: 28,
+    paddingHorizontal: 16,
     paddingVertical: 10,
+    marginHorizontal: 12,
     marginTop: 12,
+    marginBottom: 10,
+    backgroundColor: '#fff',
+  },
+  composer: {
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 140,
+    fontSize: 16,
   },
   input: {
     flex: 1,
@@ -433,10 +459,15 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     marginLeft: 12,
-    width: 42,
-    height: 42,
-    borderRadius: 18,
+    width: 52,
+    height: 52,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
 });
