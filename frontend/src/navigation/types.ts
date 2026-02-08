@@ -16,6 +16,7 @@ export type RootStackParamList = {
   OnboardingSuccess: undefined;
   AppTabs: undefined;
   CallDetailModal: { callId: string; compact?: boolean };
+  SupportPortal: undefined;
   SupportModal: undefined;
   CircleActivityModal: { activities: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };
 };

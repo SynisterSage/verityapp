@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback } from 'react';
 
 import { useTheme } from '../../context/ThemeContext';
-import { navigateToSupportModal } from '../../navigation/rootNavigator';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 import { withOpacity } from '../../utils/color';
 
 const FAQ_ITEMS = [
@@ -25,7 +25,7 @@ const FAQ_ITEMS = [
 export default function SupportInfoScreen() {
   const { theme } = useTheme();
   const handleSupportPress = useCallback(() => {
-    navigateToSupportModal();
+    navigateToSupportPortal();
   }, []);
 
   return (

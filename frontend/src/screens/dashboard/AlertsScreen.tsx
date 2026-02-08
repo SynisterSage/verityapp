@@ -41,7 +41,7 @@ import { formatAlertDateLabel, formatAlertTime } from './alertTimeUtils';
 import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
 import { logError, logEvent } from '../../services/sentry';
 import { useSupportContext } from '../../context/SupportContext';
-import { navigateToSupportModal } from '../../navigation/rootNavigator';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 const capitalizeLabel = (value?: string | null) => {
   if (!value) return '';
   return value
@@ -114,7 +114,7 @@ export default function AlertsScreen() {
 
   const handleSupportPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-    navigateToSupportModal();
+    navigateToSupportPortal();
   }, []);
 
   const navigateToCallDetail = useCallback(

@@ -52,6 +52,7 @@ import EnterInviteCodeScreen from './src/screens/settings/EnterInviteCodeScreen'
 import MembersScreen from './src/screens/settings/MembersScreen';
 import SupportInfoScreen from './src/screens/settings/SupportInfoScreen';
 import SupportScreen from './src/screens/support/SupportScreen';
+import SupportTicketsScreen from './src/screens/support/SupportTicketsScreen';
 import CreateProfileScreen from './src/screens/onboarding/CreateProfileScreen';
 import PasscodeScreen from './src/screens/onboarding/PasscodeScreen';
 import OnboardingSafePhrasesScreen from './src/screens/onboarding/OnboardingSafePhrasesScreen';
@@ -350,6 +351,11 @@ function RootNavigator() {
             <RootStack.Screen
               name="CallDetailModal"
               component={CallDetailScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="SupportPortal"
+              component={SupportTicketsScreen}
               options={{ headerShown: false, presentation: 'modal' }}
             />
             <RootStack.Screen

@@ -47,3 +47,17 @@ export async function fetchSupportUnreadCount(profileId: string) {
 }
 
 export type { SupportMessage };
+
+export type SupportTicketSummary = {
+  profile_id: string;
+  profile_name: string;
+  last_message: SupportMessage | null;
+  unread_agent_messages: number;
+  twilio_virtual_number: string | null;
+  last_activity_at: string | null;
+};
+
+export async function fetchSupportTickets() {
+  const data = await authorizedFetch(`/profiles/support/tickets`);
+  return (data?.tickets ?? []) as SupportTicketSummary[];
+}

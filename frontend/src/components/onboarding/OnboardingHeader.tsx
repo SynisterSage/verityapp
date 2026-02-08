@@ -9,7 +9,7 @@ import SupportButton from '../common/SupportButton';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import { useSupportContext } from '../../context/SupportContext';
-import { navigateToSupportModal } from '../../navigation/rootNavigator';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 
 type Props = {
   chapter: string;
@@ -115,7 +115,7 @@ export default function OnboardingHeader({
             })}
             </View>
             <SupportButton
-              onPress={navigateToSupportModal}
+              onPress={navigateToSupportPortal}
               unreadCount={unreadAgentCount}
               style={styles.supportButton}
             />

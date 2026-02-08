@@ -33,7 +33,7 @@ import { withOpacity } from '../../utils/color';
 import { useTheme } from '../../context/ThemeContext';
 import DashboardHeader from '../../components/common/DashboardHeader';
 import { useSupportContext } from '../../context/SupportContext';
-import { navigateToSupportModal } from '../../navigation/rootNavigator';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 import { getRiskStyles, getRiskSeverity } from '../../utils/risk';
 import type { AppTheme } from '../../theme/tokens';
 import type { CallsStackParamList } from '../../navigation/types';
@@ -276,7 +276,7 @@ export default function CallsScreen({
   >(null);
   const handleSupportPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-    navigateToSupportModal();
+    navigateToSupportPortal();
   }, []);
 
   const loadCalls = useCallback(async (silent = false) => {

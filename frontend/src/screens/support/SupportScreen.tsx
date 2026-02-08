@@ -1,18 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
   Keyboard,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { useNavigation } from '@react-navigation/native';
@@ -54,26 +55,29 @@ function formatTimestamp(value?: string | null) {
 
 export default function SupportScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SupportModal'>>();
-  const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
-  const { theme } = useTheme();
+  const { mode, theme } = useTheme();
   const { refreshUnread } = useSupportContext();
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [composerText, setComposerText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const scrollRef = useRef<FlatList<SupportMessage> | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastAgentIdRef = useRef<string | null>(null);
 
-  const loadMessages = useCallback(async () => {
+  const loadMessages = useCallback(async (opts?: { showLoading?: boolean }) => {
     if (!activeProfile?.id) {
       setMessages([]);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    const showLoading = opts?.showLoading ?? true;
+    if (showLoading) {
+      setLoading(true);
+    }
     try {
       const data = await fetchSupportMessages(activeProfile.id);
       setMessages(data);
@@ -82,9 +86,19 @@ export default function SupportScreen() {
     } catch (err) {
       console.warn('Failed to load support conversation', err);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   }, [activeProfile?.id, refreshUnread]);
+
+  const handleRefresh = useCallback(() => {
+    if (!activeProfile?.id) {
+      return;
+    }
+    setRefreshing(true);
+    void loadMessages({ showLoading: false }).finally(() => setRefreshing(false));
+  }, [activeProfile?.id, loadMessages]);
 
   const playNotification = useCallback(async () => {
     try {
@@ -173,6 +187,9 @@ export default function SupportScreen() {
 
   const headerSubtitle = statusMessage || 'Every message is stored in a ticket so you can revisit the timeline later.';
 
+  const composerBackgroundColor = theme.colors.surface;
+  const composerInputBackground = theme.colors.surface;
+
   return (
     <SafeAreaView
       edges={['bottom', 'top']}
@@ -183,8 +200,7 @@ export default function SupportScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 70}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={[styles.content, { backgroundColor: theme.colors.surface }]}>
+        <View style={[styles.content, { backgroundColor: theme.colors.surface }]}>
             <View style={styles.header}>
               <View style={styles.headingCopy}>
                 <Text style={[styles.title, { color: theme.colors.text }]}>Verity Support</Text>
@@ -207,45 +223,72 @@ export default function SupportScreen() {
                   </Text>
                 </View>
               ) : null}
-              <ScrollView
-                ref={scrollRef}
-                style={styles.messagesContainer}
-                contentContainerStyle={styles.messagesContent}
-                showsVerticalScrollIndicator={false}
-              >
+              <View style={styles.messagesWrapper}>
                 {loading ? (
                   <ActivityIndicator size="small" color={theme.colors.accent} />
                 ) : (
-                  messages.map((message) => {
-                    const isUser = message.sender === 'user';
-                    return (
-                      <View key={message.id} style={styles.messageRow}>
-                        <View
-                          style={[
-                            styles.messageBubble,
-                            isUser ? styles.messageRight : styles.messageLeft,
-                            {
-                              backgroundColor: isUser ? theme.colors.accent : theme.colors.surfaceAlt,
-                            },
-                          ]}
-                        >
-                          <Text style={[styles.messageText, { color: isUser ? '#fff' : theme.colors.text }]}>
-                            {message.content}
-                          </Text>
-                          <Text
+                  <FlatList
+                    ref={scrollRef}
+                    data={messages}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => {
+                      const isUser = item.sender === 'user';
+                      return (
+                        <View style={styles.messageRow}>
+                          <View
                             style={[
-                              styles.messageTimestamp,
-                              { color: isUser ? withOpacity('#fff', 0.8) : theme.colors.textMuted },
+                              styles.messageBubble,
+                              isUser ? styles.messageRight : styles.messageLeft,
+                              {
+                                backgroundColor: isUser ? theme.colors.accent : theme.colors.surfaceAlt,
+                              },
                             ]}
                           >
-                            {formatTimestamp(message.created_at)}
-                          </Text>
+                            <Text style={[styles.messageText, { color: isUser ? '#fff' : theme.colors.text }]}>
+                              {item.content}
+                            </Text>
+                            <View style={styles.timestampRow}>
+                              <Text
+                                style={[
+                                  styles.messageTimestamp,
+                                  { color: isUser ? withOpacity('#fff', 0.8) : theme.colors.textMuted },
+                                ]}
+                              >
+                                {formatTimestamp(item.created_at)}
+                              </Text>
+                              {item.is_read_by_agent ? (
+                                <Ionicons
+                                  name="eye"
+                                  size={12}
+                                  color={isUser ? withOpacity('#fff', 0.68) : theme.colors.textMuted}
+                                  style={styles.readIcon}
+                                  accessible={false}
+                                />
+                              ) : null}
+                            </View>
+                          </View>
                         </View>
-                      </View>
-                    );
-                  })
+                      );
+                    }}
+                    style={styles.messagesContainer}
+                    contentContainerStyle={styles.messagesContent}
+                    showsVerticalScrollIndicator
+                    scrollIndicatorInsets={{ right: 12 }}
+                    persistentScrollbar
+                    keyboardShouldPersistTaps="handled"
+                    keyboardDismissMode="on-drag"
+                    refreshControl={
+                      <RefreshControl
+                        refreshing={refreshing}
+                        onRefresh={handleRefresh}
+                        tintColor={theme.colors.accent}
+                        title="Pull to refresh"
+                        titleColor={theme.colors.textMuted}
+                      />
+                    }
+                  />
                 )}
-              </ScrollView>
+              </View>
               <View style={styles.quickPrompts}>
                 <ScrollView
                   horizontal
@@ -280,10 +323,17 @@ export default function SupportScreen() {
               </View>
             </View>
           </View>
-        </TouchableWithoutFeedback>
-        <View style={[styles.composerOuter, { borderColor: withOpacity(theme.colors.text, 0.1) }]}>
+        <View
+          style={[
+            styles.composerOuter,
+            {
+              borderColor: withOpacity(theme.colors.text, 0.1),
+              backgroundColor: composerBackgroundColor,
+            },
+          ]}
+        >
           <TextInput
-            style={[styles.input, { color: theme.colors.text }]}
+            style={[styles.input, { color: theme.colors.text, backgroundColor: composerInputBackground }]}
             placeholder={activeProfile ? 'Send a message' : 'Finish onboarding to open chat'}
             placeholderTextColor={withOpacity(theme.colors.text, 0.45)}
             multiline
@@ -390,8 +440,15 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
+    minHeight: 0,
+    paddingRight: 32,
+  },
+  messagesWrapper: {
+    flex: 1,
+    minHeight: 0,
   },
   messagesContent: {
+    flexGrow: 1,
     paddingBottom: 12,
   },
   messageRow: {
@@ -401,6 +458,11 @@ const styles = StyleSheet.create({
     padding: 14,
     borderRadius: 20,
     maxWidth: '80%',
+  },
+  timestampRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
   },
   messageLeft: {
     alignSelf: 'flex-start',
@@ -414,7 +476,9 @@ const styles = StyleSheet.create({
   },
   messageTimestamp: {
     fontSize: 11,
-    marginTop: 6,
+  },
+  readIcon: {
+    marginLeft: 6,
   },
   quickPrompts: {
     marginTop: 12,
@@ -443,7 +507,6 @@ const styles = StyleSheet.create({
     marginHorizontal: 12,
     marginTop: 12,
     marginBottom: 10,
-    backgroundColor: '#fff',
   },
   composer: {
     flex: 1,

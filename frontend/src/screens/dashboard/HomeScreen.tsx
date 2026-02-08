@@ -32,7 +32,7 @@ import { withOpacity } from '../../utils/color';
 import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
 import { useSupportContext } from '../../context/SupportContext';
-import { navigateToSupportModal } from '../../navigation/rootNavigator';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 
 type CallRow = {
   id: string;
@@ -378,7 +378,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   const handleSupportPress = useCallback(() => {
     triggerLightHaptic();
-    navigateToSupportModal();
+    navigateToSupportPortal();
   }, [triggerLightHaptic]);
 
   const hasHeroCall = Boolean(recentCall?.caller_number);

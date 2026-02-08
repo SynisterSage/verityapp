@@ -12,7 +12,7 @@ import { withOpacity } from '../../utils/color';
 import type { RouteProp } from '@react-navigation/native';
 import type { SettingsStackParamList } from '../../navigation/types';
 import { useSupportContext } from '../../context/SupportContext';
-import { navigateToSupportModal } from '../../navigation/rootNavigator';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 type SettingsRowItem = {
   label: string;
   subtitle?: string;
@@ -144,7 +144,7 @@ export default function SettingsScreen({
 
   const handleSupportPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-    navigateToSupportModal();
+    navigateToSupportPortal();
   }, []);
 
   const sections = useMemo(

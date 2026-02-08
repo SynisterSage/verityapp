@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { useTheme } from '../../context/ThemeContext';
-import { navigateToSupportModal } from '../../navigation/rootNavigator';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 
 type Props = {
   onPress?: () => void;
@@ -13,7 +13,7 @@ export default function NeedAssistanceCard({ onPress }: Props) {
   const { theme } = useTheme();
   const handlePress = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-    navigateToSupportModal();
+    navigateToSupportPortal();
     onPress?.();
   };
   return (
