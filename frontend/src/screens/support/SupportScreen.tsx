@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Keyboard,
@@ -42,11 +43,27 @@ const QUICK_PROMPTS = [
   },
   {
     label: 'Billing question',
-    message: 'Can you explain the last charge on my account?'
+    message: 'Can you explain the last charge on my account?',
   },
   {
     label: 'Technical help',
     message: 'I need assistance resetting my safety PIN and syncing a new device.',
+  },
+  {
+    label: 'Call schedule',
+    message: 'I would like to see a list of upcoming Verity calls for my loved one.',
+  },
+  {
+    label: 'Caregiver change',
+    message: 'How do I add or replace a caregiver on this account?',
+  },
+  {
+    label: 'Status check',
+    message: 'Can you check whether the agent I spoke with earlier has any notes?'
+  },
+  {
+    label: 'Safety advice',
+    message: 'Do you have any tips to avoid giving personal info to strangers?',
   },
 ];
 
@@ -75,6 +92,9 @@ export default function SupportScreen() {
   const [feedbackNote, setFeedbackNote] = useState('');
   const [ticketClosed, setTicketClosed] = useState(false);
   const [currentTicketId, setCurrentTicketId] = useState<string | null>(route.params?.ticketId ?? null);
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
+  const successScale = useRef(new Animated.Value(0)).current;
+  const successOpacity = useRef(new Animated.Value(0)).current;
   const isNewTicket = route.params?.newTicket ?? false;
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastAgentIdRef = useRef<string | null>(null);
@@ -87,6 +107,33 @@ export default function SupportScreen() {
     }
     return null;
   }, []);
+
+  const triggerSuccessAnimation = useCallback(() => {
+    successScale.setValue(0);
+    successOpacity.setValue(0);
+    setShowSuccessAnimation(true);
+    Animated.parallel([
+      Animated.spring(successScale, {
+        toValue: 1,
+        friction: 7,
+        tension: 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(successOpacity, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setTimeout(() => {
+        Animated.timing(successOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        }).start(() => setShowSuccessAnimation(false));
+      }, 1100);
+    });
+  }, [successOpacity, successScale]);
 
   const loadMessages = useCallback(
     async (opts?: { showLoading?: boolean; ticketId?: string | null }) => {
@@ -219,8 +266,15 @@ export default function SupportScreen() {
     }
     setIsSending(true);
     try {
-      const metadata = currentTicketId ? { ticketId: currentTicketId } : undefined;
-      const message = await createSupportMessage(activeProfile.id, { content: trimmed, metadata });
+    const metadata: Record<string, unknown> = {};
+    if (currentTicketId) {
+      metadata.ticketId = currentTicketId;
+    }
+    if (selectedPrompt) {
+      metadata.promptLabel = selectedPrompt;
+    }
+    const payload = Object.keys(metadata).length > 0 ? { metadata } : undefined;
+    const message = await createSupportMessage(activeProfile.id, { content: trimmed, metadata });
       setComposerText('');
       setSelectedPrompt(null);
       const messageMetadata = message?.metadata as Record<string, unknown> | null;
@@ -264,12 +318,21 @@ export default function SupportScreen() {
       setFeedbackNote('');
       setFeedbackRating(null);
       await loadMessages({ ticketId: currentTicketId });
+      triggerSuccessAnimation();
     } catch (err) {
       console.warn('Failed to submit feedback', err);
     } finally {
       setIsSending(false);
     }
-  }, [activeProfile?.id, currentTicketId, feedbackNote, feedbackRating, loadMessages, ticketClosed]);
+  }, [
+    activeProfile?.id,
+    currentTicketId,
+    feedbackNote,
+    feedbackRating,
+    loadMessages,
+    ticketClosed,
+    triggerSuccessAnimation,
+  ]);
 
   const handleEndTicketPress = useCallback(() => {
     if (!currentTicketId || ticketClosed) {
@@ -387,6 +450,20 @@ export default function SupportScreen() {
           </View>
 
           <View style={styles.messagesWrapper}>
+            {showSuccessAnimation && (
+              <Animated.View
+                style={[
+                  styles.successAnimationOverlay,
+                  {
+                    opacity: successOpacity,
+                    transform: [{ scale: successScale }],
+                  },
+                ]}
+              >
+                <Ionicons name="checkmark-circle-outline" size={36} color={theme.colors.success} />
+                <Text style={[styles.successAnimationText, { color: theme.colors.success }]}>Ticket closed</Text>
+              </Animated.View>
+            )}
             {loading ? (
               <ActivityIndicator color={theme.colors.accent} size="small" />
             ) : statusMessage && messages.length === 0 ? (
@@ -730,6 +807,7 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
       paddingHorizontal: 24,
       paddingTop: 12,
       marginTop: 0,
+      position: 'relative',
     },
     messagesContent: {
       paddingBottom: 22,
@@ -790,6 +868,26 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
       bottom: 0,
       width: 48,
       pointerEvents: 'none',
+    },
+    successAnimationOverlay: {
+      position: 'absolute',
+      top: 4,
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 18,
+      backgroundColor: withOpacity(theme.colors.surface, 0.6),
+      borderRadius: 28,
+      zIndex: 2,
+      elevation: 4,
+      pointerEvents: 'none',
+    },
+    successAnimationText: {
+      marginTop: 6,
+      fontSize: 13,
+      fontWeight: '600',
+      letterSpacing: 0.3,
     },
     endSessionHeader: {
       width: 40,

@@ -85,6 +85,16 @@ async function fetchLatestMessageForProfile(profileId: string) {
   return (data as SupportMessageRow) ?? null;
 }
 
+const PROMPT_AUTO_REPLY: Record<string, string> = {
+  'Report scam': 'Thanks for flagging the suspicious call. Our safety team has logged the number and the details you provided.',
+  'Billing question': 'We received your billing question and are routing it to our payments team for a response within 24 hours.',
+  'Technical help': 'We saw your tech request and are sharing it with our engineers so we can assist you with your device.',
+  'Call schedule': 'I’m pulling up the next appointments for your circle and will confirm everything via message shortly.',
+  'Caregiver change': 'You can update caregivers from the profile settings; I\'ve also notified a Verity coordinator to help you finish that.',
+  'Status check': 'I checked your conversation history and noted the latest agent updates—feel free to ask follow-ups if you need more clarity.',
+  'Safety advice': 'See the tips on our safety guide below, and remember to take your time before giving out any personal details.',
+};
+
 function resolveTicketIdentifier(message: SupportMessageRow) {
   const metadataTicketId = (message.metadata as Record<string, unknown> | null)?.ticketId;
   if (typeof metadataTicketId === 'string' && metadataTicketId.trim().length > 0) {
@@ -235,6 +245,35 @@ export default class SupportController {
         ]);
       if (agentError) {
         console.warn('Failed to insert agent greeting', agentError);
+      }
+    }
+
+    const promptLabel = metadata?.promptLabel;
+    if (typeof promptLabel === 'string') {
+      const autoMessage = PROMPT_AUTO_REPLY[promptLabel];
+      if (autoMessage) {
+        const autoMetadata: Record<string, unknown> = {
+          ticketId,
+          ticketState: 'open',
+          ticketSubject: subjectCandidate,
+          promptLabel,
+        };
+        const { error: autoError } = await supabaseAdmin
+          .from('support_messages')
+          .insert([
+            {
+              profile_id: profileId,
+              sender: 'agent',
+              content: autoMessage,
+              category: 'auto',
+              metadata: autoMetadata,
+              is_read_by_user: false,
+              is_read_by_agent: true,
+            },
+          ]);
+        if (autoError) {
+          console.warn('Failed to insert prompt reply', autoError);
+        }
       }
     }
 
