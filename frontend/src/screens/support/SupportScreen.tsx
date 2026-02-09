@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Keyboard,
@@ -16,7 +17,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 
 import { useProfile } from '../../context/ProfileContext';
 import { useSupportContext } from '../../context/SupportContext';
@@ -55,6 +56,7 @@ function formatTimestamp(value?: string | null) {
 
 export default function SupportScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SupportModal'>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'SupportModal'>>();
   const { activeProfile } = useProfile();
   const { mode, theme } = useTheme();
   const { refreshUnread } = useSupportContext();
@@ -65,25 +67,32 @@ export default function SupportScreen() {
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const scrollRef = useRef<FlatList<SupportMessage> | null>(null);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState<'positive' | 'neutral' | 'negative' | null>(null);
+  const [feedbackNote, setFeedbackNote] = useState('');
+  const [ticketClosed, setTicketClosed] = useState(false);
+  const [currentTicketId, setCurrentTicketId] = useState<string | null>(route.params?.ticketId ?? null);
+  const isNewTicket = route.params?.newTicket ?? false;
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastAgentIdRef = useRef<string | null>(null);
 
-  const loadMessages = useCallback(async (opts?: { showLoading?: boolean }) => {
-    if (!activeProfile?.id) {
-      setMessages([]);
-      setLoading(false);
-      return;
-    }
-    const showLoading = opts?.showLoading ?? true;
-    if (showLoading) {
-      setLoading(true);
-    }
-    try {
-      const data = await fetchSupportMessages(activeProfile.id);
-      setMessages(data);
-      await markSupportMessagesRead(activeProfile.id);
-      await refreshUnread();
-    } catch (err) {
+  const loadMessages = useCallback(
+    async (opts?: { showLoading?: boolean; ticketId?: string | null }) => {
+      if (!activeProfile?.id) {
+        setMessages([]);
+        setLoading(false);
+        return;
+      }
+      const showLoading = opts?.showLoading ?? true;
+      if (showLoading) {
+        setLoading(true);
+      }
+      try {
+        const data = await fetchSupportMessages(activeProfile.id, opts?.ticketId);
+        setMessages(data);
+        await markSupportMessagesRead(activeProfile.id);
+        await refreshUnread();
+      } catch (err) {
       console.warn('Failed to load support conversation', err);
     } finally {
       if (showLoading) {
@@ -142,8 +151,34 @@ export default function SupportScreen() {
   }, [messages, playNotification]);
 
   useEffect(() => {
+    const latestMessage = [...messages].slice(-1)[0];
+    const ticketState = (latestMessage?.metadata as Record<string, unknown> | null)?.ticketState;
+    setTicketClosed(ticketState === 'closed');
+  }, [messages]);
+
+  useEffect(() => {
     scrollRef.current?.scrollToEnd({ animated: true });
   }, [messages]);
+
+  useEffect(() => {
+    if (!activeProfile?.id) {
+      return;
+    }
+    if (isNewTicket && !currentTicketId) {
+      setMessages([]);
+      setLoading(false);
+      return;
+    }
+    void loadMessages({ ticketId: currentTicketId });
+  }, [activeProfile?.id, currentTicketId, isNewTicket, loadMessages]);
+
+  const getTicketIdFromMetadata = useCallback((metadata?: Record<string, unknown> | null) => {
+    const ticketId = metadata?.ticketId;
+    if (typeof ticketId === 'string' && ticketId.trim().length > 0) {
+      return ticketId;
+    }
+    return null;
+  }, []);
 
   const handleSend = useCallback(async () => {
     if (!activeProfile?.id) {
@@ -155,22 +190,75 @@ export default function SupportScreen() {
     }
     setIsSending(true);
     try {
-      await createSupportMessage(activeProfile.id, { content: trimmed });
+      const metadata = currentTicketId ? { ticketId: currentTicketId } : undefined;
+      const message = await createSupportMessage(activeProfile.id, { content: trimmed, metadata });
       setComposerText('');
       setSelectedPrompt(null);
-      await loadMessages();
+      const messageMetadata = message?.metadata as Record<string, unknown> | null;
+      const nextTicketId = getTicketIdFromMetadata(messageMetadata) ?? currentTicketId;
+      if (nextTicketId && nextTicketId !== currentTicketId) {
+        setCurrentTicketId(nextTicketId);
+      }
+      await loadMessages({ ticketId: nextTicketId });
       Keyboard.dismiss();
     } catch (err) {
       console.warn('Failed to send support message', err);
     } finally {
       setIsSending(false);
     }
-  }, [activeProfile?.id, composerText, loadMessages]);
+  }, [activeProfile?.id, composerText, currentTicketId, getTicketIdFromMetadata, loadMessages]);
 
   const handlePromptPress = useCallback((prompt: { label: string; message: string }) => {
     setComposerText(prompt.message);
     setSelectedPrompt(prompt.label);
   }, []);
+
+  const submitFeedback = useCallback(async () => {
+    if (!activeProfile?.id || ticketClosed || !feedbackRating || !currentTicketId) {
+      return;
+    }
+    const trimmedNote = feedbackNote.trim();
+    setIsSending(true);
+    try {
+      const metadata = {
+        ticketId: currentTicketId,
+        ticketState: 'closed',
+        feedbackRating,
+        feedbackNote: trimmedNote || undefined,
+      };
+      await createSupportMessage(activeProfile.id, {
+        content: trimmedNote ? `Feedback: ${trimmedNote}` : `Feedback: ${feedbackRating}`,
+        metadata,
+      });
+      setTicketClosed(true);
+      setShowFeedback(false);
+      setFeedbackNote('');
+      setFeedbackRating(null);
+      await loadMessages({ ticketId: currentTicketId });
+    } catch (err) {
+      console.warn('Failed to submit feedback', err);
+    } finally {
+      setIsSending(false);
+    }
+  }, [activeProfile?.id, currentTicketId, feedbackNote, feedbackRating, loadMessages, ticketClosed]);
+
+  const handleEndTicketPress = useCallback(() => {
+    if (!currentTicketId || ticketClosed) {
+      return;
+    }
+    Alert.alert(
+      'End ticket',
+      'Closing this ticket will archive the conversation. You can reopen a new one anytime.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'End ticket',
+          style: 'destructive',
+          onPress: () => setShowFeedback(true),
+        },
+      ]
+    );
+  }, [currentTicketId, ticketClosed]);
 
   const statusMessage = useMemo(() => {
     if (!activeProfile) {
@@ -284,44 +372,65 @@ export default function SupportScreen() {
                         tintColor={theme.colors.accent}
                         title="Pull to refresh"
                         titleColor={theme.colors.textMuted}
+                        colors={[theme.colors.accent]}
+                        progressBackgroundColor={
+                          mode === 'dark' ? withOpacity(theme.colors.surface, 0.08) : theme.colors.surface
+                        }
                       />
                     }
+                    indicatorStyle={mode === 'dark' ? 'white' : 'black'}
                   />
                 )}
               </View>
               <View style={styles.quickPrompts}>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.quickPromptsContent}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.quickPromptsContent}
+              >
+                <Pressable
+                  onPress={handleEndTicketPress}
+                  disabled={!currentTicketId || ticketClosed}
+                  style={({ pressed }) => [
+                    styles.endTicketAction,
+                    {
+                      backgroundColor: pressed
+                        ? withOpacity(theme.colors.danger, 0.2)
+                        : withOpacity(theme.colors.danger, 0.1),
+                      borderColor: pressed ? theme.colors.danger : 'transparent',
+                      opacity: !currentTicketId || ticketClosed ? 0.5 : 1,
+                    },
+                  ]}
                 >
-                  {QUICK_PROMPTS.map((prompt) => {
-                    const active = prompt.label === selectedPrompt;
-                    return (
-                      <Pressable
-                        key={prompt.label}
-                        onPress={() => handlePromptPress(prompt)}
-                        style={({ pressed }) => [
-                          styles.promptChip,
-                          {
-                            backgroundColor: active
-                              ? theme.colors.accent
-                              : pressed
-                              ? withOpacity(theme.colors.accent, 0.08)
-                              : theme.colors.surfaceAlt,
-                            borderColor: active ? theme.colors.accent : 'transparent',
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.promptText, { color: active ? '#fff' : theme.colors.text }]}>
-                          {prompt.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
+                  <Text style={[styles.endTicketText, { color: theme.colors.danger }]}>End ticket</Text>
+                </Pressable>
+                {QUICK_PROMPTS.map((prompt) => {
+                  const active = prompt.label === selectedPrompt;
+                  return (
+                    <Pressable
+                      key={prompt.label}
+                      onPress={() => handlePromptPress(prompt)}
+                      style={({ pressed }) => [
+                        styles.promptChip,
+                        {
+                          backgroundColor: active
+                            ? theme.colors.accent
+                            : pressed
+                            ? withOpacity(theme.colors.accent, 0.08)
+                            : theme.colors.surfaceAlt,
+                          borderColor: active ? theme.colors.accent : 'transparent',
+                        },
+                      ]}
+                    >
+                      <Text style={[styles.promptText, { color: active ? '#fff' : theme.colors.text }]}>
+                        {prompt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
+          </View>
           </View>
         <View
           style={[
@@ -332,39 +441,118 @@ export default function SupportScreen() {
             },
           ]}
         >
-          <TextInput
-            style={[styles.input, { color: theme.colors.text, backgroundColor: composerInputBackground }]}
-            placeholder={activeProfile ? 'Send a message' : 'Finish onboarding to open chat'}
-            placeholderTextColor={withOpacity(theme.colors.text, 0.45)}
-            multiline
-            value={composerText}
-            onChangeText={setComposerText}
-            returnKeyType="send"
-            editable={Boolean(activeProfile)}
-            onSubmitEditing={() => {
-              if (Platform.OS === 'ios' && activeProfile) {
-                void handleSend();
-              }
-            }}
-          />
-          <Pressable
-            onPress={() => void handleSend()}
-            disabled={isSending || !composerText.trim() || !activeProfile}
-            style={({ pressed }) => [
-              styles.sendButton,
-              {
-                backgroundColor: pressed ? withOpacity(theme.colors.accent, 0.85) : theme.colors.accent,
-                opacity: isSending || !composerText.trim() || !activeProfile ? 0.6 : 1,
-              },
-            ]}
-          >
-            {isSending ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Ionicons name="arrow-up" size={18} color="#fff" />
-            )}
-          </Pressable>
+          {ticketClosed ? (
+            <Text style={[styles.ticketClosedCopy, { color: theme.colors.textMuted }]}>
+              Ticket closed. Start a new one from the portal to continue the conversation.
+            </Text>
+          ) : (
+            <>
+              <TextInput
+                style={[styles.input, { color: theme.colors.text, backgroundColor: composerInputBackground }]}
+                placeholder={activeProfile ? 'Send a message' : 'Finish onboarding to open chat'}
+                placeholderTextColor={withOpacity(theme.colors.text, 0.45)}
+                multiline
+                value={composerText}
+                onChangeText={setComposerText}
+                returnKeyType="send"
+                editable={Boolean(activeProfile)}
+                onSubmitEditing={() => {
+                  if (Platform.OS === 'ios' && activeProfile) {
+                    void handleSend();
+                  }
+                }}
+              />
+              <Pressable
+                onPress={() => void handleSend()}
+                disabled={isSending || !composerText.trim() || !activeProfile}
+                style={({ pressed }) => [
+                  styles.sendButton,
+                  {
+                    backgroundColor: pressed ? withOpacity(theme.colors.accent, 0.85) : theme.colors.accent,
+                    opacity: isSending || !composerText.trim() || !activeProfile ? 0.6 : 1,
+                  },
+                ]}
+              >
+                {isSending ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Ionicons name="arrow-up" size={18} color="#fff" />
+                )}
+              </Pressable>
+            </>
+          )}
         </View>
+        {showFeedback && (
+          <View style={styles.feedbackOverlay}>
+            <View style={[styles.feedbackPanel, { backgroundColor: theme.colors.surface }]}>
+              <Text style={[styles.feedbackTitle, { color: theme.colors.text }]}>How did we do?</Text>
+              <View style={styles.ratingRow}>
+                {[
+                  { value: 'positive', label: 'Great' },
+                  { value: 'neutral', label: 'Meh' },
+                  { value: 'negative', label: 'Needs work' },
+                ].map((option) => (
+                  <Pressable
+                    key={option.value}
+                    onPress={() => setFeedbackRating(option.value as 'positive' | 'neutral' | 'negative')}
+                    style={[
+                      styles.ratingButton,
+                      {
+                        backgroundColor:
+                          feedbackRating === option.value
+                            ? theme.colors.accent
+                            : theme.colors.surfaceAlt,
+                        borderColor:
+                          feedbackRating === option.value ? theme.colors.accent : withOpacity(theme.colors.text, 0.2),
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.ratingButtonText,
+                        { color: feedbackRating === option.value ? '#fff' : theme.colors.text },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <TextInput
+                style={[
+                  styles.feedbackInput,
+                  {
+                    borderColor: withOpacity(theme.colors.text, 0.2),
+                    color: theme.colors.text,
+                    backgroundColor: withOpacity(theme.colors.surfaceAlt, 0.6),
+                  },
+                ]}
+                value={feedbackNote}
+                onChangeText={setFeedbackNote}
+                placeholder="Notes (optional)"
+                placeholderTextColor={withOpacity(theme.colors.text, 0.4)}
+                multiline
+              />
+              <View style={styles.feedbackActions}>
+                <Pressable onPress={() => setShowFeedback(false)} style={styles.feedbackCancel}>
+                  <Text style={[styles.feedbackActionText, { color: theme.colors.textMuted }]}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  onPress={submitFeedback}
+                  disabled={!feedbackRating || isSending}
+                  style={[
+                    styles.feedbackSubmit,
+                    {
+                      backgroundColor: feedbackRating ? theme.colors.accent : '#ccc',
+                    },
+                  ]}
+                >
+                  <Text style={styles.feedbackActionText}>Submit</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -486,6 +674,17 @@ const styles = StyleSheet.create({
   quickPromptsContent: {
     paddingVertical: 4,
   },
+  endTicketText: {
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  endTicketAction: {
+    paddingVertical: 6,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    marginRight: 8,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   promptChip: {
     paddingVertical: 6,
     paddingHorizontal: 14,
@@ -532,5 +731,67 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
+  },
+  ticketClosedCopy: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  feedbackOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    justifyContent: 'flex-end',
+  },
+  feedbackPanel: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 20,
+    paddingBottom: 30,
+  },
+  feedbackTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  ratingButton: {
+    flex: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    paddingVertical: 10,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  ratingButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  feedbackInput: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 16,
+    minHeight: 80,
+    padding: 12,
+    textAlignVertical: 'top',
+    marginBottom: 12,
+  },
+  feedbackActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  feedbackCancel: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginRight: 12,
+  },
+  feedbackSubmit: {
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 16,
+  },
+  feedbackActionText: {
+    fontWeight: '600',
   },
 });

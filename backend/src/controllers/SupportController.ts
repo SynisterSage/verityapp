@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 
+import { randomUUID } from 'crypto';
 import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { getAuthenticatedUserId, userCanAccessProfile } from '@src/common/util/auth';
@@ -32,6 +33,8 @@ type SupportTicketSummary = {
   last_message: SupportMessageRow | null;
   unread_agent_messages: number;
   last_activity_at: string | null;
+  ticket_id: string;
+  ticket_subject: string | null;
 };
 
 async function fetchAccessibleProfiles(userId: string) {
@@ -82,6 +85,14 @@ async function fetchLatestMessageForProfile(profileId: string) {
   return (data as SupportMessageRow) ?? null;
 }
 
+function resolveTicketIdentifier(message: SupportMessageRow) {
+  const metadataTicketId = (message.metadata as Record<string, unknown> | null)?.ticketId;
+  if (typeof metadataTicketId === 'string' && metadataTicketId.trim().length > 0) {
+    return metadataTicketId;
+  }
+  return message.profile_id;
+}
+
 async function fetchUnreadAgentMessagesCount(profileId: string) {
   const { count, error } = await supabaseAdmin
     .from('support_messages')
@@ -113,6 +124,7 @@ export default class SupportController {
       return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
     }
 
+    const ticketIdParam = typeof req.query?.ticketId === 'string' && req.query.ticketId.trim() ? req.query.ticketId : null;
     const limitParam = Number(req.query?.limit ?? 200);
     const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 2000) : 200;
 
@@ -130,7 +142,11 @@ export default class SupportController {
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to load messages' });
     }
 
-    return res.status(HTTP_STATUS_CODES.Ok).json({ messages: data ?? [] });
+    const rows = (data ?? []) as SupportMessageRow[];
+    const filtered = ticketIdParam
+      ? rows.filter((row) => resolveTicketIdentifier(row) === ticketIdParam)
+      : rows;
+    return res.status(HTTP_STATUS_CODES.Ok).json({ messages: filtered });
   }
 
   static async createMessage(req: Request, res: Response) {
@@ -155,6 +171,28 @@ export default class SupportController {
       metadata?: Record<string, unknown>;
     };
 
+    const metadataTicketId = metadata?.ticketId;
+    const ticketId =
+      typeof metadataTicketId === 'string' && metadataTicketId.trim().length > 0
+        ? metadataTicketId
+        : randomUUID();
+
+    const subjectCandidate = typeof metadata?.ticketSubject === 'string' && metadata.ticketSubject.trim().length > 0
+      ? metadata.ticketSubject.trim()
+      : content.trim().slice(0, 80);
+
+    const { count: existingCount } = await supabaseAdmin
+      .from('support_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('metadata->>ticketId', ticketId);
+    const isNewTicket = (existingCount ?? 0) === 0;
+
+    const resolvedMetadata: Record<string, unknown> = {
+      ...(metadata ?? {}),
+      ticketId,
+      ticketSubject: isNewTicket ? subjectCandidate : metadata?.ticketSubject ?? subjectCandidate,
+    };
+
     const { data, error } = await supabaseAdmin
       .from('support_messages')
       .insert([
@@ -163,7 +201,7 @@ export default class SupportController {
           sender: 'user',
           content,
           category: category ?? null,
-          metadata: metadata ?? null,
+          metadata: resolvedMetadata,
           is_read_by_user: true,
           is_read_by_agent: false,
         },
@@ -176,7 +214,78 @@ export default class SupportController {
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to send message' });
     }
 
+    if (isNewTicket) {
+      const greetingMetadata: Record<string, unknown> = {
+        ticketId,
+        ticketSubject: subjectCandidate,
+        ticketState: 'open',
+      };
+      const { error: agentError } = await supabaseAdmin
+        .from('support_messages')
+        .insert([
+          {
+            profile_id: profileId,
+            sender: 'agent',
+            content: 'Hi there! What can we assist you with today?',
+            category: 'auto',
+            metadata: greetingMetadata,
+            is_read_by_user: false,
+            is_read_by_agent: true,
+          },
+        ]);
+      if (agentError) {
+        console.warn('Failed to insert agent greeting', agentError);
+      }
+    }
+
     return res.status(201).json({ message: data });
+  }
+
+  static async createTicket(req: Request, res: Response) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+    }
+
+    const { profileId } = req.params;
+    if (!profileId) {
+      return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+    }
+
+    const allowed = await userCanAccessProfile(userId, profileId);
+    if (!allowed) {
+      return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+    }
+
+    const ticketId = randomUUID();
+    const metadata: Record<string, unknown> = {
+      ticketId,
+      ticketSubject: 'New support conversation',
+      ticketState: 'open',
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('support_messages')
+      .insert([
+        {
+          profile_id: profileId,
+          sender: 'agent',
+          content: 'Hi there! What can we assist you with today?',
+          category: 'auto',
+          metadata,
+          is_read_by_user: false,
+          is_read_by_agent: true,
+        },
+      ])
+      .select('*')
+      .single();
+
+    if (error) {
+      console.warn('Failed to create support ticket', error);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to create ticket' });
+    }
+
+    return res.status(201).json({ ticketId, message: data });
   }
 
   static async markAgentMessagesRead(req: Request, res: Response) {
@@ -252,22 +361,67 @@ export default class SupportController {
       return res.status(HTTP_STATUS_CODES.Ok).json({ tickets: [] });
     }
 
-    const ticketSummaries: SupportTicketSummary[] = await Promise.all(
-      profiles.map(async (profile) => {
-        const lastMessage = await fetchLatestMessageForProfile(profile.id);
-        const unreadAgentMessages = await fetchUnreadAgentMessagesCount(profile.id);
-        return {
+    const profileIds = profiles.map((profile) => profile.id);
+    const profileMap = new Map<string, AccessibleProfileRow>();
+    profiles.forEach((profile) => {
+      profileMap.set(profile.id, profile);
+    });
+
+    const { data, error } = await supabaseAdmin
+      .from('support_messages')
+      .select(
+        'id, profile_id, sender, content, category, metadata, is_read_by_user, is_read_by_agent, created_at, updated_at'
+      )
+      .in('profile_id', profileIds)
+      .order('created_at', { ascending: false })
+      .limit(400);
+
+    if (error) {
+      console.warn('Failed to fetch tickets', error);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to load tickets' });
+    }
+
+    const ticketsMap = new Map<string, SupportTicketSummary>();
+    const rows = (data ?? []) as SupportMessageRow[];
+    rows.forEach((message) => {
+      const ticketId = resolveTicketIdentifier(message);
+      if (!ticketId) {
+        return;
+      }
+      const existing = ticketsMap.get(ticketId);
+      const profile = profileMap.get(message.profile_id);
+      if (!profile) {
+        return;
+      }
+      const messageMetadata = message.metadata as Record<string, unknown> | null;
+      const ticketSubject = typeof messageMetadata?.ticketSubject === 'string' ? messageMetadata.ticketSubject : null;
+      if (!existing) {
+        ticketsMap.set(ticketId, {
+          ticket_id: ticketId,
           profile_id: profile.id,
           profile_name: [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Support ticket',
           twilio_virtual_number: profile.twilio_virtual_number,
-          last_message: lastMessage,
-          unread_agent_messages: unreadAgentMessages,
-          last_activity_at: lastMessage?.created_at ?? profile.created_at,
-        };
-      })
-    );
+          last_message: message,
+          last_activity_at: message.created_at,
+          unread_agent_messages: message.sender === 'agent' && !message.is_read_by_user ? 1 : 0,
+          ticket_subject: ticketSubject,
+        });
+        return;
+      }
+      const existingLastActivity = new Date(existing.last_activity_at ?? '').getTime();
+      const messageTime = new Date(message.created_at).getTime();
+      if (messageTime > existingLastActivity) {
+        existing.last_message = message;
+        existing.last_activity_at = message.created_at;
+        existing.ticket_subject = existing.ticket_subject ?? ticketSubject;
+      }
+      if (message.sender === 'agent' && !message.is_read_by_user) {
+        existing.unread_agent_messages += 1;
+      }
+      ticketsMap.set(ticketId, existing);
+    });
 
-    ticketSummaries.sort((a, b) => {
+    const ticketSummaries = Array.from(ticketsMap.values()).sort((a, b) => {
       const aTime = new Date(a.last_activity_at ?? '').getTime();
       const bTime = new Date(b.last_activity_at ?? '').getTime();
       return bTime - aTime;

@@ -19,8 +19,12 @@ async function fetchJson(path: string) {
   return data;
 }
 
-export async function fetchSupportMessages(profileId: string, limit = 200) {
-  const data = await fetchJson(`${baseSupportPath(profileId)}/messages?limit=${limit}`);
+export async function fetchSupportMessages(profileId: string, ticketId?: string | null, limit = 200) {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (ticketId) {
+    query.append('ticketId', ticketId);
+  }
+  const data = await fetchJson(`${baseSupportPath(profileId)}/messages?${query.toString()}`);
   return (data?.messages ?? []) as SupportMessage[];
 }
 
@@ -46,6 +50,13 @@ export async function fetchSupportUnreadCount(profileId: string) {
   return (data?.unreadAgentMessages ?? 0) as number;
 }
 
+export async function createSupportTicket(profileId: string) {
+  const data = await authorizedFetch(`${baseSupportPath(profileId)}/tickets`, {
+    method: 'POST',
+  });
+  return data as { ticketId: string; message: SupportMessage | null };
+}
+
 export type { SupportMessage };
 
 export type SupportTicketSummary = {
@@ -55,6 +66,8 @@ export type SupportTicketSummary = {
   unread_agent_messages: number;
   twilio_virtual_number: string | null;
   last_activity_at: string | null;
+  ticket_id: string;
+  ticket_subject: string | null;
 };
 
 export async function fetchSupportTickets() {

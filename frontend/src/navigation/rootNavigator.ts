@@ -10,8 +10,14 @@ export function navigateToSupportPortal() {
   }
 }
 
-export function navigateToSupportModal() {
+type SupportModalParams = {
+  ticketId?: string | null;
+  profileId?: string;
+  newTicket?: boolean;
+};
+
+export function navigateToSupportModal(params?: SupportModalParams) {
   if (rootNavigationRef.isReady()) {
-    rootNavigationRef.navigate('SupportModal');
+    rootNavigationRef.navigate('SupportModal', params ?? {});
   }
 }

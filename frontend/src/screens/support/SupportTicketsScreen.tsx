@@ -16,7 +16,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
-import { fetchSupportTickets, SupportTicketSummary } from '../../services/support';
+import { createSupportTicket, fetchSupportTickets, SupportTicketSummary } from '../../services/support';
 import { navigateToSupportModal } from '../../navigation/rootNavigator';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -35,6 +35,7 @@ export default function SupportTicketsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [creatingTicket, setCreatingTicket] = useState(false);
 
   const loadTickets = useCallback(
     async (opts?: { showLoading?: boolean }) => {
@@ -68,21 +69,34 @@ export default function SupportTicketsScreen() {
   }, [loadTickets]);
 
   const handleOpenChat = useCallback(
-    (ticketProfileId: string) => {
+    (ticketProfileId: string, ticketId: string) => {
       const profile = profiles.find((item) => item.id === ticketProfileId);
       if (profile) {
         setActiveProfile(profile);
       }
-      navigateToSupportModal();
+      navigateToSupportModal({ ticketId, profileId: ticketProfileId });
     },
     [profiles, setActiveProfile]
   );
 
-  const handleStartNew = useCallback(() => {
-    if (profiles.length > 0) {
-      setActiveProfile(profiles[0]);
+  const handleStartNew = useCallback(async () => {
+    if (profiles.length === 0) {
+      setError('Finish setting up a profile before contacting support.');
+      return;
     }
-    navigateToSupportModal();
+    const primaryProfile = profiles[0];
+    setActiveProfile(primaryProfile);
+    setCreatingTicket(true);
+    try {
+      const data = await createSupportTicket(primaryProfile.id);
+      setCreatingTicket(false);
+      setError(null);
+      navigateToSupportModal({ profileId: primaryProfile.id, ticketId: data?.ticketId ?? null });
+    } catch (err) {
+      console.warn('Failed to start new ticket', err);
+      setCreatingTicket(false);
+      setError('Unable to start a new support conversation. Please try again.');
+    }
   }, [profiles, setActiveProfile]);
 
   const ticketsWithPlaceholders = useMemo(() => {
@@ -96,20 +110,24 @@ export default function SupportTicketsScreen() {
     ({ item }: { item: SupportTicketSummary }) => {
       const hasUnread = item.unread_agent_messages > 0;
       const snippet = item.last_message?.content?.trim().slice(0, 80) ?? 'No conversations yet';
+      const subject = item.ticket_subject ?? 'New conversation';
       return (
         <Pressable
-          onPress={() => handleOpenChat(item.profile_id)}
+          onPress={() => handleOpenChat(item.profile_id, item.ticket_id)}
           style={({ pressed }) => [
             styles.ticketRow,
             { backgroundColor: pressed ? withOpacity(theme.colors.surface, 0.95) : theme.colors.surface },
           ]}
         >
-          <View style={styles.ticketRowLeft}>
-            <Text style={[styles.ticketTitle, { color: theme.colors.text }]}>{item.profile_name}</Text>
-            <Text style={[styles.ticketSnippet, { color: theme.colors.textMuted }]} numberOfLines={2}>
-              {snippet}
-            </Text>
-          </View>
+            <View style={styles.ticketRowLeft}>
+              <Text style={[styles.ticketTitle, { color: theme.colors.text }]}>{item.profile_name}</Text>
+              {subject ? (
+                <Text style={[styles.ticketSubject, { color: theme.colors.textDim }]}>{subject}</Text>
+              ) : null}
+              <Text style={[styles.ticketSnippet, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                {snippet}
+              </Text>
+            </View>
           <View style={styles.ticketMeta}>
             <Text style={[styles.ticketTime, { color: theme.colors.textMuted }]}>
               {formatTimestamp(item.last_activity_at)}
@@ -129,7 +147,7 @@ export default function SupportTicketsScreen() {
   const ListHeader = useCallback(() => {
     return (
       <View style={styles.headerCopy}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>Support tickets</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>History Feed</Text>
         <Text style={[styles.headerSubtitle, { color: theme.colors.textMuted }]}>
           View every ticket tied to your circle, respond, or whip up a fresh message.
         </Text>
@@ -146,22 +164,39 @@ export default function SupportTicketsScreen() {
         <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
           {error ? 'Something went wrong' : 'No tickets yet'}
         </Text>
-        <Text style={[styles.emptyBody, { color: theme.colors.textMuted }]}>
-          {error ?? 'Start a chat and every message will save to this timeline.'}
+        <Text style={[styles.emptyBody, { color: theme.colors.textMuted }]}> 
+          {error ?? 'Start a chat and every message will save to this timeline. The assistant will ask what you need before you reply so we can capture the subject.'}
         </Text>
-        <Pressable onPress={handleStartNew} style={[styles.startButton, { backgroundColor: theme.colors.accent }]}>
-          <Text style={styles.startButtonText}>Send a support message</Text>
+        <Pressable
+          onPress={handleStartNew}
+          disabled={creatingTicket}
+          style={({ pressed }) => [
+            styles.startButton,
+            {
+              backgroundColor: creatingTicket ? withOpacity(theme.colors.accent, 0.6) : theme.colors.accent,
+              opacity: creatingTicket ? 0.8 : 1,
+            },
+          ]}
+        >
+          {creatingTicket ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.startButtonText}>Send a support message</Text>
+          )}
         </Pressable>
       </View>
     );
-  }, [error, handleStartNew, loading, theme.colors.accent, theme.colors.text, theme.colors.textMuted]);
+  }, [error, handleStartNew, loading, theme.colors.accent, theme.colors.text, theme.colors.textMuted, creatingTicket]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.bg }]}>
       <View
         style={[
           styles.topBar,
-          { borderColor: withOpacity(theme.colors.text, 0.12), backgroundColor: theme.colors.surface },
+          {
+            borderColor: withOpacity(theme.colors.text, 0.12),
+            backgroundColor: theme.colors.bg,
+          },
         ]}
       >
         <View>
@@ -174,23 +209,30 @@ export default function SupportTicketsScreen() {
           <Ionicons name="close" size={22} color={theme.colors.text} />
         </Pressable>
       </View>
-      {loading && tickets.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator color={theme.colors.accent} />
-        </View>
-      ) : (
-        <FlatList
-          data={ticketsWithPlaceholders}
-          keyExtractor={(item) => item.profile_id}
-          renderItem={renderTicketItem}
-          ListHeaderComponent={ListHeader}
-          ListEmptyComponent={ListEmpty}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.accent} />
-          }
-          contentContainerStyle={styles.listContent}
-        />
-      )}
+      <View
+        style={[
+          styles.bodyWrapper,
+          { backgroundColor: withOpacity(theme.colors.surface, 0.08) },
+        ]}
+      >
+        {loading && tickets.length === 0 ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator color={theme.colors.accent} />
+          </View>
+        ) : (
+          <FlatList
+            data={ticketsWithPlaceholders}
+            keyExtractor={(item) => item.ticket_id}
+            renderItem={renderTicketItem}
+            ListHeaderComponent={ListHeader}
+            ListEmptyComponent={ListEmpty}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.accent} />
+            }
+            contentContainerStyle={styles.listContent}
+          />
+        )}
+      </View>
       <View style={styles.newTicketFooter}>
         <Pressable onPress={handleStartNew} style={[styles.footerButton, { backgroundColor: theme.colors.accent }]}>
           <Text style={styles.footerButtonText}>New support message</Text>
@@ -232,14 +274,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  bodyWrapper: {
+    flex: 1,
+    marginTop: 12,
+    marginHorizontal: 16,
+    borderRadius: 32,
+    paddingTop: 20,
+    paddingBottom: 10,
+    paddingHorizontal: 0,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   listContent: {
-    padding: 20,
-    paddingBottom: 80,
+    paddingBottom: 200,
+    paddingHorizontal: 16,
   },
   ticketRow: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 22,
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 4,
+    borderColor: 'rgba(255,255,255,0.04)',
   },
   ticketRowLeft: {
     marginBottom: 8,
@@ -251,6 +307,10 @@ const styles = StyleSheet.create({
   ticketSnippet: {
     fontSize: 14,
     marginTop: 4,
+  },
+  ticketSubject: {
+    fontSize: 12,
+    marginTop: 2,
   },
   ticketMeta: {
     flexDirection: 'row',
