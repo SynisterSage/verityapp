@@ -541,6 +541,7 @@ export default function SupportScreen() {
             )}
           </View>
 
+          {!ticketClosed && (
           <View style={styles.quickActions}>
             <ScrollView
               horizontal
@@ -572,7 +573,9 @@ export default function SupportScreen() {
               })}
             </ScrollView>
           </View>
+          )}
 
+          {!ticketClosed && (
           <View
             style={[
               styles.composerOuter,
@@ -630,7 +633,7 @@ export default function SupportScreen() {
                     <Ionicons
                       name="arrow-up"
                       size={20}
-                      color="#fff"
+                      color={composerDisabled ? (mode === 'light' ? theme.colors.text : '#fff') : '#fff'}
                       style={styles.sendIcon}
                     />
                   )}
@@ -638,6 +641,7 @@ export default function SupportScreen() {
               </>
             )}
           </View>
+          )}
         </View>
         <Modal
           visible={showFeedback}
@@ -871,13 +875,14 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
     },
     successAnimationOverlay: {
       position: 'absolute',
-      top: 4,
+      bottom: -4,
       left: 0,
       right: 0,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 18,
-      backgroundColor: withOpacity(theme.colors.surface, 0.6),
+      paddingVertical: 14,
+      marginHorizontal: 12,
+      backgroundColor: withOpacity(theme.colors.surface, 0.0),
       borderRadius: 28,
       zIndex: 2,
       elevation: 4,
