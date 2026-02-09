@@ -587,6 +587,7 @@ const createStyles = (theme: AppTheme) =>
       textAlign: 'center',
       marginBottom: 16,
       lineHeight: 20,
+      paddingBottom: -20,
     },
     startButton: {
       paddingHorizontal: 20,

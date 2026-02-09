@@ -451,6 +451,7 @@ export default class SupportController {
       .select('metadata')
       .eq('profile_id', profileId)
       .eq('metadata->>ticketId', ticketId)
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 

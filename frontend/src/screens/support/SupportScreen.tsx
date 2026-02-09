@@ -5,6 +5,7 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Keyboard,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -77,6 +78,15 @@ export default function SupportScreen() {
   const isNewTicket = route.params?.newTicket ?? false;
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastAgentIdRef = useRef<string | null>(null);
+  const activeTicketId = route.params?.ticketId ?? currentTicketId;
+
+  const getTicketIdFromMetadata = useCallback((metadata?: Record<string, unknown> | null) => {
+    const ticketId = metadata?.ticketId;
+    if (typeof ticketId === 'string' && ticketId.trim().length > 0) {
+      return ticketId;
+    }
+    return null;
+  }, []);
 
   const loadMessages = useCallback(
     async (opts?: { showLoading?: boolean; ticketId?: string | null }) => {
@@ -85,13 +95,29 @@ export default function SupportScreen() {
         setLoading(false);
         return;
       }
-      const showLoading = opts?.showLoading ?? true;
+    const showLoading = opts?.showLoading ?? true;
+    const ticketIdToUse = opts?.ticketId ?? currentTicketId;
+    if (!ticketIdToUse) {
+      setMessages([]);
+      if (showLoading) {
+        setLoading(false);
+      }
+      return;
+    }
       if (showLoading) {
         setLoading(true);
       }
       try {
-        const data = await fetchSupportMessages(activeProfile.id, opts?.ticketId);
+        const data = await fetchSupportMessages(activeProfile.id, ticketIdToUse);
         setMessages(data);
+        if (!opts?.ticketId && data.length > 0) {
+          const inferredFromMetadata = data
+            .map((message) => getTicketIdFromMetadata(message.metadata))
+            .filter(Boolean)[0];
+          if (inferredFromMetadata) {
+            setCurrentTicketId((prev) => prev ?? inferredFromMetadata);
+          }
+        }
         await markSupportMessagesRead(activeProfile.id);
         await refreshUnread();
       } catch (err) {
@@ -101,15 +127,17 @@ export default function SupportScreen() {
         setLoading(false);
       }
     }
-  }, [activeProfile?.id, refreshUnread]);
+  }, [activeProfile?.id, currentTicketId, getTicketIdFromMetadata, refreshUnread, setCurrentTicketId]);
 
   const handleRefresh = useCallback(() => {
     if (!activeProfile?.id) {
       return;
     }
     setRefreshing(true);
-    void loadMessages({ showLoading: false }).finally(() => setRefreshing(false));
-  }, [activeProfile?.id, loadMessages]);
+    void loadMessages({ showLoading: false, ticketId: activeTicketId }).finally(() =>
+      setRefreshing(false)
+    );
+  }, [activeProfile?.id, activeTicketId, loadMessages]);
 
   const playNotification = useCallback(async () => {
     try {
@@ -171,16 +199,15 @@ export default function SupportScreen() {
       setLoading(false);
       return;
     }
-    void loadMessages({ ticketId: currentTicketId });
-  }, [activeProfile?.id, currentTicketId, isNewTicket, loadMessages]);
+    void loadMessages({ ticketId: activeTicketId });
+  }, [activeProfile?.id, activeTicketId, isNewTicket, loadMessages]);
 
-  const getTicketIdFromMetadata = useCallback((metadata?: Record<string, unknown> | null) => {
-    const ticketId = metadata?.ticketId;
-    if (typeof ticketId === 'string' && ticketId.trim().length > 0) {
-      return ticketId;
+  useEffect(() => {
+    const nextTicketId = route.params?.ticketId ?? null;
+    if (nextTicketId && nextTicketId !== currentTicketId) {
+      setCurrentTicketId(nextTicketId);
     }
-    return null;
-  }, []);
+  }, [currentTicketId, route.params?.ticketId]);
 
   const handleSend = useCallback(async () => {
     if (!activeProfile?.id) {
@@ -261,6 +288,11 @@ export default function SupportScreen() {
       ]
     );
   }, [currentTicketId, ticketClosed]);
+
+  const handleCloseFeedback = useCallback(() => {
+    setShowFeedback(false);
+    Keyboard.dismiss();
+  }, []);
 
   const statusMessage = useMemo(() => {
     if (!activeProfile) {
@@ -530,77 +562,106 @@ export default function SupportScreen() {
             )}
           </View>
         </View>
-        {showFeedback && (
-          <View style={styles.feedbackOverlay}>
-            <View style={[styles.feedbackPanel, { backgroundColor: theme.colors.surface }]}>
-              <Text style={[styles.feedbackTitle, { color: theme.colors.text }]}>How did we do?</Text>
-              <View style={styles.ratingRow}>
-                {[
-                  { value: 'positive', label: 'Great' },
-                  { value: 'neutral', label: 'Meh' },
-                  { value: 'negative', label: 'Needs work' },
-                ].map((option) => (
-                  <Pressable
-                    key={option.value}
-                    onPress={() => setFeedbackRating(option.value as 'positive' | 'neutral' | 'negative')}
+        <Modal
+          visible={showFeedback}
+          transparent
+          animationType="fade"
+          onRequestClose={handleCloseFeedback}
+        >
+          <Pressable
+            style={styles.feedbackOverlay}
+            onPress={() => {
+              Keyboard.dismiss();
+            }}
+          >
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={Platform.OS === 'ios' ? 70 : 90}
+              style={styles.feedbackKeyboardWrapper}
+            >
+              <Pressable onPress={(event) => event.stopPropagation()} style={styles.feedbackContentWrapper}>
+                <View style={[styles.feedbackPanel, { backgroundColor: theme.colors.surface }]}>
+                  <Text style={[styles.feedbackTitle, { color: theme.colors.text }]}>How did we do?</Text>
+                  <View style={styles.ratingRow}>
+                    {[
+                      { value: 'positive', label: 'Great' },
+                      { value: 'neutral', label: 'Meh' },
+                      { value: 'negative', label: 'Needs work' },
+                    ].map((option) => (
+                      <Pressable
+                        key={option.value}
+                        onPress={() => setFeedbackRating(option.value as 'positive' | 'neutral' | 'negative')}
+                        style={[
+                          styles.ratingButton,
+                          {
+                            backgroundColor:
+                              feedbackRating === option.value
+                                ? theme.colors.accent
+                                : theme.colors.surfaceAlt,
+                            borderColor:
+                              feedbackRating === option.value ? theme.colors.accent : withOpacity(theme.colors.text, 0.2),
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.ratingButtonText,
+                            { color: feedbackRating === option.value ? '#fff' : theme.colors.text },
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  <TextInput
                     style={[
-                      styles.ratingButton,
+                      styles.feedbackInput,
                       {
-                        backgroundColor:
-                          feedbackRating === option.value
-                            ? theme.colors.accent
-                            : theme.colors.surfaceAlt,
-                        borderColor:
-                          feedbackRating === option.value ? theme.colors.accent : withOpacity(theme.colors.text, 0.2),
+                        borderColor: withOpacity(theme.colors.text, 0.2),
+                        color: theme.colors.text,
+                        backgroundColor: withOpacity(theme.colors.surfaceAlt, 0.6),
                       },
                     ]}
-                  >
-                    <Text
+                    value={feedbackNote}
+                    onChangeText={setFeedbackNote}
+                    placeholder="Notes (optional)"
+                    placeholderTextColor={withOpacity(theme.colors.text, 0.4)}
+                    multiline
+                    onSubmitEditing={() => Keyboard.dismiss()}
+                    scrollEnabled
+                  />
+                  <View style={styles.feedbackActions}>
+                    <Pressable onPress={handleCloseFeedback} style={styles.feedbackCancel}>
+                      <Text style={[styles.feedbackActionText, { color: theme.colors.textMuted }]}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={submitFeedback}
+                      disabled={!feedbackRating || isSending}
                       style={[
-                        styles.ratingButtonText,
-                        { color: feedbackRating === option.value ? '#fff' : theme.colors.text },
+                        styles.feedbackSubmit,
+                        {
+                          backgroundColor: feedbackRating ? theme.colors.accent : withOpacity(theme.colors.text, 0.3),
+                        },
                       ]}
                     >
-                      {option.label}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-              <TextInput
-                style={[
-                  styles.feedbackInput,
-                  {
-                    borderColor: withOpacity(theme.colors.text, 0.2),
-                    color: theme.colors.text,
-                    backgroundColor: withOpacity(theme.colors.surfaceAlt, 0.6),
-                  },
-                ]}
-                value={feedbackNote}
-                onChangeText={setFeedbackNote}
-                placeholder="Notes (optional)"
-                placeholderTextColor={withOpacity(theme.colors.text, 0.4)}
-                multiline
-              />
-              <View style={styles.feedbackActions}>
-                <Pressable onPress={() => setShowFeedback(false)} style={styles.feedbackCancel}>
-                  <Text style={[styles.feedbackActionText, { color: theme.colors.textMuted }]}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={submitFeedback}
-                  disabled={!feedbackRating || isSending}
-                  style={[
-                    styles.feedbackSubmit,
-                    {
-                      backgroundColor: feedbackRating ? theme.colors.accent : '#ccc',
-                    },
-                  ]}
-                >
-                  <Text style={styles.feedbackActionText}>Submit</Text>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        )}
+                      <Text
+                        style={[
+                          styles.feedbackActionText,
+                          {
+                            color: mode === 'light' ? '#fff' : theme.colors.text,
+                          },
+                        ]}
+                      >
+                        Submit
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </Pressable>
+            </KeyboardAvoidingView>
+          </Pressable>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -818,12 +879,25 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
     },
     feedbackOverlay: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: 'rgba(0, 0, 0, 0.35)',
-      justifyContent: 'flex-end',
+      backgroundColor: 'rgba(0, 0, 0, 0.55)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    feedbackKeyboardWrapper: {
+      width: '100%',
+      alignItems: 'center',
+      flex: 1,
+      justifyContent: 'center',
+    },
+    feedbackContentWrapper: {
+      width: '100%',
+      maxWidth: 380,
+      borderRadius: 32,
+      overflow: 'hidden',
     },
     feedbackPanel: {
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
+      borderRadius: 32,
       padding: 20,
       paddingBottom: 30,
     },
@@ -846,8 +920,10 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
       alignItems: 'center',
     },
     ratingButtonText: {
-      fontSize: 14,
+      fontSize: 11,
       fontWeight: '600',
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
     },
     feedbackInput: {
       borderWidth: StyleSheet.hairlineWidth,
