@@ -16,8 +16,6 @@ type SupportMessageRow = {
   updated_at: string;
 };
 
-const CLI_IDENTITY = 'dev-assistant';
-
 type TicketSummary = {
   ticketId: string;
   profileId: string;
@@ -257,7 +255,7 @@ async function getAssistantStatus() {
   const { data } = await supabaseAdmin
     .from('assistant_status')
     .select('id, is_online, updated_at')
-    .eq('id', CLI_IDENTITY)
+    .eq('id', ASSISTANT_STATUS_ID)
     .limit(1)
     .maybeSingle();
   return data;
@@ -265,7 +263,7 @@ async function getAssistantStatus() {
 
 async function setAssistantStatus(isOnline: boolean) {
   await supabaseAdmin.from('assistant_status').upsert({
-    id: CLI_IDENTITY,
+    id: ASSISTANT_STATUS_ID,
     is_online: isOnline,
     updated_at: new Date().toISOString(),
   });

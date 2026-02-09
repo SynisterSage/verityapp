@@ -93,7 +93,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const { activeProfile } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const { unreadAgentCount } = useSupportContext();
+  const { unreadAgentCount, assistantOnline } = useSupportContext();
   const refreshControlProps = useMemo(
     () => ({
       tintColor: theme.colors.text,
@@ -425,6 +425,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           supportAction={{
             onPress: handleSupportPress,
             unreadCount: unreadAgentCount,
+            assistantOnline,
           }}
         />
       </View>

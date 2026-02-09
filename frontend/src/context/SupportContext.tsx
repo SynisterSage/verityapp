@@ -6,7 +6,9 @@ import { useProfile } from './ProfileContext';
 
 type SupportContextValue = {
   unreadAgentCount: number;
+  assistantOnline: boolean;
   refreshUnread: () => Promise<void>;
+  refreshAssistantStatus: () => Promise<void>;
 };
 
 const SupportContext = createContext<SupportContextValue | undefined>(undefined);
@@ -14,6 +16,7 @@ const SupportContext = createContext<SupportContextValue | undefined>(undefined)
 export function SupportProvider({ children }: { children: ReactNode }) {
   const { activeProfile } = useProfile();
   const [unreadAgentCount, setUnreadAgentCount] = useState(0);
+  const [assistantOnline, setAssistantOnline] = useState(false);
   const soundRef = useRef<Audio.Sound | null>(null);
   const lastCountRef = useRef(0);
   const hasInitializedRef = useRef(false);
@@ -34,6 +37,20 @@ export function SupportProvider({ children }: { children: ReactNode }) {
     }
   }, [activeProfile?.id]);
 
+  const refreshAssistantStatus = useCallback(async () => {
+    if (!activeProfile?.id) {
+      setAssistantOnline(false);
+      return;
+    }
+    try {
+      const data = await authorizedFetch(`/profiles/${activeProfile.id}/support/assistant-status`);
+      setAssistantOnline(Boolean(data?.isOnline));
+    } catch (err) {
+      console.warn('Failed to refresh assistant status', err);
+      setAssistantOnline(false);
+    }
+  }, [activeProfile?.id]);
+
   const playNotification = useCallback(async () => {
     try {
       if (!soundRef.current) {
@@ -51,11 +68,13 @@ export function SupportProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refreshUnread();
+    void refreshAssistantStatus();
     const interval = setInterval(() => {
       void refreshUnread();
+      void refreshAssistantStatus();
     }, 30_000);
     return () => clearInterval(interval);
-  }, [refreshUnread]);
+  }, [refreshUnread, refreshAssistantStatus]);
 
   useEffect(() => {
     if (!hasInitializedRef.current) {
@@ -77,9 +96,14 @@ export function SupportProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const contextValue = useMemo(
-    () => ({ unreadAgentCount, refreshUnread }),
-    [unreadAgentCount, refreshUnread]
+const contextValue = useMemo(
+  () => ({
+    unreadAgentCount,
+    assistantOnline,
+      refreshUnread,
+      refreshAssistantStatus,
+    }),
+    [assistantOnline, refreshAssistantStatus, refreshUnread, unreadAgentCount]
   );
 
   return <SupportContext.Provider value={contextValue}>{children}</SupportContext.Provider>;

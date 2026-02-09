@@ -9,6 +9,7 @@ type SupportButtonProps = {
   unreadCount?: number;
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
+  assistantOnline?: boolean;
 };
 
 export default function SupportButton({
@@ -16,6 +17,7 @@ export default function SupportButton({
   unreadCount = 0,
   accessibilityLabel,
   style,
+  assistantOnline = false,
 }: SupportButtonProps) {
   const { theme } = useTheme();
   const countLabel = unreadCount > 9 ? '9+' : `${unreadCount}`;
@@ -28,7 +30,7 @@ export default function SupportButton({
       accessibilityLabel={accessibilityLabel ?? 'Open support chat'}
     >
       <View style={[styles.iconBox, { backgroundColor: theme.colors.surfaceAlt }]}>
-        <Ionicons name="chatbubble-ellipses-outline" size={20} color={theme.colors.text} />
+        <Ionicons name="chatbubble-ellipses-outline" size={20} color={assistantOnline ? theme.colors.success : theme.colors.text} />
         {unreadCount > 0 && (
           <View style={[styles.badge, { backgroundColor: theme.colors.danger }]}>
             <Text style={styles.badgeText}>{countLabel}</Text>
