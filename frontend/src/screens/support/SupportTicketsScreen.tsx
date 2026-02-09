@@ -67,6 +67,7 @@ function getTicketState(ticket: SupportTicketSummary) {
   return ticketState === 'closed' ? 'handled' : 'active';
 }
 
+
 export default function SupportTicketsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SupportPortal'>>();
   const { mode, theme } = useTheme();
@@ -199,8 +200,12 @@ export default function SupportTicketsScreen() {
       return;
     }
     hideTray();
-    handleOpenChat(trayTicket.profile_id, trayTicket.ticket_id);
-  }, [handleOpenChat, hideTray, trayTicket]);
+    navigateToSupportModal({
+      ticketId: trayTicket.ticket_id,
+      profileId: trayTicket.profile_id,
+      autoEnd: true,
+    });
+  }, [hideTray, trayTicket]);
 
   const handleTrayDelete = useCallback(async () => {
     if (!trayTicket) {
@@ -268,10 +273,17 @@ export default function SupportTicketsScreen() {
           delayLongPress={300}
           style={styles.ticketRow}
         >
-          <View style={styles.ticketRowIconRow}>
-            <View style={[styles.avatar, { backgroundColor: avatarColor }]}> 
-              <Ionicons name="chatbubble-outline" size={22} color={avatarIconColor} />
-            </View>
+            <View style={styles.ticketRowIconRow}>
+              <View style={styles.avatarWrapper}>
+                <View style={[styles.avatar, { backgroundColor: avatarColor }]}> 
+                  <Ionicons name="chatbubble-outline" size={22} color={avatarIconColor} />
+                </View>
+                {item.unread_agent_messages > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{item.unread_agent_messages}</Text>
+                  </View>
+                )}
+              </View>
             <View style={styles.ticketTextBlock}>
               <Text style={[styles.ticketTitle, { color: theme.colors.text, fontSize: 19 }]} numberOfLines={1}>
                 {item.profile_name}
@@ -328,12 +340,8 @@ export default function SupportTicketsScreen() {
       <View style={styles.resourcesSection}>
         <Text
           style={[
-            styles.resourcesLabel,
-            {
-              color: theme.colors.textDim,
-              fontSize: 13,
-              letterSpacing: 0.35,
-            },
+            styles.sectionHeader,
+            { color: theme.colors.textMuted, fontWeight: '600' },
           ]}
         >
           RESOURCES
@@ -511,7 +519,10 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      gap: 8,
+      gap: 0,
+    },
+    avatarWrapper: {
+      position: 'relative',
     },
     avatar: {
       width: 56,
@@ -520,6 +531,28 @@ const createStyles = (theme: AppTheme) =>
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 16,
+    },
+    unreadBadge: {
+      position: 'absolute',
+      top: 38,
+      right: 12,
+      minWidth: 24,
+      paddingHorizontal: 6,
+      borderRadius: 999,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#000',
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+      shadowOffset: { width: 0, height: 1 },
+    },
+    unreadBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.colors.accent,
     },
     ticketTextBlock: {
       flex: 1,
@@ -533,6 +566,11 @@ const createStyles = (theme: AppTheme) =>
       fontSize: 16,
       lineHeight: 24,
     },
+    ticketMeta: {
+      fontSize: 12,
+      letterSpacing: 0.15,
+      marginTop: 4,
+    },
     ticketSubject: {
       fontSize: 14,
       marginTop: 6,
@@ -542,7 +580,7 @@ const createStyles = (theme: AppTheme) =>
       fontWeight: '600',
     },
     resourcesSection: {
-      marginTop: 24,
+      marginTop: 6,
       marginBottom: 8,
     },
     resourcesLabel: {

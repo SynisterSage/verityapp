@@ -17,7 +17,7 @@ export type RootStackParamList = {
   AppTabs: undefined;
   CallDetailModal: { callId: string; compact?: boolean };
   SupportPortal: undefined;
-  SupportModal: { ticketId?: string | null; profileId?: string | null; newTicket?: boolean };
+  SupportModal: { ticketId?: string | null; profileId?: string | null; newTicket?: boolean; autoEnd?: boolean };
   CircleActivityModal: { activities: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };
 };
 

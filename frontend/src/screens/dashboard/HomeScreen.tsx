@@ -604,7 +604,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </View>
 
           <View style={styles.section}>
-            <NeedAssistanceCard onPress={() => navigation.navigate('SettingsTab')} />
+            <NeedAssistanceCard onPress={navigateToSupportPortal} />
           </View>
         </View>
       </ScrollView>

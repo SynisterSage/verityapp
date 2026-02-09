@@ -18,7 +18,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { Audio } from 'expo-av';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -79,7 +78,7 @@ export default function SupportScreen() {
   const route = useRoute<RouteProp<RootStackParamList, 'SupportModal'>>();
   const { activeProfile } = useProfile();
   const { mode, theme } = useTheme();
-  const { refreshUnread } = useSupportContext();
+  const { refreshUnread, assistantOnline, playNotificationSound } = useSupportContext();
   const [messages, setMessages] = useState<SupportMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [composerText, setComposerText] = useState('');
@@ -92,12 +91,12 @@ export default function SupportScreen() {
   const [feedbackNote, setFeedbackNote] = useState('');
   const [ticketClosed, setTicketClosed] = useState(false);
   const [currentTicketId, setCurrentTicketId] = useState<string | null>(route.params?.ticketId ?? null);
+  const [autoEndTriggered, setAutoEndTriggered] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const successScale = useRef(new Animated.Value(0)).current;
   const successOpacity = useRef(new Animated.Value(0)).current;
-  const isNewTicket = route.params?.newTicket ?? false;
-  const soundRef = useRef<Audio.Sound | null>(null);
   const lastAgentIdRef = useRef<string | null>(null);
+  const isNewTicket = route.params?.newTicket ?? false;
   const activeTicketId = route.params?.ticketId ?? currentTicketId;
 
   const getTicketIdFromMetadata = useCallback((metadata?: Record<string, unknown> | null) => {
@@ -155,8 +154,8 @@ export default function SupportScreen() {
         setLoading(true);
       }
       try {
-        const data = await fetchSupportMessages(activeProfile.id, ticketIdToUse);
-        setMessages(data);
+      const data = await fetchSupportMessages(activeProfile.id, ticketIdToUse);
+      setMessages(data);
         if (!opts?.ticketId && data.length > 0) {
           const inferredFromMetadata = data
             .map((message) => getTicketIdFromMetadata(message.metadata))
@@ -165,7 +164,7 @@ export default function SupportScreen() {
             setCurrentTicketId((prev) => prev ?? inferredFromMetadata);
           }
         }
-        await markSupportMessagesRead(activeProfile.id);
+      await markSupportMessagesRead(activeProfile.id);
         await refreshUnread();
       } catch (err) {
       console.warn('Failed to load support conversation', err);
@@ -186,30 +185,9 @@ export default function SupportScreen() {
     );
   }, [activeProfile?.id, activeTicketId, loadMessages]);
 
-  const playNotification = useCallback(async () => {
-    try {
-      if (!soundRef.current) {
-        const { sound } = await Audio.Sound.createAsync(
-          require('../../../assets/sounds/support-notification.wav'),
-          { shouldPlay: false }
-        );
-        soundRef.current = sound;
-      }
-      await soundRef.current.replayAsync();
-    } catch (err) {
-      console.warn('Failed to play support notification', err);
-    }
-  }, []);
-
   useEffect(() => {
     void loadMessages();
   }, [loadMessages]);
-
-  useEffect(() => {
-    return () => {
-      soundRef.current?.unloadAsync();
-    };
-  }, []);
 
   useEffect(() => {
     if (messages.length === 0) {
@@ -223,9 +201,9 @@ export default function SupportScreen() {
     }
     if (latestAgent.id !== lastAgentIdRef.current && !latestAgent.is_read_by_user) {
       lastAgentIdRef.current = latestAgent.id;
-      void playNotification();
+      void playNotificationSound();
     }
-  }, [messages, playNotification]);
+  }, [messages, playNotificationSound]);
 
   useEffect(() => {
     const latestMessage = [...messages].slice(-1)[0];
@@ -255,6 +233,7 @@ export default function SupportScreen() {
       setCurrentTicketId(nextTicketId);
     }
   }, [currentTicketId, route.params?.ticketId]);
+
 
   const handleSend = useCallback(async () => {
     if (!activeProfile?.id) {
@@ -352,6 +331,21 @@ export default function SupportScreen() {
     );
   }, [currentTicketId, ticketClosed]);
 
+  useEffect(() => {
+    if (!route.params?.autoEnd) {
+      setAutoEndTriggered(false);
+      return;
+    }
+    if (autoEndTriggered) {
+      return;
+    }
+    if (messages.length === 0 || !currentTicketId) {
+      return;
+    }
+    setAutoEndTriggered(true);
+    handleEndTicketPress();
+  }, [route.params?.autoEnd, autoEndTriggered, messages.length, currentTicketId, handleEndTicketPress]);
+
   const handleCloseFeedback = useCallback(() => {
     setShowFeedback(false);
     Keyboard.dismiss();
@@ -425,9 +419,19 @@ export default function SupportScreen() {
                 {headerTitle}
               </Text>
               <View style={styles.statusRow}>
-                <View style={[styles.statusDot, { backgroundColor: theme.colors.success }]} />
-                <Text style={[styles.statusLabel, { color: withOpacity(theme.colors.text, 0.6) }]}>
-                  ASSISTANT ONLINE
+                <View
+                  style={[
+                    styles.statusDot,
+                    { backgroundColor: assistantOnline ? theme.colors.success : withOpacity(theme.colors.text, 0.2) },
+                  ]}
+                />
+                <Text
+                  style={[
+                    styles.statusLabel,
+                    { color: withOpacity(theme.colors.text, assistantOnline ? 0.6 : 0.4) },
+                  ]}
+                >
+                  {assistantOnline ? 'ASSISTANT ONLINE' : 'ASSISTANT OFFLINE'}
                 </Text>
               </View>
             </View>
@@ -479,8 +483,12 @@ export default function SupportScreen() {
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => {
                   const isUser = item.sender === 'user';
-                  const statusIcon = item.is_read_by_agent ? 'eye' : 'shield-checkmark';
-                  return (
+              const statusIcon = isUser
+                ? item.is_read_by_agent
+                  ? 'eye'
+                  : 'shield-checkmark'
+                : undefined;
+              return (
                     <View style={styles.messageRow}>
                       <View
                         style={[
@@ -627,8 +635,8 @@ export default function SupportScreen() {
                     },
                   ]}
                 >
-                  {isSending ? (
-                    <ActivityIndicator color="#fff" />
+                {isSending ? (
+                    <ActivityIndicator color={mode === 'light' ? theme.colors.text : '#fff'} />
                   ) : (
                     <Ionicons
                       name="arrow-up"

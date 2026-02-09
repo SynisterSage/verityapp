@@ -9,6 +9,7 @@ type SupportContextValue = {
   assistantOnline: boolean;
   refreshUnread: () => Promise<void>;
   refreshAssistantStatus: () => Promise<void>;
+  playNotificationSound: () => Promise<void>;
 };
 
 const SupportContext = createContext<SupportContextValue | undefined>(undefined);
@@ -96,14 +97,15 @@ export function SupportProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-const contextValue = useMemo(
-  () => ({
-    unreadAgentCount,
-    assistantOnline,
+  const contextValue = useMemo(
+    () => ({
+      unreadAgentCount,
+      assistantOnline,
       refreshUnread,
       refreshAssistantStatus,
+      playNotificationSound: playNotification,
     }),
-    [assistantOnline, refreshAssistantStatus, refreshUnread, unreadAgentCount]
+    [assistantOnline, refreshAssistantStatus, refreshUnread, unreadAgentCount, playNotification]
   );
 
   return <SupportContext.Provider value={contextValue}>{children}</SupportContext.Provider>;

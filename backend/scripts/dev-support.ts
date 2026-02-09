@@ -26,7 +26,7 @@ type TicketSummary = {
 };
 
 const USAGE = `Available commands:
-  list                Show a summary of recent tickets
+  list [history]      Show a summary of recent tickets (add 'history' to dump every ticket's timeline)
   view <ticketId>     Print the timeline for a ticket
   reply <ticketId>    Send an agent reply (typing or passing text after the id)
   close <ticketId>    Close a ticket with an optional closing note
@@ -150,7 +150,7 @@ function formatDate(value: string) {
   return new Date(value).toLocaleString('en-US', { hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'short' });
 }
 
-async function listTickets() {
+async function listTickets(showHistory = false) {
   const summaries = await fetchTicketSummaries();
   const profileIds = Array.from(new Set(summaries.map((summary) => summary.profileId))).filter(Boolean);
   const profileNames = await fetchProfileNames(profileIds);
@@ -168,6 +168,24 @@ async function listTickets() {
     Unread: summary.unreadAgentCount,
   }));
   console.table(table);
+  if (!showHistory) {
+    return;
+  }
+  for (const summary of summaries) {
+    console.log(`\nTicket ${summary.ticketId} history (${summary.ticketState ?? 'open'}):`);
+    const messages = await fetchMessagesForTicket(summary.ticketId);
+    if (messages.length === 0) {
+      console.log('  (no messages yet)');
+      continue;
+    }
+    for (const message of messages) {
+      const prefix = message.sender === 'agent' ? 'A' : 'U';
+      const tag = message.sender === 'agent' ? 'AGENT' : 'USER';
+      const time = formatDate(message.created_at);
+      const content = message.content.replace(/\s+/g, ' ').trim();
+      console.log(`  [${prefix}] ${time} ${tag}: ${content}`);
+    }
+  }
 }
 
 async function fetchMessagesForTicket(ticketId: string) {
@@ -287,11 +305,11 @@ async function markTicketRead(ticketId: string) {
   const { profileId } = result;
   await supabaseAdmin
     .from('support_messages')
-    .update({ is_read_by_user: true })
+    .update({ is_read_by_agent: true })
     .eq('profile_id', profileId)
-    .eq('sender', 'agent')
+    .eq('sender', 'user')
     .eq('metadata->>ticketId', ticketId)
-    .eq('is_read_by_user', false);
+    .eq('is_read_by_agent', false);
   console.log('Agent messages marked as read.');
 }
 
@@ -316,9 +334,11 @@ async function repl() {
         return;
       }
       switch (command) {
-        case 'list':
-          await listTickets();
+        case 'list': {
+          const showHistory = args[0] === 'history';
+          await listTickets(showHistory);
           break;
+        }
         case 'view':
           if (!args[0]) {
             console.log('view requires a ticketId');

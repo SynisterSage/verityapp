@@ -14,6 +14,7 @@ type SupportModalParams = {
   ticketId?: string | null;
   profileId?: string;
   newTicket?: boolean;
+  autoEnd?: boolean;
 };
 
 export function navigateToSupportModal(params?: SupportModalParams) {
