@@ -429,4 +429,52 @@ export default class SupportController {
 
     return res.status(HTTP_STATUS_CODES.Ok).json({ tickets: ticketSummaries });
   }
+
+  static async deleteTicket(req: Request, res: Response) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+    }
+
+    const { profileId, ticketId } = req.params;
+    if (!profileId || !ticketId) {
+      return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId or ticketId' });
+    }
+
+    const allowed = await userCanAccessProfile(userId, profileId);
+    if (!allowed) {
+      return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+    }
+
+    const { data, error: fetchError } = await supabaseAdmin
+      .from('support_messages')
+      .select('metadata')
+      .eq('profile_id', profileId)
+      .eq('metadata->>ticketId', ticketId)
+      .limit(1)
+      .maybeSingle();
+
+    if (fetchError || !data) {
+      console.warn('Failed to load ticket metadata', fetchError);
+      return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Ticket not found' });
+    }
+
+    const metadata = data.metadata as Record<string, unknown> | null;
+    if (metadata?.ticketState !== 'closed') {
+      return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Only handled tickets can be deleted' });
+    }
+
+    const { error: deleteError } = await supabaseAdmin
+      .from('support_messages')
+      .delete()
+      .eq('profile_id', profileId)
+      .eq('metadata->>ticketId', ticketId);
+
+    if (deleteError) {
+      console.warn('Failed to delete ticket', deleteError);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to delete ticket' });
+    }
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({ deleted: true });
+  }
 }

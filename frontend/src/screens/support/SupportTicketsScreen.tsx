@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
+  Alert,
+  Animated,
+  Easing,
+  Modal,
   Pressable,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
   View,
@@ -16,26 +20,72 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
-import { createSupportTicket, fetchSupportTickets, SupportTicketSummary } from '../../services/support';
+import { createSupportTicket, deleteSupportTicket, fetchSupportTickets, SupportTicketSummary } from '../../services/support';
 import { navigateToSupportModal } from '../../navigation/rootNavigator';
+import ActionFooter from '../../components/onboarding/ActionFooter';
+import DashboardHeader from '../../components/common/DashboardHeader';
 import type { RootStackParamList } from '../../navigation/types';
+import type { AppTheme } from '../../theme/tokens';
 
-function formatTimestamp(value?: string | null) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const RESOURCES = [
+  { id: 'system', label: 'System Basics', icon: 'book' },
+  { id: 'billing', label: 'Billing', icon: 'card' },
+  { id: 'privacy', label: 'Privacy', icon: 'shield-checkmark' },
+  { id: 'faq', label: 'FAQ', icon: 'help-circle' },
+];
+
+function getRelativeLabel(value?: string | null) {
+  if (!value) return 'Unknown';
+  const now = Date.now();
+  const date = new Date(value).getTime();
+  const diffMs = now - date;
+  if (diffMs < 0) {
+    return 'now';
+  }
+  const minutes = diffMs / (1000 * 60);
+  if (minutes < 60) {
+    const rounded = Math.max(1, Math.round(minutes));
+    return `${rounded}m`;
+  }
+  const hours = minutes / 60;
+  if (hours < 24) {
+    const rounded = Math.max(1, Math.round(hours));
+    return `${rounded}h`;
+  }
+  const days = hours / 24;
+  if (days < 7) {
+    const rounded = Math.max(1, Math.round(days));
+    return `${rounded}d`;
+  }
+  const weeks = Math.max(1, Math.round(days / 7));
+  return `${weeks}w`;
+}
+
+function getTicketState(ticket: SupportTicketSummary) {
+  const metadata = ticket.last_message?.metadata as Record<string, unknown> | null;
+  const ticketState = typeof metadata?.ticketState === 'string' ? metadata.ticketState : null;
+  return ticketState === 'closed' ? 'handled' : 'active';
 }
 
 export default function SupportTicketsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SupportPortal'>>();
-  const { theme } = useTheme();
+  const { mode, theme } = useTheme();
   const { profiles, setActiveProfile } = useProfile();
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [creatingTicket, setCreatingTicket] = useState(false);
+  const [trayTicket, setTrayTicket] = useState<SupportTicketSummary | null>(null);
+  const [isTrayMounted, setIsTrayMounted] = useState(false);
+  const trayAnim = useRef(new Animated.Value(0)).current;
+  const [trayState, setTrayState] = useState<'active' | 'handled' | null>(null);
+  const [trayProcessing, setTrayProcessing] = useState(false);
+  const [activeTrayAction, setActiveTrayAction] = useState<'end' | 'delete' | null>(null);
+
+  const primaryName = profiles[0]?.first_name;
+  const greeting = primaryName ? `How can we assist you, ${primaryName}?` : 'How can we assist you today?';
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const loadTickets = useCallback(
     async (opts?: { showLoading?: boolean }) => {
@@ -79,14 +129,104 @@ export default function SupportTicketsScreen() {
     [profiles, setActiveProfile]
   );
 
+  const handleDeleteTicket = useCallback(
+    async (ticket: SupportTicketSummary, options?: { silent?: boolean }) => {
+      try {
+        await deleteSupportTicket(ticket.profile_id, ticket.ticket_id);
+        if (!options?.silent) {
+          Alert.alert('Conversation removed', 'This handled ticket has been deleted from your history.');
+        }
+        await loadTickets({ showLoading: false });
+      } catch (err) {
+        console.warn('Failed to delete support ticket', err);
+        Alert.alert('Unable to delete', 'Please try again later.');
+        throw err;
+      }
+    },
+    [loadTickets]
+  );
+
+  const showTray = useCallback(
+    (ticket: SupportTicketSummary, state: 'active' | 'handled') => {
+      setTrayTicket(ticket);
+      setTrayState(state);
+      setIsTrayMounted(true);
+      trayAnim.setValue(0);
+      Animated.timing(trayAnim, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    },
+    [trayAnim]
+  );
+
+  const hideTray = useCallback(() => {
+    Animated.timing(trayAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsTrayMounted(false);
+      setTrayTicket(null);
+      setTrayState(null);
+      setActiveTrayAction(null);
+      setTrayProcessing(false);
+    });
+  }, [trayAnim]);
+
+  const trayBackdropOpacity = trayAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.45],
+  });
+  const trayTranslateY = trayAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
+  });
+
+  const handleTrayLongPress = useCallback(
+    (ticket: SupportTicketSummary) => {
+      const state = getTicketState(ticket);
+      showTray(ticket, state);
+    },
+    [showTray]
+  );
+
+  const handleTrayEndTicket = useCallback(() => {
+    if (!trayTicket) {
+      return;
+    }
+    hideTray();
+    handleOpenChat(trayTicket.profile_id, trayTicket.ticket_id);
+  }, [handleOpenChat, hideTray, trayTicket]);
+
+  const handleTrayDelete = useCallback(async () => {
+    if (!trayTicket) {
+      return;
+    }
+    setTrayProcessing(true);
+    setActiveTrayAction('delete');
+    try {
+      await handleDeleteTicket(trayTicket, { silent: true });
+      hideTray();
+    } catch (err) {
+      // Error already handled inside handleDeleteTicket
+    } finally {
+      setTrayProcessing(false);
+      setActiveTrayAction(null);
+    }
+  }, [handleDeleteTicket, hideTray, trayTicket]);
+
   const handleStartNew = useCallback(async () => {
     if (profiles.length === 0) {
       setError('Finish setting up a profile before contacting support.');
       return;
     }
     const primaryProfile = profiles[0];
-    setActiveProfile(primaryProfile);
-    setCreatingTicket(true);
+      setActiveProfile(primaryProfile);
+      setCreatingTicket(true);
     try {
       const data = await createSupportTicket(primaryProfile.id);
       setCreatingTicket(false);
@@ -99,61 +239,56 @@ export default function SupportTicketsScreen() {
     }
   }, [profiles, setActiveProfile]);
 
-  const ticketsWithPlaceholders = useMemo(() => {
-    if (tickets.length > 0) {
-      return tickets;
+  const sections = useMemo(() => {
+    const activeTickets = tickets.filter((ticket) => getTicketState(ticket) === 'active');
+    const handledTickets = tickets.filter((ticket) => getTicketState(ticket) === 'handled');
+    const sectionsList = [] as { title: string; data: SupportTicketSummary[] }[];
+    if (activeTickets.length > 0) {
+      sectionsList.push({ title: 'Active conversations', data: activeTickets });
     }
-    return [];
+    if (handledTickets.length > 0) {
+      sectionsList.push({ title: 'Handled conversations', data: handledTickets });
+    }
+    return sectionsList;
   }, [tickets]);
 
   const renderTicketItem = useCallback(
     ({ item }: { item: SupportTicketSummary }) => {
-      const hasUnread = item.unread_agent_messages > 0;
-      const snippet = item.last_message?.content?.trim().slice(0, 80) ?? 'No conversations yet';
-      const subject = item.ticket_subject ?? 'New conversation';
+      const state = getTicketState(item);
+      const snippet =
+        state === 'handled'
+          ? 'Ticket resolved'
+          : item.last_message?.content?.trim().slice(0, 80) ?? 'No conversations yet';
+      const avatarColor = state === 'active' ? theme.colors.accent : withOpacity(theme.colors.text, 0.15);
+      const avatarIconColor = state === 'active' ? '#fff' : theme.colors.textDim;
       return (
         <Pressable
           onPress={() => handleOpenChat(item.profile_id, item.ticket_id)}
-          style={({ pressed }) => [
-            styles.ticketRow,
-            { backgroundColor: pressed ? withOpacity(theme.colors.surface, 0.95) : theme.colors.surface },
-          ]}
+          onLongPress={() => handleTrayLongPress(item)}
+          delayLongPress={300}
+          style={styles.ticketRow}
         >
-            <View style={styles.ticketRowLeft}>
-              <Text style={[styles.ticketTitle, { color: theme.colors.text }]}>{item.profile_name}</Text>
-              {subject ? (
-                <Text style={[styles.ticketSubject, { color: theme.colors.textDim }]}>{subject}</Text>
-              ) : null}
+          <View style={styles.ticketRowIconRow}>
+            <View style={[styles.avatar, { backgroundColor: avatarColor }]}> 
+              <Ionicons name="chatbubble-outline" size={22} color={avatarIconColor} />
+            </View>
+            <View style={styles.ticketTextBlock}>
+              <Text style={[styles.ticketTitle, { color: theme.colors.text, fontSize: 19 }]} numberOfLines={1}>
+                {item.profile_name}
+              </Text>
               <Text style={[styles.ticketSnippet, { color: theme.colors.textMuted }]} numberOfLines={2}>
                 {snippet}
               </Text>
             </View>
-          <View style={styles.ticketMeta}>
-            <Text style={[styles.ticketTime, { color: theme.colors.textMuted }]}>
-              {formatTimestamp(item.last_activity_at)}
+            <Text style={[styles.ticketTime, { color: theme.colors.textMuted }]} numberOfLines={1}>
+              {getRelativeLabel(item.last_activity_at)}
             </Text>
-            {hasUnread ? (
-              <View style={[styles.unreadBadge, { backgroundColor: theme.colors.accent }]}>
-                <Text style={styles.unreadBadgeText}>{item.unread_agent_messages}</Text>
-              </View>
-            ) : null}
           </View>
         </Pressable>
       );
     },
-    [handleOpenChat, theme.colors.text, theme.colors.surface, theme.colors.textMuted, theme.colors.accent]
+    [handleOpenChat, theme]
   );
-
-  const ListHeader = useCallback(() => {
-    return (
-      <View style={styles.headerCopy}>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>History Feed</Text>
-        <Text style={[styles.headerSubtitle, { color: theme.colors.textMuted }]}>
-          View every ticket tied to your circle, respond, or whip up a fresh message.
-        </Text>
-      </View>
-    );
-  }, [theme.colors.text, theme.colors.textMuted]);
 
   const ListEmpty = useCallback(() => {
     if (loading) {
@@ -161,11 +296,11 @@ export default function SupportTicketsScreen() {
     }
     return (
       <View style={styles.emptyState}>
-        <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.emptyTitle, { color: theme.colors.text }]}> 
           {error ? 'Something went wrong' : 'No tickets yet'}
         </Text>
         <Text style={[styles.emptyBody, { color: theme.colors.textMuted }]}> 
-          {error ?? 'Start a chat and every message will save to this timeline. The assistant will ask what you need before you reply so we can capture the subject.'}
+          {error ?? 'Start a chat and every message will save to this timeline. Our assistant asks what you need before you reply.'}
         </Text>
         <Pressable
           onPress={handleStartNew}
@@ -184,201 +319,366 @@ export default function SupportTicketsScreen() {
             <Text style={styles.startButtonText}>Send a support message</Text>
           )}
         </Pressable>
+    </View>
+  );
+}, [creatingTicket, error, handleStartNew, loading, theme.colors]);
+
+  const ListHeader = useCallback(() => {
+    return (
+      <View style={styles.resourcesSection}>
+        <Text
+          style={[
+            styles.resourcesLabel,
+            {
+              color: theme.colors.textDim,
+              fontSize: 13,
+              letterSpacing: 0.35,
+            },
+          ]}
+        >
+          RESOURCES
+        </Text>
+        <View style={styles.resourcesGrid}>
+          {RESOURCES.map((resource) => (
+            <Pressable
+              key={resource.id}
+              style={({ pressed }) => [
+                styles.resourceTile,
+                {
+                  backgroundColor: pressed
+                    ? withOpacity(theme.colors.surfaceAlt, 0.9)
+                    : theme.colors.surfaceAlt,
+                },
+              ]}
+              onPress={() => null}
+            >
+              <Ionicons name={resource.icon as any} size={18} color={theme.colors.accent} style={styles.resourceIcon} />
+              <Text style={[styles.resourceLabel, { color: theme.colors.text }]}>{resource.label}</Text>
+            </Pressable>
+          ))}
+        </View>
       </View>
     );
-  }, [error, handleStartNew, loading, theme.colors.accent, theme.colors.text, theme.colors.textMuted, creatingTicket]);
+  }, [theme.colors]);
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.bg }]}>
-      <View
-        style={[
-          styles.topBar,
-          {
-            borderColor: withOpacity(theme.colors.text, 0.12),
-            backgroundColor: theme.colors.bg,
-          },
-        ]}
-      >
-        <View>
-          <Text style={[styles.topTitle, { color: theme.colors.text }]}>Support</Text>
-          <Text style={[styles.topSubtitle, { color: theme.colors.textMuted }]}>
-            Stay on top of every ticket and new reply.
-          </Text>
-        </View>
-        <Pressable onPress={navigation.goBack} style={styles.closeButton}>
-          <Ionicons name="close" size={22} color={theme.colors.text} />
-        </Pressable>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.bg }]}> 
+      <View style={styles.headerContainer}>
+        <DashboardHeader
+          title={greeting}
+          subtitle="Message our safety team or browse the quick guides below."
+          align="left"
+        />
       </View>
-      <View
-        style={[
-          styles.bodyWrapper,
-          { backgroundColor: withOpacity(theme.colors.surface, 0.08) },
-        ]}
-      >
+      <View style={styles.contentArea}>
         {loading && tickets.length === 0 ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator color={theme.colors.accent} />
           </View>
         ) : (
-          <FlatList
-            data={ticketsWithPlaceholders}
-            keyExtractor={(item) => item.ticket_id}
-            renderItem={renderTicketItem}
-            ListHeaderComponent={ListHeader}
-            ListEmptyComponent={ListEmpty}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.accent} />
-            }
-            contentContainerStyle={styles.listContent}
-          />
+        <SectionList
+          sections={sections}
+          keyExtractor={(item) => item.ticket_id}
+          renderItem={renderTicketItem}
+          renderSectionHeader={({ section }) => (
+            <Text style={[styles.sectionHeader, { color: theme.colors.textMuted }]}> 
+              {section.title}
+            </Text>
+          )}
+          ListHeaderComponent={ListHeader}
+          ListEmptyComponent={ListEmpty}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.colors.accent} />
+          }
+          contentContainerStyle={styles.listContent}
+          stickySectionHeadersEnabled={false}
+          showsVerticalScrollIndicator={false}
+        />
         )}
       </View>
-      <View style={styles.newTicketFooter}>
-        <Pressable onPress={handleStartNew} style={[styles.footerButton, { backgroundColor: theme.colors.accent }]}>
-          <Text style={styles.footerButtonText}>New support message</Text>
-        </Pressable>
-      </View>
+      <Modal
+        visible={isTrayMounted && Boolean(trayTicket)}
+        transparent
+        animationType="none"
+        onRequestClose={hideTray}
+      >
+        <View style={styles.trayOverlay} pointerEvents="box-none">
+          <Animated.View
+            style={[
+              styles.trayBackdrop,
+              { opacity: trayBackdropOpacity, position: 'absolute', width: '100%', height: '100%' },
+            ]}
+          />
+          <Pressable style={StyleSheet.absoluteFill} onPress={hideTray} />
+          {trayTicket && (
+            <Animated.View
+              style={[
+                styles.tray,
+                {
+                  transform: [{ translateY: trayTranslateY }],
+                },
+              ]}
+            >
+              <View style={styles.trayContent}>
+                <View style={styles.trayHandle} />
+                <Text style={styles.trayTitle}>{trayState === 'handled' ? 'Handled conversation' : 'Active conversation'}</Text>
+                <Text style={styles.traySubtitle}>{trayTicket.profile_name}</Text>
+                <Text style={styles.trayDetail}>{getRelativeLabel(trayTicket.last_activity_at)}</Text>
+                {trayState === 'handled' ? (
+                  <Pressable
+                    style={({ pressed }) => [styles.trayAction, pressed && styles.trayActionPressed]}
+                    onPress={handleTrayDelete}
+                    disabled={trayProcessing}
+                  >
+                    <Text style={styles.trayActionText}>
+                      {trayProcessing && activeTrayAction === 'delete' ? 'Deleting…' : 'Delete from history'}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={({ pressed }) => [styles.trayAction, pressed && styles.trayActionPressed]}
+                    onPress={handleTrayEndTicket}
+                    disabled={trayProcessing}
+                  >
+                    <Text style={styles.trayActionText}>End ticket</Text>
+                  </Pressable>
+                )}
+                <Pressable style={styles.trayCancel} onPress={hideTray}>
+                  <Text style={styles.trayCancelText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </Animated.View>
+          )}
+        </View>
+      </Modal>
+      <ActionFooter
+        primaryLabel="New Message"
+        onPrimaryPress={handleStartNew}
+        primaryLoading={creatingTicket}
+        primaryBackgroundColor={theme.colors.accent}
+        primaryTextColor={mode === 'light' ? theme.colors.surface : theme.colors.text}
+        style={styles.actionFooter}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  topSubtitle: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  bodyWrapper: {
-    flex: 1,
-    marginTop: 12,
-    marginHorizontal: 16,
-    borderRadius: 32,
-    paddingTop: 20,
-    paddingBottom: 10,
-    paddingHorizontal: 0,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  listContent: {
-    paddingBottom: 200,
-    paddingHorizontal: 16,
-  },
-  ticketRow: {
-    borderRadius: 20,
-    padding: 18,
-    marginBottom: 22,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 4,
-    borderColor: 'rgba(255,255,255,0.04)',
-  },
-  ticketRowLeft: {
-    marginBottom: 8,
-  },
-  ticketTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  ticketSnippet: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  ticketSubject: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  ticketMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  ticketTime: {
-    fontSize: 12,
-  },
-  unreadBadge: {
-    minWidth: 24,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  unreadBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  emptyState: {
-    marginTop: 40,
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  emptyBody: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  startButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 999,
-  },
-  startButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  newTicketFooter: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  footerButton: {
-    borderRadius: 999,
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  footerButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  headerCopy: {
-    marginBottom: 12,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-});
+const createStyles = (theme: AppTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    headerContainer: {
+      paddingTop: 12,
+      paddingHorizontal: 24,
+    },
+    closeButton: {
+      width: 36,
+      height: 36,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    contentArea: {
+      flex: 1,
+      paddingTop: 16,
+      paddingHorizontal: 24,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: 80,
+    },
+    listContent: {
+      paddingBottom: 220,
+    },
+    ticketRow: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: 'rgba(255,255,255,0.04)',
+      paddingVertical: 16,
+    },
+    sectionHeader: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      marginTop: 16,
+      marginBottom: 6,
+      paddingHorizontal: 0,
+    },
+    ticketRowIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    avatar: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+    },
+    ticketTextBlock: {
+      flex: 1,
+      marginRight: 12,
+    },
+    ticketTitle: {
+      fontSize: 19,
+      fontWeight: '600',
+    },
+    ticketSnippet: {
+      fontSize: 16,
+      lineHeight: 24,
+    },
+    ticketSubject: {
+      fontSize: 14,
+      marginTop: 6,
+    },
+    ticketTime: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    resourcesSection: {
+      marginTop: 24,
+      marginBottom: 8,
+    },
+    resourcesLabel: {
+      fontSize: 11,
+      fontWeight: '900',
+      letterSpacing: 0.25,
+      marginBottom: 8,
+    },
+    resourcesGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+      marginTop: 12,
+    },
+    resourceTile: {
+      width: '48%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 24,
+      marginBottom: 12,
+    },
+    resourceIcon: {
+      marginRight: 10,
+    },
+    resourceLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    emptyState: {
+      marginTop: 40,
+      alignItems: 'center',
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      marginBottom: 8,
+    },
+    emptyBody: {
+      fontSize: 14,
+      textAlign: 'center',
+      marginBottom: 16,
+      lineHeight: 20,
+    },
+    startButton: {
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 999,
+    },
+    startButtonText: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    headerTitle: {
+      fontSize: 32,
+      fontWeight: '700',
+      lineHeight: 38,
+    },
+    headerSubtitle: {
+      fontSize: 17,
+      fontWeight: '500',
+      marginTop: 8,
+      lineHeight: 24,
+    },
+    actionFooter: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+    },
+    trayOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    trayBackdrop: {
+      backgroundColor: theme.colors.overlay,
+    },
+    tray: {
+      backgroundColor: theme.colors.surface,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      padding: 24,
+      width: '100%',
+      position: 'absolute',
+      bottom: 0,
+    },
+    trayContent: {
+      alignItems: 'center',
+    },
+    trayHandle: {
+      width: 64,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: withOpacity(theme.colors.text, 0.25),
+      marginBottom: 12,
+    },
+    trayTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 4,
+    },
+    traySubtitle: {
+      fontSize: 16,
+      color: theme.colors.textMuted,
+      marginBottom: 4,
+    },
+    trayDetail: {
+      fontSize: 14,
+      color: theme.colors.textMuted,
+      marginBottom: 24,
+    },
+    trayAction: {
+      width: '100%',
+      paddingVertical: 16,
+      borderRadius: 16,
+      backgroundColor: theme.colors.surfaceAlt,
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    trayActionPressed: {
+      opacity: 0.8,
+    },
+    trayActionText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.accent,
+    },
+    trayCancel: {
+      marginTop: 12,
+    },
+    trayCancelText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.textMuted,
+    },
+  });

@@ -57,6 +57,12 @@ export async function createSupportTicket(profileId: string) {
   return data as { ticketId: string; message: SupportMessage | null };
 }
 
+export async function deleteSupportTicket(profileId: string, ticketId: string) {
+  await authorizedFetch(`${baseSupportPath(profileId)}/tickets/${ticketId}`, {
+    method: 'DELETE',
+  });
+}
+
 export type { SupportMessage };
 
 export type SupportTicketSummary = {

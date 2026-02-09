@@ -11,5 +11,6 @@ supportRouter.get('/messages/unread-count', SupportController.getUnreadCount);
 supportRouter.post('/messages', validateRequest(createSupportMessageSchema), SupportController.createMessage);
 supportRouter.patch('/messages/mark-read', SupportController.markAgentMessagesRead);
 supportRouter.post('/tickets', SupportController.createTicket);
+supportRouter.delete('/tickets/:ticketId', SupportController.deleteTicket);
 
 export default supportRouter;

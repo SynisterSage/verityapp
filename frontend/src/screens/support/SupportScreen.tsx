@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useProfile } from '../../context/ProfileContext';
 import { useSupportContext } from '../../context/SupportContext';
@@ -31,6 +32,7 @@ import {
 } from '../../services/support';
 import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../navigation/types';
+import type { AppTheme, ThemeMode } from '../../theme/tokens';
 
 const QUICK_PROMPTS = [
   {
@@ -277,210 +279,256 @@ export default function SupportScreen() {
 
   const composerBackgroundColor = theme.colors.surface;
   const composerInputBackground = theme.colors.surface;
+  const styles = useMemo(() => createStyles(theme, mode), [theme, mode]);
+
+  const composerDisabled = isSending || !composerText.trim() || !activeProfile || ticketClosed;
+  const headerTitle = useMemo(() => {
+    const ticketCandidate = [...messages]
+      .slice()
+      .reverse()
+      .map((message) => getTicketIdFromMetadata(message.metadata))
+      .find(Boolean);
+    const ticketId = currentTicketId ?? ticketCandidate;
+    if (!ticketId) {
+      return 'Help Session';
+    }
+    const sanitized = ticketId.trim();
+    const display =
+      sanitized.length > 6 ? `…${sanitized.slice(-6)}` : sanitized;
+    return `Ticket ${display}`;
+  }, [currentTicketId, getTicketIdFromMetadata, messages]);
 
   return (
     <SafeAreaView
-      edges={['bottom', 'top']}
+      edges={['top', 'bottom']}
       style={[styles.container, { backgroundColor: theme.colors.bg }]}
     >
       <KeyboardAvoidingView
         style={styles.keyboardAvoiding}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 70}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 80}
       >
-        <View style={[styles.content, { backgroundColor: theme.colors.surface }]}>
-            <View style={styles.header}>
-              <View style={styles.headingCopy}>
-                <Text style={[styles.title, { color: theme.colors.text }]}>Verity Support</Text>
-                <Text style={[styles.subtitle, { color: theme.colors.textMuted }]}>{headerSubtitle}</Text>
+        <View style={styles.flex}>
+          <View
+            style={[
+              styles.headerGlass,
+              {
+                borderColor: withOpacity(theme.colors.border, 0.6),
+                backgroundColor: theme.colors.bg,
+              },
+            ]}
+          >
+            <Pressable
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+              accessibilityLabel="Go back"
+            >
+              <Ionicons name="arrow-back" size={20} color={theme.colors.text} />
+            </Pressable>
+            <View style={styles.headerText}>
+              <Text style={[styles.headerTitle, { color: theme.colors.text }]} numberOfLines={1}>
+                {headerTitle}
+              </Text>
+              <View style={styles.statusRow}>
+                <View style={[styles.statusDot, { backgroundColor: theme.colors.success }]} />
+                <Text style={[styles.statusLabel, { color: withOpacity(theme.colors.text, 0.6) }]}>
+                  ASSISTANT ONLINE
+                </Text>
               </View>
-              <Pressable
-                onPress={() => navigation.goBack()}
-                style={styles.closeButton}
-                accessibilityLabel="Close support chat"
-              >
-                <Ionicons name="close" size={22} color={theme.colors.text} />
-              </Pressable>
             </View>
-            <View style={[styles.body, { borderColor: withOpacity(theme.colors.text, 0.08) }]}>
-              {statusMessage && !activeProfile ? (
-                <View style={styles.emptyState}>
-                  <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>Support chat is ready</Text>
-                  <Text style={[styles.emptyStateBody, { color: theme.colors.textMuted }]}>
-                    Finish setting up your profile and the conversation will keep saving in one place.
-                  </Text>
-                </View>
-              ) : null}
-              <View style={styles.messagesWrapper}>
-                {loading ? (
-                  <ActivityIndicator size="small" color={theme.colors.accent} />
-                ) : (
-                  <FlatList
-                    ref={scrollRef}
-                    data={messages}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => {
-                      const isUser = item.sender === 'user';
-                      return (
-                        <View style={styles.messageRow}>
-                          <View
-                            style={[
-                              styles.messageBubble,
-                              isUser ? styles.messageRight : styles.messageLeft,
-                              {
-                                backgroundColor: isUser ? theme.colors.accent : theme.colors.surfaceAlt,
-                              },
-                            ]}
-                          >
-                            <Text style={[styles.messageText, { color: isUser ? '#fff' : theme.colors.text }]}>
-                              {item.content}
-                            </Text>
-                            <View style={styles.timestampRow}>
-                              <Text
-                                style={[
-                                  styles.messageTimestamp,
-                                  { color: isUser ? withOpacity('#fff', 0.8) : theme.colors.textMuted },
-                                ]}
-                              >
-                                {formatTimestamp(item.created_at)}
-                              </Text>
-                              {item.is_read_by_agent ? (
-                                <Ionicons
-                                  name="eye"
-                                  size={12}
-                                  color={isUser ? withOpacity('#fff', 0.68) : theme.colors.textMuted}
-                                  style={styles.readIcon}
-                                  accessible={false}
-                                />
-                              ) : null}
-                            </View>
-                          </View>
-                        </View>
-                      );
-                    }}
-                    style={styles.messagesContainer}
-                    contentContainerStyle={styles.messagesContent}
-                    showsVerticalScrollIndicator
-                    scrollIndicatorInsets={{ right: 12 }}
-                    persistentScrollbar
-                    keyboardShouldPersistTaps="handled"
-                    keyboardDismissMode="on-drag"
-                    refreshControl={
-                      <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={handleRefresh}
-                        tintColor={theme.colors.accent}
-                        title="Pull to refresh"
-                        titleColor={theme.colors.textMuted}
-                        colors={[theme.colors.accent]}
-                        progressBackgroundColor={
-                          mode === 'dark' ? withOpacity(theme.colors.surface, 0.08) : theme.colors.surface
-                        }
-                      />
-                    }
-                    indicatorStyle={mode === 'dark' ? 'white' : 'black'}
-                  />
-                )}
+            <Pressable
+              onPress={handleEndTicketPress}
+              disabled={!currentTicketId || ticketClosed}
+              style={({ pressed }) => [
+                styles.endSessionHeader,
+                {
+                  opacity: !currentTicketId || ticketClosed ? 0.4 : 1,
+                  backgroundColor: pressed
+                    ? withOpacity(theme.colors.danger, 0.18)
+                    : withOpacity(theme.colors.danger, 0.08),
+                },
+              ]}
+              accessibilityLabel="End session"
+            >
+              <Ionicons name="close-circle" size={20} color={theme.colors.danger} />
+            </Pressable>
+          </View>
+
+          <View style={styles.messagesWrapper}>
+            {loading ? (
+              <ActivityIndicator color={theme.colors.accent} size="small" />
+            ) : statusMessage && messages.length === 0 ? (
+              <View style={styles.statusMessage}>
+                <Text style={[styles.statusMessageText, { color: theme.colors.textMuted }]}>
+                  {statusMessage}
+                </Text>
               </View>
-              <View style={styles.quickPrompts}>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.quickPromptsContent}
-              >
-                <Pressable
-                  onPress={handleEndTicketPress}
-                  disabled={!currentTicketId || ticketClosed}
-                  style={({ pressed }) => [
-                    styles.endTicketAction,
+            ) : (
+              <FlatList
+                ref={scrollRef}
+                data={messages}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => {
+                  const isUser = item.sender === 'user';
+                  const statusIcon = item.is_read_by_agent ? 'eye' : 'shield-checkmark';
+                  return (
+                    <View style={styles.messageRow}>
+                      <View
+                        style={[
+                          styles.messageBubble,
+                          isUser ? styles.userBubble : styles.agentBubble,
+                          {
+                            backgroundColor: isUser ? theme.colors.accent : theme.colors.surfaceAlt,
+                            borderBottomRightRadius: isUser ? 6 : 24,
+                            borderBottomLeftRadius: isUser ? 24 : 6,
+                            borderColor: isUser ? 'transparent' : withOpacity(theme.colors.text, 0.2),
+                            borderWidth: isUser ? 0 : StyleSheet.hairlineWidth,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.messageText, { color: isUser ? '#fff' : theme.colors.text }]}>
+                          {item.content}
+                        </Text>
+                      </View>
+                      <View
+                        style={[
+                          styles.metadataRow,
+                          isUser ? styles.metadataRowRight : null,
+                        ]}
+                      >
+                        <Text style={[styles.metadataText, { color: withOpacity(theme.colors.text, 0.4) }]}>
+                          {formatTimestamp(item.created_at)}
+                        </Text>
+                        <Ionicons
+                          name={statusIcon}
+                          size={14}
+                          color={withOpacity(theme.colors.text, 0.4)}
+                          style={styles.metadataIcon}
+                          accessible={false}
+                        />
+                      </View>
+                    </View>
+                    );
+                  }}
+                contentContainerStyle={styles.messagesContent}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    tintColor={theme.colors.accent}
+                    titleColor={theme.colors.textMuted}
+                    colors={[theme.colors.accent]}
+                    progressBackgroundColor={
+                      mode === 'dark'
+                        ? withOpacity(theme.colors.surface, 0.08)
+                        : theme.colors.surface
+                    }
+                  />
+                }
+              />
+            )}
+          </View>
+
+          <View style={styles.quickActions}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickActionsContent}
+            >
+              {QUICK_PROMPTS.map((prompt) => {
+                const active = prompt.label === selectedPrompt;
+                return (
+                  <Pressable
+                    key={prompt.label}
+                    onPress={() => handlePromptPress(prompt)}
+                    style={({ pressed }) => [
+                      styles.quickChip,
+                      {
+                        backgroundColor: active
+                          ? theme.colors.accent
+                          : pressed
+                          ? withOpacity(theme.colors.accent, 0.12)
+                          : theme.colors.surfaceAlt,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.quickChipText, { color: active ? '#fff' : theme.colors.text }]}>
+                      {prompt.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          <View
+            style={[
+              styles.composerOuter,
+              {
+                backgroundColor: composerBackgroundColor,
+                borderColor: withOpacity(theme.colors.text, 0.08),
+              },
+            ]}
+          >
+            {ticketClosed ? (
+              <Text style={[styles.ticketClosedCopy, { color: theme.colors.textMuted }]}>
+                Ticket closed. Start a new one from the portal to continue the conversation.
+              </Text>
+            ) : (
+              <>
+                <TextInput
+                  style={[
+                    styles.input,
                     {
-                      backgroundColor: pressed
-                        ? withOpacity(theme.colors.danger, 0.2)
-                        : withOpacity(theme.colors.danger, 0.1),
-                      borderColor: pressed ? theme.colors.danger : 'transparent',
-                      opacity: !currentTicketId || ticketClosed ? 0.5 : 1,
+                      color: theme.colors.text,
+                      backgroundColor: composerInputBackground,
+                      borderColor: 'transparent',
+                    },
+                  ]}
+                  placeholder={activeProfile ? 'Message us…' : 'Finish onboarding to open chat'}
+                  placeholderTextColor={withOpacity(theme.colors.text, 0.45)}
+                  multiline
+                  value={composerText}
+                  onChangeText={setComposerText}
+                  returnKeyType="send"
+                  editable={Boolean(activeProfile)}
+                  onSubmitEditing={() => {
+                    if (Platform.OS === 'ios' && activeProfile) {
+                      void handleSend();
+                    }
+                  }}
+                />
+                <Pressable
+                  onPress={() => void handleSend()}
+                  disabled={composerDisabled}
+                  style={({ pressed }) => [
+                    styles.sendButton,
+                    {
+                      backgroundColor: composerDisabled
+                        ? withOpacity(theme.colors.border, 0.8)
+                        : pressed
+                        ? withOpacity(theme.colors.accent, 0.85)
+                        : theme.colors.accent,
                     },
                   ]}
                 >
-                  <Text style={[styles.endTicketText, { color: theme.colors.danger }]}>End ticket</Text>
+                  {isSending ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Ionicons
+                      name="arrow-up"
+                      size={20}
+                      color="#fff"
+                      style={styles.sendIcon}
+                    />
+                  )}
                 </Pressable>
-                {QUICK_PROMPTS.map((prompt) => {
-                  const active = prompt.label === selectedPrompt;
-                  return (
-                    <Pressable
-                      key={prompt.label}
-                      onPress={() => handlePromptPress(prompt)}
-                      style={({ pressed }) => [
-                        styles.promptChip,
-                        {
-                          backgroundColor: active
-                            ? theme.colors.accent
-                            : pressed
-                            ? withOpacity(theme.colors.accent, 0.08)
-                            : theme.colors.surfaceAlt,
-                          borderColor: active ? theme.colors.accent : 'transparent',
-                        },
-                      ]}
-                    >
-                      <Text style={[styles.promptText, { color: active ? '#fff' : theme.colors.text }]}>
-                        {prompt.label}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </ScrollView>
-            </View>
+              </>
+            )}
           </View>
-          </View>
-        <View
-          style={[
-            styles.composerOuter,
-            {
-              borderColor: withOpacity(theme.colors.text, 0.1),
-              backgroundColor: composerBackgroundColor,
-            },
-          ]}
-        >
-          {ticketClosed ? (
-            <Text style={[styles.ticketClosedCopy, { color: theme.colors.textMuted }]}>
-              Ticket closed. Start a new one from the portal to continue the conversation.
-            </Text>
-          ) : (
-            <>
-              <TextInput
-                style={[styles.input, { color: theme.colors.text, backgroundColor: composerInputBackground }]}
-                placeholder={activeProfile ? 'Send a message' : 'Finish onboarding to open chat'}
-                placeholderTextColor={withOpacity(theme.colors.text, 0.45)}
-                multiline
-                value={composerText}
-                onChangeText={setComposerText}
-                returnKeyType="send"
-                editable={Boolean(activeProfile)}
-                onSubmitEditing={() => {
-                  if (Platform.OS === 'ios' && activeProfile) {
-                    void handleSend();
-                  }
-                }}
-              />
-              <Pressable
-                onPress={() => void handleSend()}
-                disabled={isSending || !composerText.trim() || !activeProfile}
-                style={({ pressed }) => [
-                  styles.sendButton,
-                  {
-                    backgroundColor: pressed ? withOpacity(theme.colors.accent, 0.85) : theme.colors.accent,
-                    opacity: isSending || !composerText.trim() || !activeProfile ? 0.6 : 1,
-                  },
-                ]}
-              >
-                {isSending ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Ionicons name="arrow-up" size={18} color="#fff" />
-                )}
-              </Pressable>
-            </>
-          )}
         </View>
         {showFeedback && (
           <View style={styles.feedbackOverlay}>
@@ -558,240 +606,272 @@ export default function SupportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  keyboardAvoiding: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    marginHorizontal: 12,
-    borderRadius: 32,
-    padding: 24,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 6,
-    overflow: 'hidden',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  headingCopy: {
-    flex: 1,
-    paddingRight: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  subtitle: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  closeButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  body: {
-    flex: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 28,
-    padding: 16,
-    paddingBottom: 8,
-    marginTop: 6,
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyStateTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  emptyStateBody: {
-    textAlign: 'center',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  messagesContainer: {
-    flex: 1,
-    minHeight: 0,
-    paddingRight: 32,
-  },
-  messagesWrapper: {
-    flex: 1,
-    minHeight: 0,
-  },
-  messagesContent: {
-    flexGrow: 1,
-    paddingBottom: 12,
-  },
-  messageRow: {
-    marginBottom: 10,
-  },
-  messageBubble: {
-    padding: 14,
-    borderRadius: 20,
-    maxWidth: '80%',
-  },
-  timestampRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  messageLeft: {
-    alignSelf: 'flex-start',
-  },
-  messageRight: {
-    alignSelf: 'flex-end',
-  },
-  messageText: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  messageTimestamp: {
-    fontSize: 11,
-  },
-  readIcon: {
-    marginLeft: 6,
-  },
-  quickPrompts: {
-    marginTop: 12,
-  },
-  quickPromptsContent: {
-    paddingVertical: 4,
-  },
-  endTicketText: {
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  endTicketAction: {
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    marginRight: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  promptChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    marginRight: 8,
-    borderWidth: 1,
-  },
-  promptText: {
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  composerOuter: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 28,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginHorizontal: 12,
-    marginTop: 12,
-    marginBottom: 10,
-  },
-  composer: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 140,
-    fontSize: 16,
-  },
-  input: {
-    flex: 1,
-    minHeight: 40,
-    maxHeight: 140,
-    fontSize: 15,
-  },
-  sendButton: {
-    marginLeft: 12,
-    width: 52,
-    height: 52,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 6,
-  },
-  ticketClosedCopy: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  feedbackOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
-    justifyContent: 'flex-end',
-  },
-  feedbackPanel: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    padding: 20,
-    paddingBottom: 30,
-  },
-  feedbackTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  ratingButton: {
-    flex: 1,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    paddingVertical: 10,
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  ratingButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  feedbackInput: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 16,
-    minHeight: 80,
-    padding: 12,
-    textAlignVertical: 'top',
-    marginBottom: 12,
-  },
-  feedbackActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  feedbackCancel: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginRight: 12,
-  },
-  feedbackSubmit: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 16,
-  },
-  feedbackActionText: {
-    fontWeight: '600',
-  },
-});
+const createStyles = (theme: AppTheme, mode: ThemeMode) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    keyboardAvoiding: {
+      flex: 1,
+    },
+    flex: {
+      flex: 1,
+      paddingTop: 0,
+      paddingHorizontal: 0,
+    },
+    headerGlass: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      marginBottom: 0,
+      zIndex: 2,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceAlt,
+      marginRight: 16,
+    },
+    headerText: {
+      flex: 1,
+    },
+    headerTitle: {
+      fontSize: 19,
+      fontWeight: '700',
+    },
+    statusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    statusDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      marginRight: 6,
+      shadowColor: theme.colors.success,
+      shadowRadius: 10,
+      shadowOpacity: 0.6,
+      shadowOffset: { width: 0, height: 0 },
+      elevation: 3,
+    },
+    statusLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.1,
+    },
+    messagesWrapper: {
+      flex: 1,
+      paddingHorizontal: 24,
+      paddingTop: 12,
+      marginTop: 0,
+    },
+    messagesContent: {
+      paddingBottom: 22,
+      paddingTop: 12,
+    },
+    messageRow: {
+      marginBottom: 32,
+    },
+    messageBubble: {
+      paddingHorizontal: 18,
+      paddingVertical: 16,
+      borderRadius: 24,
+      maxWidth: '85%',
+    },
+    userBubble: {
+      alignSelf: 'flex-end',
+    },
+    agentBubble: {
+      alignSelf: 'flex-start',
+    },
+    messageText: {
+      fontSize: 16,
+      lineHeight: 24,
+    },
+    metadataRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    metadataRowRight: {
+      alignSelf: 'flex-end',
+      justifyContent: 'flex-end',
+    },
+    metadataText: {
+      fontSize: 11,
+    },
+    metadataIcon: {
+      marginTop: 2,
+    },
+    quickActions: {
+      marginTop: 10,
+      marginBottom: 12,
+      paddingLeft: 24,
+      paddingRight: 16,
+      paddingTop: 4,
+      paddingBottom: 4,
+      position: 'relative',
+    },
+    quickActionsContent: {
+      paddingBottom: 4,
+      paddingRight: 32,
+      paddingLeft: 16,
+    },
+    quickActionsFade: {
+      position: 'absolute',
+      right: 4,
+      top: 0,
+      bottom: 0,
+      width: 48,
+      pointerEvents: 'none',
+    },
+    endSessionHeader: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 12,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.danger, 0.4),
+    },
+    statusMessage: {
+      padding: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    statusMessageText: {
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign: 'center',
+      maxWidth: 240,
+    },
+    quickChip: {
+      borderRadius: 18,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      marginRight: 8,
+      borderWidth: 0,
+      minHeight: 38,
+      justifyContent: 'center',
+    },
+    quickChipText: {
+      fontSize: 13,
+      fontWeight: '700',
+      letterSpacing: 0.03,
+      textTransform: 'none',
+    },
+    endSessionChip: {
+      backgroundColor: withOpacity(theme.colors.danger, 0.12),
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.danger,
+    },
+    composerOuter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 18,
+      paddingVertical: 12,
+      borderRadius: 30,
+      marginHorizontal: 12,
+      marginBottom: 14,
+      borderWidth: StyleSheet.hairlineWidth,
+      shadowColor: '#000',
+      shadowOpacity: mode === 'dark' ? 0.25 : 0.12,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 6,
+    },
+    input: {
+      flex: 1,
+      minHeight: 6,
+      maxHeight: 180,
+      borderRadius: 24,
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      fontSize: 16,
+    },
+    sendButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 12,
+      shadowColor: '#000',
+      shadowOpacity: 0.25,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 8,
+    },
+    sendIcon: {
+      marginTop: -2,
+    },
+    ticketClosedCopy: {
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: 'center',
+    },
+    feedbackOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.35)',
+      justifyContent: 'flex-end',
+    },
+    feedbackPanel: {
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      padding: 20,
+      paddingBottom: 30,
+    },
+    feedbackTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      marginBottom: 12,
+    },
+    ratingRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    ratingButton: {
+      flex: 1,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: 20,
+      paddingVertical: 10,
+      marginHorizontal: 4,
+      alignItems: 'center',
+    },
+    ratingButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    feedbackInput: {
+      borderWidth: StyleSheet.hairlineWidth,
+      borderRadius: 16,
+      minHeight: 80,
+      padding: 12,
+      textAlignVertical: 'top',
+      marginBottom: 12,
+    },
+    feedbackActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+    },
+    feedbackCancel: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      marginRight: 12,
+    },
+    feedbackSubmit: {
+      paddingVertical: 10,
+      paddingHorizontal: 18,
+      borderRadius: 16,
+    },
+    feedbackActionText: {
+      fontWeight: '600',
+    },
+  });
