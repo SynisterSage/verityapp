@@ -118,7 +118,7 @@ async function fetchTicketSummaries(limit = 600): Promise<TicketSummary[]> {
     if (row.sender === 'agent' && !row.is_read_by_user) {
       existing.unreadAgentCount += 1;
     }
-    if (state) {
+    if (state && !existing.ticketState) {
       existing.ticketState = state;
     }
     if (subject && !existing.subject) {
