@@ -86,13 +86,19 @@ async function fetchLatestMessageForProfile(profileId: string) {
 }
 
 const PROMPT_AUTO_REPLY: Record<string, string> = {
-  'Report scam': 'Thanks for flagging the suspicious call. Our safety team has logged the number and the details you provided.',
-  'Billing question': 'We received your billing question and are routing it to our payments team for a response within 24 hours.',
-  'Technical help': 'We saw your tech request and are sharing it with our engineers so we can assist you with your device.',
-  'Call schedule': 'I’m pulling up the next appointments for your circle and will confirm everything via message shortly.',
-  'Caregiver change': 'You can update caregivers from the profile settings; I\'ve also notified a Verity coordinator to help you finish that.',
-  'Status check': 'I checked your conversation history and noted the latest agent updates—feel free to ask follow-ups if you need more clarity.',
-  'Safety advice': 'See the tips on our safety guide below, and remember to take your time before giving out any personal details.',
+  'Billing question':
+    'Thanks for the billing question. An agent will review the App Store/Play Store receipt and follow up with you shortly.',
+  'Automation & alerts':
+    'Automation and alert settings are noted. An agent will reach out shortly to help you fine-tune the rules.',
+  'Members & roles':
+    'We documented your members/roles question and an agent will be with you shortly to explain the difference between caretakers, trusted contacts, and guests.',
+  'Call recordings':
+    'I’m routing your recording request to a specialist. We’ll reply shortly with the transcript or link you requested.',
+  'Safe phrases':
+    'Safe phrases are a great tool—we’ve logged your question and an agent will follow up shortly to help you add them.',
+  'Connect Verity number':
+    'Connecting the Verity number is noted. An agent will be with you shortly to help forward or pair it to your device.',
+  'General question': 'Thanks for reaching out. An agent will be with you shortly to answer any other questions.',
 };
 
 function resolveTicketIdentifier(message: SupportMessageRow) {

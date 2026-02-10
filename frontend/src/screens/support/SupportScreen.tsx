@@ -38,33 +38,38 @@ import type { AppTheme, ThemeMode } from '../../theme/tokens';
 
 const QUICK_PROMPTS = [
   {
-    label: 'Report scam',
-    message: 'I need help reporting a suspicious call. The number was ___ and it mentioned ___.',
-  },
-  {
     label: 'Billing question',
     message:
-      'I noticed a charge from the App Store/Play Store for Verity Protect. Can you help me understand or gather info for a refund?',
+      'I noticed a charge from the App Store/Play Store for Verity Protect. Please confirm the receipt and next steps if I need a refund.',
   },
   {
-    label: 'Technical help',
-    message: 'I need assistance resetting my safety PIN and syncing a new device.',
+    label: 'Automation & alerts',
+    message:
+      'I want to change automation rules or add safe phrases—help me understand what to edit so alerts behave better.',
   },
   {
-    label: 'Call schedule',
-    message: 'I would like to see a list of upcoming Verity calls for my loved one.',
+    label: 'Members & roles',
+    message:
+      'Explain the difference between caretakers, trusted contacts, and guests, and who can reply to alerts or edit settings.',
   },
   {
-    label: 'Caregiver change',
-    message: 'How do I add or replace a caregiver on this account?',
+    label: 'Call recordings',
+    message:
+      'Point me to a specific call recording/transcript (approximate date/time or caller number) so I can review what happened.',
   },
   {
-    label: 'Status check',
-    message: 'Can you check whether the agent I spoke with earlier has any notes?'
+    label: 'Safe phrases',
+    message:
+      'What are safe phrases, how do I add them, and how do they help my circle bypass screening during calls?',
   },
   {
-    label: 'Safety advice',
-    message: 'Do you have any tips to avoid giving personal info to strangers?',
+    label: 'Connect Verity number',
+    message:
+      'How do I forward or pair the Verity Protect number to my phone/paired device so the calls ring through smoothly?',
+  },
+  {
+    label: 'General question',
+    message: 'Something else about alerts, devices, or account settings—walk me through it.',
   },
 ];
 
@@ -391,7 +396,7 @@ export default function SupportScreen() {
 
   return (
     <SafeAreaView
-      edges={['top', 'bottom']}
+      edges={['top']}
       style={[styles.container, { backgroundColor: theme.colors.bg }]}
     >
       <KeyboardAvoidingView

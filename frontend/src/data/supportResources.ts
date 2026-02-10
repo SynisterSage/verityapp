@@ -35,6 +35,6 @@ export const SUPPORT_PORTAL_RESOURCES: SupportResourceEntry[] = [
     label: 'Billing',
     icon: 'card',
     resource: 'billing',
-    title: 'Billing & subscriptions',
+    title: 'Billing & Subscriptions',
   },
 ];
