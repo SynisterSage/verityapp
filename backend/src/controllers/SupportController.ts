@@ -87,18 +87,19 @@ async function fetchLatestMessageForProfile(profileId: string) {
 
 const PROMPT_AUTO_REPLY: Record<string, string> = {
   'Billing question':
-    'Thanks for the billing question. An agent will review the App Store/Play Store receipt and follow up with you shortly.',
+    'Billing for Verity Protect runs through the App Store or Play Store—you can see receipts and cancel subscriptions there. An agent will send any extra details or next steps shortly.',
   'Automation & alerts':
-    'Automation and alert settings are noted. An agent will reach out shortly to help you fine-tune the rules.',
+    'Automation hunts for scam keywords, repeat callers, and location patterns. Safe phrases let you tell us a call is good without interruption. An agent will be here shortly to help adjust the thresholds and notifications.',
   'Members & roles':
-    'We documented your members/roles question and an agent will be with you shortly to explain the difference between caretakers, trusted contacts, and guests.',
+    'Caretakers can update automation, invite others, and respond to alerts. Trusted contacts only read alerts and can verify safe phrases once you allow the contact picker in Settings → Data & Privacy, and guests have view-only access. An agent will be with you shortly to walk through any role changes.',
   'Call recordings':
-    'I’m routing your recording request to a specialist. We’ll reply shortly with the transcript or link you requested.',
+    'Call entries store recordings, transcripts, and fraud scores so you can review what happened before sharing with your circle. I’m flagging your request and an agent will follow up soon with the right file or link.',
   'Safe phrases':
-    'Safe phrases are a great tool—we’ve logged your question and an agent will follow up shortly to help you add them.',
+    'Safe phrases are words your circle uses to confirm a caller is trusted, and they keep automation from interrupting. Add them in Settings → Safe Phrases. An agent will arrive shortly to help you pick and save the right ones.',
   'Connect Verity number':
-    'Connecting the Verity number is noted. An agent will be with you shortly to help forward or pair it to your device.',
-  'General question': 'Thanks for reaching out. An agent will be with you shortly to answer any other questions.',
+    'Forwarding the Verity number means pairing it to your phone or device in Settings → Paired Devices so calls ring on the hardware you chose. I’ve captured the request and an agent will explain how to finish the setup.',
+  'General question':
+    'Thanks for the question. An agent will review your note shortly and give you a full answer.',
 };
 
 function resolveTicketIdentifier(message: SupportMessageRow) {

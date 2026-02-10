@@ -26,21 +26,32 @@ export const SYSTEM_BASICS_CONTENT: ResourceSection[] = [
     ],
   },
   {
+    id: 'calls-interactions',
+    title: 'Actions on the calls and alerts screens',
+    body:
+      'Calls and alerts stay together so you can take action fast. Tap a call or alert to open the detail view, or long press to bring up quick tools for that item.',
+    bullets: [
+      'Long press a call to block the number, trust it, archive it, or delete the log when it is no longer helpful.',
+      'Long press a handled alert to delete it from your list while keeping the history for your circle.',
+      'Each call shows recordings, transcripts, and the fraud score so you know exactly what happened before sharing or blocking.',
+    ],
+  },
+  {
     id: 'circles',
     title: 'Circle members & roles',
     body:
-      'Invite caretakers, trusted contacts, or emergency helpers from the Members screen. Assign roles to control who can change automation, who can read alerts, and who can stay silent.',
+      'Invite caretakers, trusted contacts, or guests from the Members screen. Assign roles so caretakers manage automation, trusted contacts verify alerts, and guests just watch what you share.',
     bullets: [
-      'Caretakers manage automation, invite people, and can open tickets on behalf of a profile.',
-      'Trusted contacts get read-only insights and can verify alerts with a safe phrase.',
-      'Guests see only what you share and cannot reply or edit settings.',
+      'Caretakers can change automation, invite people, and open tickets.',
+      'Trusted contacts see alerts and prove safety with a safe phrase. To load contacts from your phone, enable contact picker access inside Settings → Data & Privacy before you add trusteds.',
+      'Guests only get read-only history and cannot edit anything.',
     ],
   },
   {
     id: 'automation-safe-phrases',
     title: 'Automation, safe phrases, and blocked callers',
     body:
-      'Automation watches keywords, call volume, location, and other signals. Combine it with safe phrases so your circle knows a call is okay without interrupting you.',
+      'Automation watches keywords, call volume, location, and other signals. Combine it with safe phrases so your circle knows a call is okay without interrupting you. Adjust notifications inside Settings → Notifications to hear only the alerts you care about.',
     bullets: [
       'Create automation rules for scam keywords; the system escalates alerts automatically.',
       'Add safe phrases that the system accepts when heard on a call so your caretakers can keep listening without raising an alarm.',
@@ -72,11 +83,11 @@ export const SYSTEM_BASICS_CONTENT: ResourceSection[] = [
     id: 'support-tickets',
     title: 'Support tickets & feedback',
     body:
-      'Open a ticket whenever something feels off. We keep the conversation in the portal so you can scroll back through replies, file attachments, and automation notes.',
+      'Open a ticket whenever something feels off. We keep the conversation in the portal so you can scroll back through replies, file attachments, and automation notes. Each prompt now sends an auto-reply telling you an agent will join shortly.',
     bullets: [
-      'Use quick-prompt chips to start conversations about scams, billing, or technical help.',
-      'View the timeline to see past replies before writing a new message.',
-      'Hit “End session” when resolved so we can ask how we did and archive the ticket.',
+      'Use quick-prompt chips to get straight to billing, automation, members, recordings, safe phrases, or number setup questions.',
+      'View the timeline to see past replies before writing a new message, and end the session when everything is resolved.',
+      'When you end a ticket we ask for feedback so the team can learn what went well or needs improvement.',
     ],
   },
   {

@@ -1002,9 +1002,15 @@ export default function CallDetailScreen({
                 {isLoadingAudio || recordingStatus === 'loading' ? (
                   <ActivityIndicator color={theme.colors.text} />
                 ) : (
-                  <Text style={styles.playButtonText}>
-                    {isPlaying ? 'Playing…' : 'Listen to message'}
-                  </Text>
+                <Text
+                  style={[
+                    styles.playButtonText,
+                    { color: mode === 'dark' ? '#fff' : theme.colors.surface },
+                    isPlaying && { opacity: 0.8 },
+                  ]}
+                >
+                  {isPlaying ? 'Playing…' : 'Listen to message'}
+                </Text>
                 )}
               </TouchableOpacity>
               {recordingStatus === 'error' && (
