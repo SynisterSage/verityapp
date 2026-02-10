@@ -1,3 +1,5 @@
+import type { SupportResourceType } from '../data/resourceSections';
+
 export type RootStackParamList = {
   SignIn: undefined;
   SignUp: undefined;
@@ -18,6 +20,7 @@ export type RootStackParamList = {
   CallDetailModal: { callId: string; compact?: boolean };
   SupportPortal: undefined;
   SupportModal: { ticketId?: string | null; profileId?: string | null; newTicket?: boolean; autoEnd?: boolean };
+  SupportResource: { resource: SupportResourceType; title?: string };
   CircleActivityModal: { activities: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };
 };
 

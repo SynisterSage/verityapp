@@ -1,6 +1,7 @@
 import { createNavigationContainerRef } from '@react-navigation/native';
 
 import type { RootStackParamList } from './types';
+import type { SupportResourceType } from '../data/resourceSections';
 
 export const rootNavigationRef = createNavigationContainerRef<RootStackParamList>();
 
@@ -17,8 +18,19 @@ type SupportModalParams = {
   autoEnd?: boolean;
 };
 
+type SupportResourceParams = {
+  resource: SupportResourceType;
+  title?: string;
+};
+
 export function navigateToSupportModal(params?: SupportModalParams) {
   if (rootNavigationRef.isReady()) {
     rootNavigationRef.navigate('SupportModal', params ?? {});
+  }
+}
+
+export function navigateToSupportResource(params: SupportResourceParams) {
+  if (rootNavigationRef.isReady()) {
+    rootNavigationRef.navigate('SupportResource', params);
   }
 }

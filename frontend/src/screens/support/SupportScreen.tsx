@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 
 import { useProfile } from '../../context/ProfileContext';
 import { useSupportContext } from '../../context/SupportContext';
@@ -42,7 +43,8 @@ const QUICK_PROMPTS = [
   },
   {
     label: 'Billing question',
-    message: 'Can you explain the last charge on my account?',
+    message:
+      'I noticed a charge from the App Store/Play Store for Verity Protect. Can you help me understand or gather info for a refund?',
   },
   {
     label: 'Technical help',
@@ -561,7 +563,10 @@ export default function SupportScreen() {
                 return (
                   <Pressable
                     key={prompt.label}
-                    onPress={() => handlePromptPress(prompt)}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => null);
+                      handlePromptPress(prompt);
+                    }}
                     style={({ pressed }) => [
                       styles.quickChip,
                       {

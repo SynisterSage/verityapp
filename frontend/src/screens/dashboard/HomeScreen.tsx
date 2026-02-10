@@ -388,18 +388,23 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     ? 'No calls yet'
     : 'Missing #';
   const heroTranscript = recentCall?.transcript ?? (loading ? 'Loading…' : null);
-  const heroFraudLevel =
-    recentCall?.feedback_status === 'marked_fraud'
-      ? 'critical'
-      : recentCall?.feedback_status === 'marked_safe'
-      ? 'low'
-      : recentCall?.fraud_risk_level;
-  const heroBadgeLabel =
-    hasHeroCall && recentCall?.feedback_status === 'marked_fraud'
-      ? 'Fraud'
-      : hasHeroCall && recentCall?.feedback_status === 'marked_safe'
-      ? 'Safe'
-      : undefined;
+  const heroIsHandledFraud = hasHeroCall && recentCall?.feedback_status === 'marked_fraud';
+  const heroFraudLevel = heroIsHandledFraud
+    ? undefined
+    : recentCall?.feedback_status === 'marked_fraud'
+    ? 'critical'
+    : recentCall?.feedback_status === 'marked_safe'
+    ? 'low'
+    : recentCall?.fraud_risk_level;
+  const heroBadgeLabel = heroIsHandledFraud
+    ? 'Handled'
+    : hasHeroCall && recentCall?.feedback_status === 'marked_safe'
+    ? 'Safe'
+    : undefined;
+  const heroBadgeBackgroundColor = heroIsHandledFraud
+    ? withOpacity(theme.colors.textDim, 0.2)
+    : undefined;
+  const heroBadgeTextColor = heroIsHandledFraud ? theme.colors.textDim : undefined;
   const heroSubtitleLabel = hasHeroCall
     ? undefined
     : hasTwilioNumber
@@ -465,6 +470,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               createdAt={recentCall?.created_at}
               fraudLevel={heroFraudLevel}
               badgeLabel={heroBadgeLabel}
+              badgeBackgroundColor={heroBadgeBackgroundColor}
+              badgeTextColor={heroBadgeTextColor}
               hideBadge={!hasHeroCall}
               subtitleLabel={heroSubtitleLabel}
               emptyText={

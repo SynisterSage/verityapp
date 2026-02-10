@@ -1,4 +1,4 @@
 ## Verity App
 
     - Lex F
-    - Last push Jan 11, 26
+    - Last push Feb 10th, 26

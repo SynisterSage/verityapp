@@ -18,6 +18,8 @@ type RecentCallCardProps = {
   maxLength?: number;
   onPress: () => void;
   hideBadge?: boolean;
+  badgeBackgroundColor?: string;
+  badgeTextColor?: string;
 };
 
 export default function RecentCallCard({
@@ -31,12 +33,16 @@ export default function RecentCallCard({
   maxLength = 90,
   onPress,
   hideBadge = false,
+  badgeBackgroundColor,
+  badgeTextColor,
 }: RecentCallCardProps) {
   const { theme } = useTheme();
   const formattedCreatedAt = createdAt ? formatTimestamp(createdAt) : undefined;
   const riskStyles = getRiskStyles(fraudLevel);
-  const badgeBackground = riskStyles.background;
-  const badgeTextColor = riskStyles.accent;
+  const defaultBadgeBackground = riskStyles.background;
+  const defaultBadgeTextColor = riskStyles.accent;
+  const resolvedBadgeBackground = badgeBackgroundColor ?? defaultBadgeBackground;
+  const resolvedBadgeTextColor = badgeTextColor ?? defaultBadgeTextColor;
   const badgeText = (badgeLabel ?? fraudLevel ?? 'unknown').toUpperCase();
   const body = transcript
     ? transcript.length > maxLength
@@ -74,11 +80,11 @@ export default function RecentCallCard({
           style={[
             styles.topBadge,
             {
-              backgroundColor: badgeBackground,
+              backgroundColor: resolvedBadgeBackground,
             },
           ]}
         >
-          <Text style={[styles.badgeText, { color: badgeTextColor }]}>{badgeText}</Text>
+          <Text style={[styles.badgeText, { color: resolvedBadgeTextColor }]}>{badgeText}</Text>
         </View>
         ) : null}
       </View>

@@ -22,17 +22,15 @@ import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import { createSupportTicket, deleteSupportTicket, fetchSupportTickets, SupportTicketSummary } from '../../services/support';
 import { navigateToSupportModal } from '../../navigation/rootNavigator';
+import { navigateToSupportResource } from '../../navigation/rootNavigator';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import DashboardHeader from '../../components/common/DashboardHeader';
 import type { RootStackParamList } from '../../navigation/types';
 import type { AppTheme } from '../../theme/tokens';
 
-const RESOURCES = [
-  { id: 'system', label: 'System Basics', icon: 'book' },
-  { id: 'billing', label: 'Billing', icon: 'card' },
-  { id: 'privacy', label: 'Privacy', icon: 'shield-checkmark' },
-  { id: 'faq', label: 'FAQ', icon: 'help-circle' },
-];
+
+import { SUPPORT_PORTAL_RESOURCES } from '../../data/supportResources';
+import * as Haptics from 'expo-haptics';
 
 function getRelativeLabel(value?: string | null) {
   if (!value) return 'Unknown';
@@ -337,33 +335,36 @@ export default function SupportTicketsScreen() {
 
   const ListHeader = useCallback(() => {
     return (
-      <View style={styles.resourcesSection}>
-        <Text
-          style={[
-            styles.sectionHeader,
-            { color: theme.colors.textMuted, fontWeight: '600' },
-          ]}
-        >
-          RESOURCES
-        </Text>
-        <View style={styles.resourcesGrid}>
-          {RESOURCES.map((resource) => (
-            <Pressable
-              key={resource.id}
-              style={({ pressed }) => [
-                styles.resourceTile,
-                {
-                  backgroundColor: pressed
-                    ? withOpacity(theme.colors.surfaceAlt, 0.9)
-                    : theme.colors.surfaceAlt,
-                },
-              ]}
-              onPress={() => null}
-            >
-              <Ionicons name={resource.icon as any} size={18} color={theme.colors.accent} style={styles.resourceIcon} />
-              <Text style={[styles.resourceLabel, { color: theme.colors.text }]}>{resource.label}</Text>
-            </Pressable>
-          ))}
+        <View style={styles.resourcesSection}>
+          <Text
+            style={[
+              styles.sectionHeader,
+              { color: theme.colors.textMuted, fontWeight: '600' },
+            ]}
+          >
+            RESOURCES
+          </Text>
+          <View style={styles.resourcesGrid}>
+            {SUPPORT_PORTAL_RESOURCES.map((resource) => (
+              <Pressable
+                key={resource.id}
+                style={({ pressed }) => [
+                  styles.resourceTile,
+                  {
+                    backgroundColor: pressed
+                      ? withOpacity(theme.colors.surfaceAlt, 0.9)
+                      : theme.colors.surfaceAlt,
+                  },
+                ]}
+                onPress={() => {
+                  Haptics.selectionAsync().catch(() => null);
+                  navigateToSupportResource({ resource: resource.resource, title: resource.title });
+                }}
+              >
+                <Ionicons name={resource.icon as any} size={18} color={theme.colors.accent} style={styles.resourceIcon} />
+                <Text style={[styles.resourceLabel, { color: theme.colors.text }]}>{resource.label}</Text>
+              </Pressable>
+            ))}
         </View>
       </View>
     );

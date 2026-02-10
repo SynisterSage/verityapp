@@ -135,3 +135,19 @@ Frontend work
 
 Next suggested steps
 - Prototype the remaining main pages and confirm the new headers/footers carry over everywhere; continue pairing the settings experience to onboarding before moving on to any backend follow-up.
+
+2026-02-10
+Scope
+- Centralize support documentation access (resources/billing) across the portal and settings screens, including a dedicated billing page that explains App Store/Play Store charges and support’s role in refunds.
+- Surface those resources directly on the Settings support screen via the 2×2 pill grid, keep the headers/hero copy distinct from the portal, and ensure resource navigation can be reached from both locations without going through the portal.
+- Improve haptics on support interactions and align resource pills’ visual treatment with the portal design.
+
+Frontend work
+- Added billing-focused content (FAQ entry + dedicated resource sections) and a shared `SUPPORT_PORTAL_RESOURCES` list so both portal pills and settings tiles share the same config and navigation targets.
+- Enhanced `SupportResourceScreen` to honor the new billing type, choose tailored titles/subtitles/intros, and keep hero copy specific to each resource.
+- Surface the resource grid inside Settings above the “Need support” hero while keeping the hero and portal cards underneath with their previous treatments, and wire each tile to `navigateToSupportResource`.
+- Applied Expo Haptics to the support quick prompts and resource pills so tapping these controls yields consistent tactile feedback.
+
+Next steps
+- Verify the billing resource is reachable from both the portal and the new Settings grid, and that the App Store guidance stays visible even if the user never opens the chat portal.
+- Keep observing analytics (if available) for flyers on billing tickets so we can refine the quick prompt wording and the FAQ narrative.
