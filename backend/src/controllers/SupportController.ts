@@ -104,7 +104,7 @@ const PROMPT_AUTO_REPLY: Record<string, string> = {
 
 const RESOURCE_AUTO_REPLY_TYPE = 'resource-suggestion';
 const RESOURCE_AUTO_REPLY_CONTENT =
-  'Thanks for the details. An agent will be with you shortly and you can tap the Resources tab in the Support portal to browse system basics, automation & alerts, members & roles, billing, and the FAQ while you wait.';
+  'Thanks for the note. An agent will be with you shortly, and the Resources tab in the Support portal highlights system basics, automation & alerts, members & roles, billing, and the FAQ while you wait.';
 
 function resolveTicketIdentifier(message: SupportMessageRow) {
   const metadataTicketId = (message.metadata as Record<string, unknown> | null)?.ticketId;
@@ -320,6 +320,13 @@ export default class SupportController {
         if (autoError) {
           console.warn('Failed to insert prompt reply', autoError);
         }
+      }
+    }
+
+    if (typeof promptLabel !== 'string') {
+      const alreadyAutoReplied = await hasResourceAutoReply(profileId, ticketId);
+      if (!alreadyAutoReplied) {
+        await insertResourceAutoReply(profileId, ticketId, subjectCandidate);
       }
     }
 
