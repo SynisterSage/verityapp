@@ -5,6 +5,7 @@ import ProfilesController from '@src/controllers/ProfilesController';
 import ProfileMembersController from '@src/controllers/ProfileMembersController';
 import ProfileDeviceTokensController from '@src/controllers/ProfileDeviceTokensController';
 import TwilioClientController from '@src/controllers/TwilioClientController';
+import ProfessionalLookupController from '@src/controllers/ProfessionalLookupController';
 import { validateRequest } from '@src/middleware/validateRequest';
 import {
   createProfileSchema,
@@ -44,5 +45,6 @@ router.delete(PATHS.Profiles.Member, ProfileMembersController.removeMember);
 router.post('/:profileId/twilio-client/token', validateRequest(createClientTokenSchema), TwilioClientController.createClientToken);
 router.post('/:profileId/twilio-client/heartbeat', validateRequest(recordClientHeartbeatSchema), TwilioClientController.recordClientHeartbeat);
 router.post(PATHS.Profiles.DeviceTokens, validateRequest(registerDeviceTokenSchema), ProfileDeviceTokensController.registerDeviceToken);
+router.get(PATHS.Profiles.ProfessionalLookup, ProfessionalLookupController.search);
 
 export default router;
