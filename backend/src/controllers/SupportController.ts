@@ -102,6 +102,10 @@ const PROMPT_AUTO_REPLY: Record<string, string> = {
     'Thanks for the question. An agent will review your note shortly and give you a full answer.',
 };
 
+const RESOURCE_AUTO_REPLY_TYPE = 'resource-suggestion';
+const RESOURCE_AUTO_REPLY_CONTENT =
+  'Thanks for the details. An agent will be with you shortly and you can tap the Resources tab in the Support portal to browse system basics, automation & alerts, members & roles, billing, and the FAQ while you wait.';
+
 function resolveTicketIdentifier(message: SupportMessageRow) {
   const metadataTicketId = (message.metadata as Record<string, unknown> | null)?.ticketId;
   if (typeof metadataTicketId === 'string' && metadataTicketId.trim().length > 0) {
@@ -122,6 +126,41 @@ async function fetchUnreadAgentMessagesCount(profileId: string) {
     return 0;
   }
   return count ?? 0;
+}
+
+async function hasResourceAutoReply(profileId: string, ticketId: string) {
+  const { data } = await supabaseAdmin
+    .from('support_messages')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('metadata->>ticketId', ticketId)
+    .eq('sender', 'agent')
+    .eq('metadata->>autoReplyType', RESOURCE_AUTO_REPLY_TYPE)
+    .limit(1);
+  return Array.isArray(data) && data.length > 0;
+}
+
+async function insertResourceAutoReply(profileId: string, ticketId: string, ticketSubject: string) {
+  const metadata: Record<string, unknown> = {
+    ticketId,
+    ticketSubject,
+    ticketState: 'open',
+    autoReplyType: RESOURCE_AUTO_REPLY_TYPE,
+  };
+  const { error } = await supabaseAdmin.from('support_messages').insert([
+    {
+      profile_id: profileId,
+      sender: 'agent',
+      content: RESOURCE_AUTO_REPLY_CONTENT,
+      category: 'auto',
+      metadata,
+      is_read_by_user: false,
+      is_read_by_agent: true,
+    },
+  ]);
+  if (error) {
+    console.warn('Failed to insert resource auto reply', error);
+  }
 }
 
 export default class SupportController {
