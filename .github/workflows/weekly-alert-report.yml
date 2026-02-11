@@ -13,7 +13,7 @@ jobs:
       - name: Install backend dependencies
         run: |
           cd backend
-          npm ci
+          npm install
       - name: Send weekly alert report
         env:
           NODE_ENV: production
