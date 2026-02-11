@@ -9,6 +9,9 @@ import { getAuthenticatedUserId, userCanAccessProfile } from '@src/common/util/a
 const lookupSchema = z.object({
   q: z.string().min(1).max(200),
   limit: z.string().optional(),
+  lat: z.string().optional(),
+  lon: z.string().optional(),
+  radius: z.string().optional(),
 });
 
 export default class ProfessionalLookupController {
@@ -30,9 +33,16 @@ export default class ProfessionalLookupController {
     if (!parsed.success) {
       return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid query parameters' });
     }
-    const { q, limit } = parsed.data;
+    const { q, limit, lat, lon, radius } = parsed.data;
     try {
-      const results = await searchProfessionalDirectory(q, Number(limit ?? 5));
+      const options = {
+        query: q,
+        limit: Number(limit ?? 5),
+        radiusMeters: radius ? Number(radius) : undefined,
+        lat: lat ? Number(lat) : undefined,
+        lon: lon ? Number(lon) : undefined,
+      };
+      const results = await searchProfessionalDirectory(options);
       return res.status(HTTP_STATUS_CODES.Ok).json({ providers: results });
     } catch (error) {
       logger.err(error as Error);
