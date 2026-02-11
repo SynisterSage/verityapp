@@ -77,7 +77,7 @@ export default function NotificationsScreen() {
       {
         key: 'email',
         title: 'Email reports',
-        description: 'Daily summaries',
+        description: 'Weekly summaries',
         icon: 'mail-outline',
         active: emailAlerts,
       },
