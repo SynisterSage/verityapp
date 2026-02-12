@@ -34,25 +34,60 @@ export type ProfessionalLookupResponse = {
 
 const cache = new Map<string, CacheEntry>();
 
+const STATE_MAP: Record<string, string> = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', 'district of columbia': 'DC',
+  florida: 'FL', georgia: 'GA', hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN',
+  iowa: 'IA', kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD',
+  massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS', missouri: 'MO',
+  montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH', 'new jersey': 'NJ',
+  'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC', 'north dakota': 'ND',
+  ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA', 'rhode island': 'RI',
+  'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN', texas: 'TX', utah: 'UT',
+  vermont: 'VT', virginia: 'VA', washington: 'WA', 'west virginia': 'WV', wisconsin: 'WI',
+  wyoming: 'WY',
+};
+
+function titleCase(input?: string) {
+  if (!input) return input;
+  return input
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 function parseLocationText(text: string) {
   if (!text) {
     return {};
   }
   const normalized = text.replace(/\s+/g, ' ').trim();
   const postalMatch = normalized.match(/\b(\d{5})(?:-\d{4})?\b/);
-  const parts = normalized.split(',').map((section) => section.trim()).filter(Boolean);
-  let city: string | undefined;
+
+  const stateMatch = normalized.match(/(?:,|\s)([A-Za-z]{2})$/);
+  const fullStateMatch = normalized.match(/,\s*([A-Za-z\s]+)$/);
   let state: string | undefined;
-  if (parts.length >= 2) {
-    city = parts[0];
-    state = parts[1];
-  } else if (parts.length === 1) {
-    if (!postalMatch) {
-      city = parts[0];
-    } else if (parts[0].length > 2 && !parts[0].match(/^\d+$/)) {
-      city = parts[0];
-    }
+  if (stateMatch) {
+    state = stateMatch[1].toUpperCase();
+  } else if (fullStateMatch) {
+    const key = fullStateMatch[1].trim().toLowerCase();
+    state = STATE_MAP[key];
   }
+
+  const cleaned = normalized
+    .replace(/,\s*([A-Za-z]{2})$/, '')
+    .replace(/,\s*[A-Za-z\s]+$/, '')
+    .replace(/\s+[A-Za-z]{2}$/, '')
+    .trim();
+
+  const parts = cleaned.split(',').map((p) => p.trim()).filter(Boolean);
+  let city: string | undefined;
+  if (parts.length > 0) {
+    city = titleCase(parts[0]);
+  } else if (!postalMatch) {
+    city = titleCase(cleaned);
+  }
+
   return {
     postalCode: postalMatch ? postalMatch[1] : undefined,
     city,
@@ -74,7 +109,6 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
   const searchParams = new URLSearchParams({
     version: '2.1',
     limit: String(Math.min(limit, 1000)),
-    enumeration_type: 'NPI-1',
     address_purpose: 'LOCATION',
     country_code: 'US',
   });
