@@ -143,10 +143,13 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
       },
     });
     if (!response.ok) {
-      logger.warn(`NPI lookup failed (${response.status}) for query=${normalizedQuery}`);
+      logger.warn(`NPI lookup failed (${response.status}) url=${url}`);
       return { providers: [], totalResults: 0 };
     }
     const body = (await response.json()) as { result_count?: number; results?: any[] };
+    if (!body.results || body.results.length === 0) {
+      logger.info(`NPI lookup returned 0 results url=${url}`);
+    }
     const providers = (body.results ?? [])
       .filter((entry) => entry)
       .map((entry) => {
