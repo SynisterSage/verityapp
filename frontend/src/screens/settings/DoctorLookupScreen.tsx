@@ -14,8 +14,8 @@ import * as Location from 'expo-location';
 import * as Haptics from 'expo-haptics';
 
 import SettingsHeader from '../../components/common/SettingsHeader';
-import ActionFooter from '../../components/onboarding/ActionFooter';
 import { useTheme } from '../../context/ThemeContext';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 import { useProfile } from '../../context/ProfileContext';
 import {
   lookupProviders,
@@ -42,7 +42,7 @@ function truncateLabel(value?: string | null, maxLength = 56) {
 }
 
 export default function DoctorLookupScreen({ navigation }: { navigation: any }) {
-  const { theme } = useTheme();
+  const { mode, theme } = useTheme();
   const colors = theme.colors as {
     surface: string;
     surfaceAlt?: string;
@@ -66,6 +66,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   const [hasSearched, setHasSearched] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingTrusted, setLoadingTrusted] = useState(true);
   const [currentQuery, setCurrentQuery] = useState('');
   const [savingProviderId, setSavingProviderId] = useState<string | null>(null);
   const [deletingTrustedId, setDeletingTrustedId] = useState<string | null>(null);
@@ -77,8 +78,10 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     if (!activeProfile?.id) {
       return;
     }
+    setLoadingTrusted(true);
     const professionals = await listTrustedProfessionals(activeProfile.id);
     setTrusted(professionals);
+    setLoadingTrusted(false);
   }, [activeProfile?.id]);
 
   useMemo(() => {
@@ -114,7 +117,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
         setLoading(false);
       }
     },
-    [activeProfile?.id]
+    [activeProfile?.id, nameQuery]
   );
 
   const loadMoreProviders = useCallback(async () => {
@@ -147,7 +150,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     } finally {
       setLoadingMore(false);
     }
-  }, [activeProfile?.id, currentQuery, results.length, totalResults, loading, loadingMore]);
+  }, [activeProfile?.id, currentQuery, nameQuery, results.length, totalResults, loading, loadingMore]);
 
   const handleLookup = useCallback(() => {
     executeLookup(query);
@@ -277,6 +280,8 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     [trustedPhoneSet, trustedPlaceIdSet]
   );
 
+  const trustedSkeletonRows = useMemo(() => Array.from({ length: 3 }, (_, index) => `trusted-skeleton-${index}`), []);
+  const showTrustedSkeleton = loadingTrusted && doctorTrusted.length === 0;
   const trustedSection = useMemo(
     () => (
       <View style={[styles.trustedWrapper, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -286,7 +291,16 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
             {doctorTrusted.length} Active
           </Text>
         </View>
-        {doctorTrusted.length === 0 ? (
+        {showTrustedSkeleton ? (
+          <View style={styles.trustedSkeletonList}>
+            {trustedSkeletonRows.map((key) => (
+              <View key={key} style={[styles.trustedSkeletonCard, { backgroundColor: withOpacity(theme.colors.text, 0.08) }]}>
+                <View style={[styles.trustedSkeletonLineShort, { backgroundColor: withOpacity(theme.colors.text, 0.2) }]} />
+                <View style={[styles.trustedSkeletonLineLong, { backgroundColor: withOpacity(theme.colors.text, 0.15) }]} />
+              </View>
+            ))}
+          </View>
+        ) : doctorTrusted.length === 0 ? (
           <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Add providers to your safe list</Text>
         ) : (
           doctorTrusted.map((contact) => {
@@ -306,13 +320,13 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
                   <View style={[styles.trustedIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.18) }]}>
                     <Ionicons name="checkmark-circle" size={18} color={theme.colors.accent} />
                   </View>
-                  <View style={styles.trustedText}>
+                  <View style={[styles.trustedText, { marginRight: 12 }]}>
                     <Text
                       style={[styles.providerName, { color: theme.colors.text }]}
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
-                      {truncateLabel(contact.contact_name ?? contact.caller_number, 64)}
+                      {truncateLabel(contact.contact_name ?? contact.caller_number, 20)}
                     </Text>
                     <Text style={[styles.providerMeta, { color: theme.colors.textMuted }]}>{contact.relationship_tag ?? 'Professional'}</Text>
                   </View>
@@ -347,6 +361,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
           ref={scrollViewRef}
           contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 32) + 50, paddingTop: 26 }}
           showsVerticalScrollIndicator={false}
+          indicatorStyle={mode === 'light' ? 'black' : 'white'}
         >
         <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={[styles.heroIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.15) }]}>
@@ -483,6 +498,31 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
           </View>
         </View>
         {trustedSection}
+        <Pressable
+          style={({ pressed }) => [
+            styles.supportCard,
+            {
+              backgroundColor: colors.surfaceAlt ?? colors.surface,
+              borderColor: colors.border,
+              opacity: pressed ? 0.8 : 1,
+            },
+          ]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+            navigateToSupportPortal();
+          }}
+        >
+          <View style={styles.supportIcon}>
+            <Ionicons name="help-circle-outline" size={20} color={colors.accent} />
+          </View>
+          <View style={styles.supportText}>
+            <Text style={[styles.supportTitle, { color: colors.text }]}>Didn’t find your office?</Text>
+            <Text style={[styles.supportSubtitle, { color: colors.textMuted }]}>
+              Contact support to verify it for you.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -674,7 +714,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    marginTop: 6,
+    marginTop: 0,
   },
   trustedHeader: {
     flexDirection: 'row',
@@ -705,6 +745,7 @@ const styles = StyleSheet.create({
   trustedText: {
     flex: 1,
     minWidth: 0,
+    flexShrink: 1,
   },
   trustedCard: {
     borderRadius: 18,
@@ -721,12 +762,60 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     overflow: 'hidden',
   },
+  trustedSkeletonList: {
+    marginBottom: 12,
+  },
+  trustedSkeletonCard: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+  },
+  trustedSkeletonLineShort: {
+    height: 10,
+    borderRadius: 6,
+    marginBottom: 6,
+    width: '55%',
+  },
+  trustedSkeletonLineLong: {
+    height: 10,
+    borderRadius: 6,
+    width: '35%',
+  },
   trashButton: {
     width: 44,
     height: 44,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  supportCard: {
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 16,
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  supportIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  supportText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  supportTitle: {
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  supportSubtitle: {
+    fontSize: 13,
   },
   sectionTitle: {
     fontSize: 14,
