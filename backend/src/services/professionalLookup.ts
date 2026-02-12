@@ -48,8 +48,11 @@ async function fetchProviders(options: LookupOptions) {
     extratags: '1',
     limit: String(limit),
   });
-  if (query) {
-    params.set('q', query);
+  const normalizedQuery = query?.trim();
+  const needsGeoOnlyQuery = !normalizedQuery && lat !== undefined && lon !== undefined;
+  const searchQuery = normalizedQuery || (needsGeoOnlyQuery ? 'healthcare provider' : undefined);
+  if (searchQuery) {
+    params.set('q', searchQuery);
   }
   if (lat !== undefined && lon !== undefined) {
     params.set('lat', String(lat));
