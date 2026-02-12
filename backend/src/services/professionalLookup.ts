@@ -59,6 +59,39 @@ function titleCase(input?: string) {
     .join(' ');
 }
 
+function normalizeForSearch(input?: string | null) {
+  if (!input) {
+    return '';
+  }
+  return input.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function entryMatchesName(entry: any, rawNeedle: string) {
+  const needle = normalizeForSearch(rawNeedle);
+  if (!needle) {
+    return true;
+  }
+  const basic = entry.basic ?? {};
+  const addresses = Array.isArray(entry.addresses) ? entry.addresses : [];
+  const otherNames = Array.isArray(entry.other_names) ? entry.other_names : [];
+  const taxonomies = Array.isArray(entry.taxonomies) ? entry.taxonomies : [];
+  const locationAddress = addresses.find((addr: any) => addr.address_purpose === 'LOCATION') ?? addresses[0] ?? {};
+  const haystack = [
+    basic.organization_name,
+    [basic.first_name, basic.middle_name, basic.last_name].filter(Boolean).join(' '),
+    locationAddress.address_1,
+    locationAddress.address_2,
+    locationAddress.city,
+    locationAddress.state,
+    ...otherNames.map((n: any) => n.organization_name),
+    ...taxonomies.map((t: any) => t.desc),
+  ]
+    .map((value) => normalizeForSearch(String(value ?? '')))
+    .filter(Boolean)
+    .join(' ');
+  return haystack.includes(needle);
+}
+
 function parseLocationText(text: string) {
   if (!text) {
     return {};
@@ -113,14 +146,14 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
   }
   const trimmedName = name?.trim() ?? '';
   const nameParts = trimmedName ? trimmedName.split(/\s+/) : [];
-  const buildSearchParams = (mode: NameMode, requestLimit: number) => {
+  const buildSearchParams = (mode: NameMode, requestLimit: number, includeSkip: boolean) => {
     const params = new URLSearchParams({
       version: '2.1',
       limit: String(Math.min(requestLimit, 1000)),
       address_purpose: 'LOCATION',
       country_code: 'US',
     });
-    if (offset > 0) {
+    if (includeSkip && offset > 0) {
       params.set('skip', String(offset));
     }
     if (locationParams.postalCode) {
@@ -142,8 +175,8 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
     return params;
   };
 
-  const fetchAttempt = async (mode: NameMode, requestLimit = limit) => {
-    const url = `${NPI_API_URL}?${buildSearchParams(mode, requestLimit).toString()}`;
+  const fetchAttempt = async (mode: NameMode, requestLimit = limit, includeSkip = true) => {
+    const url = `${NPI_API_URL}?${buildSearchParams(mode, requestLimit, includeSkip).toString()}`;
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'VerityProtect/1.0 (support@verityprotect.com)',
@@ -166,32 +199,26 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
       : ['none'];
 
     let selectedBody: { result_count?: number; results?: any[] } = { results: [], result_count: 0 };
-    let selectedMode: NameMode = candidateModes[0] ?? 'none';
     for (const mode of candidateModes) {
-      const requestLimit = mode === 'none' && trimmedName ? Math.max(limit * 5, 50) : limit;
-      const { body } = await fetchAttempt(mode, requestLimit);
-      if ((body.results ?? []).length > 0) {
-        selectedBody = body;
-        selectedMode = mode;
+      const requestLimit = trimmedName ? Math.max(limit * 20, 200) : limit;
+      const { body } = await fetchAttempt(mode, requestLimit, !trimmedName);
+      const candidates = (body.results ?? []).filter((entry) => entryMatchesName(entry, trimmedName));
+      if (trimmedName && candidates.length > 0) {
+        selectedBody = { ...body, results: candidates, result_count: candidates.length };
         break;
       }
-      selectedBody = body;
-      selectedMode = mode;
+      if (!trimmedName && (body.results ?? []).length > 0) {
+        selectedBody = body;
+        break;
+      }
+      selectedBody = trimmedName
+        ? { ...body, results: candidates, result_count: candidates.length }
+        : body;
     }
 
     let entries = selectedBody.results ?? [];
-    if (trimmedName && entries.length > 0 && selectedMode === 'none') {
-      const needle = trimmedName.toLowerCase();
-      entries = entries.filter((entry) => {
-        const basic = entry.basic ?? {};
-        const addresses = Array.isArray(entry.addresses) ? entry.addresses : [];
-        const locationAddress = addresses.find((addr: any) => addr.address_purpose === 'LOCATION') ?? addresses[0] ?? {};
-        const personName = [basic.first_name, basic.middle_name, basic.last_name].filter(Boolean).join(' ').toLowerCase();
-        const orgName = String(basic.organization_name ?? '').toLowerCase();
-        const address = String(locationAddress.address_1 ?? '').toLowerCase();
-        return orgName.includes(needle) || personName.includes(needle) || address.includes(needle);
-      });
-      entries = entries.slice(0, limit);
+    if (trimmedName) {
+      entries = entries.slice(offset, offset + limit);
     }
 
     const providers = entries
