@@ -124,13 +124,16 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
   if (locationParams.state) {
     searchParams.set('state', locationParams.state);
   }
+
   if (name?.trim()) {
-    const parts = name.trim().split(/\s+/);
+    const trimmedName = name.trim();
+    const parts = trimmedName.split(/\s+/);
     if (parts.length >= 2) {
       searchParams.set('first_name', parts[0]);
       searchParams.set('last_name', parts.slice(1).join(' '));
+    } else {
+      searchParams.set('organization_name', trimmedName);
     }
-    searchParams.set('organization_name', name.trim());
   }
   const url = `${NPI_API_URL}?${searchParams.toString()}`;
   try {

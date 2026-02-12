@@ -328,7 +328,8 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
       <SettingsHeader title="Doctor Lookup" subtitle="Trusted Professionals" />
         <ScrollView
           ref={scrollViewRef}
-          contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 32) + 150, paddingTop: 26 }}
+          contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 32) + 50, paddingTop: 26 }}
+          showsVerticalScrollIndicator={false}
         >
         <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={[styles.heroIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.15) }]}>
@@ -466,11 +467,6 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
         </View>
         {trustedSection}
       </ScrollView>
-      <ActionFooter
-        primaryLabel="Back to Settings"
-        onPrimaryPress={() => navigation.goBack()}
-        primaryTextColor="#ffffff"
-      />
     </SafeAreaView>
   );
 }
@@ -661,7 +657,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     padding: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    marginTop: 16,
+    marginTop: 6,
   },
   trustedHeader: {
     flexDirection: 'row',
