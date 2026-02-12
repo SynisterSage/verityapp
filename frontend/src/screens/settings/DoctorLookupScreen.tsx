@@ -190,7 +190,8 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
       fetchTrusted();
     } catch (err) {
       setOptimisticTrusted((prev) => prev.filter((entry) => entry.id !== optimistic.id));
-      throw err;
+      console.error('Doctor lookup add error', err);
+      setError((err as any)?.message ?? 'Unable to add this provider right now.');
     } finally {
       setSavingProviderId(null);
     }
