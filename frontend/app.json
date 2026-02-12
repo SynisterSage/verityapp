@@ -17,12 +17,16 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.lexferguson.verityprotect.com",
       "infoPlist": {
-        "NSContactsUsageDescription": "Verity Protect uses your contacts to let trusted callers skip the passcode."
+        "NSContactsUsageDescription": "Verity Protect uses your contacts to let trusted callers skip the passcode.",
+        "NSLocationWhenInUseUsageDescription": "Location lets us find care professionals nearby to add to your trusted list.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Location lets us find care professionals nearby to add to your trusted list."
       }
     },
     "android": {
       "permissions": [
-        "READ_CONTACTS"
+        "READ_CONTACTS",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

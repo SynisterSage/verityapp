@@ -51,6 +51,7 @@ import AutomationScreen from './src/screens/settings/AutomationScreen';
 import EnterInviteCodeScreen from './src/screens/settings/EnterInviteCodeScreen';
 import MembersScreen from './src/screens/settings/MembersScreen';
 import SupportInfoScreen from './src/screens/settings/SupportInfoScreen';
+import DoctorLookupScreen from './src/screens/settings/DoctorLookupScreen';
 import SupportScreen from './src/screens/support/SupportScreen';
 import SupportTicketsScreen from './src/screens/support/SupportTicketsScreen';
 import SupportResourceScreen from './src/screens/support/SupportResourceScreen';
@@ -129,11 +130,11 @@ function CallsStackNavigator() {
 
 function SettingsStackNavigator() {
   return (
-    <SettingsStack.Navigator
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
+      <SettingsStack.Navigator
+        screenOptions={{
+          headerShown: false,
+        }}
+      >
       <SettingsStack.Screen name="Settings" component={SettingsScreen} />
       <SettingsStack.Screen name="Account" component={AccountScreen} />
       <SettingsStack.Screen name="Notifications" component={NotificationsScreen} />
@@ -156,6 +157,7 @@ function SettingsStackNavigator() {
       />
       <SettingsStack.Screen name="Members" component={MembersScreen} />
       <SettingsStack.Screen name="SupportInfo" component={SupportInfoScreen} />
+      <SettingsStack.Screen name="SafetyIntelligence" component={DoctorLookupScreen} />
     </SettingsStack.Navigator>
   );
 }

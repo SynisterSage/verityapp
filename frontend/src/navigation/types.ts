@@ -50,4 +50,5 @@ export type SettingsStackParamList = {
   EnterInviteCode: undefined;
   Members: { highlightInviteEntry?: boolean } | undefined;
   SupportInfo: undefined;
+  SafetyIntelligence: undefined;
 };

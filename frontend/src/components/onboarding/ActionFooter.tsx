@@ -45,9 +45,10 @@ export default function ActionFooter({
   onHelperPress,
   style,
 }: ActionFooterProps) {
-  const { theme } = useTheme();
+  const { theme, mode } = useTheme();
   const colors = theme.colors as { surfaceAlt?: string; surface: string; border: string };
   const insets = useSafeAreaInsets();
+  const defaultPrimaryTextColor = mode === 'light' ? theme.colors.text : theme.colors.surface;
 
   return (
     <View
@@ -81,7 +82,7 @@ export default function ActionFooter({
             styles.primaryButtonText,
             {
               fontFamily: theme.typography.fontFamily,
-              color: primaryTextColor ?? theme.colors.surface,
+            color: primaryTextColor ?? defaultPrimaryTextColor,
             },
           ]}
         >

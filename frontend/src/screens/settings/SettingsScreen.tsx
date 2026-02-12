@@ -77,6 +77,12 @@ export default function SettingsScreen({
         onPress: () => navigation.navigate('SafePhrases'),
       },
       {
+        label: 'Doctor Lookup',
+        subtitle: 'Recognize care team numbers',
+        icon: 'medkit-outline',
+        onPress: () => navigation.navigate('SafetyIntelligence'),
+      },
+      {
         label: 'Trusted Contacts',
         subtitle: 'Bypass the screening PIN',
         icon: 'people-outline',
@@ -221,7 +227,7 @@ export default function SettingsScreen({
           backgroundColor: theme.colors.bg,
         },
       ]}
-      edges={['bottom']}
+      edges={[]}
     >
       <DashboardHeader
         title="Settings"
