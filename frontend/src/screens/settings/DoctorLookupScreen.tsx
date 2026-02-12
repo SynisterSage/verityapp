@@ -67,9 +67,10 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     }
     setLoading(true);
     setError('');
+    console.log('[DoctorLookup] handleLookup', { profileId: activeProfile?.id, query: query.trim() });
     try {
-      const providers = await lookupProviders(activeProfile.id, { query: query.trim(), limit: 6 });
-      setResults(providers);
+      const { providers: matchedProviders } = await lookupProviders(activeProfile.id, { query: query.trim(), limit: 6 });
+      setResults(matchedProviders);
     } catch (err) {
       setError('Lookup failed. Try again.');
     } finally {
@@ -79,25 +80,32 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
 
   const handleUseLocation = useCallback(async () => {
     if (!activeProfile?.id) {
+      console.log('[DoctorLookup] handleUseLocation aborted: missing profile');
       return;
     }
     setLocationLoading(true);
     setError('');
+    console.log('[DoctorLookup] handleUseLocation start', { profileId: activeProfile.id });
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('[DoctorLookup] requested location permission', status);
       if (status !== Location.PermissionStatus.GRANTED) {
         setError('Enable location access to look up nearby providers.');
         return;
       }
+      console.log('[DoctorLookup] permission granted, fetching position');
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
-      const providers = await lookupProviders(activeProfile.id, {
+      console.log('[DoctorLookup] position received', position.coords);
+      const { providers: providersFromLocation, derivedLocation } = await lookupProviders(activeProfile.id, {
         lat: position.coords.latitude,
         lon: position.coords.longitude,
         radius: 15000,
         limit: 6,
       });
-      setResults(providers);
-      setQuery('');
+      console.log('[DoctorLookup] lookupProviders result count', providersFromLocation.length);
+      setResults(providersFromLocation);
+      const locationLabel = derivedLocation?.postalCode ?? derivedLocation?.displayLabel;
+      setQuery(locationLabel ?? '');
     } catch (err: any) {
       console.error('Doctor lookup location error', err);
       setError(err?.message ? err.message : 'Unable to fetch location. Try again.');

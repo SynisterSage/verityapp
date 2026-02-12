@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { z } from 'zod';
 import logger from 'jet-logger';
 
-import { searchProfessionalDirectory } from '@src/services/professionalLookup';
+import { searchProfessionalDirectory, ProfessionalLookupResponse } from '@src/services/professionalLookup';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { getAuthenticatedUserId, userCanAccessProfile } from '@src/common/util/auth';
 
@@ -42,8 +42,15 @@ export default class ProfessionalLookupController {
         lat: lat ? Number(lat) : undefined,
         lon: lon ? Number(lon) : undefined,
       };
-      const results = await searchProfessionalDirectory(options);
-      return res.status(HTTP_STATUS_CODES.Ok).json({ providers: results });
+      logger.info(
+        `professional lookup request profile=${profileId} query=${options.query ?? 'none'} limit=${options.limit} lat=${options.lat ?? 'n/a'} lon=${options.lon ?? 'n/a'} radius=${options.radiusMeters ?? 'default'}`
+      );
+      const lookupResult: ProfessionalLookupResponse = await searchProfessionalDirectory(options);
+      const { providers, derivedLocation } = lookupResult;
+      logger.info(
+        `professional lookup response profile=${profileId} total=${providers.length} geo=${Boolean(options.lat && options.lon)}`
+      );
+      return res.status(HTTP_STATUS_CODES.Ok).json({ providers, derivedLocation });
     } catch (error) {
       logger.err(error as Error);
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to lookup providers' });
