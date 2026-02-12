@@ -22,6 +22,8 @@ type LookupOptions = {
   offset?: number;
 };
 
+type NameMode = 'none' | 'organization' | 'person';
+
 type CacheEntry = {
   expiresAt: number;
   data: ProfessionalLookupResponse;
@@ -83,9 +85,12 @@ function parseLocationText(text: string) {
   const parts = cleaned.split(',').map((p) => p.trim()).filter(Boolean);
   let city: string | undefined;
   if (parts.length > 0) {
-    city = titleCase(parts[0]);
+    const firstPart = parts[0];
+    const isNumericOnly = /^\d+$/.test(firstPart);
+    city = !isNumericOnly ? titleCase(firstPart) : undefined;
   } else if (!postalMatch) {
-    city = titleCase(cleaned);
+    const isNumericOnly = /^\d+$/.test(cleaned);
+    city = !isNumericOnly ? titleCase(cleaned) : undefined;
   }
 
   return {
@@ -106,51 +111,90 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
     logger.warn(`Lookup skipped because query did not contain location info: ${normalizedQuery}`);
     return { providers: [], totalResults: 0 };
   }
-  const searchParams = new URLSearchParams({
-    version: '2.1',
-    limit: String(Math.min(limit, 1000)),
-    address_purpose: 'LOCATION',
-    country_code: 'US',
-  });
-  if (offset > 0) {
-    searchParams.set('skip', String(offset));
-  }
-  if (locationParams.postalCode) {
-    searchParams.set('postal_code', locationParams.postalCode);
-  }
-  if (locationParams.city) {
-    searchParams.set('city', locationParams.city);
-  }
-  if (locationParams.state) {
-    searchParams.set('state', locationParams.state);
-  }
-
-  if (name?.trim()) {
-    const trimmedName = name.trim();
-    const parts = trimmedName.split(/\s+/);
-    if (parts.length >= 2) {
-      searchParams.set('first_name', parts[0]);
-      searchParams.set('last_name', parts.slice(1).join(' '));
-    } else {
-      searchParams.set('organization_name', trimmedName);
+  const trimmedName = name?.trim() ?? '';
+  const nameParts = trimmedName ? trimmedName.split(/\s+/) : [];
+  const buildSearchParams = (mode: NameMode, requestLimit: number) => {
+    const params = new URLSearchParams({
+      version: '2.1',
+      limit: String(Math.min(requestLimit, 1000)),
+      address_purpose: 'LOCATION',
+      country_code: 'US',
+    });
+    if (offset > 0) {
+      params.set('skip', String(offset));
     }
-  }
-  const url = `${NPI_API_URL}?${searchParams.toString()}`;
-  try {
+    if (locationParams.postalCode) {
+      params.set('postal_code', locationParams.postalCode);
+    }
+    if (locationParams.city) {
+      params.set('city', locationParams.city);
+    }
+    if (locationParams.state) {
+      params.set('state', locationParams.state);
+    }
+    if (mode === 'organization' && trimmedName) {
+      params.set('organization_name', trimmedName);
+    }
+    if (mode === 'person' && nameParts.length >= 2) {
+      params.set('first_name', nameParts[0]);
+      params.set('last_name', nameParts.slice(1).join(' '));
+    }
+    return params;
+  };
+
+  const fetchAttempt = async (mode: NameMode, requestLimit = limit) => {
+    const url = `${NPI_API_URL}?${buildSearchParams(mode, requestLimit).toString()}`;
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'VerityProtect/1.0 (support@verityprotect.com)',
       },
     });
     if (!response.ok) {
-      logger.warn(`NPI lookup failed (${response.status}) url=${url}`);
-      return { providers: [], totalResults: 0 };
+      logger.warn(`NPI lookup failed (${response.status}) mode=${mode} url=${url}`);
+      return { body: { results: [], result_count: 0 } as { result_count?: number; results?: any[] }, url };
     }
     const body = (await response.json()) as { result_count?: number; results?: any[] };
     if (!body.results || body.results.length === 0) {
-      logger.info(`NPI lookup returned 0 results url=${url}`);
+      logger.info(`NPI lookup returned 0 results mode=${mode} url=${url}`);
     }
-    const providers = (body.results ?? [])
+    return { body, url };
+  };
+
+  try {
+    const candidateModes: NameMode[] = trimmedName
+      ? (nameParts.length >= 2 ? ['organization', 'person', 'none'] : ['organization', 'none'])
+      : ['none'];
+
+    let selectedBody: { result_count?: number; results?: any[] } = { results: [], result_count: 0 };
+    let selectedMode: NameMode = candidateModes[0] ?? 'none';
+    for (const mode of candidateModes) {
+      const requestLimit = mode === 'none' && trimmedName ? Math.max(limit * 5, 50) : limit;
+      const { body } = await fetchAttempt(mode, requestLimit);
+      if ((body.results ?? []).length > 0) {
+        selectedBody = body;
+        selectedMode = mode;
+        break;
+      }
+      selectedBody = body;
+      selectedMode = mode;
+    }
+
+    let entries = selectedBody.results ?? [];
+    if (trimmedName && entries.length > 0 && selectedMode === 'none') {
+      const needle = trimmedName.toLowerCase();
+      entries = entries.filter((entry) => {
+        const basic = entry.basic ?? {};
+        const addresses = Array.isArray(entry.addresses) ? entry.addresses : [];
+        const locationAddress = addresses.find((addr: any) => addr.address_purpose === 'LOCATION') ?? addresses[0] ?? {};
+        const personName = [basic.first_name, basic.middle_name, basic.last_name].filter(Boolean).join(' ').toLowerCase();
+        const orgName = String(basic.organization_name ?? '').toLowerCase();
+        const address = String(locationAddress.address_1 ?? '').toLowerCase();
+        return orgName.includes(needle) || personName.includes(needle) || address.includes(needle);
+      });
+      entries = entries.slice(0, limit);
+    }
+
+    const providers = entries
       .filter((entry) => entry)
       .map((entry) => {
         const basic = entry.basic ?? {};
@@ -185,7 +229,7 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
       });
     return {
       providers,
-      totalResults: body.result_count ?? providers.length,
+      totalResults: selectedBody.result_count ?? providers.length,
     };
   } catch (error) {
     logger.err(error as Error);
