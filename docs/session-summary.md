@@ -151,3 +151,24 @@ Frontend work
 Next steps
 - Verify the billing resource is reachable from both the portal and the new Settings grid, and that the App Store guidance stays visible even if the user never opens the chat portal.
 - Keep observing analytics (if available) for flyers on billing tickets so we can refine the quick prompt wording and the FAQ narrative.
+
+2026-02-12
+Scope
+- Fix long doctor/contact names overflowing off-screen in Trusted Contacts and Doctor Lookup flows.
+- Ensure auto-added doctor entries from lookup do not save giant provider titles that later break list rows.
+
+Frontend work
+- Updated Settings Trusted Contacts safe-list rows to enforce real truncation behavior by combining `numberOfLines={1}` with non-shrinking action layout and shrinkable text containers.
+- Applied the same truncation/flex constraints to Onboarding Trusted Contacts safe-list rows.
+- Updated Doctor Lookup trusted-care-team rows to hard-truncate long labels and prevent overflow with `minWidth: 0` + clipped row layout.
+- Added provider-name normalization before saving trusted contacts from Doctor Lookup so newly added doctors store compact names instead of long registry strings.
+
+Files touched
+- `frontend/src/screens/settings/TrustedContactsScreen.tsx`
+- `frontend/src/screens/onboarding/OnboardingTrustedContactsScreen.tsx`
+- `frontend/src/screens/settings/DoctorLookupScreen.tsx`
+- `frontend/src/services/professionalLookup.ts`
+
+Result
+- Long names in current safe lists now truncate instead of running off the right edge.
+- New doctor entries added from lookup are shorter by default, reducing repeated overflow issues.

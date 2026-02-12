@@ -30,6 +30,17 @@ import { withOpacity } from '../../utils/color';
 const Loader = () => <ActivityIndicator size="small" color="rgba(255,255,255,0.85)" />;
 const RESULTS_PAGE_SIZE = 10;
 
+function truncateLabel(value?: string | null, maxLength = 56) {
+  if (!value) {
+    return '';
+  }
+  const normalized = value.trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
+}
+
 export default function DoctorLookupScreen({ navigation }: { navigation: any }) {
   const { theme } = useTheme();
   const colors = theme.colors as {
@@ -183,7 +194,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     (provider: ProfessionalLookupResult): TrustedProfessional => ({
       id: `lookup:${provider.placeId}:${provider.phones[0] ?? ''}`,
       caller_number: provider.phones[0] ?? null,
-      contact_name: provider.name,
+      contact_name: truncateLabel(provider.name, 64),
       relationship_tag: provider.category ?? 'Doctor',
       source: 'professional_lookup',
       caller_hash: null,
@@ -296,7 +307,13 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
                     <Ionicons name="checkmark-circle" size={18} color={theme.colors.accent} />
                   </View>
                   <View style={styles.trustedText}>
-                    <Text style={[styles.providerName, { color: theme.colors.text }]}>{contact.contact_name ?? contact.caller_number}</Text>
+                    <Text
+                      style={[styles.providerName, { color: theme.colors.text }]}
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {truncateLabel(contact.contact_name ?? contact.caller_number, 64)}
+                    </Text>
                     <Text style={[styles.providerMeta, { color: theme.colors.textMuted }]}>{contact.relationship_tag ?? 'Professional'}</Text>
                   </View>
                 </View>
@@ -675,6 +692,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    minWidth: 0,
   },
   trustedIcon: {
     width: 38,
@@ -686,6 +704,7 @@ const styles = StyleSheet.create({
   },
   trustedText: {
     flex: 1,
+    minWidth: 0,
   },
   trustedCard: {
     borderRadius: 18,
@@ -700,6 +719,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 12,
+    overflow: 'hidden',
   },
   trashButton: {
     width: 44,

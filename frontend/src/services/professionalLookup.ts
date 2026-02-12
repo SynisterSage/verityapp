@@ -27,6 +27,14 @@ export type ProfessionalLookupResponse = {
   totalResults: number;
 };
 
+function compactProviderName(rawName: string) {
+  const base = rawName.split(/[,(]/)[0]?.trim() || rawName.trim();
+  if (base.length <= 64) {
+    return base;
+  }
+  return `${base.slice(0, 61).trimEnd()}...`;
+}
+
 export async function lookupProviders(profileId: string, params: { query?: string; name?: string; limit?: number; offset?: number; }): Promise<ProfessionalLookupResponse> {
   const searchParams = new URLSearchParams();
   if (params.query) {
@@ -62,13 +70,14 @@ export async function listTrustedProfessionals(profileId: string) {
 }
 
 export async function addTrustedProfessional(profileId: string, provider: ProfessionalLookupResult) {
+  const contactName = compactProviderName(provider.name);
   const payload = {
     profileId,
     callerNumbers: provider.phones,
     source: 'professional_lookup',
     contactNames: provider.phones.reduce<Record<string, string>>((acc, phone) => {
       if (phone) {
-        acc[phone] = provider.name;
+        acc[phone] = contactName;
       }
       return acc;
     }, {}),

@@ -538,7 +538,7 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
                         <Text style={styles.relationship}>{relationshipLabel}</Text>
                       </View>
                     </View>
-                    <TouchableOpacity onPress={() => openManageTray(contact)}>
+                    <TouchableOpacity style={styles.manageAction} onPress={() => openManageTray(contact)}>
                       <Text style={styles.manageLabel}>Manage</Text>
                     </TouchableOpacity>
                   </View>
@@ -766,6 +766,8 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
+      flex: 1,
+      minWidth: 0,
     },
     avatar: {
       width: 48,
@@ -783,16 +785,21 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
     identityText: {
       gap: 4,
       alignItems: 'flex-start',
+      flex: 1,
+      minWidth: 0,
     },
     nameRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+      flex: 1,
+      minWidth: 0,
     },
     personName: {
       color: theme.colors.text,
       fontSize: 16,
       fontWeight: '700',
+      flexShrink: 1,
     },
     relationship: {
       color: theme.colors.textMuted,
@@ -805,6 +812,11 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       fontSize: 11,
       letterSpacing: 1,
       fontWeight: '700',
+    },
+    manageAction: {
+      marginLeft: 12,
+      flexShrink: 0,
+      alignSelf: 'center',
     },
     emptyCard: {
       borderRadius: 28,
