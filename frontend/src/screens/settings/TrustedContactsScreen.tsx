@@ -45,6 +45,7 @@ type TrustedContactRow = {
   relationship_tag?: string | null;
   contact_name?: string | null;
   caller_hash?: string | null;
+  trusted_care_team?: boolean;
 };
 
 type ContactMapEntry = {
@@ -673,6 +674,11 @@ export default function TrustedContactsScreen() {
     trayContact &&
     'source' in trayContact &&
     (trayContact as TrustedContactRow).source === 'quick_action';
+  const isHealthcareTrayContact =
+    trayMode === 'manage' &&
+    trayContact &&
+    'trusted_care_team' in trayContact &&
+    (trayContact as TrustedContactRow).trusted_care_team;
   const manualManageRow = isManualManageContact ? (trayContact as TrustedContactRow) : null;
   const manualManageNumber = manualManageRow?.caller_number ?? '';
   const manualManageDisplayName =
@@ -681,6 +687,12 @@ export default function TrustedContactsScreen() {
     contactMap[manualManageNumber]?.name ||
     formatPhoneNumberDisplay(manualManageNumber.replace(/\D/g, '')) ||
     manualManageNumber;
+
+  const trayHintText = isQuickManageContact
+    ? 'Trusted via quick action'
+    : isHealthcareTrayContact
+    ? 'Healthcare provider'
+    : 'Trusted Safe Contact';
 
   const manualTrayNumber =
     trayMode === 'manual' && trayContact ? (trayContact as DeviceContact).numbers[0] : '';
@@ -975,9 +987,7 @@ export default function TrustedContactsScreen() {
                         </Text>
                         <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
                       </View>
-                    <Text style={styles.trayHint}>
-                      {isQuickManageContact ? 'Trusted via quick action' : 'Trusted Safe Contact'}
-                    </Text>
+                    <Text style={styles.trayHint}>{trayHintText}</Text>
                     </>
                   )}
                 </View>

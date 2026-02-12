@@ -18,6 +18,7 @@ export type TrustedProfessional = {
   relationship_tag: string | null;
   source: string;
   caller_hash: string | null;
+  trusted_care_team?: boolean;
 };
 
 export type ProfessionalLookupResponse = {
@@ -51,7 +52,9 @@ export async function listTrustedProfessionals(profileId: string) {
   if (!res?.trusted_contacts) {
     return [] as TrustedProfessional[];
   }
-  return (res.trusted_contacts as TrustedProfessional[]).filter((contact) => contact.source === 'professional_lookup');
+  return (res.trusted_contacts as TrustedProfessional[]).filter(
+    (contact) => contact.source === 'professional_lookup' && contact.trusted_care_team
+  );
 }
 
 export async function addTrustedProfessional(profileId: string, provider: ProfessionalLookupResult) {
@@ -65,6 +68,7 @@ export async function addTrustedProfessional(profileId: string, provider: Profes
       }
       return acc;
     }, {}),
+    trustedCareTeam: true,
     relationship_tag: provider.category ?? 'Professional',
   };
   return authorizedFetch('/fraud/trusted-contacts', {

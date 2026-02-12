@@ -270,7 +270,10 @@ export default class SupportController {
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to send message' });
     }
 
-    if (isNewTicket) {
+    const resolvedTicketState = typeof resolvedMetadata.ticketState === 'string' ? resolvedMetadata.ticketState : null;
+    const shouldAutoReply = resolvedTicketState !== 'closed';
+
+    if (isNewTicket && shouldAutoReply) {
       const greetingMetadata: Record<string, unknown> = {
         ticketId,
         ticketSubject: subjectCandidate,
@@ -295,7 +298,7 @@ export default class SupportController {
     }
 
     const promptLabel = metadata?.promptLabel;
-    if (typeof promptLabel === 'string') {
+    if (typeof promptLabel === 'string' && shouldAutoReply) {
       const autoMessage = PROMPT_AUTO_REPLY[promptLabel];
       if (autoMessage) {
         const autoMetadata: Record<string, unknown> = {
@@ -323,7 +326,7 @@ export default class SupportController {
       }
     }
 
-    if (typeof promptLabel !== 'string') {
+    if (typeof promptLabel !== 'string' && shouldAutoReply) {
       const alreadyAutoReplied = await hasResourceAutoReply(profileId, ticketId);
       if (!alreadyAutoReplied) {
         await insertResourceAutoReply(profileId, ticketId, subjectCandidate);

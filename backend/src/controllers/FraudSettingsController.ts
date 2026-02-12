@@ -325,7 +325,7 @@ async function listTrustedContacts(req: Request, res: Response) {
 
   const { data, error } = await supabaseAdmin
     .from('trusted_contacts')
-    .select('id, caller_number, source, created_at, relationship_tag, contact_name, caller_hash')
+    .select('id, caller_number, source, created_at, relationship_tag, contact_name, caller_hash, trusted_care_team')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false });
 
@@ -357,12 +357,13 @@ async function addTrustedContacts(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
   }
 
-  const { profileId, callerNumber, callerNumbers, source, contactNames } = req.body as {
+  const { profileId, callerNumber, callerNumbers, source, contactNames, trustedCareTeam } = req.body as {
     profileId?: string;
     callerNumber?: string;
     callerNumbers?: string[];
     source?: string;
     contactNames?: Record<string, string>;
+    trustedCareTeam?: boolean;
   };
 
   if (!profileId) {
@@ -391,7 +392,8 @@ async function addTrustedContacts(req: Request, res: Response) {
     )
   );
 
-  const normalizedSource = source === 'contacts' ? 'contacts' : 'manual';
+  const allowedSources = new Set(['contacts', 'manual', 'professional_lookup', 'quick_action']);
+  const normalizedSource = source && allowedSources.has(source) ? source : 'manual';
   const normalizedContactNames: Record<string, string> = {};
   Object.entries(contactNames ?? {}).forEach(([rawNumber, name]) => {
     const normalized = normalizeCallerNumber(rawNumber);
@@ -399,6 +401,7 @@ async function addTrustedContacts(req: Request, res: Response) {
       normalizedContactNames[normalized] = name;
     }
   });
+  const trustedCareTeamFlag = Boolean(trustedCareTeam);
   const { data: existingRows } = await supabaseAdmin
     .from('trusted_contacts')
     .select('caller_number')
@@ -435,6 +438,7 @@ async function addTrustedContacts(req: Request, res: Response) {
       caller_hash: callerHash,
       caller_number: normalizedNumber,
       source: normalizedSource,
+      trusted_care_team: trustedCareTeamFlag,
       contact_name: contactName?.trim() || null,
       caretaker_id: profileData?.caretaker_id,
     };
@@ -443,8 +447,9 @@ async function addTrustedContacts(req: Request, res: Response) {
       profile_id: string;
       caller_hash: string;
       caller_number: string;
-      source: 'manual' | 'contacts';
+      source: 'manual' | 'contacts' | 'professional_lookup' | 'quick_action';
       contact_name?: string | null;
+      trusted_care_team?: boolean;
     }[];
 
   if (rows.length === 0) {
