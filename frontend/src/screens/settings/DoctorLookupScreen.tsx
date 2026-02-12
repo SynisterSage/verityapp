@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -61,22 +61,38 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     fetchTrusted();
   }, [fetchTrusted]);
 
-  const handleLookup = useCallback(async () => {
-    if (!activeProfile?.id || !query.trim()) {
-      return;
-    }
-    setLoading(true);
-    setError('');
-    console.log('[DoctorLookup] handleLookup', { profileId: activeProfile?.id, query: query.trim() });
-    try {
-      const { providers: matchedProviders } = await lookupProviders(activeProfile.id, { query: query.trim(), limit: 6 });
-      setResults(matchedProviders);
-    } catch (err) {
-      setError('Lookup failed. Try again.');
-    } finally {
-      setLoading(false);
-    }
-  }, [activeProfile?.id, query]);
+  const listRef = useRef<FlatList<ProfessionalLookupResult>>(null);
+
+  const executeLookup = useCallback(
+    async (searchQuery: string) => {
+      const trimmedQuery = searchQuery.trim();
+      if (!activeProfile?.id || !trimmedQuery) {
+        return false;
+      }
+      setLoading(true);
+      setError('');
+      console.log('[DoctorLookup] executeLookup', { profileId: activeProfile.id, query: trimmedQuery });
+      try {
+        const matchedProviders = await lookupProviders(activeProfile.id, {
+          query: trimmedQuery,
+          limit: 6,
+        });
+        setResults(matchedProviders);
+        listRef.current?.scrollToOffset({ offset: 0, animated: true });
+        return matchedProviders.length > 0;
+      } catch (err) {
+        setError('Lookup failed. Try again.');
+        return false;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [activeProfile?.id]
+  );
+
+  const handleLookup = useCallback(() => {
+    executeLookup(query);
+  }, [executeLookup, query]);
 
   const handleUseLocation = useCallback(async () => {
     if (!activeProfile?.id) {
@@ -96,16 +112,17 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
       console.log('[DoctorLookup] permission granted, fetching position');
       const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
       console.log('[DoctorLookup] position received', position.coords);
-      const { providers: providersFromLocation, derivedLocation } = await lookupProviders(activeProfile.id, {
-        lat: position.coords.latitude,
-        lon: position.coords.longitude,
-        radius: 15000,
-        limit: 6,
-      });
-      console.log('[DoctorLookup] lookupProviders result count', providersFromLocation.length);
-      setResults(providersFromLocation);
-      const locationLabel = derivedLocation?.postalCode ?? derivedLocation?.displayLabel;
-      setQuery(locationLabel ?? '');
+      const addresses = await Location.reverseGeocodeAsync(position.coords);
+      const firstAddress = addresses[0];
+      const locationLabel =
+        firstAddress?.postalCode ??
+        (firstAddress?.city ? `${firstAddress.city}${firstAddress.region ? `, ${firstAddress.region}` : ''}` : '');
+      if (!locationLabel) {
+        setError('Unable to resolve your ZIP code. Please enter it manually.');
+        return;
+      }
+      setQuery(locationLabel);
+      await executeLookup(locationLabel);
     } catch (err: any) {
       console.error('Doctor lookup location error', err);
       setError(err?.message ? err.message : 'Unable to fetch location. Try again.');
@@ -158,19 +175,42 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
 
   const trustedSection = useMemo(
     () => (
-      <View style={[styles.trustedCard, { borderColor: theme.colors.border }]}> 
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Trusted Professionals</Text>
-        {trusted.map((contact) => (
-          <View key={contact.id} style={[styles.trustedRow, { backgroundColor: theme.colors.surface }]}> 
-            <View>
-              <Text style={[styles.providerName, { color: theme.colors.text }]}>{contact.contact_name ?? contact.caller_number}</Text>
-              <Text style={[styles.providerMeta, { color: theme.colors.textMuted }]}>{contact.relationship_tag ?? 'Professional'}</Text>
+      <View style={[styles.trustedWrapper, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+        <View style={styles.trustedHeader}>
+          <Text style={[styles.searchLabel, { color: theme.colors.textMuted }]}>Trusted Care Team</Text>
+          <Text style={[styles.activeBadge, { color: theme.colors.accent }]}>
+            {trusted.length} Active
+          </Text>
+        </View>
+        {trusted.length === 0 ? (
+          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Add providers to your safe list</Text>
+        ) : (
+          trusted.map((contact) => (
+            <View
+              key={contact.id}
+              style={[
+                styles.trustedRow,
+                {
+                  backgroundColor: theme.colors.surfaceAlt,
+                  borderColor: withOpacity(theme.colors.textMuted, 0.25),
+                },
+              ]}
+            >
+              <View style={styles.trustedMeta}>
+                <View style={[styles.trustedIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.18) }]}>
+                  <Ionicons name="checkmark-circle" size={18} color={theme.colors.accent} />
+                </View>
+                <View style={styles.trustedText}>
+                  <Text style={[styles.providerName, { color: theme.colors.text }]}>{contact.contact_name ?? contact.caller_number}</Text>
+                  <Text style={[styles.providerMeta, { color: theme.colors.textMuted }]}>{contact.relationship_tag ?? 'Professional'}</Text>
+                </View>
+              </View>
+              <Pressable style={[styles.trashButton, { backgroundColor: withOpacity(theme.colors.danger, 0.2) }]} onPress={() => handleRemove(contact.id)}>
+                <Ionicons name="trash" size={16} color={theme.colors.danger} />
+              </Pressable>
             </View>
-            <Pressable style={[styles.trashButton, { backgroundColor: theme.colors.danger }]} onPress={() => handleRemove(contact.id)}>
-              <Ionicons name="trash" size={18} color="white" />
-            </Pressable>
-          </View>
-        ))}
+          ))
+        )}
       </View>
     ),
     [handleRemove, theme.colors, trusted]
@@ -205,9 +245,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
             {searchSection}
           </>
         }
-        ListEmptyComponent={!loading && results.length === 0 ? (
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No search active</Text>
-        ) : null}
+        ListEmptyComponent={null}
         ListFooterComponent={trustedSection}
         contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 64, paddingTop: insets.top +  0}}
         ListHeaderComponentStyle={{ paddingTop: 0 }}
@@ -316,6 +354,40 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     paddingVertical: 12,
   },
+  trustedWrapper: {
+    borderRadius: 18,
+    padding: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 16,
+  },
+  trustedHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  activeBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  trustedMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  trustedIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  trustedText: {
+    flex: 1,
+  },
   trustedCard: {
     borderRadius: 18,
     padding: 16,
@@ -325,7 +397,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    padding: 12,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: 12,
   },
   trashButton: {
     width: 44,

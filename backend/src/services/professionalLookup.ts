@@ -1,16 +1,8 @@
 import fetch from 'node-fetch';
 import logger from 'jet-logger';
 
-const NOMINATIM_URL = 'https://nominatim.openstreetmap.org/search';
-const REVERSE_NOMINATIM_URL = 'https://nominatim.openstreetmap.org/reverse';
+const NPI_API_URL = 'https://npiregistry.cms.hhs.gov/api';
 const CACHE_TTL_MS = 5 * 60 * 1000;
-
-type DerivedLocation = {
-  postalCode?: string;
-  city?: string;
-  state?: string;
-  displayLabel?: string;
-};
 
 export type ProfessionalLookupResult = {
   name: string;
@@ -26,9 +18,6 @@ export type ProfessionalLookupResult = {
 type LookupOptions = {
   query?: string;
   limit?: number;
-  lat?: number;
-  lon?: number;
-  radiusMeters?: number;
 };
 
 type CacheEntry = {
@@ -38,97 +27,64 @@ type CacheEntry = {
 
 export type ProfessionalLookupResponse = {
   providers: ProfessionalLookupResult[];
-  derivedLocation?: DerivedLocation;
 };
 
 const cache = new Map<string, CacheEntry>();
 
-function buildViewbox(lat: number, lon: number, radiusMeters: number) {
-  const latDelta = radiusMeters / 111_000;
-  const lonDelta = radiusMeters / (111_000 * Math.cos((lat * Math.PI) / 180));
-  const minLat = lat - latDelta;
-  const maxLat = lat + latDelta;
-  const minLon = lon - lonDelta;
-  const maxLon = lon + lonDelta;
-  return `${minLon},${minLat},${maxLon},${maxLat}`;
-}
-
-async function reverseGeocodeCoordinates(lat: number, lon: number) {
-  try {
-    const params = new URLSearchParams({
-      format: 'json',
-      addressdetails: '1',
-      lat: String(lat),
-      lon: String(lon),
-    });
-    const response = await fetch(`${REVERSE_NOMINATIM_URL}?${params.toString()}`, {
-      headers: {
-        'User-Agent': 'VerityProtect/1.0 (support@verityprotect.com)',
-      },
-    });
-    if (!response.ok) {
-      logger.warn(`Reverse geocode failed (${response.status}) for lat=${lat}, lon=${lon}`);
-      return null;
-    }
-    const raw = (await response.json()) as any;
-    const address = (raw.address ?? {}) as Record<string, string>;
-    const postalCode = address.postcode?.trim();
-    const city = (address.city || address.town || address.village)?.trim();
-    const state = address.state?.trim();
-    const displayLabel = postalCode || (city && state ? `${city}, ${state}` : city ?? state);
-    return {
-      postalCode,
-      city,
-      state,
-      displayLabel,
-    };
-  } catch (error) {
-    const err = error as Error;
-    logger.warn(`Reverse geocode error for lat=${lat}, lon=${lon} message=${err.message}`);
-    return null;
+function parseLocationText(text: string) {
+  if (!text) {
+    return {};
   }
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  const postalMatch = normalized.match(/\b(\d{5})(?:-\d{4})?\b/);
+  const parts = normalized.split(',').map((section) => section.trim()).filter(Boolean);
+  let city: string | undefined;
+  let state: string | undefined;
+  if (parts.length >= 2) {
+    city = parts[0];
+    state = parts[1];
+  } else if (parts.length === 1) {
+    if (!postalMatch) {
+      city = parts[0];
+    } else if (parts[0].length > 2 && !parts[0].match(/^\d+$/)) {
+      city = parts[0];
+    }
+  }
+  return {
+    postalCode: postalMatch ? postalMatch[1] : undefined,
+    city,
+    state,
+  };
 }
 
 async function fetchProviders(options: LookupOptions): Promise<ProfessionalLookupResponse> {
-  const { query, limit = 5, lat, lon, radiusMeters = 5_000 } = options;
-  const params = new URLSearchParams({
-    format: 'json',
-    addressdetails: '1',
-    extratags: '1',
-    limit: String(limit),
-  });
+  const { query, limit = 5 } = options;
   const normalizedQuery = query?.trim();
-  const hasCoordinates = lat !== undefined && lon !== undefined;
-  const shouldAutoQuery = !normalizedQuery && hasCoordinates;
-  let derivedLocation: DerivedLocation | undefined;
-  let locationParts: string | undefined;
-  if (shouldAutoQuery && lat !== undefined && lon !== undefined) {
-    const reverseResult = await reverseGeocodeCoordinates(lat, lon);
-    if (reverseResult) {
-      derivedLocation = reverseResult;
-      locationParts = [reverseResult.postalCode, reverseResult.city, reverseResult.state]
-        .filter(Boolean)
-        .join(' ');
-      if (reverseResult.displayLabel) {
-        derivedLocation.displayLabel = reverseResult.displayLabel;
-      } else if (locationParts) {
-        derivedLocation.displayLabel = locationParts;
-      }
-    }
+  if (!normalizedQuery) {
+    return { providers: [] };
   }
-  const fallbackQuery = locationParts ? `medical doctor ${locationParts}` : 'healthcare provider';
-  const searchQuery = normalizedQuery || (hasCoordinates ? fallbackQuery : undefined);
-  if (!searchQuery) {
-    return { providers: [], derivedLocation };
+  const locationParams = parseLocationText(normalizedQuery);
+  if (!locationParams.postalCode && !locationParams.city) {
+    logger.warn(`Lookup skipped because query did not contain location info: ${normalizedQuery}`);
+    return { providers: [] };
   }
-  params.set('q', searchQuery);
-  if (lat !== undefined && lon !== undefined) {
-    params.set('lat', String(lat));
-    params.set('lon', String(lon));
-    params.set('viewbox', buildViewbox(lat, lon, radiusMeters));
-    params.set('bounded', '1');
+  const searchParams = new URLSearchParams({
+    version: '2.1',
+    limit: String(Math.min(limit, 1000)),
+    enumeration_type: 'NPI-1',
+    address_purpose: 'LOCATION',
+    country_code: 'US',
+  });
+  if (locationParams.postalCode) {
+    searchParams.set('postal_code', locationParams.postalCode);
   }
-  const url = `${NOMINATIM_URL}?${params.toString()}`;
+  if (locationParams.city) {
+    searchParams.set('city', locationParams.city);
+  }
+  if (locationParams.state) {
+    searchParams.set('state', locationParams.state);
+  }
+  const url = `${NPI_API_URL}?${searchParams.toString()}`;
   try {
     const response = await fetch(url, {
       headers: {
@@ -136,53 +92,54 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
       },
     });
     if (!response.ok) {
-      logger.warn(`Nominatim lookup failed (${response.status}) for query=${searchQuery}`);
-      return { providers: [], derivedLocation };
+      logger.warn(`NPI lookup failed (${response.status}) for query=${normalizedQuery}`);
+      return { providers: [] };
     }
-    const raw = (await response.json()) as any[];
-    const providers = raw
-      .filter((entry) => typeof entry === 'object' && entry !== null)
+    const body = (await response.json()) as { result_count?: number; results?: any[] };
+    const providers = (body.results ?? [])
+      .filter((entry) => entry)
       .map((entry) => {
-        const address = (entry.address ?? {}) as Record<string, string>;
+        const basic = entry.basic ?? {};
+        const addresses = Array.isArray(entry.addresses) ? entry.addresses : [];
+        const locationAddress = addresses.find((addr: any) => addr.address_purpose === 'LOCATION') ?? addresses[0] ?? {};
+        const phones: string[] = [];
+        if (locationAddress.telephone_number) {
+          phones.push(locationAddress.telephone_number);
+        }
         const displayAddress = [
-          entry.display_name,
-          address.suburb,
-          address.city,
-          address.state,
-          address.country,
+          locationAddress.address_1,
+          locationAddress.address_2,
+          locationAddress.city,
+          locationAddress.state,
+          locationAddress.postal_code,
         ]
           .filter(Boolean)
           .join(', ');
-        const phones: string[] = [];
-        if (entry.extratags?.phone) {
-          phones.push(entry.extratags.phone);
-        }
-        if (entry.extratags?.fax) {
-          phones.push(entry.extratags.fax);
-        }
+        const taxonomy = Array.isArray(entry.taxonomies) ? entry.taxonomies[0] : null;
+        const nameParts = [basic.organization_name, [basic.first_name, basic.middle_name, basic.last_name].filter(Boolean).join(' ').trim()]
+          .filter(Boolean);
         return {
-          name: entry.display_name ?? 'Professional',
+          name: nameParts[0] ?? 'Professional',
           displayAddress,
           phones,
-          type: entry.type ?? null,
-          category: entry.class ?? null,
-          placeId: String(entry.place_id ?? ''),
-          latitude: entry.lat ? Number(entry.lat) : undefined,
-          longitude: entry.lon ? Number(entry.lon) : undefined,
+          type: taxonomy?.code ?? null,
+          category: taxonomy?.desc ?? null,
+          placeId: entry.number ?? `${basic.first_name}_${basic.last_name}_${locationAddress.postal_code ?? 'unknown'}`,
+          latitude: undefined,
+          longitude: undefined,
         };
       });
     return {
       providers,
-      derivedLocation,
     };
   } catch (error) {
     logger.err(error as Error);
-    return { providers: [], derivedLocation };
+    return { providers: [] };
   }
 }
 
 export async function searchProfessionalDirectory(options: LookupOptions): Promise<ProfessionalLookupResponse> {
-  const keyParts = [options.query ?? '', options.lat ?? '', options.lon ?? '', options.radiusMeters ?? '', options.limit ?? ''];
+  const keyParts = [options.query ?? '', options.limit ?? ''];
   const key = keyParts.join('::');
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) {

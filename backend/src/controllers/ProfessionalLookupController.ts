@@ -9,9 +9,6 @@ import { getAuthenticatedUserId, userCanAccessProfile } from '@src/common/util/a
 const lookupSchema = z.object({
   q: z.string().min(1).max(200).optional(),
   limit: z.string().optional(),
-  lat: z.string().optional(),
-  lon: z.string().optional(),
-  radius: z.string().optional(),
 });
 
 export default class ProfessionalLookupController {
@@ -33,24 +30,21 @@ export default class ProfessionalLookupController {
     if (!parsed.success) {
       return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid query parameters' });
     }
-    const { q, limit, lat, lon, radius } = parsed.data;
+    const { q, limit } = parsed.data;
     try {
       const options = {
         query: q,
         limit: Number(limit ?? 5),
-        radiusMeters: radius ? Number(radius) : undefined,
-        lat: lat ? Number(lat) : undefined,
-        lon: lon ? Number(lon) : undefined,
       };
       logger.info(
-        `professional lookup request profile=${profileId} query=${options.query ?? 'none'} limit=${options.limit} lat=${options.lat ?? 'n/a'} lon=${options.lon ?? 'n/a'} radius=${options.radiusMeters ?? 'default'}`
+        `professional lookup request profile=${profileId} query=${options.query ?? 'none'} limit=${options.limit}`
       );
       const lookupResult: ProfessionalLookupResponse = await searchProfessionalDirectory(options);
-      const { providers, derivedLocation } = lookupResult;
+      const { providers } = lookupResult;
       logger.info(
-        `professional lookup response profile=${profileId} total=${providers.length} geo=${Boolean(options.lat && options.lon)}`
+        `professional lookup response profile=${profileId} total=${providers.length}`
       );
-      return res.status(HTTP_STATUS_CODES.Ok).json({ providers, derivedLocation });
+      return res.status(HTTP_STATUS_CODES.Ok).json({ providers });
     } catch (error) {
       logger.err(error as Error);
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to lookup providers' });

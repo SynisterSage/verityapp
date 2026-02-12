@@ -11,18 +11,6 @@ export type ProfessionalLookupResult = {
   longitude?: number;
 };
 
-export type DerivedLocation = {
-  postalCode?: string;
-  city?: string;
-  state?: string;
-  displayLabel?: string;
-};
-
-export type ProfessionalLookupResponse = {
-  providers: ProfessionalLookupResult[];
-  derivedLocation?: DerivedLocation;
-};
-
 export type TrustedProfessional = {
   id: string;
   caller_number: string | null;
@@ -32,31 +20,18 @@ export type TrustedProfessional = {
   caller_hash: string | null;
 };
 
-export async function lookupProviders(profileId: string, params: { query?: string; lat?: number; lon?: number; radius?: number; limit?: number; }): Promise<ProfessionalLookupResponse> {
+export async function lookupProviders(profileId: string, params: { query?: string; limit?: number; }): Promise<ProfessionalLookupResult[]> {
   const searchParams = new URLSearchParams();
   if (params.query) {
     searchParams.set('q', params.query);
-  }
-  if (params.lat) {
-    searchParams.set('lat', String(params.lat));
-  }
-  if (params.lon) {
-    searchParams.set('lon', String(params.lon));
-  }
-  if (params.radius) {
-    searchParams.set('radius', String(params.radius));
   }
   if (params.limit) {
     searchParams.set('limit', String(params.limit));
   }
   const res = (await authorizedFetch(`/profiles/${profileId}/professional-lookup?${searchParams.toString()}`)) as {
     providers?: ProfessionalLookupResult[];
-    derivedLocation?: DerivedLocation;
   } | null;
-  return {
-    providers: res?.providers ?? [],
-    derivedLocation: res?.derivedLocation,
-  };
+  return res?.providers ?? [];
 }
 
 export async function listTrustedProfessionals(profileId: string) {

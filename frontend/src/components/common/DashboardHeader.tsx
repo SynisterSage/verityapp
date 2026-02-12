@@ -13,6 +13,7 @@ type DashboardHeaderProps = {
   supportAction?: {
     onPress: () => void;
     unreadCount?: number;
+    assistantOnline?: boolean;
   };
 };
 
@@ -66,6 +67,7 @@ export default function DashboardHeader({
                 style={styles.supportActionSpacing}
                 onPress={supportAction.onPress}
                 unreadCount={supportAction.unreadCount}
+                assistantOnline={supportAction.assistantOnline}
                 accessibilityLabel="Open support chat"
               />
             ) : (
@@ -76,6 +78,7 @@ export default function DashboardHeader({
           <SupportButton
             onPress={supportAction.onPress}
             unreadCount={supportAction.unreadCount}
+            assistantOnline={supportAction.assistantOnline}
             accessibilityLabel="Open support chat"
           />
         ) : (
