@@ -46,6 +46,7 @@ type TrustedContactRow = {
   contact_name?: string | null;
   caller_hash?: string | null;
   trusted_care_team?: boolean;
+  professional_lookup_place_id?: string | null;
 };
 
 type ContactMapEntry = {

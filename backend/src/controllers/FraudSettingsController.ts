@@ -325,7 +325,7 @@ async function listTrustedContacts(req: Request, res: Response) {
 
   const { data, error } = await supabaseAdmin
     .from('trusted_contacts')
-    .select('id, caller_number, source, created_at, relationship_tag, contact_name, caller_hash, trusted_care_team')
+    .select('id, caller_number, source, created_at, relationship_tag, contact_name, caller_hash, trusted_care_team, professional_lookup_place_id')
     .eq('profile_id', profileId)
     .order('created_at', { ascending: false });
 
@@ -357,13 +357,14 @@ async function addTrustedContacts(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
   }
 
-  const { profileId, callerNumber, callerNumbers, source, contactNames, trustedCareTeam } = req.body as {
+  const { profileId, callerNumber, callerNumbers, source, contactNames, trustedCareTeam, lookupPlaceId } = req.body as {
     profileId?: string;
     callerNumber?: string;
     callerNumbers?: string[];
     source?: string;
     contactNames?: Record<string, string>;
     trustedCareTeam?: boolean;
+    lookupPlaceId?: string;
   };
 
   if (!profileId) {
@@ -402,6 +403,7 @@ async function addTrustedContacts(req: Request, res: Response) {
     }
   });
   const trustedCareTeamFlag = Boolean(trustedCareTeam);
+  const normalizedLookupPlaceId = lookupPlaceId?.trim() || null;
   const { data: existingRows } = await supabaseAdmin
     .from('trusted_contacts')
     .select('caller_number')
@@ -436,6 +438,7 @@ async function addTrustedContacts(req: Request, res: Response) {
       caller_number: normalizedNumber,
       source: normalizedSource,
       trusted_care_team: trustedCareTeamFlag,
+      professional_lookup_place_id: normalizedLookupPlaceId,
       contact_name: contactName?.trim() || null,
       caretaker_id: profileData?.caretaker_id,
     };
@@ -447,6 +450,7 @@ async function addTrustedContacts(req: Request, res: Response) {
       source: 'manual' | 'contacts' | 'professional_lookup' | 'quick_action';
       contact_name?: string | null;
       trusted_care_team?: boolean;
+      professional_lookup_place_id?: string | null;
     }[];
 
   if (rows.length === 0) {

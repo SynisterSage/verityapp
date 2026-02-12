@@ -19,6 +19,7 @@ export type TrustedProfessional = {
   source: string;
   caller_hash: string | null;
   trusted_care_team?: boolean;
+  professional_lookup_place_id?: string | null;
 };
 
 export type ProfessionalLookupResponse = {
@@ -70,6 +71,7 @@ export async function addTrustedProfessional(profileId: string, provider: Profes
     }, {}),
     trustedCareTeam: true,
     relationship_tag: provider.category ?? 'Professional',
+    lookupPlaceId: provider.placeId,
   };
   return authorizedFetch('/fraud/trusted-contacts', {
     method: 'POST',

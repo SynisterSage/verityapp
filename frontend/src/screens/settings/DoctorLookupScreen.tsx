@@ -173,6 +173,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
       source: 'professional_lookup',
       caller_hash: null,
       trusted_care_team: true,
+      professional_lookup_place_id: provider.placeId,
     }),
     []
   );
@@ -217,8 +218,8 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
         uniq.set(key, contact);
       }
     });
-    return Array.from(uniq.values());
-  }, [trusted, optimisticTrusted]);
+  return Array.from(uniq.values());
+}, [trusted, optimisticTrusted]);
   const trustedPhoneSet = useMemo(
     () =>
       new Set(
@@ -228,9 +229,20 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
       ),
     [doctorTrusted]
   );
+  const trustedPlaceIdSet = useMemo(
+    () =>
+      new Set(
+        doctorTrusted
+          .map((prof) => prof.professional_lookup_place_id)
+          .filter((id): id is string => Boolean(id))
+      ),
+    [doctorTrusted]
+  );
   const isTrustedProvider = useCallback(
-    (provider: ProfessionalLookupResult) => provider.phones.some((phone) => trustedPhoneSet.has(phone)),
-    [trustedPhoneSet]
+    (provider: ProfessionalLookupResult) =>
+      trustedPlaceIdSet.has(provider.placeId) ||
+      provider.phones.some((phone) => trustedPhoneSet.has(phone)),
+    [trustedPhoneSet, trustedPlaceIdSet]
   );
 
   const trustedSection = useMemo(
@@ -337,6 +349,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
             ) : null}
             {results.map((item) => {
               const saving = savingProviderId === item.placeId;
+              const busyWithOther = Boolean(savingProviderId) && !saving;
               const trustedState = isTrustedProvider(item);
               return (
                 <View key={item.placeId} style={[styles.resultRow, { backgroundColor: colors.surfaceAlt ?? colors.surface, borderColor: colors.border }]}>
@@ -362,12 +375,12 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
                       },
                     ]}
                     onPress={() => {
-                      if (trustedState || saving) {
+                      if (trustedState || saving || busyWithOther) {
                         return;
                       }
                       handleAdd(item);
                     }}
-                    disabled={saving || trustedState}
+                    disabled={saving || trustedState || busyWithOther}
                     android_ripple={{ color: withOpacity(colors.text, 0.15) }}
                     accessibilityLabel={`${trustedState ? 'Trusted' : 'Add'} ${item.name}`}
                   >
