@@ -9,6 +9,7 @@ import { getAuthenticatedUserId, userCanAccessProfile } from '@src/common/util/a
 const lookupSchema = z.object({
   q: z.string().min(1).max(200).optional(),
   limit: z.string().optional(),
+  offset: z.string().optional(),
 });
 
 export default class ProfessionalLookupController {
@@ -30,21 +31,22 @@ export default class ProfessionalLookupController {
     if (!parsed.success) {
       return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid query parameters' });
     }
-    const { q, limit } = parsed.data;
+    const { q, limit, offset } = parsed.data;
     try {
       const options = {
         query: q,
         limit: Number(limit ?? 5),
+        offset: offset ? Number(offset) : undefined,
       };
       logger.info(
-        `professional lookup request profile=${profileId} query=${options.query ?? 'none'} limit=${options.limit}`
+      `professional lookup request profile=${profileId} query=${options.query ?? 'none'} limit=${options.limit} offset=${options.offset ?? 0}`
       );
       const lookupResult: ProfessionalLookupResponse = await searchProfessionalDirectory(options);
-      const { providers } = lookupResult;
+      const { providers, totalResults } = lookupResult;
       logger.info(
-        `professional lookup response profile=${profileId} total=${providers.length}`
+        `professional lookup response profile=${profileId} total=${providers.length} totalResults=${totalResults}`
       );
-      return res.status(HTTP_STATUS_CODES.Ok).json({ providers });
+      return res.status(HTTP_STATUS_CODES.Ok).json({ providers, totalResults });
     } catch (error) {
       logger.err(error as Error);
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to lookup providers' });

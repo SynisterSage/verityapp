@@ -20,7 +20,12 @@ export type TrustedProfessional = {
   caller_hash: string | null;
 };
 
-export async function lookupProviders(profileId: string, params: { query?: string; limit?: number; }): Promise<ProfessionalLookupResult[]> {
+export type ProfessionalLookupResponse = {
+  providers: ProfessionalLookupResult[];
+  totalResults: number;
+};
+
+export async function lookupProviders(profileId: string, params: { query?: string; limit?: number; offset?: number; }): Promise<ProfessionalLookupResponse> {
   const searchParams = new URLSearchParams();
   if (params.query) {
     searchParams.set('q', params.query);
@@ -28,10 +33,17 @@ export async function lookupProviders(profileId: string, params: { query?: strin
   if (params.limit) {
     searchParams.set('limit', String(params.limit));
   }
+  if (params.offset) {
+    searchParams.set('offset', String(params.offset));
+  }
   const res = (await authorizedFetch(`/profiles/${profileId}/professional-lookup?${searchParams.toString()}`)) as {
     providers?: ProfessionalLookupResult[];
+    totalResults?: number;
   } | null;
-  return res?.providers ?? [];
+  return {
+    providers: res?.providers ?? [],
+    totalResults: res?.totalResults ?? 0,
+  };
 }
 
 export async function listTrustedProfessionals(profileId: string) {

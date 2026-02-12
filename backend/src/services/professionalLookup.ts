@@ -18,6 +18,7 @@ export type ProfessionalLookupResult = {
 type LookupOptions = {
   query?: string;
   limit?: number;
+  offset?: number;
 };
 
 type CacheEntry = {
@@ -27,6 +28,7 @@ type CacheEntry = {
 
 export type ProfessionalLookupResponse = {
   providers: ProfessionalLookupResult[];
+  totalResults: number;
 };
 
 const cache = new Map<string, CacheEntry>();
@@ -58,15 +60,15 @@ function parseLocationText(text: string) {
 }
 
 async function fetchProviders(options: LookupOptions): Promise<ProfessionalLookupResponse> {
-  const { query, limit = 5 } = options;
+  const { query, limit = 5, offset = 0 } = options;
   const normalizedQuery = query?.trim();
   if (!normalizedQuery) {
-    return { providers: [] };
+    return { providers: [], totalResults: 0 };
   }
   const locationParams = parseLocationText(normalizedQuery);
   if (!locationParams.postalCode && !locationParams.city) {
     logger.warn(`Lookup skipped because query did not contain location info: ${normalizedQuery}`);
-    return { providers: [] };
+    return { providers: [], totalResults: 0 };
   }
   const searchParams = new URLSearchParams({
     version: '2.1',
@@ -75,6 +77,9 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
     address_purpose: 'LOCATION',
     country_code: 'US',
   });
+  if (offset > 0) {
+    searchParams.set('skip', String(offset));
+  }
   if (locationParams.postalCode) {
     searchParams.set('postal_code', locationParams.postalCode);
   }
@@ -93,7 +98,7 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
     });
     if (!response.ok) {
       logger.warn(`NPI lookup failed (${response.status}) for query=${normalizedQuery}`);
-      return { providers: [] };
+      return { providers: [], totalResults: 0 };
     }
     const body = (await response.json()) as { result_count?: number; results?: any[] };
     const providers = (body.results ?? [])
@@ -131,15 +136,16 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
       });
     return {
       providers,
+      totalResults: body.result_count ?? providers.length,
     };
   } catch (error) {
     logger.err(error as Error);
-    return { providers: [] };
+    return { providers: [], totalResults: 0 };
   }
 }
 
 export async function searchProfessionalDirectory(options: LookupOptions): Promise<ProfessionalLookupResponse> {
-  const keyParts = [options.query ?? '', options.limit ?? ''];
+  const keyParts = [options.query ?? '', options.limit ?? '', options.offset ?? ''];
   const key = keyParts.join('::');
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) {

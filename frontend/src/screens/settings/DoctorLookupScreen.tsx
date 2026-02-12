@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -48,6 +48,10 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   const [trusted, setTrusted] = useState<TrustedProfessional[]>([]);
   const [error, setError] = useState('');
   const [locationLoading, setLocationLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [totalResults, setTotalResults] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [currentQuery, setCurrentQuery] = useState('');
 
   const fetchTrusted = useCallback(async () => {
     if (!activeProfile?.id) {
@@ -61,8 +65,6 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     fetchTrusted();
   }, [fetchTrusted]);
 
-  const listRef = useRef<FlatList<ProfessionalLookupResult>>(null);
-
   const executeLookup = useCallback(
     async (searchQuery: string) => {
       const trimmedQuery = searchQuery.trim();
@@ -71,14 +73,16 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
       }
       setLoading(true);
       setError('');
+      setHasSearched(true);
       console.log('[DoctorLookup] executeLookup', { profileId: activeProfile.id, query: trimmedQuery });
       try {
-        const matchedProviders = await lookupProviders(activeProfile.id, {
+        const { providers: matchedProviders, totalResults: total } = await lookupProviders(activeProfile.id, {
           query: trimmedQuery,
           limit: 6,
         });
         setResults(matchedProviders);
-        listRef.current?.scrollToOffset({ offset: 0, animated: true });
+        setTotalResults(total);
+        setCurrentQuery(trimmedQuery);
         return matchedProviders.length > 0;
       } catch (err) {
         setError('Lookup failed. Try again.');
@@ -89,6 +93,32 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     },
     [activeProfile?.id]
   );
+
+  const loadMoreProviders = useCallback(async () => {
+    if (
+      loadingMore ||
+      !activeProfile?.id ||
+      !currentQuery ||
+      results.length >= totalResults ||
+      loading
+    ) {
+      return;
+    }
+    setLoadingMore(true);
+    try {
+      const { providers: moreProviders, totalResults: updatedTotal } = await lookupProviders(activeProfile.id, {
+        query: currentQuery,
+        limit: 6,
+        offset: results.length,
+      });
+      setResults((prev) => [...prev, ...moreProviders]);
+      setTotalResults(updatedTotal);
+    } catch (err) {
+      setError('Lookup failed. Try again.');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [activeProfile?.id, currentQuery, results.length, totalResults, loading, loadingMore]);
 
   const handleLookup = useCallback(() => {
     executeLookup(query);
@@ -144,35 +174,6 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     fetchTrusted();
   }, [fetchTrusted]);
 
-  const searchSection = useMemo(
-    () => (
-      <View style={[styles.searchCard, { backgroundColor: theme.colors.surface }]}> 
-        <Text style={[styles.searchLabel, { color: theme.colors.textMuted }]}>ZIP Code or City</Text>
-        <View style={styles.searchRow}>
-          <TextInput
-            style={[styles.searchInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-            placeholder="e.g. Wayne, New Jersey"
-            placeholderTextColor={withOpacity(theme.colors.textMuted, 0.6)}
-            value={query}
-            onChangeText={setQuery}
-          />
-          <Pressable
-            style={[styles.navButton, { backgroundColor: theme.colors.accent }]}
-            onPress={handleUseLocation}
-            disabled={locationLoading}
-          >
-            {locationLoading ? <Loader /> : <Ionicons name="navigate" size={20} color="white" />}
-          </Pressable>
-        </View>
-        <Pressable style={[styles.lookupButton, { backgroundColor: theme.colors.accent }]} onPress={handleLookup}>
-          {loading ? <Loader /> : <Text style={styles.lookupButtonText}>Lookup Providers</Text>}
-        </Pressable>
-        {error ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text> : null}
-      </View>
-    ),
-    [handleLookup, loading, query, theme.colors, error]
-  );
-
   const trustedSection = useMemo(
     () => (
       <View style={[styles.trustedWrapper, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -186,16 +187,16 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
           <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Add providers to your safe list</Text>
         ) : (
           trusted.map((contact) => (
-            <View
-              key={contact.id}
-              style={[
-                styles.trustedRow,
-                {
-                  backgroundColor: theme.colors.surfaceAlt,
-                  borderColor: withOpacity(theme.colors.textMuted, 0.25),
-                },
-              ]}
-            >
+                <View
+                  key={contact.id}
+                  style={[
+                    styles.trustedRow,
+                    {
+                      backgroundColor: colors.surfaceAlt ?? colors.surface,
+                    borderColor: withOpacity(theme.colors.textMuted, 0.25),
+                  },
+                ]}
+              >
               <View style={styles.trustedMeta}>
                 <View style={[styles.trustedIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.18) }]}>
                   <Ionicons name="checkmark-circle" size={18} color={theme.colors.accent} />
@@ -217,39 +218,106 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.bg }]} edges={[]}> 
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.bg }]} edges={[]}>
       <SettingsHeader title="Doctor Lookup" subtitle="Trusted Professionals" />
-      <FlatList
-        data={results}
-        keyExtractor={(item) => item.placeId}
-        renderItem={({ item }) => (
-          <View style={[styles.providerRow, { borderColor: theme.colors.border }]}> 
-            <View style={styles.providerInfo}>
-              <Ionicons name="medkit-outline" size={18} color={theme.colors.accent} />
-              <View style={styles.providerText}>
-                <Text style={[styles.providerName, { color: theme.colors.text }]}>{item.name}</Text>
-                <Text style={[styles.providerMeta, { color: theme.colors.textMuted }]}> {item.category ?? 'Provider'} • {item.displayAddress}</Text>
-              </View>
+      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 32) + 150, paddingTop: 26 }}>
+        <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.heroIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.15) }]}>
+            <Ionicons name="analytics-outline" size={20} color={theme.colors.accent} />
+          </View>
+          <View style={styles.heroText}>
+            <Text style={[styles.heroTitle, { color: theme.colors.text }]}>Recognition Engine</Text>
+            <Text style={[styles.heroBody, { color: theme.colors.textMuted }]}>NPPES NPI Registry • care teams call from rotating vanity numbers in your area.</Text>
+          </View>
+        </View>
+        <View style={[styles.searchModule, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Search Directory</Text>
+          <Text style={[styles.searchLabel, { color: colors.textMuted }]}>ZIP Code or City</Text>
+          <View style={styles.searchRow}>
+            <View style={[styles.inputWrapper, { backgroundColor: withOpacity(colors.text, 0.08) }]}>
+              <Ionicons name="locate" size={20} color={colors.textMuted} />
+              <TextInput
+                style={[styles.searchInput, { flex: 1, color: colors.text, borderColor: 'transparent' }]}
+                placeholder="07450 or Wayne, NJ"
+                placeholderTextColor={withOpacity(colors.textMuted, 0.7)}
+                value={query}
+                onChangeText={setQuery}
+                returnKeyType="search"
+              />
             </View>
-            <Pressable style={[styles.addButton, { backgroundColor: theme.colors.accent }]} onPress={() => handleAdd(item)}>
-              <Text style={styles.addButtonText}>Add</Text>
+            <Pressable
+              style={[styles.navButton, { backgroundColor: colors.accent }]}
+              onPress={handleUseLocation}
+              disabled={locationLoading}
+            >
+              {locationLoading ? <Loader /> : <Ionicons name="navigate" size={20} color="white" />}
             </Pressable>
           </View>
-        )}
-        ListHeaderComponent={
-          <>
-            <View style={[styles.badge, { backgroundColor: theme.colors.surface }]}> 
-              <Ionicons name="analytics-outline" size={20} color={theme.colors.accent} />
-              <Text style={[styles.badgeText, { color: theme.colors.text }]}>Recognition Engine · care teams call from rotating numbers.</Text>
-            </View>
-            {searchSection}
-          </>
-        }
-        ListEmptyComponent={null}
-        ListFooterComponent={trustedSection}
-        contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 64, paddingTop: insets.top +  0}}
-        ListHeaderComponentStyle={{ paddingTop: 0 }}
-      />
+          {error ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text> : null}
+          <Pressable
+            style={[styles.lookupButton, { backgroundColor: theme.colors.accent }]}
+            onPress={handleLookup}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader />
+            ) : (
+              <Text style={[styles.lookupButtonText, { color: '#fff' }]}>Lookup Providers</Text>
+            )}
+          </Pressable>
+          <View style={[styles.resultList, { borderColor: withOpacity(theme.colors.textMuted, 0.2) }]}>
+            {results.length === 0 && !loading ? (
+              <View style={styles.emptyState}>
+                <Text style={[styles.emptyStateText, { color: theme.colors.textMuted }]}>
+                  {hasSearched ? 'We couldn’t find any providers in that area.' : 'No search active'}
+                </Text>
+                {hasSearched ? (
+                  <Text style={[styles.emptyStateSubtext, { color: theme.colors.textMuted }]}>
+                    Try another ZIP code or city, or tap the location icon again.
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+            {results.map((item) => (
+              <View key={item.placeId} style={[styles.resultRow, { backgroundColor: colors.surfaceAlt ?? colors.surface, borderColor: colors.border }]}>
+                <View style={styles.resultContent}>
+                  <View style={styles.providerText}>
+                  <Text style={[styles.providerName, { color: colors.text }]}>{item.name}</Text>
+                  <Text style={[styles.providerMeta, { color: colors.textMuted }]}>{item.category ?? 'Provider'}</Text>
+                  <Text style={[styles.providerMeta, { color: colors.textMuted }]}>
+                    {item.displayAddress}
+                  </Text>
+                  {item.phones.length > 0 && (
+                    <Text style={[styles.providerMeta, { color: colors.textMuted, marginTop: 2 }]}>{item.phones[0]}</Text>
+                  )}
+                </View>
+              </View>
+              <Pressable
+                style={[styles.addButtonCircle, { backgroundColor: colors.accent }]}
+                onPress={() => handleAdd(item)}
+                accessibilityLabel={`Add ${item.name}`}
+              >
+                <Ionicons name="add" size={18} color="white" />
+              </Pressable>
+              </View>
+            ))}
+            {results.length < totalResults ? (
+              <Pressable
+                style={[styles.loadMoreButton, { borderColor: colors.border }]}
+                onPress={loadMoreProviders}
+                disabled={loadingMore}
+              >
+                {loadingMore ? (
+                  <ActivityIndicator color={colors.accent} />
+                ) : (
+                  <Text style={[styles.loadMoreText, { color: colors.accent }]}>Load more providers</Text>
+                )}
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+        {trustedSection}
+      </ScrollView>
       <ActionFooter
         primaryLabel="Back to Settings"
         onPrimaryPress={() => navigation.goBack()}
@@ -275,10 +343,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     flex: 1,
   },
-  searchCard: {
-    borderRadius: 18,
-    padding: 16,
+  searchModule: {
+    borderRadius: 22,
+    padding: 20,
+    borderWidth: StyleSheet.hairlineWidth,
     marginBottom: 16,
+  },
+  heroCard: {
+    borderRadius: 22,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  heroIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  heroText: {
+    flex: 1,
+  },
+  heroTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  heroBody: {
+    fontSize: 13,
   },
   searchLabel: {
     fontSize: 12,
@@ -292,11 +388,20 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
+  inputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    height: 48,
+    gap: 8,
+  },
   searchInput: {
     flex: 1,
     borderWidth: 1,
     borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 0,
     height: 48,
     fontSize: 16,
   },
@@ -318,6 +423,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
+  resultList: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 16,
+    paddingTop: 12,
+  },
+  resultContent: {
+    flex: 1,
+    flexDirection: 'column',
+    gap: 4,
+    marginRight: 8,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 12,
+    width: '100%',
+  },
   providerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -331,7 +458,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   providerText: {
-    maxWidth: 220,
+    flex: 1,
   },
   providerName: {
     fontWeight: '600',
@@ -340,14 +467,42 @@ const styles = StyleSheet.create({
   providerMeta: {
     fontSize: 13,
   },
-  addButton: {
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  addButtonCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    alignSelf: 'center',
+    marginLeft: 8,
+    elevation: 2,
   },
-  addButtonText: {
-    color: '#fff',
+  loadMoreButton: {
+    marginTop: 12,
+    alignSelf: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  loadMoreText: {
+    fontSize: 14,
     fontWeight: '600',
+  },
+  emptyState: {
+    paddingVertical: 24,
+    alignItems: 'center',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  emptyStateSubtext: {
+    fontSize: 12,
+    textAlign: 'center',
   },
   emptyText: {
     textAlign: 'center',
