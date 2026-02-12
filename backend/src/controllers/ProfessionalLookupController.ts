@@ -7,7 +7,7 @@ import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { getAuthenticatedUserId, userCanAccessProfile } from '@src/common/util/auth';
 
 const lookupSchema = z.object({
-  q: z.string().min(1).max(200),
+  q: z.string().min(1).max(200).optional(),
   limit: z.string().optional(),
   lat: z.string().optional(),
   lon: z.string().optional(),
