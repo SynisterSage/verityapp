@@ -522,7 +522,11 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
                       </View>
                       <View style={styles.identityText}>
                         <View style={styles.nameRow}>
-                          <Text style={styles.personName}>
+                          <Text
+                            style={styles.personName}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
                             {getContactDisplayName(contact)}
                           </Text>
                           <Ionicons

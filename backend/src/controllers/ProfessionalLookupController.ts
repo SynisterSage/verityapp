@@ -8,6 +8,7 @@ import { getAuthenticatedUserId, userCanAccessProfile } from '@src/common/util/a
 
 const lookupSchema = z.object({
   q: z.string().min(1).max(200).optional(),
+  name: z.string().min(1).max(200).optional(),
   limit: z.string().optional(),
   offset: z.string().optional(),
 });
@@ -31,11 +32,12 @@ export default class ProfessionalLookupController {
     if (!parsed.success) {
       return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid query parameters' });
     }
-    const { q, limit, offset } = parsed.data;
+    const { q, name, limit, offset } = parsed.data;
     try {
       const options = {
         query: q,
-        limit: Number(limit ?? 5),
+        name,
+        limit: Number(limit ?? 10),
         offset: offset ? Number(offset) : undefined,
       };
       logger.info(

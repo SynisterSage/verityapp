@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -27,7 +27,8 @@ import {
 } from '../../services/professionalLookup';
 import { withOpacity } from '../../utils/color';
 
-  const Loader = () => <ActivityIndicator size="small" color="rgba(255,255,255,0.85)" />;
+const Loader = () => <ActivityIndicator size="small" color="rgba(255,255,255,0.85)" />;
+const RESULTS_PAGE_SIZE = 10;
 
 export default function DoctorLookupScreen({ navigation }: { navigation: any }) {
   const { theme } = useTheme();
@@ -44,6 +45,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const [query, setQuery] = useState('');
+  const [nameQuery, setNameQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<ProfessionalLookupResult[]>([]);
   const [trusted, setTrusted] = useState<TrustedProfessional[]>([]);
@@ -55,6 +57,10 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   const [loadingMore, setLoadingMore] = useState(false);
   const [currentQuery, setCurrentQuery] = useState('');
   const [savingProviderId, setSavingProviderId] = useState<string | null>(null);
+  const [deletingTrustedId, setDeletingTrustedId] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [canLoadMore, setCanLoadMore] = useState(false);
+  const [lastPageSize, setLastPageSize] = useState(0);
 
   const fetchTrusted = useCallback(async () => {
     if (!activeProfile?.id) {
@@ -81,12 +87,15 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
       try {
         const { providers: matchedProviders, totalResults: total } = await lookupProviders(activeProfile.id, {
           query: trimmedQuery,
-          limit: 6,
+          name: nameQuery.trim() || undefined,
+          limit: RESULTS_PAGE_SIZE,
         });
-        setResults(matchedProviders);
-        setTotalResults(total);
-        setCurrentQuery(trimmedQuery);
-        return matchedProviders.length > 0;
+      setResults(matchedProviders);
+      setTotalResults(total);
+      setLastPageSize(matchedProviders.length);
+      setCanLoadMore(total > matchedProviders.length || matchedProviders.length === RESULTS_PAGE_SIZE);
+      setCurrentQuery(trimmedQuery);
+      return matchedProviders.length > 0;
       } catch (err) {
         setError('Lookup failed. Try again.');
         return false;
@@ -98,24 +107,30 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   );
 
   const loadMoreProviders = useCallback(async () => {
+    const hasMoreResults = results.length < totalResults || canLoadMore;
     if (
       loadingMore ||
       !activeProfile?.id ||
       !currentQuery ||
-      results.length >= totalResults ||
+      !hasMoreResults ||
       loading
     ) {
       return;
     }
     setLoadingMore(true);
     try {
+    const offset = results.length;
       const { providers: moreProviders, totalResults: updatedTotal } = await lookupProviders(activeProfile.id, {
         query: currentQuery,
-        limit: 6,
-        offset: results.length,
+        name: nameQuery.trim() || undefined,
+        limit: RESULTS_PAGE_SIZE,
+        offset,
       });
-      setResults((prev) => [...prev, ...moreProviders]);
-      setTotalResults(updatedTotal);
+    setResults((prev) => [...prev, ...moreProviders]);
+    setTotalResults(updatedTotal);
+    setLastPageSize(moreProviders.length);
+    setCanLoadMore(updatedTotal > offset + moreProviders.length || moreProviders.length === RESULTS_PAGE_SIZE);
+    scrollViewRef.current?.scrollToEnd({ animated: true });
     } catch (err) {
       setError('Lookup failed. Try again.');
     } finally {
@@ -125,7 +140,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
 
   const handleLookup = useCallback(() => {
     executeLookup(query);
-  }, [executeLookup, query]);
+  }, [executeLookup, query, nameQuery]);
 
   const handleUseLocation = useCallback(async () => {
     if (!activeProfile?.id) {
@@ -188,7 +203,8 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     try {
       await addTrustedProfessional(activeProfile.id, provider);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
-      fetchTrusted();
+      await fetchTrusted();
+      setOptimisticTrusted((prev) => prev.filter((entry) => entry.id !== optimistic.id));
     } catch (err) {
       setOptimisticTrusted((prev) => prev.filter((entry) => entry.id !== optimistic.id));
       console.error('Doctor lookup add error', err);
@@ -199,9 +215,14 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   }, [activeProfile?.id, buildTrustedFromProvider, fetchTrusted]);
 
   const handleRemove = useCallback(async (id: string) => {
-    await removeTrustedProfessional(id);
-    fetchTrusted();
-    setOptimisticTrusted((prev) => prev.filter((contact) => contact.id !== id));
+    setDeletingTrustedId(id);
+    try {
+      await removeTrustedProfessional(id);
+      fetchTrusted();
+      setOptimisticTrusted((prev) => prev.filter((contact) => contact.id !== id));
+    } finally {
+      setDeletingTrustedId(null);
+    }
   }, [fetchTrusted]);
 
   const includesDoctorTag = (contact: TrustedProfessional) =>
@@ -257,41 +278,58 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
         {doctorTrusted.length === 0 ? (
           <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Add providers to your safe list</Text>
         ) : (
-          doctorTrusted.map((contact) => (
-            <View
-              key={contact.id}
-              style={[
-                styles.trustedRow,
-                {
-                  backgroundColor: colors.surfaceAlt ?? colors.surface,
-                  borderColor: withOpacity(theme.colors.textMuted, 0.25),
-                },
-              ]}
-            >
-              <View style={styles.trustedMeta}>
-                <View style={[styles.trustedIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.18) }]}>
-                  <Ionicons name="checkmark-circle" size={18} color={theme.colors.accent} />
+          doctorTrusted.map((contact) => {
+            const isDeleting = deletingTrustedId === contact.id;
+            return (
+              <View
+                key={contact.id}
+                style={[
+                  styles.trustedRow,
+                  {
+                    backgroundColor: colors.surfaceAlt ?? colors.surface,
+                    borderColor: withOpacity(theme.colors.textMuted, 0.25),
+                  },
+                ]}
+              >
+                <View style={styles.trustedMeta}>
+                  <View style={[styles.trustedIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.18) }]}>
+                    <Ionicons name="checkmark-circle" size={18} color={theme.colors.accent} />
+                  </View>
+                  <View style={styles.trustedText}>
+                    <Text style={[styles.providerName, { color: theme.colors.text }]}>{contact.contact_name ?? contact.caller_number}</Text>
+                    <Text style={[styles.providerMeta, { color: theme.colors.textMuted }]}>{contact.relationship_tag ?? 'Professional'}</Text>
+                  </View>
                 </View>
-                <View style={styles.trustedText}>
-                  <Text style={[styles.providerName, { color: theme.colors.text }]}>{contact.contact_name ?? contact.caller_number}</Text>
-                  <Text style={[styles.providerMeta, { color: theme.colors.textMuted }]}>{contact.relationship_tag ?? 'Professional'}</Text>
-                </View>
+                <Pressable
+                  style={[
+                    styles.trashButton,
+                    { backgroundColor: withOpacity(theme.colors.danger, 0.2) },
+                  ]}
+                  onPress={() => handleRemove(contact.id)}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? (
+                    <ActivityIndicator size="small" color={theme.colors.text} />
+                  ) : (
+                    <Ionicons name="trash" size={16} color={theme.colors.danger} />
+                  )}
+                </Pressable>
               </View>
-              <Pressable style={[styles.trashButton, { backgroundColor: withOpacity(theme.colors.danger, 0.2) }]} onPress={() => handleRemove(contact.id)}>
-                <Ionicons name="trash" size={16} color={theme.colors.danger} />
-              </Pressable>
-            </View>
-          ))
+            );
+          })
         )}
       </View>
     ),
-    [handleRemove, theme.colors, doctorTrusted, colors.surfaceAlt, colors.surface]
+    [handleRemove, theme.colors, doctorTrusted, colors.surfaceAlt, colors.surface, deletingTrustedId]
   );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.bg }]} edges={[]}>
       <SettingsHeader title="Doctor Lookup" subtitle="Trusted Professionals" />
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 32) + 150, paddingTop: 26 }}>
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 32) + 150, paddingTop: 26 }}
+        >
         <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={[styles.heroIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.15) }]}>
             <Ionicons name="analytics-outline" size={20} color={theme.colors.accent} />
@@ -323,6 +361,18 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
             >
               {locationLoading ? <Loader /> : <Ionicons name="navigate" size={20} color="white" />}
             </Pressable>
+          </View>
+          <Text style={[styles.searchLabel, { color: colors.textMuted, marginTop: 6 }]}>Name or Office (optional)</Text>
+          <View style={[styles.inputWrapper, { backgroundColor: withOpacity(colors.text, 0.05), marginBottom: 12 }]}>
+            <Ionicons name="person" size={18} color={colors.textMuted} />
+            <TextInput
+              style={[styles.searchInput, { flex: 1, color: colors.text, borderColor: 'transparent' }]}
+              placeholder="e.g., Dr. Smith or Valley Health"
+              placeholderTextColor={withOpacity(colors.textMuted, 0.7)}
+              value={nameQuery}
+              onChangeText={setNameQuery}
+              returnKeyType="search"
+            />
           </View>
           {error ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text> : null}
           <Pressable
@@ -393,19 +443,25 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
                 </View>
               );
             })}
-            {results.length < totalResults ? (
-              <Pressable
-                style={[styles.loadMoreButton, { borderColor: colors.border }]}
-                onPress={loadMoreProviders}
-                disabled={loadingMore}
-              >
-                {loadingMore ? (
-                  <ActivityIndicator color={colors.accent} />
-                ) : (
-                  <Text style={[styles.loadMoreText, { color: colors.accent }]}>Load more providers</Text>
-                )}
-              </Pressable>
-            ) : null}
+            {(() => {
+              const showLoadMore =
+                (results.length < totalResults) ||
+                (lastPageSize === RESULTS_PAGE_SIZE && results.length > 0) ||
+                canLoadMore;
+              return showLoadMore ? (
+                <Pressable
+                  style={[styles.loadMoreButton, { borderColor: colors.border }]}
+                  onPress={loadMoreProviders}
+                  disabled={loadingMore}
+                >
+                  {loadingMore ? (
+                    <ActivityIndicator color={colors.accent} />
+                  ) : (
+                    <Text style={[styles.loadMoreText, { color: colors.accent }]}>Load more providers</Text>
+                  )}
+                </Pressable>
+              ) : null;
+            })()}
           </View>
         </View>
         {trustedSection}

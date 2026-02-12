@@ -27,10 +27,13 @@ export type ProfessionalLookupResponse = {
   totalResults: number;
 };
 
-export async function lookupProviders(profileId: string, params: { query?: string; limit?: number; offset?: number; }): Promise<ProfessionalLookupResponse> {
+export async function lookupProviders(profileId: string, params: { query?: string; name?: string; limit?: number; offset?: number; }): Promise<ProfessionalLookupResponse> {
   const searchParams = new URLSearchParams();
   if (params.query) {
     searchParams.set('q', params.query);
+  }
+  if (params.name) {
+    searchParams.set('name', params.name);
   }
   if (params.limit) {
     searchParams.set('limit', String(params.limit));

@@ -841,7 +841,13 @@ export default function TrustedContactsScreen() {
                       </View>
                       <View style={styles.identityText}>
                         <View style={styles.nameRow}>
-                          <Text style={styles.personName}>{getContactDisplayName(contact)}</Text>
+                          <Text
+                            style={styles.personName}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {getContactDisplayName(contact)}
+                          </Text>
                           <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
                         </View>
                       <View style={styles.relationshipBadge}>

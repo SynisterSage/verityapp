@@ -17,6 +17,7 @@ export type ProfessionalLookupResult = {
 
 type LookupOptions = {
   query?: string;
+  name?: string;
   limit?: number;
   offset?: number;
 };
@@ -60,7 +61,7 @@ function parseLocationText(text: string) {
 }
 
 async function fetchProviders(options: LookupOptions): Promise<ProfessionalLookupResponse> {
-  const { query, limit = 5, offset = 0 } = options;
+  const { query, name, limit = 10, offset = 0 } = options;
   const normalizedQuery = query?.trim();
   if (!normalizedQuery) {
     return { providers: [], totalResults: 0 };
@@ -88,6 +89,14 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
   }
   if (locationParams.state) {
     searchParams.set('state', locationParams.state);
+  }
+  if (name?.trim()) {
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) {
+      searchParams.set('first_name', parts[0]);
+      searchParams.set('last_name', parts.slice(1).join(' '));
+    }
+    searchParams.set('organization_name', name.trim());
   }
   const url = `${NPI_API_URL}?${searchParams.toString()}`;
   try {
@@ -145,7 +154,7 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
 }
 
 export async function searchProfessionalDirectory(options: LookupOptions): Promise<ProfessionalLookupResponse> {
-  const keyParts = [options.query ?? '', options.limit ?? '', options.offset ?? ''];
+  const keyParts = [options.query ?? '', options.name ?? '', options.limit ?? '', options.offset ?? ''];
   const key = keyParts.join('::');
   const cached = cache.get(key);
   if (cached && cached.expiresAt > Date.now()) {
