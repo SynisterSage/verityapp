@@ -416,9 +416,6 @@ async function addTrustedContacts(req: Request, res: Response) {
   const filteredNumbers = normalizedNumbers.filter(
     (number) => !existingCanonicalNumbers.has(number)
   );
-  if (filteredNumbers.length === 0) {
-    return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true, added: 0 });
-  }
 
   // Get caretaker_id for RLS policy
   const { data: profileData } = await supabaseAdmin
@@ -427,7 +424,7 @@ async function addTrustedContacts(req: Request, res: Response) {
     .eq('id', profileId)
     .single();
 
-  const rows = filteredNumbers.map((normalizedNumber) => {
+  const rows = normalizedNumbers.map((normalizedNumber) => {
     const callerHash = hashCallerNumber(normalizedNumber);
     if (!callerHash) {
       return null;
