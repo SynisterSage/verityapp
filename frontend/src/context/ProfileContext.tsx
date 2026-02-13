@@ -40,6 +40,10 @@ export type Profile = {
   auto_block_on_fraud?: boolean | null;
   created_at: string;
   last_pin_update?: string | null;
+  address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
 };
 
 export type ProfileMembership = {

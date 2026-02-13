@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -73,6 +73,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   const scrollViewRef = useRef<ScrollView>(null);
   const [canLoadMore, setCanLoadMore] = useState(false);
   const [lastPageSize, setLastPageSize] = useState(0);
+  const [lastResolvedLocation, setLastResolvedLocation] = useState<string | null>(null);
 
   const fetchTrusted = useCallback(async () => {
     if (!activeProfile?.id) {
@@ -92,7 +93,9 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     async (searchQuery: string) => {
       const trimmedQuery = searchQuery.trim();
       const trimmedName = nameQuery.trim();
-      const effectiveQuery = trimmedQuery || trimmedName;
+      const fallbackLocation = lastResolvedLocation ??
+        (activeProfile?.zip_code ?? activeProfile?.city ?? '').trim();
+      const effectiveQuery = trimmedQuery || trimmedName || fallbackLocation;
       if (!activeProfile?.id || !effectiveQuery) {
         if (!effectiveQuery) {
           setError('Enter a ZIP code, city, or provider name first.');
@@ -102,7 +105,11 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
       setLoading(true);
       setError('');
       setHasSearched(true);
-      console.log('[DoctorLookup] executeLookup', { profileId: activeProfile.id, query: effectiveQuery });
+      console.log('[DoctorLookup] executeLookup', {
+        profileId: activeProfile.id,
+        query: effectiveQuery,
+        fallbackLocation: !trimmedQuery && !trimmedName ? fallbackLocation : undefined,
+      });
       try {
         const { providers: matchedProviders, totalResults: total } = await lookupProviders(activeProfile.id, {
           query: effectiveQuery,
@@ -114,6 +121,9 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
         setLastPageSize(matchedProviders.length);
         setCanLoadMore(total > matchedProviders.length || matchedProviders.length === RESULTS_PAGE_SIZE);
         setCurrentQuery(effectiveQuery);
+        if (trimmedQuery) {
+          setLastResolvedLocation(trimmedQuery);
+        }
         return matchedProviders.length > 0;
       } catch (err) {
         setError('Lookup failed. Try again.');
