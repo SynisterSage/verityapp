@@ -17,6 +17,7 @@ type ActivityRowProps = {
   badge: string;
   badgeLevel?: string;
   muted?: boolean;
+  disabled?: boolean;
   onPress: () => void;
 };
 
@@ -32,6 +33,7 @@ export default function ActivityRow({
   badge,
   badgeLevel,
   muted = false,
+  disabled = false,
   onPress,
 }: ActivityRowProps) {
   const { theme } = useTheme();
@@ -48,6 +50,7 @@ export default function ActivityRow({
   const shouldFormatPhone = digitsOnly.length >= 10 && !/[A-Za-z]/.test(label);
   const formattedLabel = shouldFormatPhone ? formatPhoneNumber(label, label) : label;
   const handlePress = () => {
+    if (disabled) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     onPress();
   };
@@ -61,7 +64,7 @@ export default function ActivityRow({
         },
       ]}
       onPress={handlePress}
-      activeOpacity={0.85}
+      activeOpacity={disabled ? 1 : 0.85}
     >
       <View style={styles.rowLeft}>
         <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>

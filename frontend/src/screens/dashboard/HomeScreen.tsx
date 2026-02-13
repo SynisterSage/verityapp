@@ -65,6 +65,7 @@ type ActivityItem =
       badgeLevel?: string;
       callId: string;
       muted?: boolean;
+      viewOnly?: boolean;
     }
   | {
       type: 'alert';
@@ -74,6 +75,7 @@ type ActivityItem =
       badge: string;
       badgeLevel?: string;
       muted?: boolean;
+      viewOnly?: boolean;
     };
 
 type StatTile = {
@@ -248,7 +250,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           const isTrusted = alert.alert_type === 'trusted';
           const isPinChange = alert.alert_type === 'pin_change';
           const callerNumber = alert.payload?.callerNumber as string | undefined;
-          const callerName = callerNumber ? contactNameMap[callerNumber] : '';
+          const payloadContactName = (alert.payload?.contactName as string | undefined) ?? '';
+          const callerName = payloadContactName || (callerNumber ? contactNameMap[callerNumber] : '');
           const feedback = alert.call_id ? alertFeedbackMap.get(alert.call_id)?.feedback_status ?? '' : '';
           const isHandled = feedback === 'marked_fraud' || feedback === 'marked_safe';
           const label =
@@ -265,13 +268,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             isPinChange
               ? 'PIN CHANGE'
               : isTrusted
-              ? 'TRUSTED'
+              ? 'TRUSTED CALLER'
               : label.toUpperCase();
           const badgeLevel =
             isPinChange
               ? 'circle'
               : isTrusted
-              ? 'low'
+              ? 'circle'
               : feedback === 'marked_fraud'
               ? 'critical'
               : feedback === 'marked_safe'
@@ -281,10 +284,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             type: 'alert' as const,
             id: alert.id,
             created_at: alert.created_at,
-            label: isTrusted ? 'Trusted call' : isPinChange ? 'Pin change' : 'Fraud alert',
+            label: isTrusted
+              ? callerName
+                ? `Trusted caller: ${callerName}`
+                : 'Trusted caller'
+              : isPinChange
+              ? 'Pin change'
+              : 'Fraud alert',
             badge,
             badgeLevel,
             muted: isHandled,
+            viewOnly: isTrusted,
           };
         }),
       ]
@@ -587,6 +597,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                       createdAt={item.created_at}
                       badge={item.badge}
                       muted={item.muted}
+                      disabled={Boolean(item.viewOnly)}
                       badgeLevel={
                         item.badge === 'FRAUD'
                           ? 'critical'
@@ -594,14 +605,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                           ? 'low'
                           : item.badgeLevel
                       }
-                      onPress={() =>
-                        item.type === 'call'
-                          ? navigation.navigate('CallsTab', {
-                              screen: 'Calls',
-                              params: { initialCallId: item.callId },
-                            })
-                          : navigation.navigate('AlertsTab')
-                      }
+                      onPress={() => {
+                        if (item.viewOnly) {
+                          return;
+                        }
+                        if (item.type === 'call') {
+                          navigation.navigate('CallsTab', {
+                            screen: 'Calls',
+                            params: { initialCallId: item.callId },
+                          });
+                          return;
+                        }
+                        navigation.navigate('AlertsTab');
+                      }}
                     />
                   </View>
                 ))}

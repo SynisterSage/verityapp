@@ -7,7 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -20,7 +20,8 @@
         "NSContactsUsageDescription": "Verity Protect uses your contacts to let trusted callers skip the passcode.",
         "NSLocationWhenInUseUsageDescription": "Location lets us find care professionals nearby to add to your trusted list.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Location lets us find care professionals nearby to add to your trusted list."
-      }
+      },
+      "appleTeamId": "CAY3N8J725"
     },
     "android": {
       "permissions": [

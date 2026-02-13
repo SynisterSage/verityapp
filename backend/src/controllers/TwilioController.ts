@@ -56,17 +56,56 @@ function extractPin(digits?: string, speechResult?: string) {
 const CLIENT_SESSION_TTL_MS = Number(process.env.TWILIO_CLIENT_SESSION_TTL ?? '120') * 1000;
 
 async function isCallerTrusted(profileId: string, fromNumber?: string | null) {
+  const trustedCaller = await getTrustedCaller(profileId, fromNumber);
+  return Boolean(trustedCaller);
+}
+
+async function getTrustedCaller(profileId: string, fromNumber?: string | null) {
   const callerHash = hashCallerNumber(fromNumber);
   if (!callerHash) {
-    return false;
+    return null;
   }
   const { data } = await supabaseAdmin
     .from('trusted_contacts')
-    .select('id')
+    .select('id, caller_number, contact_name')
     .eq('profile_id', profileId)
     .eq('caller_hash', callerHash)
     .maybeSingle();
-  return !!data;
+  return data ?? null;
+}
+
+async function logTrustedBridgeActivity(args: {
+  profileId: string;
+  fromNumber?: string | null;
+  toNumber?: string | null;
+  bridgeTarget: string;
+  trustedCaller?: { caller_number?: string | null; contact_name?: string | null } | null;
+}) {
+  const { profileId, fromNumber, toNumber, bridgeTarget, trustedCaller } = args;
+  const contactName = trustedCaller?.contact_name ?? null;
+  const callerNumber = fromNumber ?? trustedCaller?.caller_number ?? null;
+  const payload = {
+    callerNumber,
+    contactName,
+    toNumber: toNumber ?? null,
+    bridgeTarget,
+    riskLevel: 'low',
+    label: 'trusted',
+    bridged: true,
+  };
+
+  const { error } = await supabaseAdmin.from('alerts').insert({
+    profile_id: profileId,
+    call_id: null,
+    alert_type: 'trusted',
+    status: 'pending',
+    payload,
+  });
+
+  if (error) {
+    logger.err(error);
+    logger.warn(`Failed to log trusted bridge activity profile=${profileId}`);
+  }
 }
 
 function appendVoicemail(
@@ -221,8 +260,8 @@ async function callIncoming(req: Request, res: Response) {
   const fromNumber = payload.From ?? '';
   const profile = await getProfileByToNumber(toNumber);
   if (profile) {
-    const trusted = await isCallerTrusted(profile.id, fromNumber);
-    if (trusted) {
+    const trustedCaller = await getTrustedCaller(profile.id, fromNumber);
+    if (trustedCaller) {
       const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
       if (bridgeEnabled) {
         const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
@@ -234,6 +273,13 @@ async function callIncoming(req: Request, res: Response) {
           profile
         );
         if (bridgeTarget) {
+          await logTrustedBridgeActivity({
+            profileId: profile.id,
+            fromNumber,
+            toNumber,
+            bridgeTarget,
+            trustedCaller,
+          });
           logger.info(`Trusted caller bridged ${bridgeTarget} to=${toNumber} from=${fromNumber}`);
           return res.type('text/xml').send(twimlResponse.toString());
         }
@@ -374,8 +420,8 @@ async function verifyPin(req: Request, res: Response) {
     return res.type('text/xml').send(twimlResponse.toString());
   }
 
-  const trusted = await isCallerTrusted(profile.id, fromNumber);
-  if (trusted) {
+  const trustedCaller = await getTrustedCaller(profile.id, fromNumber);
+  if (trustedCaller) {
     const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
     if (bridgeEnabled) {
       const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
@@ -387,6 +433,13 @@ async function verifyPin(req: Request, res: Response) {
         profile
       );
       if (bridgeTarget) {
+        await logTrustedBridgeActivity({
+          profileId: profile.id,
+          fromNumber,
+          toNumber,
+          bridgeTarget,
+          trustedCaller,
+        });
         logger.info(`Trusted caller bridged ${bridgeTarget} to=${toNumber} from=${fromNumber}`);
         return res.type('text/xml').send(twimlResponse.toString());
       }
