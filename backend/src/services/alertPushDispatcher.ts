@@ -59,8 +59,10 @@ function buildPushContent(alert: AlertLike) {
         : null;
     const riskLevel = coerceString(payload.riskLevel);
     return {
-      title: score ? `Priority alert (${score}%)` : 'Priority alert',
-      body: riskLevel ? `Potential ${riskLevel} risk call detected.` : 'Potential fraud call detected.',
+      title: score ? `Urgent safety alert (${score}%)` : 'Urgent safety alert',
+      body: riskLevel
+        ? `We detected a possible ${riskLevel} risk call.`
+        : 'We detected a possible fraud call.',
     };
   }
 
@@ -76,20 +78,20 @@ function buildPushContent(alert: AlertLike) {
   if (alertType === 'pin_change') {
     return {
       title: 'Safety PIN updated',
-      body: coerceString(payload.message) || 'A profile member updated the Safety PIN.',
+      body: coerceString(payload.message) || 'Someone in your circle updated the Safety PIN.',
     };
   }
 
   if (CIRCLE_ALERT_TYPES.has(alertType)) {
     return {
       title: 'Circle activity update',
-      body: coerceString(payload.message) || 'There is a new update in your circle activity.',
+      body: coerceString(payload.message) || 'There is a new update in your circle.',
     };
   }
 
   return {
     title: 'New alert',
-    body: coerceString(payload.message) || 'There is a new alert on this profile.',
+    body: coerceString(payload.message) || 'Open Verity Protect to review this alert.',
   };
 }
 
@@ -176,4 +178,3 @@ export async function dispatchAlertPush(alert: AlertLike) {
     );
   }
 }
-

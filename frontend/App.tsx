@@ -548,8 +548,17 @@ function NavigationHost() {
       return;
     }
     pendingNotificationRef.current = null;
-    if (payload.routeTarget === 'call_detail' && payload.callId) {
-      rootNavigationRef.current.navigate('CallDetailModal', { callId: payload.callId });
+    if (payload.routeTarget === 'call_detail') {
+      if (payload.callId) {
+        rootNavigationRef.current.navigate('CallDetailModal', { callId: payload.callId });
+      } else {
+        rootNavigationRef.current.dispatch(
+          CommonActions.navigate({
+            name: 'AppTabs',
+            params: { screen: 'AlertsTab' },
+          })
+        );
+      }
       return;
     }
     if (payload.routeTarget === 'calls_trusted') {

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -25,18 +25,63 @@ import type { CircleActivityItem } from './circleActivityTypes';
 import { AlertRow } from './alertTypes';
 import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
 import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
+import { formatAlertTime } from './alertTimeUtils';
 import * as Haptics from 'expo-haptics';
 import EmptyState from '../../components/common/EmptyState';
 import AlertCard from '../../components/alerts/AlertCard';
 import { useProfile } from '../../context/ProfileContext';
 
+function toCircleActivityItem(alert: AlertRow): CircleActivityItem {
+  const actorLabel = alert.payload?.actor_label ?? 'Circle member';
+  const description =
+    alert.payload?.message ??
+    (alert.alert_type === 'circle_invite'
+      ? 'Shared an invite link.'
+      : alert.alert_type === 'pin_change'
+      ? 'Updated the Safety PIN.'
+      : alert.alert_type === 'safe_phrase_added'
+      ? `Added safe word "${alert.payload?.phrase ?? 'a phrase'}".`
+      : alert.alert_type === 'trusted_contact_added'
+      ? `Added ${alert.payload?.added ?? 1} trusted contact${(alert.payload?.added ?? 1) === 1 ? '' : 's'}.`
+      : alert.alert_type === 'blocked_caller_added'
+      ? `Blocked number ${alert.payload?.caller_number ?? 'a caller'}.`
+      : alert.alert_type === 'security_password'
+      ? 'Updated the account password.'
+      : alert.alert_type === 'member_joined'
+      ? `${alert.payload?.member_display_name ?? 'A member'} joined the circle.`
+      : alert.alert_type === 'member_role_changed'
+      ? `Updated ${alert.payload?.target_display_name ?? 'a member'} role.`
+      : alert.alert_type === 'member_removed'
+      ? `Removed ${alert.payload?.target_display_name ?? 'a member'} from the circle.`
+      : alert.alert_type === 'automation_settings_updated'
+      ? 'Updated automation settings.'
+      : alert.alert_type === 'data_exported'
+      ? 'Exported the profile data.'
+      : alert.alert_type === 'data_cleared'
+      ? 'Cleared call and alert history.'
+      : 'Circle activity updated.');
+
+  return {
+    id: `${alert.id}-circle`,
+    label: actorLabel,
+    description,
+    timestamp: formatAlertTime(alert.created_at),
+    alertRow: alert,
+  };
+}
+
 export default function CircleActivityScreen() {
   const { theme } = useTheme();
-  const { canManageProfile } = useProfile();
+  const { activeProfile, canManageProfile } = useProfile();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'CircleActivityModal'>>();
-  const [activityList, setActivityList] = useState<CircleActivityItem[]>(route.params?.activities ?? []);
+  const [activityList, setActivityList] = useState<CircleActivityItem[]>(
+    route.params?.activities ?? []
+  );
+  const [isLoadingActivities, setIsLoadingActivities] = useState(
+    !route.params?.activities?.length
+  );
   const styles = useMemo(() => createCircleStyles(theme), [theme]);
   const handleBackPress = useCallback(() => {
     navigation.goBack();
@@ -48,6 +93,50 @@ export default function CircleActivityScreen() {
   const trayAnim = useRef(new Animated.Value(0)).current;
   const [trayProcessing, setTrayProcessing] = useState(false);
   const [activeTrayAction, setActiveTrayAction] = useState<'delete' | null>(null);
+
+  useEffect(() => {
+    if (route.params?.activities && route.params.activities.length > 0) {
+      setActivityList(route.params.activities);
+      setIsLoadingActivities(false);
+      return;
+    }
+    if (!activeProfile?.id) {
+      setIsLoadingActivities(false);
+      return;
+    }
+
+    let cancelled = false;
+    const loadCircleActivity = async () => {
+      setIsLoadingActivities(true);
+      try {
+        const data = await authorizedFetch('/alerts?limit=50');
+        const alerts = (data?.alerts ?? []) as AlertRow[];
+        const mapped = alerts
+          .filter((alert) => CIRCLE_ALERT_TYPES.has(alert.alert_type ?? ''))
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+          )
+          .map(toCircleActivityItem);
+        if (!cancelled) {
+          setActivityList(mapped);
+        }
+      } catch {
+        if (!cancelled) {
+          setActivityList([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingActivities(false);
+        }
+      }
+    };
+
+    loadCircleActivity();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile?.id, route.params?.activities]);
 
   const deleteAlert = useCallback(async (alertId: string) => {
     try {
@@ -192,7 +281,11 @@ export default function CircleActivityScreen() {
           )}
         </TouchableOpacity>
       </View>
-      {activityList.length === 0 ? (
+      {isLoadingActivities ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={theme.colors.textMuted} />
+        </View>
+      ) : activityList.length === 0 ? (
         <View style={styles.emptyContainer}>
           <EmptyState
             icon="people-outline"
@@ -337,6 +430,11 @@ const createCircleStyles = (theme: AppTheme) =>
       paddingHorizontal: 24,
       paddingTop: 0,
       paddingBottom: 34
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     trayOverlay: {
       ...StyleSheet.absoluteFillObject,
