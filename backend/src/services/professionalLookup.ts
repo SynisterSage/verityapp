@@ -136,11 +136,12 @@ function parseLocationText(text: string) {
 async function fetchProviders(options: LookupOptions): Promise<ProfessionalLookupResponse> {
   const { query, name, limit = 10, offset = 0 } = options;
   const normalizedQuery = query?.trim();
-  if (!normalizedQuery) {
+  if (!normalizedQuery && !name?.trim()) {
     return { providers: [], totalResults: 0 };
   }
-  const locationParams = parseLocationText(normalizedQuery);
-  if (!locationParams.postalCode && !locationParams.city) {
+  const locationParams = parseLocationText(normalizedQuery ?? '');
+  const requireLocation = !name?.trim();
+  if (!locationParams.postalCode && !locationParams.city && requireLocation) {
     logger.warn(`Lookup skipped because query did not contain location info: ${normalizedQuery}`);
     return { providers: [], totalResults: 0 };
   }

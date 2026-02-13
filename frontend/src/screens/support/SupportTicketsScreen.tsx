@@ -375,7 +375,7 @@ export default function SupportTicketsScreen() {
       <View style={styles.headerContainer}>
         <DashboardHeader
           title={greeting}
-          subtitle="Message our safety team or browse the quick guides below."
+          subtitle="Leave a message for our safety team or browse the quick guides below."
           align="left"
         />
       </View>

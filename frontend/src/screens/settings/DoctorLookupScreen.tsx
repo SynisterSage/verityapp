@@ -91,25 +91,30 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   const executeLookup = useCallback(
     async (searchQuery: string) => {
       const trimmedQuery = searchQuery.trim();
-      if (!activeProfile?.id || !trimmedQuery) {
+      const trimmedName = nameQuery.trim();
+      const effectiveQuery = trimmedQuery || trimmedName;
+      if (!activeProfile?.id || !effectiveQuery) {
+        if (!effectiveQuery) {
+          setError('Enter a ZIP code, city, or provider name first.');
+        }
         return false;
       }
       setLoading(true);
       setError('');
       setHasSearched(true);
-      console.log('[DoctorLookup] executeLookup', { profileId: activeProfile.id, query: trimmedQuery });
+      console.log('[DoctorLookup] executeLookup', { profileId: activeProfile.id, query: effectiveQuery });
       try {
         const { providers: matchedProviders, totalResults: total } = await lookupProviders(activeProfile.id, {
-          query: trimmedQuery,
-          name: nameQuery.trim() || undefined,
+          query: effectiveQuery,
+          name: trimmedName || undefined,
           limit: RESULTS_PAGE_SIZE,
         });
-      setResults(matchedProviders);
-      setTotalResults(total);
-      setLastPageSize(matchedProviders.length);
-      setCanLoadMore(total > matchedProviders.length || matchedProviders.length === RESULTS_PAGE_SIZE);
-      setCurrentQuery(trimmedQuery);
-      return matchedProviders.length > 0;
+        setResults(matchedProviders);
+        setTotalResults(total);
+        setLastPageSize(matchedProviders.length);
+        setCanLoadMore(total > matchedProviders.length || matchedProviders.length === RESULTS_PAGE_SIZE);
+        setCurrentQuery(effectiveQuery);
+        return matchedProviders.length > 0;
       } catch (err) {
         setError('Lookup failed. Try again.');
         return false;

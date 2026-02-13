@@ -430,7 +430,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           supportAction={{
             onPress: handleSupportPress,
             unreadCount: unreadAgentCount,
-            assistantOnline,
           }}
         />
       </View>
