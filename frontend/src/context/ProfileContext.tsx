@@ -139,13 +139,27 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   const refreshTwilioClientToken = useCallback(async (profileId: string) => {
     try {
+      console.info('[twilio-client] token refresh start', { profileId });
       setTwilioClientError(null);
       const data = await requestTwilioClientToken(profileId);
+      console.info('[twilio-client] token refresh success', {
+        profileId,
+        hasToken: Boolean(data?.token),
+        identity: data?.identity ?? null,
+      });
       setTwilioClientToken(data.token);
       setTwilioClientIdentity(data.identity);
       await sendTwilioClientHeartbeat(profileId, data.identity);
+      console.info('[twilio-client] heartbeat success', {
+        profileId,
+        identity: data.identity,
+      });
       setTwilioClientHeartbeatActive(true);
     } catch (err) {
+      console.warn('[twilio-client] token refresh failed', {
+        profileId,
+        message: err instanceof Error ? err.message : String(err),
+      });
       setTwilioClientToken(null);
       setTwilioClientIdentity(null);
       setTwilioClientHeartbeatActive(false);

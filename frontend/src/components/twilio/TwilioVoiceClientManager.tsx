@@ -17,6 +17,11 @@ export default function TwilioVoiceClientManager() {
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    console.info('[twilio-voice] manager state', {
+      isTwilioClientReady,
+      hasToken: Boolean(twilioClientToken),
+      identity: twilioClientIdentity ?? null,
+    });
     if (!isTwilioClientReady || !twilioClientToken || !twilioClientIdentity) {
       registeredTokenRef.current = null;
       TwilioVoice.unregister();
@@ -30,12 +35,14 @@ export default function TwilioVoiceClientManager() {
       return;
     }
     let cancelled = false;
+    console.info('[twilio-voice] initWithToken start', { identity: twilioClientIdentity });
     TwilioVoice.initWithToken(twilioClientToken)
       .then(() => {
         if (cancelled) {
           return;
         }
         registeredTokenRef.current = twilioClientToken;
+        console.info('[twilio-voice] initWithToken success', { identity: twilioClientIdentity });
         if (heartbeatRef.current) {
           clearInterval(heartbeatRef.current);
         }

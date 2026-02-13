@@ -98,7 +98,14 @@ async function createClientToken(req: Request, res: Response) {
   const identity = profile.twilio_client_identity ?? `profile-${profileId}`;
   const ttlSeconds = Number(process.env.TWILIO_CLIENT_TOKEN_TTL ?? 3600);
   const AccessToken = twilio.jwt.AccessToken;
-  const grant = new AccessToken.VoiceGrant({ incomingAllow: true });
+  const pushCredentialSid = process.env.TWILIO_PUSH_CREDENTIAL_SID_IOS ?? '';
+  const voiceGrantOptions: Record<string, unknown> = { incomingAllow: true };
+  if (pushCredentialSid) {
+    voiceGrantOptions.pushCredentialSid = pushCredentialSid;
+  } else {
+    logger.warn('[twilio-client] missing TWILIO_PUSH_CREDENTIAL_SID_IOS; incoming client calls may fail');
+  }
+  const grant = new AccessToken.VoiceGrant(voiceGrantOptions);
   const token = new AccessToken(accountSid, apiKey, apiSecret, {
     identity,
     ttl: Number(ttlSeconds),
