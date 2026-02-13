@@ -33,15 +33,18 @@ async function userIsCaretaker(userId: string, profileId: string) {
 async function registerDeviceToken(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
+    logger.warn(`[device-tokens] unauthorized request profile=${req.params?.profileId ?? 'missing'}`);
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
   }
 
   const { profileId } = req.params as { profileId?: string };
   if (!profileId) {
+    logger.warn(`[device-tokens] missing profileId user=${userId}`);
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
   }
 
   if (!(await userIsCaretaker(userId, profileId))) {
+    logger.warn(`[device-tokens] forbidden user=${userId} profile=${profileId}`);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
@@ -64,10 +67,15 @@ async function registerDeviceToken(req: Request, res: Response) {
   const platform = rawPlatform ?? legacyDeviceType;
 
   if (!expoPushToken || !platform) {
+    logger.warn(`[device-tokens] invalid payload user=${userId} profile=${profileId} hasToken=${Boolean(expoPushToken)} hasPlatform=${Boolean(platform)}`);
     return res.status(HTTP_STATUS_CODES.BadRequest).json({
       error: 'expoPushToken and platform are required',
     });
   }
+
+  logger.info(
+    `[device-tokens] upsert start user=${userId} profile=${profileId} platform=${platform} tokenPreview=${expoPushToken.slice(0, 14)}...`
+  );
 
   const payload = {
     profile_id: profileId,
@@ -89,8 +97,11 @@ async function registerDeviceToken(req: Request, res: Response) {
 
   if (error) {
     logger.err(error);
+    logger.err(`[device-tokens] upsert failed user=${userId} profile=${profileId} message=${error.message}`);
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to register device' });
   }
+
+  logger.info(`[device-tokens] upsert success user=${userId} profile=${profileId} row=${data?.id ?? 'none'}`);
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ device: data });
 }

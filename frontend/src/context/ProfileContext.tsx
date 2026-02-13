@@ -197,12 +197,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
     try {
       isRegisteringPushRef.current = true;
+      console.info('[push] register start', { profileId: activeProfile.id, platform: Platform.OS });
       const { status: initialStatus } = await Notifications.getPermissionsAsync();
       let finalStatus = initialStatus;
       if (initialStatus !== 'granted') {
         const { status } = await Notifications.requestPermissionsAsync();
         finalStatus = status;
       }
+      console.info('[push] permission status', { initialStatus, finalStatus });
       if (finalStatus !== 'granted') {
         logEvent('push_permission_denied', {
           level: 'warning',
@@ -215,6 +217,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         process.env.EXPO_PUBLIC_EXPO_PROJECT_ID ||
         Constants.expoConfig?.extra?.eas?.projectId ||
         (Constants as any).easConfig?.projectId;
+      console.info('[push] project id resolved', { hasProjectId: Boolean(expoProjectId) });
       if (!expoProjectId) {
         logEvent('push_token_error', {
           level: 'warning',
@@ -230,6 +233,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         projectId: expoProjectId,
       });
       const pushToken = tokenResult?.data;
+      console.info('[push] token generated', {
+        hasToken: Boolean(pushToken),
+        tokenPreview: pushToken ? `${pushToken.slice(0, 14)}...` : null,
+      });
       if (!pushToken) {
         logEvent('push_token_error', {
           level: 'warning',
@@ -248,16 +255,24 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           Constants.expoConfig?.version ??
           (typeof Constants.manifest === 'object' ? Constants.manifest?.version : undefined),
       };
-      await registerProfileDeviceToken({
+      const registerResult = await registerProfileDeviceToken({
         profileId: activeProfile.id,
         expoPushToken: pushToken,
         platform: Platform.OS,
         locale,
         metadata,
       });
+      console.info('[push] backend register success', {
+        profileId: activeProfile.id,
+        responseKeys: registerResult && typeof registerResult === 'object' ? Object.keys(registerResult) : [],
+      });
       pushRegistrationRef.current = { profileId: activeProfile.id, token: pushToken };
     } catch (err) {
       console.warn('Failed to register push token', err);
+      console.warn('[push] register failed details', {
+        profileId: activeProfile?.id,
+        message: err instanceof Error ? err.message : String(err),
+      });
       logError(err, {
         screen: 'ProfileContext',
         extra: { reason: 'register_push_token_failed' },

@@ -14,7 +14,8 @@ const secureStorage = {
       return await SecureStore.getItemAsync(key, secureStoreOptions);
     } catch (error) {
       console.error('SecureStore getItem failed', error);
-      throw new Error('Unable to read secure storage');
+      // Returning null keeps auth flow alive if Keychain access is temporarily blocked.
+      return null;
     }
   },
   setItem: async (key: string, value: string) => {
@@ -22,7 +23,6 @@ const secureStorage = {
       await SecureStore.setItemAsync(key, value, secureStoreOptions);
     } catch (error) {
       console.error('SecureStore setItem failed', error);
-      throw new Error('Unable to write to secure storage');
     }
   },
   removeItem: async (key: string) => {
@@ -30,7 +30,6 @@ const secureStorage = {
       await SecureStore.deleteItemAsync(key, secureStoreOptions);
     } catch (error) {
       console.error('SecureStore removeItem failed', error);
-      throw new Error('Unable to remove secure storage key');
     }
   },
 };
