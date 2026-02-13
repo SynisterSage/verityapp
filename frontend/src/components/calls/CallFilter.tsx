@@ -10,6 +10,7 @@ export const CALL_FILTER_OPTIONS = [
   { key: 'all', label: 'All' },
   { key: 'verified', label: 'Verified' },
   { key: 'risk', label: 'Risk' },
+  { key: 'trusted', label: 'Trusted' },
 ] as const;
 
 export type CallFilterKey = (typeof CALL_FILTER_OPTIONS)[number]['key'];
@@ -41,6 +42,10 @@ export default function CallFilter({ value, onChange, style }: CallFilterProps) 
         risk: {
           gradient: [theme.colors.danger, withOpacity(theme.colors.danger, 0.75)],
           shadowColor: theme.colors.danger,
+        },
+        trusted: {
+          gradient: [theme.colors.accent, withOpacity(theme.colors.accent, 0.75)],
+          shadowColor: theme.colors.accent,
         },
       }) as Record<CallFilterKey, ActiveStyle>,
     [theme]

@@ -281,6 +281,10 @@ export default function CallsScreen({
   const [activeTrayAction, setActiveTrayAction] = useState<
     'archive' | 'unarchive' | 'delete' | 'block' | 'trust' | null
   >(null);
+  const [trustedTrayItem, setTrustedTrayItem] = useState<TrustedActivityRow | null>(null);
+  const [isTrustedTrayMounted, setIsTrustedTrayMounted] = useState(false);
+  const trustedTrayAnim = useRef(new Animated.Value(0)).current;
+  const [trustedTrayProcessing, setTrustedTrayProcessing] = useState(false);
   const handleSupportPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     navigateToSupportPortal();
@@ -327,10 +331,10 @@ export default function CallsScreen({
         const contactName = (row?.payload?.contactName as string | undefined) ?? '';
         const callerNumber = (row?.payload?.callerNumber as string | undefined) ?? '';
         const label = contactName
-          ? `Trusted caller: ${contactName}`
+          ? contactName
           : callerNumber
-          ? `Trusted caller: ${formatPhoneNumber(callerNumber, callerNumber)}`
-          : 'Trusted caller';
+          ? formatPhoneNumber(callerNumber, callerNumber)
+          : 'Trusted contact';
         return {
           id: row.id as string,
           created_at: row.created_at as string,
@@ -420,6 +424,48 @@ export default function CallsScreen({
     },
     [showTray]
   );
+
+  const showTrustedTray = useCallback((item: TrustedActivityRow) => {
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    setTrustedTrayItem(item);
+    setIsTrustedTrayMounted(true);
+    setTrustedTrayProcessing(false);
+    trustedTrayAnim.setValue(0);
+    Animated.timing(trustedTrayAnim, {
+      toValue: 1,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [trustedTrayAnim]);
+
+  const hideTrustedTray = useCallback(() => {
+    void Haptics.selectionAsync();
+    Animated.timing(trustedTrayAnim, {
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: true,
+    }).start(() => {
+      setIsTrustedTrayMounted(false);
+      setTrustedTrayItem(null);
+      setTrustedTrayProcessing(false);
+    });
+  }, [trustedTrayAnim]);
+
+  const deleteTrustedActivity = useCallback(async () => {
+    if (!trustedTrayItem) return;
+    setTrustedTrayProcessing(true);
+    try {
+      await authorizedFetch(`/alerts/${trustedTrayItem.id}`, { method: 'DELETE' });
+      setTrustedActivity((prev) => prev.filter((row) => row.id !== trustedTrayItem.id));
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      hideTrustedTray();
+    } catch {
+      Alert.alert('Delete failed', 'Could not delete the notification right now.');
+      setTrustedTrayProcessing(false);
+    }
+  }, [trustedTrayItem, hideTrustedTray]);
 
   const toggleArchiveCall = useCallback(async () => {
     if (!trayCall) return;
@@ -526,6 +572,9 @@ export default function CallsScreen({
   }, [activeProfile, trayCall, loadCalls, hideTray]);
 
   const filteredCalls = useMemo(() => {
+    if (filter === 'trusted') {
+      return [];
+    }
     if (filter === 'all') {
       return calls;
     }
@@ -666,13 +715,16 @@ const sections = useMemo<CallSection[]>(() => {
   const showSkeleton = loading && calls.length === 0;
   const emptyStateMessage = error
     ? error
+    : filter === 'trusted'
+    ? 'No trusted activity yet.'
     : filter === 'verified'
     ? 'No verified calls yet.'
     : filter === 'risk'
     ? 'No risk calls found.'
     : 'No calls recorded yet.';
 
-  const headerCount = filteredCalls.length;
+  const headerCount = filter === 'trusted' ? trustedActivity.length : filteredCalls.length;
+  const showTrustedOnly = filter === 'trusted';
 
   const bottomGap = Math.max(insets.bottom, 0) + 20;
   const refreshAccent = theme.colors.accent;
@@ -683,6 +735,16 @@ const sections = useMemo<CallSection[]>(() => {
     extrapolate: 'clamp',
   });
   const trayBackdropOpacity = trayAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.45],
+    extrapolate: 'clamp',
+  });
+  const trustedTrayTranslateY = trustedTrayAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
+    extrapolate: 'clamp',
+  });
+  const trustedTrayBackdropOpacity = trustedTrayAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 0.45],
     extrapolate: 'clamp',
@@ -731,29 +793,9 @@ const sections = useMemo<CallSection[]>(() => {
       <View style={styles.filterBar}>
         <CallFilter value={filter} onChange={setFilter} />
       </View>
-      {trustedActivity.length > 0 ? (
-        <View style={styles.trustedSection}>
-          <Text style={styles.sectionHeaderText}>Trusted Activity</Text>
-          <View style={styles.trustedList}>
-            {trustedActivity.map((item) => (
-              <View key={item.id} style={styles.trustedItem}>
-                <ActivityRow
-                  type="alert"
-                  label={item.label}
-                  createdAt={item.created_at}
-                  badge="TRUSTED CALLER"
-                  badgeLevel="circle"
-                  disabled
-                  onPress={() => {}}
-                />
-              </View>
-            ))}
-          </View>
-        </View>
-      ) : null}
         <SectionList<CallRow, CallSection>
           ref={listRef}
-          sections={sections}
+          sections={showTrustedOnly ? [] : sections}
           keyExtractor={(item) => item.id}
           renderItem={renderCallItem}
           renderSectionHeader={renderSectionHeader}
@@ -776,6 +818,30 @@ const sections = useMemo<CallSection[]>(() => {
             paddingBottom: bottomGap + 40,
           },
         ]}
+        ListHeaderComponent={
+          trustedActivity.length > 0 && (filter === 'all' || showTrustedOnly) ? (
+            <View style={styles.trustedSection}>
+              <Text style={styles.sectionHeaderText}>Trusted Activity</Text>
+              <View style={styles.trustedList}>
+                {trustedActivity.map((item) => (
+                  <View key={item.id} style={styles.trustedItem}>
+                    <ActivityRow
+                      type="alert"
+                      label={item.label}
+                      createdAt={item.created_at}
+                      badge="TRUSTED"
+                      badgeLevel="circle"
+                      borderRadius={32}
+                      disabled
+                      onLongPress={canManageProfile ? () => showTrustedTray(item) : undefined}
+                      onPress={() => {}}
+                    />
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null
+        }
         ListFooterComponentStyle={styles.footer}
         ListEmptyComponent={
           showSkeleton ? (
@@ -784,12 +850,16 @@ const sections = useMemo<CallSection[]>(() => {
                 <View key={idx} style={styles.skeletonCard} />
               ))}
             </View>
-          ) : (
-            <View style={styles.emptyStateWrap}>
+          ) : showTrustedOnly && trustedActivity.length > 0 ? null : (
+            <View style={[styles.emptyStateWrap, showTrustedOnly && styles.emptyStateWrapTrusted]}>
               <EmptyState
                 icon="call-outline"
                 title={emptyStateMessage}
-                body="We will surface calls here as soon as they arrive."
+                body={
+                  showTrustedOnly
+                    ? 'Trusted caller bridges will show here.'
+                    : 'We will surface calls here as soon as they arrive.'
+                }
               />
             </View>
           )
@@ -896,6 +966,77 @@ const sections = useMemo<CallSection[]>(() => {
                   ]}
                   onPress={hideTray}
                   disabled={trayProcessing}
+                >
+                  <Text style={styles.trayCancelText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </Animated.View>
+          )}
+        </View>
+      </Modal>
+      <Modal
+        visible={isTrustedTrayMounted && Boolean(trustedTrayItem)}
+        transparent
+        animationType="none"
+        onRequestClose={hideTrustedTray}
+      >
+        <View style={styles.trayOverlay} pointerEvents="box-none">
+          <Animated.View
+            style={[
+              styles.trayBackdrop,
+              {
+                opacity: trustedTrayBackdropOpacity,
+                position: 'absolute',
+                width: '100%',
+                height: '100%',
+              },
+            ]}
+          />
+          <Pressable style={StyleSheet.absoluteFill} onPress={hideTrustedTray} />
+          {trustedTrayItem && (
+            <Animated.View
+              style={[
+                styles.tray,
+                {
+                  transform: [{ translateY: trustedTrayTranslateY }],
+                },
+              ]}
+            >
+              <View style={styles.trayContent}>
+                <View style={styles.trayHandle} />
+                <Text style={styles.trayTitle}>Trusted activity options</Text>
+                <Text style={styles.traySubtitle}>{trustedTrayItem.label}</Text>
+                <Text style={styles.trayDetail}>
+                  {formatTime(trustedTrayItem.created_at)}
+                  {formatDateLabel(trustedTrayItem.created_at)
+                    ? ` · ${formatDateLabel(trustedTrayItem.created_at)}`
+                    : ''}
+                </Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.trayAction,
+                    styles.trayDanger,
+                    pressed && styles.trayActionPressed,
+                    trustedTrayProcessing && styles.trayActionDisabled,
+                  ]}
+                  onPress={deleteTrustedActivity}
+                  disabled={trustedTrayProcessing}
+                >
+                  <Text style={[styles.trayActionText, styles.trayDangerText]}>
+                    {trustedTrayProcessing ? 'Working…' : 'Delete notification'}
+                  </Text>
+                  <Text style={styles.trayActionHint}>
+                    Removes this trusted activity item permanently.
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.trayAction,
+                    styles.trayCancel,
+                    pressed && styles.trayActionPressed,
+                  ]}
+                  onPress={hideTrustedTray}
+                  disabled={trustedTrayProcessing}
                 >
                   <Text style={styles.trayCancelText}>Cancel</Text>
                 </Pressable>
@@ -1058,6 +1199,9 @@ const createCallStyles = (theme: AppTheme) =>
       marginTop: 100,
       alignItems: 'stretch',
       paddingHorizontal: 0,
+    },
+    emptyStateWrapTrusted: {
+      marginTop: 40,
     },
     skeletonList: {
       marginTop: 24,

@@ -266,7 +266,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             isPinChange
               ? 'PIN CHANGE'
               : isTrusted
-              ? 'TRUSTED CALLER'
+              ? 'TRUSTED'
               : label.toUpperCase();
           const badgeLevel =
             isPinChange
@@ -284,8 +284,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             created_at: alert.created_at,
             label: isTrusted
               ? callerName
-                ? `Trusted caller: ${callerName}`
-                : 'Trusted caller'
+                ? callerName
+                : 'Trusted contact'
               : isPinChange
               ? 'Pin change'
               : 'Fraud alert',

@@ -18,6 +18,8 @@ type ActivityRowProps = {
   badgeLevel?: string;
   muted?: boolean;
   disabled?: boolean;
+  borderRadius?: number;
+  onLongPress?: () => void;
   onPress: () => void;
 };
 
@@ -34,6 +36,8 @@ export default function ActivityRow({
   badgeLevel,
   muted = false,
   disabled = false,
+  borderRadius = 22,
+  onLongPress,
   onPress,
 }: ActivityRowProps) {
   const { theme } = useTheme();
@@ -59,11 +63,13 @@ export default function ActivityRow({
       style={[
         styles.row,
         {
+          borderRadius,
           backgroundColor: theme.colors.surface,
           borderColor: theme.colors.border,
         },
       ]}
       onPress={handlePress}
+      onLongPress={onLongPress}
       activeOpacity={disabled ? 1 : 0.85}
     >
       <View style={styles.rowLeft}>
