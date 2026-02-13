@@ -211,7 +211,24 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         });
         return;
       }
-      const tokenResult = await Notifications.getExpoPushTokenAsync();
+      const expoProjectId =
+        process.env.EXPO_PUBLIC_EXPO_PROJECT_ID ||
+        Constants.expoConfig?.extra?.eas?.projectId ||
+        (Constants as any).easConfig?.projectId;
+      if (!expoProjectId) {
+        logEvent('push_token_error', {
+          level: 'warning',
+          screen: 'ProfileContext',
+          extra: { reason: 'missing_project_id' },
+        });
+        console.warn(
+          'Expo projectId is missing; set EXPO_PUBLIC_EXPO_PROJECT_ID to enable Expo push token registration.'
+        );
+        return;
+      }
+      const tokenResult = await Notifications.getExpoPushTokenAsync({
+        projectId: expoProjectId,
+      });
       const pushToken = tokenResult?.data;
       if (!pushToken) {
         logEvent('push_token_error', {

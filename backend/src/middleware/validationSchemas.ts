@@ -80,10 +80,22 @@ export const changeMemberRoleSchema = z.object({
 });
 
 export const registerDeviceTokenSchema = z.object({
-  device_token: z.string().min(10, 'Invalid device token'),
-  device_type: z.enum(['ios', 'android']),
+  expoPushToken: z.string().min(10, 'Invalid device token').optional(),
+  platform: z.enum(['ios', 'android']).optional(),
+  // Backward-compat field names
+  device_token: z.string().min(10, 'Invalid device token').optional(),
+  device_type: z.enum(['ios', 'android']).optional(),
   device_name: z.string().max(100).optional(),
-});
+  locale: z.string().max(50).optional().nullable(),
+  metadata: z.record(z.string(), z.any()).optional().nullable(),
+}).refine(
+  (value) =>
+    (Boolean(value.expoPushToken) && Boolean(value.platform)) ||
+    (Boolean(value.device_token) && Boolean(value.device_type)),
+  {
+    message: 'expoPushToken/platform (or device_token/device_type) is required',
+  }
+);
 
 // Twilio Client Schemas
 export const createClientTokenSchema = z.object({

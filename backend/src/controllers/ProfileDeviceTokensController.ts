@@ -45,12 +45,23 @@ async function registerDeviceToken(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
-  const { expoPushToken, platform, locale, metadata } = req.body as {
+  const {
+    expoPushToken: rawExpoPushToken,
+    device_token: legacyDeviceToken,
+    platform: rawPlatform,
+    device_type: legacyDeviceType,
+    locale,
+    metadata,
+  } = req.body as {
     expoPushToken?: string;
+    device_token?: string;
     platform?: string;
+    device_type?: string;
     locale?: string;
     metadata?: Record<string, any>;
   };
+  const expoPushToken = rawExpoPushToken ?? legacyDeviceToken;
+  const platform = rawPlatform ?? legacyDeviceType;
 
   if (!expoPushToken || !platform) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({

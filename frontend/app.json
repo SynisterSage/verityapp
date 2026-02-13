@@ -49,6 +49,12 @@
           "organization": "verity-protect"
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "3c07d22a-d47c-4729-b40b-f28fc78a5ecc"
+      }
+    },
+    "owner": "synastrr"
   }
 }
