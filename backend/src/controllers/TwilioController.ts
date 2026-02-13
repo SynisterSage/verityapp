@@ -114,6 +114,15 @@ function getClientIdentity(profile: {
   return profile.twilio_client_identity || `profile-${profile.id}`;
 }
 
+function numbersLikelyMatch(a?: string | null, b?: string | null) {
+  if (!a || !b) {
+    return false;
+  }
+  const normalizedA = getCallerMetadata(a).normalized ?? a.replace(/\D/g, '');
+  const normalizedB = getCallerMetadata(b).normalized ?? b.replace(/\D/g, '');
+  return Boolean(normalizedA && normalizedB && normalizedA === normalizedB);
+}
+
 function appendNumberBridge(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
@@ -170,6 +179,20 @@ function bridgeToProfile(
     twilio_client_last_seen_at?: string | null;
   }
 ) {
+  const loopTarget = numbersLikelyMatch(profile.phone_number, toNumber);
+
+  // If the profile number points back to the routed Twilio number, do not dial it again.
+  // Prefer Twilio Client so VoIP push can wake the app and avoid infinite call loops.
+  if (loopTarget) {
+    if (profile.twilio_client_identity) {
+      const clientIdentity = getClientIdentity(profile);
+      appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity);
+      return `client=${clientIdentity} (loop-avoidance)`;
+    }
+    logger.warn(`Skipping bridge loop for to=${toNumber}; profile phone matches routed number`);
+    return null;
+  }
+
   if (shouldUseTwilioClient(profile)) {
     const clientIdentity = getClientIdentity(profile);
     appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity);

@@ -50,9 +50,11 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Verity Protect uses location to find care professionals nearby to add to your trusted list.</string>
+	<string>Location lets us find care professionals nearby to add to your trusted list.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Allow $(PRODUCT_NAME) to access your location</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Verity Protect uses location to find care professionals nearby to add to your trusted list.</string>
+	<string>Location lets us find care professionals nearby to add to your trusted list.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your microphone</string>
 	<key>RCTNewArchEnabled</key>

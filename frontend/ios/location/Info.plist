@@ -9,5 +9,7 @@
 		<key>NSExtensionPrincipalClass</key>
 		<string>$(PRODUCT_MODULE_NAME).LocationPushService</string>
 	</dict>
+	<key>RCTNewArchEnabled</key>
+	<true/>
 </dict>
 </plist>
