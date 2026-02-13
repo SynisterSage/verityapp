@@ -4,3 +4,8 @@
 # Environment
 .env
 .env.*
+
+# Certificates / keys
+*.pem
+*.p12
+*.cer
