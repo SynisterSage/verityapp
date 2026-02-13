@@ -76,12 +76,13 @@ async function getTrustedCaller(profileId: string, fromNumber?: string | null) {
 
 async function logTrustedBridgeActivity(args: {
   profileId: string;
+  caretakerId?: string | null;
   fromNumber?: string | null;
   toNumber?: string | null;
   bridgeTarget: string;
   trustedCaller?: { caller_number?: string | null; contact_name?: string | null } | null;
 }) {
-  const { profileId, fromNumber, toNumber, bridgeTarget, trustedCaller } = args;
+  const { profileId, caretakerId, fromNumber, toNumber, bridgeTarget, trustedCaller } = args;
   const contactName = trustedCaller?.contact_name ?? null;
   const callerNumber = fromNumber ?? trustedCaller?.caller_number ?? null;
   const payload = {
@@ -96,6 +97,7 @@ async function logTrustedBridgeActivity(args: {
 
   const { error } = await supabaseAdmin.from('alerts').insert({
     profile_id: profileId,
+    caretaker_id: caretakerId ?? null,
     alert_type: 'trusted',
     status: 'pending',
     payload,
@@ -276,6 +278,7 @@ async function callIncoming(req: Request, res: Response) {
         if (bridgeTarget) {
           await logTrustedBridgeActivity({
             profileId: profile.id,
+            caretakerId: profile.caretaker_id,
             fromNumber,
             toNumber,
             bridgeTarget,
@@ -287,6 +290,7 @@ async function callIncoming(req: Request, res: Response) {
       }
       await supabaseAdmin.from('alerts').insert({
         profile_id: profile.id,
+        caretaker_id: profile.caretaker_id,
         alert_type: 'trusted',
         status: 'pending',
         payload: {
@@ -390,7 +394,7 @@ async function getProfileByToNumber(to?: string | null) {
   const { data: profile, error } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, phone_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at'
+      'id, caretaker_id, phone_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at'
     )
     .eq('twilio_virtual_number', to)
     .single();
@@ -435,6 +439,7 @@ async function verifyPin(req: Request, res: Response) {
       if (bridgeTarget) {
         await logTrustedBridgeActivity({
           profileId: profile.id,
+          caretakerId: profile.caretaker_id,
           fromNumber,
           toNumber,
           bridgeTarget,
