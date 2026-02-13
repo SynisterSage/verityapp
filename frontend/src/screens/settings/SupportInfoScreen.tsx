@@ -70,7 +70,7 @@ export default function SupportInfoScreen() {
           <View style={styles.heroText}>
             <Text style={[styles.heroTitle, { color: theme.colors.text }]}>Need support</Text>
             <Text style={[styles.heroSubtitle, { color: theme.colors.textMuted }]}>
-              Open the live chat to send us a message. Answers usually arrive in minutes.
+              Open the live chat to send us a message. Answers usually arrive within an hour, but can sometimes take up to a few hours during busy periods.
             </Text>
           </View>
         </View>
