@@ -32,6 +32,7 @@ import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import { withOpacity } from '../../utils/color';
 import { useTheme } from '../../context/ThemeContext';
 import DashboardHeader from '../../components/common/DashboardHeader';
+import ActivityRow from '../../components/home/ActivityRow';
 import { useSupportContext } from '../../context/SupportContext';
 import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 import { getRiskStyles, getRiskSeverity } from '../../utils/risk';
@@ -51,6 +52,12 @@ type CallRow = {
 
 type CallSection = SectionBase<CallRow> & {
   title: string;
+};
+
+type TrustedActivityRow = {
+  id: string;
+  created_at: string;
+  label: string;
 };
 
 const formatSectionTitle = (title: string) => {
@@ -254,12 +261,12 @@ export default function CallsScreen({
     () => ({
       tintColor: theme.colors.text,
       colors: [theme.colors.text],
-      progressBackgroundColor: withOpacity(theme.colors.text, 0.16),
-      styleBackgroundColor: withOpacity(theme.colors.surface, 0.25),
+      progressBackgroundColor: theme.colors.bg,
     }),
     [theme]
   );
   const [calls, setCalls] = useState<CallRow[]>([]);
+  const [trustedActivity, setTrustedActivity] = useState<TrustedActivityRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<CallFilterKey>('all');
@@ -290,17 +297,47 @@ export default function CallsScreen({
     if (!silent) {
       setLoading(true);
     }
-    const { data, error: fetchError } = await supabase
-      .from('calls')
-      .select('id, created_at, transcript, fraud_risk_level, fraud_score, caller_number, feedback_status, feedback_at')
-      .eq('profile_id', activeProfile.id)
-      .order('created_at', { ascending: false })
-      .limit(25);
-    if (fetchError) {
-      setError(fetchError.message);
+    const [callsRes, trustedRes] = await Promise.all([
+      supabase
+        .from('calls')
+        .select(
+          'id, created_at, transcript, fraud_risk_level, fraud_score, caller_number, feedback_status, feedback_at'
+        )
+        .eq('profile_id', activeProfile.id)
+        .order('created_at', { ascending: false })
+        .limit(25),
+      supabase
+        .from('alerts')
+        .select('id, created_at, payload')
+        .eq('profile_id', activeProfile.id)
+        .eq('alert_type', 'trusted')
+        .order('created_at', { ascending: false })
+        .limit(3),
+    ]);
+    if (callsRes.error) {
+      setError(callsRes.error.message);
       setCalls([]);
     } else {
-      setCalls(data ?? []);
+      setCalls(callsRes.data ?? []);
+    }
+    if (trustedRes.error) {
+      setTrustedActivity([]);
+    } else {
+      const items = (trustedRes.data ?? []).map((row: any) => {
+        const contactName = (row?.payload?.contactName as string | undefined) ?? '';
+        const callerNumber = (row?.payload?.callerNumber as string | undefined) ?? '';
+        const label = contactName
+          ? `Trusted caller: ${contactName}`
+          : callerNumber
+          ? `Trusted caller: ${formatPhoneNumber(callerNumber, callerNumber)}`
+          : 'Trusted caller';
+        return {
+          id: row.id as string,
+          created_at: row.created_at as string,
+          label,
+        };
+      });
+      setTrustedActivity(items);
     }
     setLoading(false);
     setRefreshing(false);
@@ -694,6 +731,26 @@ const sections = useMemo<CallSection[]>(() => {
       <View style={styles.filterBar}>
         <CallFilter value={filter} onChange={setFilter} />
       </View>
+      {trustedActivity.length > 0 ? (
+        <View style={styles.trustedSection}>
+          <Text style={styles.sectionHeaderText}>Trusted Activity</Text>
+          <View style={styles.trustedList}>
+            {trustedActivity.map((item) => (
+              <View key={item.id} style={styles.trustedItem}>
+                <ActivityRow
+                  type="alert"
+                  label={item.label}
+                  createdAt={item.created_at}
+                  badge="TRUSTED CALLER"
+                  badgeLevel="circle"
+                  disabled
+                  onPress={() => {}}
+                />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
         <SectionList<CallRow, CallSection>
           ref={listRef}
           sections={sections}
@@ -710,7 +767,6 @@ const sections = useMemo<CallSection[]>(() => {
             tintColor={refreshControlProps.tintColor}
             colors={refreshControlProps.colors}
             progressBackgroundColor={refreshControlProps.progressBackgroundColor}
-            style={{ backgroundColor: refreshControlProps.styleBackgroundColor }}
           />
           }
         contentContainerStyle={[
@@ -873,6 +929,15 @@ const createCallStyles = (theme: AppTheme) =>
       marginTop: 20,
       marginBottom: 12,
     },
+    trustedSection: {
+      marginBottom: 8,
+    },
+    trustedList: {
+      marginTop: 4,
+    },
+    trustedItem: {
+      marginBottom: 12,
+    },
     sectionHeaderText: {
       color: theme.colors.textMuted,
       fontSize: 12,
@@ -904,7 +969,6 @@ const createCallStyles = (theme: AppTheme) =>
       opacity: 0.7,
       backgroundColor: withOpacity(theme.colors.text, 0.04),
       borderColor: withOpacity(theme.colors.text, 0.15),
-      shadowOpacity: 0.1,
     },
     callRow: {
       flexDirection: 'row',

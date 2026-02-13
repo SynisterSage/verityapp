@@ -11,7 +11,6 @@ import {
   View,
   Pressable,
 } from 'react-native';
-import { BlurView } from 'expo-blur';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -100,8 +99,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     () => ({
       tintColor: theme.colors.text,
       colors: [theme.colors.text],
-      progressBackgroundColor: withOpacity(theme.colors.text, 0.16),
-      styleBackgroundColor: withOpacity(theme.colors.surface, 0.25),
+      progressBackgroundColor: theme.colors.bg,
     }),
     [theme]
   );
@@ -131,8 +129,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     } else if (!silent) {
       setLoading(true);
     }
-    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-
+    try {
+      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const callsPromise = supabase
         .from('calls')
         .select(
@@ -301,10 +299,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 3);
 
-    setRecentActivity(activityItems);
-    if (!silent) {
-      setLoading(false);
-      setRefreshing(false);
+      setRecentActivity(activityItems);
+    } catch (error) {
+      console.warn('[home] loadStats failed', error);
+    } finally {
+      if (!silent) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   };
 
@@ -455,7 +457,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             tintColor={refreshControlProps.tintColor}
             colors={refreshControlProps.colors}
             progressBackgroundColor={refreshControlProps.progressBackgroundColor}
-            style={{ backgroundColor: refreshControlProps.styleBackgroundColor }}
           />
         }
         >

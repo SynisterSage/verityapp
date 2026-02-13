@@ -191,7 +191,7 @@ export default function SafePhrasesScreen() {
               }}
               tintColor={theme.colors.accent}
               colors={[theme.colors.accent]}
-              progressBackgroundColor={theme.colors.surface}
+              progressBackgroundColor={theme.colors.bg}
             />
           }
           showsVerticalScrollIndicator={false}

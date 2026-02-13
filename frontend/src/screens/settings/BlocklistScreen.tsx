@@ -338,7 +338,7 @@ export default function BlocklistScreen() {
             onRefresh={fetchBlocked}
             tintColor={theme.colors.accent}
             colors={[theme.colors.accent]}
-            progressBackgroundColor={theme.colors.surface}
+            progressBackgroundColor={theme.colors.bg}
           />
         }
         keyboardShouldPersistTaps="handled"

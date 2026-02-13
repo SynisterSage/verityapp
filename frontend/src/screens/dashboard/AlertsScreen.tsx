@@ -87,8 +87,7 @@ export default function AlertsScreen() {
     () => ({
       tintColor: theme.colors.text,
       colors: [theme.colors.text],
-      progressBackgroundColor: withOpacity(theme.colors.text, 0.16),
-      styleBackgroundColor: withOpacity(theme.colors.surface, 0.25),
+      progressBackgroundColor: theme.colors.bg,
     }),
     [theme]
   );
@@ -1083,7 +1082,6 @@ const loadMemberNames = useCallback(async () => {
               tintColor={refreshControlProps.tintColor}
               colors={refreshControlProps.colors}
               progressBackgroundColor={refreshControlProps.progressBackgroundColor}
-              style={{ backgroundColor: refreshControlProps.styleBackgroundColor }}
             />
           }
         >

@@ -96,14 +96,15 @@ async function logTrustedBridgeActivity(args: {
 
   const { error } = await supabaseAdmin.from('alerts').insert({
     profile_id: profileId,
-    call_id: null,
     alert_type: 'trusted',
     status: 'pending',
     payload,
   });
 
   if (error) {
-    logger.err(error);
+    logger.err(
+      `[trusted-bridge] insert failed profile=${profileId} code=${error.code ?? 'n/a'} message=${error.message ?? 'unknown'} details=${error.details ?? 'n/a'} hint=${error.hint ?? 'n/a'}`
+    );
     logger.warn(`Failed to log trusted bridge activity profile=${profileId}`);
   }
 }
@@ -286,7 +287,6 @@ async function callIncoming(req: Request, res: Response) {
       }
       await supabaseAdmin.from('alerts').insert({
         profile_id: profile.id,
-        call_id: null,
         alert_type: 'trusted',
         status: 'pending',
         payload: {
