@@ -1,3 +1,4 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { SupportResourceType } from '../data/resourceSections';
 
 export type RootStackParamList = {
@@ -16,23 +17,23 @@ export type RootStackParamList = {
   OnboardingTestCall: undefined;
   OnboardingInviteCode: undefined;
   OnboardingSuccess: undefined;
-  AppTabs: undefined;
+  AppTabs: NavigatorScreenParams<TabParamList> | undefined;
   CallDetailModal: { callId: string; compact?: boolean };
   SupportPortal: undefined;
   SupportModal: { ticketId?: string | null; profileId?: string | null; newTicket?: boolean; autoEnd?: boolean };
   SupportResource: { resource: SupportResourceType; title?: string };
-  CircleActivityModal: { activities: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };
+  CircleActivityModal: { activities?: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };
 };
 
 export type TabParamList = {
   HomeTab: undefined;
-  CallsTab: undefined;
+  CallsTab: NavigatorScreenParams<CallsStackParamList> | undefined;
   AlertsTab: undefined;
-  SettingsTab: undefined;
+  SettingsTab: NavigatorScreenParams<SettingsStackParamList> | undefined;
 };
 
 export type CallsStackParamList = {
-  Calls: { initialCallId?: string } | undefined;
+  Calls: { initialCallId?: string; initialFilter?: 'all' | 'verified' | 'risk' | 'trusted' } | undefined;
   CallDetail: { callId: string };
 };
 

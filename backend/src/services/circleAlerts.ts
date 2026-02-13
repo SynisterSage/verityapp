@@ -1,4 +1,5 @@
 import supabaseAdmin from '@src/services/supabase';
+import { dispatchAlertPush } from '@src/services/alertPushDispatcher';
 
 export type CircleAlertPayload = Record<string, unknown>;
 
@@ -13,10 +14,33 @@ export async function recordCircleAlert({
   payload?: CircleAlertPayload;
   status?: string;
 }) {
-  await supabaseAdmin.from('alerts').insert({
-    profile_id: profileId,
-    alert_type: alertType,
-    status,
-    payload,
-  });
+  const { data: profileRow, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('caretaker_id')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (profileError) {
+    throw profileError;
+  }
+
+  const { data: alertRow, error } = await supabaseAdmin
+    .from('alerts')
+    .insert({
+      profile_id: profileId,
+      caretaker_id: profileRow?.caretaker_id ?? null,
+      alert_type: alertType,
+      status,
+      payload,
+    })
+    .select('id, profile_id, call_id, alert_type, payload, created_at')
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (alertRow) {
+    await dispatchAlertPush(alertRow);
+  }
 }

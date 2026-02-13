@@ -356,6 +356,15 @@ export default function CallsScreen({
   }, [route.params?.initialCallId]);
 
   useEffect(() => {
+    const nextFilter = route.params?.initialFilter;
+    if (!nextFilter) {
+      return;
+    }
+    setFilter(nextFilter);
+    navigation.setParams({ initialFilter: undefined });
+  }, [navigation, route.params?.initialFilter]);
+
+  useEffect(() => {
     const interval = isAppActive
       ? setInterval(() => {
           loadCalls(true);

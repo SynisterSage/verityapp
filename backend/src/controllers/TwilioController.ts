@@ -15,7 +15,7 @@ import {
 } from '@src/services/passcode';
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
-import { notifyProfileForAlert } from '@src/services/pushNotifications';
+import { dispatchAlertPush } from '@src/services/alertPushDispatcher';
 
 const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call is being recorded for safety purposes.';
 const PUBLIC_API_URL = process.env.PUBLIC_API_URL?.replace(/\/+$/, '');
@@ -95,20 +95,27 @@ async function logTrustedBridgeActivity(args: {
     bridged: true,
   };
 
-  const { error } = await supabaseAdmin.from('alerts').insert({
-    profile_id: profileId,
-    caretaker_id: caretakerId ?? null,
-    alert_type: 'trusted',
-    status: 'pending',
-    payload,
-  });
+  const { data: alertRow, error } = await supabaseAdmin
+    .from('alerts')
+    .insert({
+      profile_id: profileId,
+      caretaker_id: caretakerId ?? null,
+      alert_type: 'trusted',
+      status: 'pending',
+      payload,
+    })
+    .select('id, profile_id, call_id, alert_type, payload, created_at')
+    .maybeSingle();
 
-  if (error) {
+  if (error || !alertRow) {
     logger.err(
-      `[trusted-bridge] insert failed profile=${profileId} code=${error.code ?? 'n/a'} message=${error.message ?? 'unknown'} details=${error.details ?? 'n/a'} hint=${error.hint ?? 'n/a'}`
+      `[trusted-bridge] insert failed profile=${profileId} code=${error?.code ?? 'n/a'} message=${error?.message ?? 'unknown'} details=${error?.details ?? 'n/a'} hint=${error?.hint ?? 'n/a'}`
     );
     logger.warn(`Failed to log trusted bridge activity profile=${profileId}`);
+    return;
   }
+
+  await dispatchAlertPush(alertRow);
 }
 
 function appendVoicemail(
@@ -288,17 +295,24 @@ async function callIncoming(req: Request, res: Response) {
           return res.type('text/xml').send(twimlResponse.toString());
         }
       }
-      await supabaseAdmin.from('alerts').insert({
-        profile_id: profile.id,
-        caretaker_id: profile.caretaker_id,
-        alert_type: 'trusted',
-        status: 'pending',
-        payload: {
-          callerNumber: fromNumber || null,
-          riskLevel: 'low',
-          label: 'trusted',
-        },
-      });
+      const { data: trustedAlert } = await supabaseAdmin
+        .from('alerts')
+        .insert({
+          profile_id: profile.id,
+          caretaker_id: profile.caretaker_id,
+          alert_type: 'trusted',
+          status: 'pending',
+          payload: {
+            callerNumber: fromNumber || null,
+            riskLevel: 'low',
+            label: 'trusted',
+          },
+        })
+        .select('id, profile_id, call_id, alert_type, payload, created_at')
+        .maybeSingle();
+      if (trustedAlert) {
+        await dispatchAlertPush(trustedAlert);
+      }
       appendHangupMessage(
         twimlResponse,
         'Thank you. We will let them know you called.'
@@ -831,12 +845,17 @@ async function recordingReady(req: Request, res: Response) {
           if (fraudRiskLevel) {
             pushData.riskLevel = fraudRiskLevel;
           }
-          await notifyProfileForAlert(profile.id, {
-            alertId: latestAlert.id,
-            callId: latestAlert.call_id ?? callRow.id,
-            title: `Priority alert (${Math.round(fraudScore)}%)`,
-            body: `Call from ${resolvedFrom ?? 'unknown'} flagged as ${fraudRiskLevel}`,
-            data: pushData,
+          await dispatchAlertPush({
+            id: latestAlert.id,
+            profile_id: profile.id,
+            call_id: latestAlert.call_id ?? callRow.id,
+            alert_type: 'fraud',
+            payload: {
+              score: fraudScore,
+              riskLevel: fraudRiskLevel,
+              callerHash,
+              ...pushData,
+            },
           });
         }
       }

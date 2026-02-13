@@ -36,7 +36,7 @@ export default function CircleActivityScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'CircleActivityModal'>>();
-  const [activityList, setActivityList] = useState<CircleActivityItem[]>(route.params.activities ?? []);
+  const [activityList, setActivityList] = useState<CircleActivityItem[]>(route.params?.activities ?? []);
   const styles = useMemo(() => createCircleStyles(theme), [theme]);
   const handleBackPress = useCallback(() => {
     navigation.goBack();

@@ -105,7 +105,21 @@ enableScreens(true);
 type PendingNotificationData = {
   callId?: string;
   alertId?: string;
+  routeTarget?: 'call_detail' | 'calls_trusted' | 'circle_activity' | 'alerts';
+  alertType?: string;
 };
+
+function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'] {
+  if (
+    value === 'call_detail' ||
+    value === 'calls_trusted' ||
+    value === 'circle_activity' ||
+    value === 'alerts'
+  ) {
+    return value;
+  }
+  return undefined;
+}
 
 const RootStack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
@@ -534,11 +548,30 @@ function NavigationHost() {
       return;
     }
     pendingNotificationRef.current = null;
-    if (payload.callId) {
+    if (payload.routeTarget === 'call_detail' && payload.callId) {
       rootNavigationRef.current.navigate('CallDetailModal', { callId: payload.callId });
       return;
     }
-    if (payload.alertId) {
+    if (payload.routeTarget === 'calls_trusted') {
+      rootNavigationRef.current.dispatch(
+        CommonActions.navigate({
+          name: 'AppTabs',
+          params: {
+            screen: 'CallsTab',
+            params: {
+              screen: 'Calls',
+              params: { initialFilter: 'trusted' },
+            },
+          },
+        })
+      );
+      return;
+    }
+    if (payload.routeTarget === 'circle_activity') {
+      rootNavigationRef.current.navigate('CircleActivityModal', { activities: [] });
+      return;
+    }
+    if (payload.alertId || payload.routeTarget === 'alerts' || payload.alertType) {
       rootNavigationRef.current.dispatch(
         CommonActions.navigate({
           name: 'AppTabs',
@@ -549,19 +582,44 @@ function NavigationHost() {
   }, [session]);
 
   useEffect(() => {
+    Notifications.getLastNotificationResponseAsync()
+      .then((response) => {
+        if (!response) {
+          return;
+        }
+        const data = response.notification.request.content.data as Record<string, unknown>;
+        pendingNotificationRef.current = {
+          callId: typeof data.callId === 'string' ? data.callId : undefined,
+          alertId: typeof data.alertId === 'string' ? data.alertId : undefined,
+          routeTarget: parseRouteTarget(data.routeTarget),
+          alertType: typeof data.alertType === 'string' ? data.alertType : undefined,
+        };
+        resolvePendingNotification();
+      })
+      .catch(() => null);
+  }, [resolvePendingNotification]);
+
+  useEffect(() => {
     notificationListenerRef.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data as Record<string, unknown>;
         const payload: PendingNotificationData = {
           callId: typeof data.callId === 'string' ? data.callId : undefined,
           alertId: typeof data.alertId === 'string' ? data.alertId : undefined,
+          routeTarget: parseRouteTarget(data.routeTarget),
+          alertType: typeof data.alertType === 'string' ? data.alertType : undefined,
         };
-        if (!payload.callId && !payload.alertId) {
+        if (!payload.callId && !payload.alertId && !payload.routeTarget && !payload.alertType) {
           return;
         }
         logEvent('notification_opened', {
           screen: 'App',
-          extra: { callId: payload.callId, alertId: payload.alertId },
+          extra: {
+            callId: payload.callId,
+            alertId: payload.alertId,
+            routeTarget: payload.routeTarget,
+            alertType: payload.alertType,
+          },
         });
         pendingNotificationRef.current = payload;
         resolvePendingNotification();
