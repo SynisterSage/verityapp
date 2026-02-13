@@ -111,6 +111,9 @@ async function createClientToken(req: Request, res: Response) {
     ttl: Number(ttlSeconds),
   });
   token.addGrant(grant);
+  logger.info(
+    `[twilio-client] token issued profile=${profileId} identity=${identity} hasPushCredentialSid=${Boolean(pushCredentialSid)} ttl=${ttlSeconds}`
+  );
 
   await updateClientHeartbeat(profileId, identity);
 
