@@ -79,6 +79,7 @@ async function registerDeviceToken(req: Request, res: Response) {
 
   const payload = {
     profile_id: profileId,
+    caretaker_id: userId,
     expo_push_token: expoPushToken,
     platform,
     locale: locale ?? null,
@@ -89,7 +90,7 @@ async function registerDeviceToken(req: Request, res: Response) {
 
   const { data, error } = await supabaseAdmin
     .from('profile_device_tokens')
-    .upsert(payload, { onConflict: 'expo_push_token', ignoreDuplicates: false })
+    .upsert(payload, { onConflict: 'profile_id,expo_push_token', ignoreDuplicates: false })
     .select(
       'id, profile_id, expo_push_token, platform, locale, metadata, is_active, last_seen_at, created_at, updated_at'
     )

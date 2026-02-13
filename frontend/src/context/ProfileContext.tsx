@@ -17,6 +17,7 @@ import {
 } from '../services/twilioClient';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 import { registerProfileDeviceToken } from '../services/notifications';
 import { logError, logEvent } from '../services/sentry';
@@ -217,7 +218,20 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         process.env.EXPO_PUBLIC_EXPO_PROJECT_ID ||
         Constants.expoConfig?.extra?.eas?.projectId ||
         (Constants as any).easConfig?.projectId;
+      const nativeApplicationId = Application.applicationId;
+      const configApplicationId = Constants.expoConfig?.ios?.bundleIdentifier;
+      const envApplicationId = process.env.EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER;
+      // Final hard fallback keeps local dev builds moving even when expo-application can't infer app id.
+      const defaultIosApplicationId = Platform.OS === 'ios' ? 'com.lexferguson.verityprotect.com' : undefined;
+      const applicationId =
+        nativeApplicationId || configApplicationId || envApplicationId || defaultIosApplicationId;
       console.info('[push] project id resolved', { hasProjectId: Boolean(expoProjectId) });
+      console.info('[push] application id source', {
+        hasNativeApplicationId: Boolean(nativeApplicationId),
+        hasConfigApplicationId: Boolean(configApplicationId),
+        hasEnvApplicationId: Boolean(envApplicationId),
+        hasDefaultIosApplicationId: Boolean(defaultIosApplicationId),
+      });
       if (!expoProjectId) {
         logEvent('push_token_error', {
           level: 'warning',
@@ -229,8 +243,21 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         );
         return;
       }
+      if (!applicationId) {
+        logEvent('push_token_error', {
+          level: 'warning',
+          screen: 'ProfileContext',
+          extra: { reason: 'missing_application_id' },
+        });
+        console.warn(
+          'Expo applicationId is missing; set EXPO_PUBLIC_IOS_BUNDLE_IDENTIFIER to enable Expo push token registration.'
+        );
+        return;
+      }
+      console.info('[push] application id resolved', { applicationId });
       const tokenResult = await Notifications.getExpoPushTokenAsync({
         projectId: expoProjectId,
+        applicationId: String(applicationId),
       });
       const pushToken = tokenResult?.data;
       console.info('[push] token generated', {
