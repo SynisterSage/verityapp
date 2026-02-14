@@ -89,17 +89,23 @@ export async function sendVoIPPush(
     return false;
   }
 
-  // For VoIP pushes, use apn.Notification but set fields directly as properties
+  // For VoIP pushes, manually construct the raw payload
+  // VoIP pushes don't use the 'aps' wrapper that regular pushes use
   const notification = new apn.Notification();
   notification.topic = `${bundleId}.voip`;
   notification.priority = 10;
+  notification.pushType = 'voip';
 
-  // Set custom data as properties on notification object (accessed via dictionaryPayload on iOS)
-  (notification as any).call_sid = payload.callSid;
-  (notification as any).from_number = payload.fromNumber;
-  (notification as any).to_number = payload.toNumber;
-  (notification as any).call_uuid = payload.callUuid || payload.callSid;
-  (notification as any).profile_id = payload.profileId;
+  // Set the raw payload data directly - this bypasses 'aps' wrapper
+  // Access internal _data to set custom root-level properties
+  const notificationData: any = notification;
+  notificationData._data = {
+    call_sid: payload.callSid,
+    from_number: payload.fromNumber,
+    to_number: payload.toNumber,
+    call_uuid: payload.callUuid || payload.callSid,
+    profile_id: payload.profileId,
+  };
 
   logger.info(`[VoIP] Sending push: callSid=${payload.callSid} from=${payload.fromNumber}`);
 
