@@ -105,6 +105,8 @@ export async function sendVoIPPush(
     profile_id: payload.profileId,
   };
 
+  logger.info(`[VoIP] Sending push with payload: ${JSON.stringify(notification.payload)}`);
+
   try {
     const result = await provider.send(notification, voipToken);
 

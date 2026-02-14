@@ -119,11 +119,19 @@ extension VoIPPushModule: PKPushRegistryDelegate {
 
     print("[VoIPPush] Received VoIP push: \(payload.dictionaryPayload)")
 
+    // Log all keys to debug payload structure
+    print("[VoIPPush] Payload keys: \(payload.dictionaryPayload.keys)")
+    for (key, value) in payload.dictionaryPayload {
+      print("[VoIPPush] Payload[\(key)] = \(value)")
+    }
+
     let payloadDict = payload.dictionaryPayload
     let callSid = payloadDict["call_sid"] as? String ?? ""
     let fromNumber = payloadDict["from_number"] as? String ?? "Unknown"
     let toNumber = payloadDict["to_number"] as? String ?? ""
     let callUUID = payloadDict["call_uuid"] as? String ?? UUID().uuidString
+
+    print("[VoIPPush] Extracted: callSid=\(callSid) from=\(fromNumber) to=\(toNumber) uuid=\(callUUID)")
 
     // CRITICAL: Report to CallKit IMMEDIATELY to keep app alive
     // This creates the system call UI before React Native even starts
