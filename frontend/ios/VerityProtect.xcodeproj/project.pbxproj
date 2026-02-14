@@ -14,6 +14,8 @@
 		B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B3D1E2F4A5B6C7D8E9F0012 /* ContactPickerModuleBridge.m */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E42D475140FD759215B196 /* ExpoModulesProvider.swift */; };
+		D7DE6E122F40EA8A003E8AC0 /* VoIPPushModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */; };
+		D7DE6E132F40EA8A003E8AC0 /* VoIPPushModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		FA64FEB802DA64B19DC4BEDD /* libPods-VerityProtect.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E22F18D7E3530F0B8CEAA00C /* libPods-VerityProtect.a */; };
 /* End PBXBuildFile section */
@@ -43,6 +45,8 @@
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = VerityProtect/SplashScreen.storyboard; sourceTree = "<group>"; };
 		B8C8D21F475E575D07ED45A3 /* Pods-VerityProtect.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VerityProtect.release.xcconfig"; path = "Target Support Files/Pods-VerityProtect/Pods-VerityProtect.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoIPPushModule.swift; sourceTree = "<group>"; };
+		D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VoIPPushModuleBridge.m; sourceTree = "<group>"; };
 		E22F18D7E3530F0B8CEAA00C /* libPods-VerityProtect.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-VerityProtect.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = VerityProtect/AppDelegate.swift; sourceTree = "<group>"; };
@@ -116,6 +120,8 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
+				D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */,
+				D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */,
 				13B07FAE1A68108700A75B9A /* VerityProtect */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				D7DE6DD62F3D555B003E8AC0 /* location */,
@@ -392,6 +398,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D7DE6E122F40EA8A003E8AC0 /* VoIPPushModuleBridge.m in Sources */,
+				D7DE6E132F40EA8A003E8AC0 /* VoIPPushModule.swift in Sources */,
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */,
 				A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */,

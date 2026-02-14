@@ -192,9 +192,16 @@ function appendClientBridge(
   dialStatusUrl: string,
   callerId: string,
   clientIdentity: string,
-  actionUrl?: string
+  actionUrl?: string,
+  pauseBeforeDial?: number
 ) {
   twimlResponse.say({ voice: 'Polly.Joanna' }, 'Thank you. Connecting your call.');
+
+  // If we need to pause (for VoIP push wake-up), add a pause before dialing
+  if (pauseBeforeDial && pauseBeforeDial > 0) {
+    twimlResponse.pause({ length: pauseBeforeDial });
+  }
+
   const dial = twimlResponse.dial({
     callerId,
     timeout: 10,
@@ -236,16 +243,19 @@ async function bridgeToProfile(
   if (loopTarget) {
     if (profile.twilio_client_identity) {
       // Send VoIP push to wake the app BEFORE dialing
-      await sendVoIPPushToProfile(profile.id, {
+      const voipPushSent = await sendVoIPPushToProfile(profile.id, {
         callSid: callSid || 'unknown',
         fromNumber: fromNumber || 'Unknown',
         toNumber,
       }).catch((err) => {
         logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
+        return false;
       });
 
       const clientIdentity = getClientIdentity(profile);
-      appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl);
+      // If VoIP push was sent, pause 3 seconds to let app wake up and register
+      const pauseDuration = voipPushSent ? 3 : 0;
+      appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
       return `client=${clientIdentity} (loop-avoidance)`;
     }
     logger.warn(`Skipping bridge loop for to=${toNumber}; profile phone matches routed number`);
@@ -254,16 +264,19 @@ async function bridgeToProfile(
 
   if (profile.twilio_client_identity) {
     // Send VoIP push to wake the app BEFORE dialing
-    await sendVoIPPushToProfile(profile.id, {
+    const voipPushSent = await sendVoIPPushToProfile(profile.id, {
       callSid: callSid || 'unknown',
       fromNumber: fromNumber || 'Unknown',
       toNumber,
     }).catch((err) => {
       logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
+      return false;
     });
 
     const clientIdentity = getClientIdentity(profile);
-    appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl);
+    // If VoIP push was sent, pause 3 seconds to let app wake up and register
+    const pauseDuration = voipPushSent ? 3 : 0;
+    appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
     return `client=${clientIdentity}`;
   }
   if (fallbackNumber) {
@@ -537,12 +550,13 @@ async function verifyPin(req: Request, res: Response) {
     const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
     if (profile.twilio_client_identity) {
       // Send VoIP push to wake the app BEFORE dialing
-      await sendVoIPPushToProfile(profile.id, {
+      const voipPushSent = await sendVoIPPushToProfile(profile.id, {
         callSid: callSid || 'unknown',
         fromNumber: fromNumber || 'Unknown',
         toNumber,
       }).catch((err) => {
         logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
+        return false;
       });
 
       const clientIdentity = getClientIdentity(profile);
@@ -552,12 +566,15 @@ async function verifyPin(req: Request, res: Response) {
       logger.info(
         `Dialing client=${clientIdentity} callerId=${outboundCallerId}`
       );
+      // If VoIP push was sent, pause 3 seconds to let app wake up and register
+      const pauseDuration = voipPushSent ? 3 : 0;
       appendClientBridge(
         twimlResponse,
         dialStatusUrl,
         outboundCallerId,
         clientIdentity,
-        bridgeFallbackUrl
+        bridgeFallbackUrl,
+        pauseDuration
       );
       return res.type('text/xml').send(twimlResponse.toString());
     }
