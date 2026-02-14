@@ -711,6 +711,90 @@ export default class SupportController {
     return res.status(HTTP_STATUS_CODES.Ok).json({ tickets: ticketSummaries });
   }
 
+  static async listSetupTickets(req: Request, res: Response) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('support_setup_messages')
+      .select('id, user_id, email_snapshot, sender, content, category, metadata, is_read_by_user, is_read_by_agent, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(400);
+
+    if (error) {
+      console.warn('Failed to fetch setup tickets', error);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to load setup tickets' });
+    }
+
+    const ticketsMap = new Map<string, SupportTicketSummary>();
+    const rows = (data ?? []) as SetupSupportMessageRow[];
+    rows.forEach((message) => {
+      const metadata = (message.metadata as Record<string, unknown> | null) ?? {};
+      const ticketId =
+        typeof metadata.ticketId === 'string' && metadata.ticketId.trim().length > 0
+          ? metadata.ticketId
+          : SETUP_DEFAULT_TICKET_ID;
+      const ticketSubject =
+        typeof metadata.ticketSubject === 'string' && metadata.ticketSubject.trim().length > 0
+          ? metadata.ticketSubject
+          : SETUP_DEFAULT_TICKET_SUBJECT;
+
+      const existing = ticketsMap.get(ticketId);
+      const mappedLastMessage = {
+        id: message.id,
+        profile_id: message.user_id,
+        sender: message.sender,
+        content: message.content,
+        category: message.category,
+        metadata: message.metadata,
+        is_read_by_user: message.is_read_by_user,
+        is_read_by_agent: message.is_read_by_agent,
+        created_at: message.created_at,
+        updated_at: message.updated_at,
+      } as SupportMessageRow;
+
+      if (!existing) {
+        ticketsMap.set(ticketId, {
+          ticket_id: ticketId,
+          profile_id: message.user_id,
+          profile_name: message.email_snapshot ?? 'Setup support',
+          twilio_virtual_number: null,
+          last_message: mappedLastMessage,
+          last_activity_at: message.created_at,
+          unread_agent_messages: message.sender === 'agent' && !message.is_read_by_user ? 1 : 0,
+          ticket_subject: ticketSubject,
+        });
+        return;
+      }
+
+      const existingLastActivity = new Date(existing.last_activity_at ?? '').getTime();
+      const messageTime = new Date(message.created_at).getTime();
+      if (messageTime > existingLastActivity) {
+        existing.last_message = mappedLastMessage;
+        existing.last_activity_at = message.created_at;
+        existing.ticket_subject = existing.ticket_subject ?? ticketSubject;
+        if (!existing.profile_name && message.email_snapshot) {
+          existing.profile_name = message.email_snapshot;
+        }
+      }
+      if (message.sender === 'agent' && !message.is_read_by_user) {
+        existing.unread_agent_messages += 1;
+      }
+      ticketsMap.set(ticketId, existing);
+    });
+
+    const ticketSummaries = Array.from(ticketsMap.values()).sort((a, b) => {
+      const aTime = new Date(a.last_activity_at ?? '').getTime();
+      const bTime = new Date(b.last_activity_at ?? '').getTime();
+      return bTime - aTime;
+    });
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({ tickets: ticketSummaries });
+  }
+
   static async deleteTicket(req: Request, res: Response) {
     const userId = await getAuthenticatedUserId(req);
     if (!userId) {

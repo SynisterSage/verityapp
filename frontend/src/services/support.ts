@@ -108,3 +108,8 @@ export async function fetchSupportTickets() {
   const data = await authorizedFetch(`/profiles/support/tickets`);
   return (data?.tickets ?? []) as SupportTicketSummary[];
 }
+
+export async function fetchSetupSupportTickets() {
+  const data = await authorizedFetch(`/support/setup/tickets`);
+  return (data?.tickets ?? []) as SupportTicketSummary[];
+}

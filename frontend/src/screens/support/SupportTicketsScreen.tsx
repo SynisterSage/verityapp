@@ -20,7 +20,7 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
-import { createSupportTicket, deleteSupportTicket, fetchSupportTickets, SupportTicketSummary } from '../../services/support';
+import { createSupportTicket, deleteSupportTicket, fetchSetupSupportTickets, fetchSupportTickets, SupportTicketSummary } from '../../services/support';
 import { navigateToSupportModal } from '../../navigation/rootNavigator';
 import { navigateToSupportResource } from '../../navigation/rootNavigator';
 import ActionFooter from '../../components/onboarding/ActionFooter';
@@ -93,7 +93,7 @@ export default function SupportTicketsScreen() {
       }
       setError(null);
       try {
-        const data = await fetchSupportTickets();
+        const data = profiles.length > 0 ? await fetchSupportTickets() : await fetchSetupSupportTickets();
         setTickets(data);
       } catch (err) {
         console.warn('Failed to load support tickets', err);
@@ -104,7 +104,7 @@ export default function SupportTicketsScreen() {
         }
       }
     },
-    []
+    [profiles.length]
   );
 
   const handleRefresh = useCallback(() => {
