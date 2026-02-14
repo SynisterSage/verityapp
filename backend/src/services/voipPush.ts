@@ -152,21 +152,24 @@ export async function sendVoIPPush(
       req.end();
 
       let responseData = '';
+      let responseStatus = 0;
+
+      req.on('response', (headers) => {
+        responseStatus = Number(headers[':status']) || 0;
+      });
 
       req.on('data', (chunk) => {
         responseData += chunk;
       });
 
       req.on('end', () => {
-        const status = req.stream.rstCode || 200;
-
         client.close();
 
-        if (status === 200 || status === 0) {
+        if (responseStatus === 200) {
           logger.info(`[VoIP] Push sent successfully: token=${voipToken.substring(0, 8)}... callSid=${payload.callSid}`);
           resolve(true);
         } else {
-          logger.err(`[VoIP] Push failed: status=${status} response=${responseData}`);
+          logger.err(`[VoIP] Push failed: status=${responseStatus} response=${responseData}`);
           resolve(false);
         }
       });
