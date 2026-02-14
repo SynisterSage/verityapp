@@ -478,13 +478,6 @@ export default class SupportController {
       preProfile: true,
     };
 
-    const { count: existingCount } = await supabaseAdmin
-      .from('support_setup_messages')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('metadata->>ticketId', ticketId);
-    const isNewTicket = (existingCount ?? 0) === 0;
-
     const { data, error } = await supabaseAdmin
       .from('support_setup_messages')
       .insert([
@@ -507,26 +500,6 @@ export default class SupportController {
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to send message' });
     }
 
-    if (isNewTicket) {
-      const { error: greetingError } = await supabaseAdmin
-        .from('support_setup_messages')
-        .insert([
-          {
-            user_id: userId,
-            email_snapshot: emailSnapshot,
-            sender: 'agent',
-            content: SETUP_GREETING,
-            category: 'auto',
-            metadata: resolvedMetadata,
-            is_read_by_user: false,
-            is_read_by_agent: true,
-          },
-        ]);
-      if (greetingError) {
-        console.warn('Failed to insert setup greeting', greetingError);
-      }
-    }
-
     const { error: autoReplyError } = await supabaseAdmin
       .from('support_setup_messages')
       .insert([
@@ -546,6 +519,46 @@ export default class SupportController {
     }
 
     return res.status(HTTP_STATUS_CODES.Created).json({ message: data });
+  }
+
+  static async createSetupTicket(req: Request, res: Response) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+    }
+
+    const ticketId = randomUUID();
+    const emailSnapshot = await getUserEmailSnapshot(userId);
+    const metadata: Record<string, unknown> = {
+      ticketId,
+      ticketSubject: SETUP_DEFAULT_TICKET_SUBJECT,
+      ticketState: 'open',
+      preProfile: true,
+    };
+
+    const { data, error } = await supabaseAdmin
+      .from('support_setup_messages')
+      .insert([
+        {
+          user_id: userId,
+          email_snapshot: emailSnapshot,
+          sender: 'agent',
+          content: SETUP_GREETING,
+          category: 'auto',
+          metadata,
+          is_read_by_user: false,
+          is_read_by_agent: true,
+        },
+      ])
+      .select('id, sender, content, category, metadata, is_read_by_user, is_read_by_agent, created_at, updated_at')
+      .single();
+
+    if (error) {
+      console.warn('Failed to create setup support ticket', error);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to create setup ticket' });
+    }
+
+    return res.status(HTTP_STATUS_CODES.Created).json({ ticketId, message: data });
   }
 
   static async markSetupMessagesRead(req: Request, res: Response) {

@@ -283,7 +283,7 @@ export default function SupportScreen() {
   }, []);
 
   const submitFeedback = useCallback(async () => {
-    if (!activeProfile?.id || ticketClosed || !feedbackRating || !currentTicketId) {
+    if (ticketClosed || !feedbackRating || !currentTicketId) {
       return;
     }
     const trimmedNote = feedbackNote.trim();
@@ -295,10 +295,17 @@ export default function SupportScreen() {
         feedbackRating,
         feedbackNote: trimmedNote || undefined,
       };
-      await createSupportMessage(activeProfile.id, {
-        content: trimmedNote ? `Feedback: ${trimmedNote}` : `Feedback: ${feedbackRating}`,
-        metadata,
-      });
+      if (hasProfileSupport && activeProfile?.id) {
+        await createSupportMessage(activeProfile.id, {
+          content: trimmedNote ? `Feedback: ${trimmedNote}` : `Feedback: ${feedbackRating}`,
+          metadata,
+        });
+      } else {
+        await createSetupSupportMessage({
+          content: trimmedNote ? `Feedback: ${trimmedNote}` : `Feedback: ${feedbackRating}`,
+          metadata,
+        });
+      }
       setTicketClosed(true);
       setShowFeedback(false);
       setFeedbackNote('');
@@ -315,6 +322,7 @@ export default function SupportScreen() {
     currentTicketId,
     feedbackNote,
     feedbackRating,
+    hasProfileSupport,
     loadMessages,
     ticketClosed,
     triggerSuccessAnimation,

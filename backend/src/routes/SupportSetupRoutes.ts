@@ -7,6 +7,7 @@ import { createSupportMessageSchema } from '@src/middleware/validationSchemas';
 const supportSetupRouter = Router();
 
 supportSetupRouter.get('/tickets', SupportController.listSetupTickets);
+supportSetupRouter.post('/tickets', SupportController.createSetupTicket);
 supportSetupRouter.get('/messages', SupportController.listSetupMessages);
 supportSetupRouter.post('/messages', validateRequest(createSupportMessageSchema), SupportController.createSetupMessage);
 supportSetupRouter.patch('/messages/mark-read', SupportController.markSetupMessagesRead);

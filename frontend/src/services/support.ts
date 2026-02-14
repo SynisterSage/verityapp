@@ -113,3 +113,10 @@ export async function fetchSetupSupportTickets() {
   const data = await authorizedFetch(`/support/setup/tickets`);
   return (data?.tickets ?? []) as SupportTicketSummary[];
 }
+
+export async function createSetupSupportTicket() {
+  const data = await authorizedFetch(`/support/setup/tickets`, {
+    method: 'POST',
+  });
+  return data as { ticketId: string; message: SupportMessage | null };
+}

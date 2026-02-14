@@ -20,7 +20,14 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
-import { createSupportTicket, deleteSupportTicket, fetchSetupSupportTickets, fetchSupportTickets, SupportTicketSummary } from '../../services/support';
+import {
+  createSetupSupportTicket,
+  createSupportTicket,
+  deleteSupportTicket,
+  fetchSetupSupportTickets,
+  fetchSupportTickets,
+  SupportTicketSummary,
+} from '../../services/support';
 import { navigateToSupportModal } from '../../navigation/rootNavigator';
 import { navigateToSupportResource } from '../../navigation/rootNavigator';
 import ActionFooter from '../../components/onboarding/ActionFooter';
@@ -224,7 +231,16 @@ export default function SupportTicketsScreen() {
   const handleStartNew = useCallback(async () => {
     if (profiles.length === 0) {
       setError(null);
-      navigateToSupportModal({ ticketId: 'setup-help', newTicket: true });
+      setCreatingTicket(true);
+      try {
+        const data = await createSetupSupportTicket();
+        setCreatingTicket(false);
+        navigateToSupportModal({ ticketId: data?.ticketId ?? null, newTicket: true });
+      } catch (err) {
+        console.warn('Failed to start setup support conversation', err);
+        setCreatingTicket(false);
+        setError('Unable to start a new support conversation. Please try again.');
+      }
       return;
     }
     const primaryProfile = profiles[0];
