@@ -222,8 +222,15 @@ export default function TwilioVoiceClientManager() {
 
     const handleIncoming = (data: unknown) => {
       console.info('TwilioVoice incoming invite', data);
-      reportLifecycle('ringing', data);
       const parsed = parseTwilioEventData(data);
+
+      // Only navigate if we have a valid callSid (not stale/empty data)
+      if (!parsed.callSid) {
+        console.warn('[twilio-voice] Ignoring incoming invite without callSid');
+        return;
+      }
+
+      reportLifecycle('ringing', data);
       navigateToActiveCall({
         callSid: parsed.callSid,
         fromNumber: parsed.fromNumber,
@@ -245,10 +252,18 @@ export default function TwilioVoiceClientManager() {
     };
     const handleConnecting = (data: unknown) => {
       console.info('TwilioVoice connecting', data);
-      reportLifecycle('connecting', data);
       const parsed = parseTwilioEventData(data);
+      const callSid = parsed.callSid ?? activeCallSidRef.current;
+
+      // Only navigate if we have a valid callSid
+      if (!callSid) {
+        console.warn('[twilio-voice] Ignoring connecting event without callSid');
+        return;
+      }
+
+      reportLifecycle('connecting', data);
       navigateToActiveCall({
-        callSid: parsed.callSid ?? activeCallSidRef.current ?? undefined,
+        callSid,
         fromNumber: parsed.fromNumber,
         toNumber: parsed.toNumber,
         status: 'Connecting',
@@ -256,10 +271,18 @@ export default function TwilioVoiceClientManager() {
     };
     const handleConnect = (data: unknown) => {
       console.info('TwilioVoice connection connected', data);
-      reportLifecycle('connected', data);
       const parsed = parseTwilioEventData(data);
+      const callSid = parsed.callSid ?? activeCallSidRef.current;
+
+      // Only navigate if we have a valid callSid
+      if (!callSid) {
+        console.warn('[twilio-voice] Ignoring connect event without callSid');
+        return;
+      }
+
+      reportLifecycle('connected', data);
       navigateToActiveCall({
-        callSid: parsed.callSid ?? activeCallSidRef.current ?? undefined,
+        callSid,
         fromNumber: parsed.fromNumber,
         toNumber: parsed.toNumber,
         status: 'Connected',
@@ -267,10 +290,18 @@ export default function TwilioVoiceClientManager() {
     };
     const handleReconnecting = (data: unknown) => {
       console.info('TwilioVoice reconnecting', data);
-      reportLifecycle('reconnecting', data, activeCallSidRef.current);
       const parsed = parseTwilioEventData(data);
+      const callSid = parsed.callSid ?? activeCallSidRef.current;
+
+      // Only navigate if we have a valid callSid
+      if (!callSid) {
+        console.warn('[twilio-voice] Ignoring reconnecting event without callSid');
+        return;
+      }
+
+      reportLifecycle('reconnecting', data, activeCallSidRef.current);
       navigateToActiveCall({
-        callSid: parsed.callSid ?? activeCallSidRef.current ?? undefined,
+        callSid,
         fromNumber: parsed.fromNumber,
         toNumber: parsed.toNumber,
         status: 'Reconnecting',
