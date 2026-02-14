@@ -402,7 +402,23 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       });
     };
 
-    const cleanup = initializeVoIPPush(handleVoIPToken, handleIncomingCall);
+    const handleCallAnswered = (callUUID: string) => {
+      console.info('[VoIPPush] Call answered:', callUUID);
+      // The Twilio Voice SDK will automatically accept the incoming call
+      // when the user answers via CallKit
+    };
+
+    const handleCallEnded = (callUUID: string) => {
+      console.info('[VoIPPush] Call ended:', callUUID);
+      // The call state will be handled by TwilioVoiceManager
+    };
+
+    const cleanup = initializeVoIPPush({
+      onTokenUpdate: handleVoIPToken,
+      onIncomingCall: handleIncomingCall,
+      onCallAnswered: handleCallAnswered,
+      onCallEnded: handleCallEnded,
+    });
     voipPushCleanupRef.current = cleanup;
 
     return () => {

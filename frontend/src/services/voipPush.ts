@@ -7,15 +7,21 @@ const { VoIPPushModule } = NativeModules;
 let voipEventEmitter: NativeEventEmitter | null = null;
 let tokenListener: any = null;
 let pushListener: any = null;
+let answerListener: any = null;
+let endListener: any = null;
+
+export interface VoIPCallHandlers {
+  onTokenUpdate: (token: string) => void;
+  onIncomingCall: (payload: VoIPPushPayload) => void;
+  onCallAnswered?: (callUUID: string) => void;
+  onCallEnded?: (callUUID: string) => void;
+}
 
 /**
  * Initialize VoIP push notifications (iOS only)
  * Registers for PushKit notifications that can wake the app from any state
  */
-export function initializeVoIPPush(
-  onTokenUpdate: (token: string) => void,
-  onIncomingCall: (payload: VoIPPushPayload) => void
-): () => void {
+export function initializeVoIPPush(handlers: VoIPCallHandlers): () => void {
   if (Platform.OS !== 'ios' || !VoIPPushModule) {
     console.warn('[VoIPPush] VoIP push is only available on iOS');
     return () => {};
@@ -30,7 +36,7 @@ export function initializeVoIPPush(
     (data: VoIPTokenUpdate) => {
       console.info('[VoIPPush] Token updated:', data.token ? 'received' : 'invalidated');
       if (data.token) {
-        onTokenUpdate(data.token);
+        handlers.onTokenUpdate(data.token);
       }
     }
   );
@@ -40,7 +46,29 @@ export function initializeVoIPPush(
     'voipPushReceived',
     (payload: VoIPPushPayload) => {
       console.info('[VoIPPush] Incoming call:', payload);
-      onIncomingCall(payload);
+      handlers.onIncomingCall(payload);
+    }
+  );
+
+  // Listen for call answered via CallKit
+  answerListener = voipEventEmitter.addListener(
+    'callAnswered',
+    (data: { callUUID: string }) => {
+      console.info('[VoIPPush] Call answered via CallKit:', data.callUUID);
+      if (handlers.onCallAnswered) {
+        handlers.onCallAnswered(data.callUUID);
+      }
+    }
+  );
+
+  // Listen for call ended via CallKit
+  endListener = voipEventEmitter.addListener(
+    'callEnded',
+    (data: { callUUID: string }) => {
+      console.info('[VoIPPush] Call ended via CallKit:', data.callUUID);
+      if (handlers.onCallEnded) {
+        handlers.onCallEnded(data.callUUID);
+      }
     }
   );
 
@@ -57,6 +85,14 @@ export function initializeVoIPPush(
     if (pushListener) {
       pushListener.remove();
       pushListener = null;
+    }
+    if (answerListener) {
+      answerListener.remove();
+      answerListener = null;
+    }
+    if (endListener) {
+      endListener.remove();
+      endListener = null;
     }
     console.info('[VoIPPush] Unregistered listeners');
   };

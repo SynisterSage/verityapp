@@ -35,7 +35,7 @@ class VoIPPushModule: RCTEventEmitter {
   }
 
   override func supportedEvents() -> [String]! {
-    return ["voipPushReceived", "voipTokenUpdated"]
+    return ["voipPushReceived", "voipTokenUpdated", "callAnswered", "callEnded"]
   }
 
   override static func requiresMainQueueSetup() -> Bool {
@@ -176,11 +176,23 @@ extension VoIPPushModule: CXProviderDelegate {
 
   func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
     print("[VoIPPush] User answered call")
+
+    // Notify React Native that the call was answered
+    sendEvent(withName: "callAnswered", body: [
+      "callUUID": action.callUUID.uuidString
+    ])
+
     action.fulfill()
   }
 
   func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
     print("[VoIPPush] User ended call")
+
+    // Notify React Native that the call was ended
+    sendEvent(withName: "callEnded", body: [
+      "callUUID": action.callUUID.uuidString
+    ])
+
     action.fulfill()
   }
 

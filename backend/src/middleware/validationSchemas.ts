@@ -125,9 +125,9 @@ export const recordClientCallLifecycleSchema = z.object({
     'failed',
     'ended',
   ]),
-  fromNumber: z.string().max(40).optional().nullable(),
-  toNumber: z.string().max(40).optional().nullable(),
-  toClientIdentity: z.string().max(120).optional().nullable(),
+  fromNumber: z.string().max(100).optional().nullable(),
+  toNumber: z.string().max(150).optional().nullable(),
+  toClientIdentity: z.string().max(150).optional().nullable(),
   eventAt: z.string().datetime().optional(),
   metadata: z.record(z.string(), z.any()).optional(),
 });
