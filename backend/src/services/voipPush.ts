@@ -1,4 +1,6 @@
 import apn from 'apn';
+import http2 from 'http2';
+import jwt from 'jsonwebtoken';
 import logger from 'jet-logger';
 import supabaseAdmin from '@src/services/supabase';
 
@@ -70,33 +72,44 @@ export interface VoIPPushPayload {
 }
 
 /**
- * Send VoIP push notification to wake the app and show incoming call
+ * Generate APNs JWT token for authentication
+ */
+function generateAPNsToken(): string {
+  const authKeyContent = process.env.APNS_AUTH_KEY;
+  const authKeyId = process.env.APNS_AUTH_KEY_ID;
+  const teamId = process.env.APNS_TEAM_ID;
+
+  if (!authKeyContent || !authKeyId || !teamId) {
+    throw new Error('Missing APNs credentials');
+  }
+
+  const token = jwt.sign({}, authKeyContent, {
+    algorithm: 'ES256',
+    keyid: authKeyId,
+    issuer: teamId,
+    expiresIn: '1h',
+  });
+
+  return token;
+}
+
+/**
+ * Send VoIP push notification using raw HTTP/2 to APNs
  * This will wake the iOS app from ANY state (killed, background, suspended)
  */
 export async function sendVoIPPush(
   voipToken: string,
   payload: VoIPPushPayload
 ): Promise<boolean> {
-  const provider = getApnProvider();
-  if (!provider) {
-    logger.warn('APNs provider not available, skipping VoIP push');
-    return false;
-  }
-
   const bundleId = process.env.IOS_BUNDLE_IDENTIFIER;
+  const isProduction = process.env.APNS_PRODUCTION === 'true';
+
   if (!bundleId) {
     logger.err('IOS_BUNDLE_IDENTIFIER not set');
     return false;
   }
 
-  // For VoIP pushes, we need raw data at root level (no 'aps' wrapper)
-  const notification: any = new apn.Notification();
-  notification.topic = `${bundleId}.voip`;
-  notification.priority = 10;
-  notification.expiry = Math.floor(Date.now() / 1000) + 60;
-
   // VoIP pushes MUST have data at root level without 'aps' wrapper
-  // Override compile() to return raw payload structure for VoIP
   const voipPayload = {
     call_sid: payload.callSid,
     from_number: payload.fromNumber,
@@ -105,32 +118,67 @@ export async function sendVoIPPush(
     profile_id: payload.profileId,
   };
 
-  notification.compile = function() {
-    return voipPayload;
-  };
-
-  const isProduction = process.env.APNS_PRODUCTION === 'true';
   logger.info(`[VoIP] Sending: callSid=${payload.callSid} from=${payload.fromNumber}`);
   logger.info(`[VoIP] Config: token=${voipToken.substring(0, 16)}... env=${isProduction ? 'production' : 'development'} topic=${bundleId}.voip`);
-  logger.info(`[VoIP] Raw payload: ${JSON.stringify(voipPayload)}`);
+  logger.info(`[VoIP] Payload: ${JSON.stringify(voipPayload)}`);
 
   try {
-    const result = await provider.send(notification, voipToken);
+    const authToken = generateAPNsToken();
+    const apnsHost = isProduction ? 'api.push.apple.com' : 'api.sandbox.push.apple.com';
+    const path = `/3/device/${voipToken}`;
 
-    if (result.failed.length > 0) {
-      const failure = result.failed[0];
-      logger.err(
-        `VoIP push FAILED: token=${voipToken.substring(0, 8)}... reason=${failure?.response?.reason || 'unknown'} status=${failure?.status || 'unknown'}`
-      );
-      return false;
-    }
+    return new Promise((resolve, reject) => {
+      const client = http2.connect(`https://${apnsHost}`);
 
-    logger.info(
-      `VoIP push sent: token=${voipToken.substring(0, 8)}... callSid=${payload.callSid}`
-    );
-    return true;
+      client.on('error', (err) => {
+        logger.err(`[VoIP] HTTP/2 connection error: ${err.message}`);
+        client.close();
+        reject(err);
+      });
+
+      const req = client.request({
+        ':method': 'POST',
+        ':path': path,
+        ':scheme': 'https',
+        'authorization': `bearer ${authToken}`,
+        'apns-topic': `${bundleId}.voip`,
+        'apns-push-type': 'voip',
+        'apns-priority': '10',
+        'apns-expiration': '60',
+      });
+
+      req.setEncoding('utf8');
+      req.write(JSON.stringify(voipPayload));
+      req.end();
+
+      let responseData = '';
+
+      req.on('data', (chunk) => {
+        responseData += chunk;
+      });
+
+      req.on('end', () => {
+        const status = req.stream.rstCode || 200;
+
+        client.close();
+
+        if (status === 200 || status === 0) {
+          logger.info(`[VoIP] Push sent successfully: token=${voipToken.substring(0, 8)}... callSid=${payload.callSid}`);
+          resolve(true);
+        } else {
+          logger.err(`[VoIP] Push failed: status=${status} response=${responseData}`);
+          resolve(false);
+        }
+      });
+
+      req.on('error', (err) => {
+        logger.err(`[VoIP] Request error: ${err.message}`);
+        client.close();
+        resolve(false);
+      });
+    });
   } catch (error) {
-    logger.err(`VoIP push error: ${error instanceof Error ? error.message : String(error)}`);
+    logger.err(`[VoIP] Push error: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
