@@ -133,21 +133,35 @@ extension VoIPPushModule: PKPushRegistryDelegate {
 
     print("[VoIPPush] Extracted: callSid=\(callSid) from=\(fromNumber) to=\(toNumber) uuid=\(callUUID)")
 
-    // VoIP push wakes the app and keeps it alive in background
-    // Twilio SDK will handle CallKit automatically when the actual call arrives
-    // This avoids duplicate CallKit calls and UUID mismatches
-    print("[VoIPPush] App woken by VoIP push, notifying React Native")
+    // CRITICAL: iOS 13+ requires reporting incoming call to CallKit IMMEDIATELY
+    // when receiving VoIP push, otherwise iOS will stop delivering future pushes
+    let uuid = UUID(uuidString: callUUID) ?? UUID()
+    let handle = CXHandle(type: .phoneNumber, value: fromNumber)
+    let callUpdate = CXCallUpdate()
+    callUpdate.remoteHandle = handle
+    callUpdate.hasVideo = false
+    callUpdate.localizedCallerName = fromNumber
 
-    // Notify React Native (for when app is already running)
-    self.sendEvent(withName: "voipPushReceived", body: [
-      "callSid": callSid,
-      "fromNumber": fromNumber,
-      "toNumber": toNumber,
-      "callUUID": callUUID
-    ])
+    print("[VoIPPush] Reporting incoming call to CallKit: uuid=\(uuid)")
+    callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+      if let error = error {
+        print("[VoIPPush] ERROR reporting call to CallKit: \(error.localizedDescription)")
+        completion()
+        return
+      }
 
-    // Complete immediately to allow app to wake and initialize
-    completion()
+      print("[VoIPPush] Successfully reported call to CallKit")
+
+      // Notify React Native AFTER CallKit is notified
+      self.sendEvent(withName: "voipPushReceived", body: [
+        "callSid": callSid,
+        "fromNumber": fromNumber,
+        "toNumber": toNumber,
+        "callUUID": uuid.uuidString
+      ])
+
+      completion()
+    }
   }
 
   func pushRegistry(_ registry: PKPushRegistry,
