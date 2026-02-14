@@ -98,6 +98,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [twilioClientError, setTwilioClientError] = useState<string | null>(null);
   const [twilioClientHeartbeatActive, setTwilioClientHeartbeatActive] = useState(false);
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const tokenRefreshInFlightRef = useRef<Promise<void> | null>(null);
+  const lastTokenRefreshAtRef = useRef(0);
   const pushRegistrationRef = useRef<{ profileId: string; token: string } | null>(null);
   const isRegisteringPushRef = useRef(false);
 
@@ -138,6 +140,16 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [session, refreshProfiles]);
 
   const refreshTwilioClientToken = useCallback(async (profileId: string) => {
+    const MIN_REFRESH_INTERVAL_MS = 45_000;
+    const now = Date.now();
+    if (now - lastTokenRefreshAtRef.current < MIN_REFRESH_INTERVAL_MS) {
+      return;
+    }
+    if (tokenRefreshInFlightRef.current) {
+      return tokenRefreshInFlightRef.current;
+    }
+
+    const runRefresh = (async () => {
     try {
       console.info('[twilio-client] token refresh start', { profileId });
       setTwilioClientError(null);
@@ -155,17 +167,25 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         identity: data.identity,
       });
       setTwilioClientHeartbeatActive(true);
+      lastTokenRefreshAtRef.current = Date.now();
     } catch (err) {
       console.warn('[twilio-client] token refresh failed', {
         profileId,
         message: err instanceof Error ? err.message : String(err),
       });
-      setTwilioClientToken(null);
-      setTwilioClientIdentity(null);
+      // Keep last known-good token/identity on transient failures to prevent client flapping.
       setTwilioClientHeartbeatActive(false);
       const message = err instanceof Error ? err.message : 'Failed to fetch Twilio client token';
       setTwilioClientError(message);
       throw err;
+    }
+    })();
+
+    tokenRefreshInFlightRef.current = runRefresh;
+    try {
+      await runRefresh;
+    } finally {
+      tokenRefreshInFlightRef.current = null;
     }
   }, []);
 

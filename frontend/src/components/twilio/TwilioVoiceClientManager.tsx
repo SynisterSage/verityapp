@@ -45,11 +45,30 @@ export default function TwilioVoiceClientManager() {
     refreshTwilioClientSession,
   } = useProfile();
   const registeredTokenRef = useRef<string | null>(null);
+  const registeredIdentityRef = useRef<string | null>(null);
+  const unavailableEventsRef = useRef<Set<string>>(new Set());
+  const initInFlightRef = useRef(false);
+  const lastInitAtRef = useRef(0);
+  const lastRefreshAtRef = useRef(0);
   const activeCallSidRef = useRef<string | null>(null);
+  const REFRESH_MIN_INTERVAL_MS = 120_000;
+  const INIT_MIN_INTERVAL_MS = 15_000;
 
   const clearActiveCall = () => {
     activeCallSidRef.current = null;
     dismissActiveCall();
+  };
+
+  const refreshSessionIfNeeded = (reason: string) => {
+    const now = Date.now();
+    if (now - lastRefreshAtRef.current < REFRESH_MIN_INTERVAL_MS) {
+      return;
+    }
+    lastRefreshAtRef.current = now;
+    console.info('[twilio-voice] session refresh', { reason });
+    refreshTwilioClientSession().catch(() => {
+      /* handled in context */
+    });
   };
 
   const reportLifecycle = (
@@ -129,32 +148,67 @@ export default function TwilioVoiceClientManager() {
     });
     if (!isTwilioClientReady || !twilioClientToken || !twilioClientIdentity) {
       registeredTokenRef.current = null;
+      registeredIdentityRef.current = null;
+      initInFlightRef.current = false;
       TwilioVoice.unregister();
       return;
     }
-    if (registeredTokenRef.current === twilioClientToken) {
+    if (
+      registeredTokenRef.current === twilioClientToken &&
+      registeredIdentityRef.current === twilioClientIdentity
+    ) {
+      return;
+    }
+    if (initInFlightRef.current) {
+      return;
+    }
+    const now = Date.now();
+    if (
+      now - lastInitAtRef.current < INIT_MIN_INTERVAL_MS &&
+      registeredIdentityRef.current === twilioClientIdentity
+    ) {
       return;
     }
     let cancelled = false;
+    initInFlightRef.current = true;
+    lastInitAtRef.current = now;
     console.info('[twilio-voice] initWithToken start', { identity: twilioClientIdentity });
     TwilioVoice.initWithToken(twilioClientToken)
       .then(() => {
         if (cancelled) return;
         registeredTokenRef.current = twilioClientToken;
+        registeredIdentityRef.current = twilioClientIdentity;
+        initInFlightRef.current = false;
         console.info('[twilio-voice] initWithToken success', { identity: twilioClientIdentity });
       })
       .catch((err: unknown) => {
+        initInFlightRef.current = false;
         console.warn('TwilioVoice init failed', err);
-        refreshTwilioClientSession().catch(() => {
-          /* handled in context */
-        });
+        refreshSessionIfNeeded('init_failed');
       });
     return () => {
       cancelled = true;
+      initInFlightRef.current = false;
     };
   }, [isTwilioClientReady, refreshTwilioClientSession, twilioClientIdentity, twilioClientToken]);
 
   useEffect(() => {
+    const registeredEvents: Array<{ type: string; handler: (data: unknown) => void }> = [];
+    const registerEvent = (type: string, handler: (data: unknown) => void) => {
+      try {
+        TwilioVoice.addEventListener(type, handler);
+        registeredEvents.push({ type, handler });
+      } catch (err) {
+        if (!unavailableEventsRef.current.has(type)) {
+          unavailableEventsRef.current.add(type);
+          console.info('[twilio-voice] optional event unavailable', {
+            type,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    };
+
     const handleIncoming = (data: unknown) => {
       console.info('TwilioVoice incoming invite', data);
       reportLifecycle('ringing', data);
@@ -171,9 +225,7 @@ export default function TwilioVoiceClientManager() {
     };
     const handleDeviceNotReady = (data: unknown) => {
       console.warn('TwilioVoice device not ready', data);
-      refreshTwilioClientSession().catch(() => {
-        /* handled in context */
-      });
+      refreshSessionIfNeeded('device_not_ready');
     };
     const handleDisconnect = () => {
       console.info('TwilioVoice connection disconnected');
@@ -228,41 +280,34 @@ export default function TwilioVoiceClientManager() {
       reportLifecycle('ringing', data);
     };
 
-    TwilioVoice.addEventListener('deviceReady', handleDeviceReady);
-    TwilioVoice.addEventListener('deviceNotReady', handleDeviceNotReady);
-    TwilioVoice.addEventListener('deviceDidReceiveIncoming', handleIncoming);
-    TwilioVoice.addEventListener('connectionDidDisconnect', handleDisconnect);
-    TwilioVoice.addEventListener('callStateConnecting', handleConnecting);
-    TwilioVoice.addEventListener('connectionIsReconnecting', handleReconnecting);
-    TwilioVoice.addEventListener('connectionDidReconnect', handleConnect);
-    TwilioVoice.addEventListener('connectionDidFail', handleConnectFailure);
-    TwilioVoice.addEventListener('callStateConnectFailure', handleConnectFailure);
-    TwilioVoice.addEventListener('connectionDidConnect', handleConnect);
-    TwilioVoice.addEventListener('callInviteCancelled', handleInviteCancelled);
-    TwilioVoice.addEventListener('callStateRinging', handleRinging);
+    registerEvent('deviceReady', handleDeviceReady);
+    registerEvent('deviceNotReady', handleDeviceNotReady);
+    registerEvent('deviceDidReceiveIncoming', handleIncoming);
+    registerEvent('connectionDidDisconnect', handleDisconnect);
+    registerEvent('callStateConnecting', handleConnecting);
+    registerEvent('connectionIsReconnecting', handleReconnecting);
+    registerEvent('connectionDidReconnect', handleConnect);
+    registerEvent('connectionDidFail', handleConnectFailure);
+    registerEvent('callStateConnectFailure', handleConnectFailure);
+    registerEvent('connectionDidConnect', handleConnect);
+    registerEvent('callInviteCancelled', handleInviteCancelled);
+    registerEvent('callStateRinging', handleRinging);
 
     return () => {
-      TwilioVoice.removeEventListener('deviceReady', handleDeviceReady);
-      TwilioVoice.removeEventListener('deviceNotReady', handleDeviceNotReady);
-      TwilioVoice.removeEventListener('deviceDidReceiveIncoming', handleIncoming);
-      TwilioVoice.removeEventListener('connectionDidDisconnect', handleDisconnect);
-      TwilioVoice.removeEventListener('callStateConnecting', handleConnecting);
-      TwilioVoice.removeEventListener('connectionIsReconnecting', handleReconnecting);
-      TwilioVoice.removeEventListener('connectionDidReconnect', handleConnect);
-      TwilioVoice.removeEventListener('connectionDidFail', handleConnectFailure);
-      TwilioVoice.removeEventListener('callStateConnectFailure', handleConnectFailure);
-      TwilioVoice.removeEventListener('connectionDidConnect', handleConnect);
-      TwilioVoice.removeEventListener('callInviteCancelled', handleInviteCancelled);
-      TwilioVoice.removeEventListener('callStateRinging', handleRinging);
+      registeredEvents.forEach(({ type, handler }) => {
+        try {
+          TwilioVoice.removeEventListener(type, handler);
+        } catch {
+          // Native event registry can be strict during fast refresh/strict-mode cleanup.
+        }
+      });
     };
   }, [activeProfile?.id, refreshTwilioClientSession, twilioClientIdentity]);
 
   useEffect(() => {
     const listener = AppState.addEventListener('change', (nextState: string) => {
       if (nextState === 'active') {
-        refreshTwilioClientSession().catch(() => {
-          /* handled in context */
-        });
+        refreshSessionIfNeeded('app_active');
         hydrateActiveCall();
       }
     });

@@ -59,7 +59,7 @@ function buildPushContent(alert: AlertLike) {
         : null;
     const riskLevel = coerceString(payload.riskLevel);
     return {
-      title: score ? `Urgent safety alert (${score}%)` : 'Urgent safety alert',
+      title: score ? `Urgent Safety Alert (${score}%)` : 'Urgent Safety Alert',
       body: riskLevel
         ? `We detected a possible ${riskLevel} risk call.`
         : 'We detected a possible fraud call.',
@@ -70,27 +70,27 @@ function buildPushContent(alert: AlertLike) {
     const contactName = coerceString(payload.contactName);
     const callerNumber = coerceString(payload.callerNumber);
     return {
-      title: 'Trusted caller connected',
+      title: 'Trusted Caller Connected',
       body: contactName || callerNumber || 'A trusted caller reached this profile.',
     };
   }
 
   if (alertType === 'pin_change') {
     return {
-      title: 'Safety PIN updated',
+      title: 'Safety PIN Updated',
       body: coerceString(payload.message) || 'Someone in your circle updated the Safety PIN.',
     };
   }
 
   if (CIRCLE_ALERT_TYPES.has(alertType)) {
     return {
-      title: 'Circle activity update',
+      title: 'Circle Activity Update',
       body: coerceString(payload.message) || 'There is a new update in your circle.',
     };
   }
 
   return {
-    title: 'New alert',
+    title: 'New Alert',
     body: coerceString(payload.message) || 'Open Verity Protect to review this alert.',
   };
 }
