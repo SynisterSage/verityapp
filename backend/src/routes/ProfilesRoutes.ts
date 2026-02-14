@@ -21,6 +21,7 @@ import {
   createClientTokenSchema,
   recordClientHeartbeatSchema,
   recordClientCallLifecycleSchema,
+  updateVoIPTokenSchema,
 } from '@src/middleware/validationSchemas';
 
 const router = Router();
@@ -54,6 +55,7 @@ router.get('/:profileId/twilio-client/active-call', (req, res) =>
   TwilioClientController.getActiveCall(req, res)
 );
 router.post(PATHS.Profiles.DeviceTokens, validateRequest(registerDeviceTokenSchema), ProfileDeviceTokensController.registerDeviceToken);
+router.put('/:profileId/voip-token', validateRequest(updateVoIPTokenSchema), ProfilesController.updateVoIPToken);
 router.get(PATHS.Profiles.ProfessionalLookup, ProfessionalLookupController.search);
 
 export default router;

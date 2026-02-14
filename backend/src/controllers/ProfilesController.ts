@@ -1099,6 +1099,45 @@ async function revokeInvite(req: Request, res: Response) {
   return res.status(HTTP_STATUS_CODES.Ok).json({ revoked: invite.id });
 }
 
+async function updateVoIPToken(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId } = req.params as { profileId: string };
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const allowed = await userCanAccessProfile(userId, profileId);
+  if (!allowed) {
+    logProfileAccessDenied('updateVoIPToken', userId, profileId);
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { voipPushToken } = req.body as { voipPushToken?: string };
+  if (typeof voipPushToken !== 'string' || !voipPushToken.trim()) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid VoIP push token' });
+  }
+
+  const { error } = await supabaseAdmin
+    .from('profiles')
+    .update({
+      voip_push_token: voipPushToken,
+      voip_push_token_updated_at: new Date().toISOString(),
+    })
+    .eq('id', profileId);
+
+  if (error) {
+    logger.err(error);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to update VoIP token' });
+  }
+
+  logger.info(`VoIP token updated for profile ${profileId}`);
+  return res.status(HTTP_STATUS_CODES.Ok).json({ success: true });
+}
+
 export default {
   listProfiles,
   createProfile,
@@ -1114,4 +1153,5 @@ export default {
   inviteMember,
   listInvites,
   revokeInvite,
+  updateVoIPToken,
 };

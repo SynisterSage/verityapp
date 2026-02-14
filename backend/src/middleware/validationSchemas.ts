@@ -132,6 +132,10 @@ export const recordClientCallLifecycleSchema = z.object({
   metadata: z.record(z.string(), z.any()).optional(),
 });
 
+export const updateVoIPTokenSchema = z.object({
+  voipPushToken: z.string().min(10, 'Invalid VoIP push token'),
+});
+
 // Number Assignment Schema
 export const assignNumberSchema = z.object({
   // Optional body - most data comes from URL params and auth

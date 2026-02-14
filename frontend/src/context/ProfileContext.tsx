@@ -21,6 +21,9 @@ import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 import { registerProfileDeviceToken } from '../services/notifications';
 import { logError, logEvent } from '../services/sentry';
+import { initializeVoIPPush, updateVoIPPushToken } from '../services/voipPush';
+import type { VoIPPushPayload } from '../types/voip-push';
+import { navigateToActiveCall } from '../navigation/rootNavigator';
 
 export type Profile = {
   id: string;
@@ -103,6 +106,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const lastTokenRefreshAtRef = useRef(0);
   const pushRegistrationRef = useRef<{ profileId: string; token: string } | null>(null);
   const isRegisteringPushRef = useRef(false);
+  const voipPushCleanupRef = useRef<(() => void) | null>(null);
+  const voipTokenRef = useRef<string | null>(null);
 
   const refreshProfiles = useCallback(async () => {
     setIsLoading(true);
@@ -347,6 +352,66 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     registerPushTokenForProfile();
   }, [registerPushTokenForProfile]);
+
+  // VoIP push registration (iOS only) - ensures calls wake the app from any state
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !session || !activeProfile?.id) {
+      if (voipPushCleanupRef.current) {
+        voipPushCleanupRef.current();
+        voipPushCleanupRef.current = null;
+      }
+      return;
+    }
+
+    const handleVoIPToken = async (token: string) => {
+      if (voipTokenRef.current === token) {
+        return;
+      }
+      voipTokenRef.current = token;
+
+      console.info('[VoIPPush] Token received, updating backend');
+      try {
+        await updateVoIPPushToken(activeProfile.id, token);
+      } catch (error) {
+        console.error('[VoIPPush] Failed to update token on backend:', error);
+        logError(error, {
+          screen: 'ProfileContext',
+          extra: { reason: 'voip_token_update_failed' },
+        });
+      }
+    };
+
+    const handleIncomingCall = (payload: VoIPPushPayload) => {
+      console.info('[VoIPPush] Incoming call from push:', payload);
+
+      // Navigate to active call screen
+      navigateToActiveCall({
+        callSid: payload.callSid,
+        fromNumber: payload.fromNumber,
+        toNumber: payload.toNumber,
+        status: 'Ringing',
+      });
+
+      logEvent('voip_push_received', {
+        level: 'info',
+        screen: 'ProfileContext',
+        extra: {
+          hasCallSid: Boolean(payload.callSid),
+          hasFromNumber: Boolean(payload.fromNumber),
+        },
+      });
+    };
+
+    const cleanup = initializeVoIPPush(handleVoIPToken, handleIncomingCall);
+    voipPushCleanupRef.current = cleanup;
+
+    return () => {
+      if (voipPushCleanupRef.current) {
+        voipPushCleanupRef.current();
+        voipPushCleanupRef.current = null;
+      }
+    };
+  }, [session, activeProfile?.id]);
 
   useEffect(() => {
     if (!activeProfile?.id) {

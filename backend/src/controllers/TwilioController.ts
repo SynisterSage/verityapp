@@ -16,6 +16,7 @@ import {
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
 import { dispatchAlertPush } from '@src/services/alertPushDispatcher';
+import { sendVoIPPushToProfile } from '@src/services/voipPush';
 
 const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call is being recorded for safety purposes.';
 const PUBLIC_API_URL = process.env.PUBLIC_API_URL?.replace(/\/+$/, '');
@@ -211,12 +212,14 @@ function appendClientBridge(
   );
 }
 
-function bridgeToProfile(
+async function bridgeToProfile(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
   bridgeFallbackUrl: string,
   callerId: string,
   toNumber: string,
+  fromNumber: string,
+  callSid: string | undefined,
   profile: {
     id: string;
     phone_number?: string | null;
@@ -232,6 +235,15 @@ function bridgeToProfile(
   // Prefer Twilio Client so VoIP push can wake the app and avoid infinite call loops.
   if (loopTarget) {
     if (profile.twilio_client_identity) {
+      // Send VoIP push to wake the app BEFORE dialing
+      await sendVoIPPushToProfile(profile.id, {
+        callSid: callSid || 'unknown',
+        fromNumber: fromNumber || 'Unknown',
+        toNumber,
+      }).catch((err) => {
+        logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
+      });
+
       const clientIdentity = getClientIdentity(profile);
       appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl);
       return `client=${clientIdentity} (loop-avoidance)`;
@@ -241,6 +253,15 @@ function bridgeToProfile(
   }
 
   if (profile.twilio_client_identity) {
+    // Send VoIP push to wake the app BEFORE dialing
+    await sendVoIPPushToProfile(profile.id, {
+      callSid: callSid || 'unknown',
+      fromNumber: fromNumber || 'Unknown',
+      toNumber,
+    }).catch((err) => {
+      logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
+    });
+
     const clientIdentity = getClientIdentity(profile);
     appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl);
     return `client=${clientIdentity}`;
@@ -267,6 +288,7 @@ async function callIncoming(req: Request, res: Response) {
   const payload = getPayload(req);
   const toNumber = payload.To ?? '';
   const fromNumber = payload.From ?? '';
+  const callSid = payload.CallSid;
   const profile = await getProfileByToNumber(toNumber);
   if (profile) {
     const trustedCaller = await getTrustedCaller(profile.id, fromNumber);
@@ -277,12 +299,14 @@ async function callIncoming(req: Request, res: Response) {
         const bridgeFallbackUrl = `${bridgeFallbackBaseUrl}?profileId=${encodeURIComponent(
           profile.id
         )}&to=${encodeURIComponent(toNumber)}&from=${encodeURIComponent(fromNumber)}`;
-        const bridgeTarget = bridgeToProfile(
+        const bridgeTarget = await bridgeToProfile(
           twimlResponse,
           dialStatusUrl,
           bridgeFallbackUrl,
           outboundCallerId,
           toNumber,
+          fromNumber,
+          callSid,
           profile
         );
         if (bridgeTarget) {
@@ -426,6 +450,7 @@ async function verifyPin(req: Request, res: Response) {
   const pin = extractPin(payload.Digits, payload.SpeechResult);
   const toNumber = payload.To ?? '';
   const fromNumber = payload.From ?? '';
+  const callSid = payload.CallSid;
   const callbackUrl = buildRecordingCallbackUrl(req);
   const dialStatusUrl = buildDialStatusUrl(req);
   const bridgeFallbackBaseUrl = buildBridgeFallbackUrl(req);
@@ -450,12 +475,14 @@ async function verifyPin(req: Request, res: Response) {
       const bridgeFallbackUrl = `${bridgeFallbackBaseUrl}?profileId=${encodeURIComponent(
         profile.id
       )}&to=${encodeURIComponent(toNumber)}&from=${encodeURIComponent(fromNumber)}`;
-      const bridgeTarget = bridgeToProfile(
+      const bridgeTarget = await bridgeToProfile(
         twimlResponse,
         dialStatusUrl,
         bridgeFallbackUrl,
         outboundCallerId,
         toNumber,
+        fromNumber,
+        callSid,
         profile
       );
       if (bridgeTarget) {
@@ -509,6 +536,15 @@ async function verifyPin(req: Request, res: Response) {
   if (isValid && bridgeEnabled) {
     const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
     if (profile.twilio_client_identity) {
+      // Send VoIP push to wake the app BEFORE dialing
+      await sendVoIPPushToProfile(profile.id, {
+        callSid: callSid || 'unknown',
+        fromNumber: fromNumber || 'Unknown',
+        toNumber,
+      }).catch((err) => {
+        logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
+      });
+
       const clientIdentity = getClientIdentity(profile);
       const bridgeFallbackUrl = `${bridgeFallbackBaseUrl}?profileId=${encodeURIComponent(
         profile.id
