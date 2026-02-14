@@ -94,10 +94,10 @@ export async function sendVoIPPush(
   // VoIP notifications are silent - they wake the app but don't show a banner
   notification.topic = `${bundleId}.voip`;
   notification.priority = 10; // High priority
-  notification.contentAvailable = true;
 
-  // Payload that will be delivered to the app
-  notification.payload = {
+  // For VoIP pushes, set the raw payload directly
+  // This bypasses the 'aps' wrapper and sends custom data at root level
+  notification.rawPayload = {
     call_sid: payload.callSid,
     from_number: payload.fromNumber,
     to_number: payload.toNumber,
@@ -105,7 +105,7 @@ export async function sendVoIPPush(
     profile_id: payload.profileId,
   };
 
-  logger.info(`[VoIP] Sending push with payload: ${JSON.stringify(notification.payload)}`);
+  logger.info(`[VoIP] Sending push with data: callSid=${payload.callSid} from=${payload.fromNumber}`);
 
   try {
     const result = await provider.send(notification, voipToken);
