@@ -253,9 +253,10 @@ async function bridgeToProfile(
       });
 
       const clientIdentity = getClientIdentity(profile);
-      // If VoIP push was sent, pause 12 seconds to let app wake up and register
+      // If VoIP push was sent, pause 20 seconds to let app wake up and register
       // App needs time to: wake from VoIP push, load React Native, initialize Twilio SDK
-      const pauseDuration = voipPushSent ? 12 : 0;
+      // This is CRITICAL for killed app scenario - don't reduce below 20 seconds
+      const pauseDuration = voipPushSent ? 20 : 0;
       appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
       return `client=${clientIdentity} (loop-avoidance)`;
     }
@@ -567,9 +568,10 @@ async function verifyPin(req: Request, res: Response) {
       logger.info(
         `Dialing client=${clientIdentity} callerId=${outboundCallerId}`
       );
-      // If VoIP push was sent, pause 12 seconds to let app wake up and register
+      // If VoIP push was sent, pause 20 seconds to let app wake up and register
       // App needs time to: wake from VoIP push, load React Native, initialize Twilio SDK
-      const pauseDuration = voipPushSent ? 12 : 0;
+      // This is CRITICAL for killed app scenario - don't reduce below 20 seconds
+      const pauseDuration = voipPushSent ? 20 : 0;
       appendClientBridge(
         twimlResponse,
         dialStatusUrl,

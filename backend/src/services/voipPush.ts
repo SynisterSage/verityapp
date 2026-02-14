@@ -89,13 +89,15 @@ export async function sendVoIPPush(
     return false;
   }
 
-  // For VoIP pushes, set payload normally - node-apn handles .voip topic specially
+  // BATTLE-TESTED VoIP push configuration for node-apn
   const notification = new apn.Notification();
+
+  // VoIP push configuration
   notification.topic = `${bundleId}.voip`;
   notification.priority = 10;
-  notification.pushType = 'voip';
+  notification.expiry = Math.floor(Date.now() / 1000) + 60; // Expire in 60 seconds
 
-  // For VoIP pushes, payload goes at root level (no 'aps' wrapper needed)
+  // Custom payload - node-apn will handle .voip topic correctly
   notification.payload = {
     call_sid: payload.callSid,
     from_number: payload.fromNumber,
@@ -104,9 +106,9 @@ export async function sendVoIPPush(
     profile_id: payload.profileId,
   };
 
-  // Log what we're actually sending
-  logger.info(`[VoIP] Sending push: callSid=${payload.callSid} from=${payload.fromNumber}`);
-  logger.info(`[VoIP] Compiled notification:`, JSON.stringify((notification as any).compile()));
+  const isProduction = process.env.APNS_PRODUCTION === 'true';
+  logger.info(`[VoIP] Sending: callSid=${payload.callSid} from=${payload.fromNumber}`);
+  logger.info(`[VoIP] Details: token=${voipToken.substring(0, 16)}... env=${isProduction ? 'production' : 'development'} topic=${bundleId}.voip`);
 
   try {
     const result = await provider.send(notification, voipToken);
