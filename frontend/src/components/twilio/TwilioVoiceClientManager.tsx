@@ -325,9 +325,5 @@ export default function TwilioVoiceClientManager() {
     return () => listener.remove();
   }, [activeProfile?.id, refreshTwilioClientSession]);
 
-  useEffect(() => {
-    hydrateActiveCall();
-  }, [activeProfile?.id]);
-
   return null;
 }
