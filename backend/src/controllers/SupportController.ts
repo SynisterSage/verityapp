@@ -478,6 +478,13 @@ export default class SupportController {
       preProfile: true,
     };
 
+    const { count: userMessageCount } = await supabaseAdmin
+      .from('support_setup_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('metadata->>ticketId', ticketId)
+      .eq('sender', 'user');
+
     const { data, error } = await supabaseAdmin
       .from('support_setup_messages')
       .insert([
@@ -500,22 +507,31 @@ export default class SupportController {
       return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to send message' });
     }
 
-    const { error: autoReplyError } = await supabaseAdmin
-      .from('support_setup_messages')
-      .insert([
-        {
-          user_id: userId,
-          email_snapshot: emailSnapshot,
-          sender: 'agent',
-          content: SETUP_AUTO_REPLY,
-          category: 'auto',
-          metadata: resolvedMetadata,
-          is_read_by_user: false,
-          is_read_by_agent: true,
-        },
-      ]);
-    if (autoReplyError) {
-      console.warn('Failed to insert setup auto reply', autoReplyError);
+    const promptLabel = metadata?.promptLabel;
+    const ticketState = typeof resolvedMetadata.ticketState === 'string' ? resolvedMetadata.ticketState : null;
+    const shouldAutoReply =
+      (userMessageCount ?? 0) === 0 &&
+      ticketState !== 'closed' &&
+      !(typeof promptLabel === 'string' && promptLabel.trim().length > 0);
+
+    if (shouldAutoReply) {
+      const { error: autoReplyError } = await supabaseAdmin
+        .from('support_setup_messages')
+        .insert([
+          {
+            user_id: userId,
+            email_snapshot: emailSnapshot,
+            sender: 'agent',
+            content: SETUP_AUTO_REPLY,
+            category: 'auto',
+            metadata: resolvedMetadata,
+            is_read_by_user: false,
+            is_read_by_agent: true,
+          },
+        ]);
+      if (autoReplyError) {
+        console.warn('Failed to insert setup auto reply', autoReplyError);
+      }
     }
 
     return res.status(HTTP_STATUS_CODES.Created).json({ message: data });

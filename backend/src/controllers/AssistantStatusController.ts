@@ -6,6 +6,30 @@ import { getAuthenticatedUserId, userCanAccessProfile } from '@src/common/util/a
 import { ASSISTANT_STATUS_ID } from '@src/constants/assistantStatus';
 
 export default class AssistantStatusController {
+  static async getSetupStatus(req: Request, res: Response) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('assistant_status')
+      .select('is_online, updated_at')
+      .eq('id', ASSISTANT_STATUS_ID)
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('Failed to load setup assistant status', error);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to load assistant status' });
+    }
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({
+      isOnline: Boolean(data?.is_online),
+      updatedAt: data?.updated_at ?? null,
+    });
+  }
+
   static async getStatus(req: Request, res: Response) {
     const userId = await getAuthenticatedUserId(req);
     if (!userId) {

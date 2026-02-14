@@ -39,12 +39,10 @@ export function SupportProvider({ children }: { children: ReactNode }) {
   }, [activeProfile?.id]);
 
   const refreshAssistantStatus = useCallback(async () => {
-    if (!activeProfile?.id) {
-      setAssistantOnline(false);
-      return;
-    }
     try {
-      const data = await authorizedFetch(`/profiles/${activeProfile.id}/support/assistant-status`);
+      const data = activeProfile?.id
+        ? await authorizedFetch(`/profiles/${activeProfile.id}/support/assistant-status`)
+        : await authorizedFetch('/support/setup/assistant-status');
       setAssistantOnline(Boolean(data?.isOnline));
     } catch (err) {
       console.warn('Failed to refresh assistant status', err);
