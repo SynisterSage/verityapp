@@ -120,6 +120,15 @@ export default function TwilioVoiceClientManager() {
           clearActiveCall();
           return;
         }
+
+        // Only navigate if call is actually active (not ended/failed/disconnected)
+        const activeStates = ['ringing', 'connecting', 'connected', 'reconnecting'];
+        if (!activeStates.includes(session.state?.toLowerCase() || '')) {
+          console.info('[twilio-voice] Skipping hydrate for non-active call state:', session.state);
+          clearActiveCall();
+          return;
+        }
+
         activeCallSidRef.current = session.call_sid;
         navigateToActiveCall({
           callSid: session.call_sid,
