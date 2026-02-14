@@ -51,6 +51,13 @@ export default function ActiveCallScreen() {
   const fromNumber = route.params?.fromNumber ?? '';
   const status = route.params?.status || 'Ringing';
 
+  console.log('[ActiveCallScreen] Render with params:', {
+    fromNumber,
+    status,
+    callSid: route.params?.callSid,
+    toNumber: route.params?.toNumber,
+  });
+
   // Start timer when call connects
   useEffect(() => {
     if (status === 'Connected' && !connectedAt) {
@@ -79,11 +86,13 @@ export default function ActiveCallScreen() {
   useEffect(() => {
     const profileId = activeProfile?.id;
     if (!profileId || !fromNumber) {
+      console.log('[ActiveCallScreen] Skipping trusted lookup:', { profileId, fromNumber });
       setTrustedDisplayName(null);
       return;
     }
     let cancelled = false;
     const normalizedIncoming = normalizePhone(fromNumber);
+    console.log('[ActiveCallScreen] Looking up trusted contact:', { fromNumber, normalizedIncoming });
     if (!normalizedIncoming) {
       setTrustedDisplayName(null);
       return;
@@ -92,10 +101,12 @@ export default function ActiveCallScreen() {
       .then((data) => {
         if (cancelled) return;
         const trustedContacts = (data?.trusted_contacts ?? []) as TrustedContact[];
+        console.log('[ActiveCallScreen] Found trusted contacts:', trustedContacts.length);
         const matched = trustedContacts.find((entry) => {
           return normalizePhone(entry.caller_number) === normalizedIncoming;
         });
         const name = matched?.contact_name?.trim();
+        console.log('[ActiveCallScreen] Matched contact:', { name, matched: !!matched });
         setTrustedDisplayName(name ? name : null);
       })
       .catch(() => {
