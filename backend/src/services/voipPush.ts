@@ -89,17 +89,14 @@ export async function sendVoIPPush(
     return false;
   }
 
-  // For VoIP pushes, manually construct the raw payload
-  // VoIP pushes don't use the 'aps' wrapper that regular pushes use
+  // For VoIP pushes, set payload normally - node-apn handles .voip topic specially
   const notification = new apn.Notification();
   notification.topic = `${bundleId}.voip`;
   notification.priority = 10;
   notification.pushType = 'voip';
 
-  // Set the raw payload data directly - this bypasses 'aps' wrapper
-  // Access internal _data to set custom root-level properties
-  const notificationData: any = notification;
-  notificationData._data = {
+  // For VoIP pushes, payload goes at root level (no 'aps' wrapper needed)
+  notification.payload = {
     call_sid: payload.callSid,
     from_number: payload.fromNumber,
     to_number: payload.toNumber,
@@ -107,7 +104,9 @@ export async function sendVoIPPush(
     profile_id: payload.profileId,
   };
 
+  // Log what we're actually sending
   logger.info(`[VoIP] Sending push: callSid=${payload.callSid} from=${payload.fromNumber}`);
+  logger.info(`[VoIP] Compiled notification:`, JSON.stringify((notification as any).compile()));
 
   try {
     const result = await provider.send(notification, voipToken);
