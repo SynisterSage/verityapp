@@ -94,7 +94,6 @@ export async function sendVoIPPush(
   notification.topic = `${bundleId}.voip`;
   notification.priority = 10;
   notification.expiry = Math.floor(Date.now() / 1000) + 60;
-  notification.pushType = 'voip';
 
   // For VoIP pushes, payload must be at root level (not wrapped in 'aps')
   notification.payload = {
