@@ -20,6 +20,11 @@ export const createProfileSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100, 'First name too long'),
   last_name: z.string().min(1, 'Last name is required').max(100, 'Last name too long'),
   phone_number: z.string().regex(/^[\d+\-().x\s]*$/, 'Invalid phone number format').optional().nullable(),
+  fallback_phone_number: z
+    .string()
+    .regex(/^[\d+\-().x\s]*$/, 'Invalid fallback phone number format')
+    .optional()
+    .nullable(),
   twilio_virtual_number: z.string().regex(/^\+?1?\d{10,}$/, 'Invalid Twilio number format').optional().nullable(),
   address: z.string().max(300, 'Address too long').optional().nullable(),
   city: z.string().max(100, 'City name too long').optional().nullable(),

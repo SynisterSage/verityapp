@@ -19,6 +19,7 @@ twilioRouter.use(validateTwilioSignature);
 twilioRouter.post('/call-incoming', TwilioController.callIncoming);
 twilioRouter.post('/verify-pin', TwilioController.verifyPin);
 twilioRouter.post('/dial-status', TwilioController.dialStatus);
+twilioRouter.post('/bridge-fallback', TwilioController.bridgeFallback);
 // Twilio may send GET callbacks in some console flows; accept both.
 twilioRouter.post('/recording-ready', TwilioController.recordingReady);
 twilioRouter.get('/recording-ready', TwilioController.recordingReady);

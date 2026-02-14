@@ -128,7 +128,7 @@ async function listProfiles(req: Request, res: Response) {
   const { data: caretakerProfiles } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+      'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .eq('caretaker_id', userId);
 
@@ -143,7 +143,7 @@ async function listProfiles(req: Request, res: Response) {
     const { data } = await supabaseAdmin
       .from('profiles')
       .select(
-        'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+        'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
       )
       .in('id', memberIds);
     memberRows = data ?? [];
@@ -165,6 +165,7 @@ async function createProfile(req: Request, res: Response) {
     first_name,
     last_name,
     phone_number,
+    fallback_phone_number,
     twilio_virtual_number,
     alert_threshold_score,
     enable_email_alerts,
@@ -188,6 +189,7 @@ async function createProfile(req: Request, res: Response) {
       first_name,
       last_name,
       phone_number: phone_number ?? null,
+      fallback_phone_number: fallback_phone_number ?? null,
       twilio_virtual_number: twilio_virtual_number ?? null,
       alert_threshold_score: typeof alert_threshold_score === 'number' ? alert_threshold_score : undefined,
       enable_email_alerts:
@@ -205,7 +207,7 @@ async function createProfile(req: Request, res: Response) {
         typeof auto_block_on_fraud === 'boolean' ? auto_block_on_fraud : undefined,
     })
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+      'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .single();
 
@@ -588,7 +590,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
   // Fetch the profile to return (frontend expects profile object with notification fields)
   const { data: profileData, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('id, first_name, last_name, phone_number, twilio_virtual_number, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at')
+    .select('id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at')
     .eq('id', profileId)
     .single();
 
@@ -635,10 +637,11 @@ async function updateProfile(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
-  const { first_name, last_name, phone_number } = req.body as {
+  const { first_name, last_name, phone_number, fallback_phone_number } = req.body as {
     first_name?: string;
     last_name?: string;
     phone_number?: string | null;
+    fallback_phone_number?: string | null;
   };
 
   const updates: Record<string, string | null> = {};
@@ -651,6 +654,9 @@ async function updateProfile(req: Request, res: Response) {
   if (typeof phone_number !== 'undefined') {
     updates.phone_number = phone_number ? phone_number.trim() : null;
   }
+  if (typeof fallback_phone_number !== 'undefined') {
+    updates.fallback_phone_number = fallback_phone_number ? fallback_phone_number.trim() : null;
+  }
 
   if (Object.keys(updates).length === 0) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'No updates provided' });
@@ -661,7 +667,7 @@ async function updateProfile(req: Request, res: Response) {
     .update(updates)
     .eq('id', profileId)
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
+      'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
     )
     .single();
 
@@ -693,7 +699,7 @@ async function getProfile(req: Request, res: Response) {
   const { data, error } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+      'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
     )
     .eq('id', profileId)
     .maybeSingle();
@@ -736,7 +742,7 @@ async function exportProfileData(req: Request, res: Response) {
     supabaseAdmin
       .from('profiles')
       .select(
-        'id, first_name, last_name, phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
+        'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
       )
       .eq('id', profileId)
       .maybeSingle(),

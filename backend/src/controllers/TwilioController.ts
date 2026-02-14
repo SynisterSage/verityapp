@@ -16,6 +16,7 @@ import {
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
 import { dispatchAlertPush } from '@src/services/alertPushDispatcher';
+import { notifyProfileForAlert } from '@src/services/pushNotifications';
 
 const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call is being recorded for safety purposes.';
 const PUBLIC_API_URL = process.env.PUBLIC_API_URL?.replace(/\/+$/, '');
@@ -40,6 +41,10 @@ function buildVerifyPinUrl(req: Request) {
 
 function buildDialStatusUrl(req: Request) {
   return new URL('/api/v1/webhook/twilio/dial-status', getPublicBaseUrl(req)).toString();
+}
+
+function buildBridgeFallbackUrl(req: Request) {
+  return new URL('/api/v1/webhook/twilio/bridge-fallback', getPublicBaseUrl(req)).toString();
 }
 
 function extractPin(digits?: string, speechResult?: string) {
@@ -72,6 +77,50 @@ async function getTrustedCaller(profileId: string, fromNumber?: string | null) {
     .eq('caller_hash', callerHash)
     .maybeSingle();
   return data ?? null;
+}
+
+async function notifyStaleClientSession(profile: {
+  id: string;
+  twilio_client_last_seen_at?: string | null;
+  twilio_client_stale_notified_at?: string | null;
+}) {
+  if (!profile.twilio_client_last_seen_at) {
+    return;
+  }
+  const lastSeenAt = new Date(profile.twilio_client_last_seen_at);
+  if (Number.isNaN(lastSeenAt.getTime())) {
+    return;
+  }
+  if (Date.now() - lastSeenAt.getTime() < CLIENT_SESSION_TTL_MS) {
+    return;
+  }
+  const lastNotifiedAt = profile.twilio_client_stale_notified_at
+    ? new Date(profile.twilio_client_stale_notified_at)
+    : null;
+  if (lastNotifiedAt && !Number.isNaN(lastNotifiedAt.getTime())) {
+    // Notify at most once per 24h for this condition.
+    if (Date.now() - lastNotifiedAt.getTime() < 24 * 60 * 60 * 1000) {
+      return;
+    }
+  }
+
+  try {
+    await notifyProfileForAlert(profile.id, {
+      alertId: `twilio-stale-${Date.now()}`,
+      title: 'Open Verity to stay reachable',
+      body: 'Open Verity Protect so incoming protected calls can reach you in-app.',
+      data: {
+        alertType: 'twilio_client_stale',
+        routeTarget: 'calls_trusted',
+      },
+    });
+    await supabaseAdmin
+      .from('profiles')
+      .update({ twilio_client_stale_notified_at: new Date().toISOString() })
+      .eq('id', profile.id);
+  } catch (error) {
+    logger.err(error as Error);
+  }
 }
 
 async function logTrustedBridgeActivity(args: {
@@ -143,19 +192,6 @@ function appendHangupMessage(
   twimlResponse.hangup();
 }
 
-function shouldUseTwilioClient(profile: {
-  twilio_client_last_seen_at?: string | null;
-}) {
-  if (!profile.twilio_client_last_seen_at) {
-    return false;
-  }
-  const lastSeen = new Date(profile.twilio_client_last_seen_at).getTime();
-  if (!Number.isFinite(lastSeen)) {
-    return false;
-  }
-  return Date.now() - lastSeen <= CLIENT_SESSION_TTL_MS;
-}
-
 function getClientIdentity(profile: {
   id: string;
   twilio_client_identity?: string | null;
@@ -176,13 +212,16 @@ function appendNumberBridge(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
   callerId: string,
-  destination: string
+  destination: string,
+  actionUrl?: string
 ) {
   twimlResponse.say({ voice: 'Polly.Joanna' }, 'Thank you. Connecting your call.');
   const dial = twimlResponse.dial({
     callerId,
     timeout: 20,
     answerOnBridge: true,
+    action: actionUrl,
+    method: actionUrl ? 'POST' : undefined,
   });
   dial.number(
     {
@@ -198,13 +237,16 @@ function appendClientBridge(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
   callerId: string,
-  clientIdentity: string
+  clientIdentity: string,
+  actionUrl?: string
 ) {
   twimlResponse.say({ voice: 'Polly.Joanna' }, 'Thank you. Connecting your call.');
   const dial = twimlResponse.dial({
     callerId,
-    timeout: 20,
+    timeout: 10,
     answerOnBridge: true,
+    action: actionUrl,
+    method: actionUrl ? 'POST' : undefined,
   });
   dial.client(
     {
@@ -219,15 +261,18 @@ function appendClientBridge(
 function bridgeToProfile(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
+  bridgeFallbackUrl: string,
   callerId: string,
   toNumber: string,
   profile: {
     id: string;
     phone_number?: string | null;
+    fallback_phone_number?: string | null;
     twilio_client_identity?: string | null;
     twilio_client_last_seen_at?: string | null;
   }
 ) {
+  const fallbackNumber = profile.fallback_phone_number || profile.phone_number || null;
   const loopTarget = numbersLikelyMatch(profile.phone_number, toNumber);
 
   // If the profile number points back to the routed Twilio number, do not dial it again.
@@ -235,21 +280,21 @@ function bridgeToProfile(
   if (loopTarget) {
     if (profile.twilio_client_identity) {
       const clientIdentity = getClientIdentity(profile);
-      appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity);
+      appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl);
       return `client=${clientIdentity} (loop-avoidance)`;
     }
     logger.warn(`Skipping bridge loop for to=${toNumber}; profile phone matches routed number`);
     return null;
   }
 
-  if (shouldUseTwilioClient(profile)) {
+  if (profile.twilio_client_identity) {
     const clientIdentity = getClientIdentity(profile);
-    appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity);
+    appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl);
     return `client=${clientIdentity}`;
   }
-  if (profile.phone_number) {
-    appendNumberBridge(twimlResponse, dialStatusUrl, callerId, profile.phone_number);
-    return `number=${profile.phone_number}`;
+  if (fallbackNumber) {
+    appendNumberBridge(twimlResponse, dialStatusUrl, callerId, fallbackNumber);
+    return `number=${fallbackNumber}`;
   }
   return null;
 }
@@ -262,6 +307,7 @@ async function callIncoming(req: Request, res: Response) {
   const callbackUrl = buildRecordingCallbackUrl(req);
   const verifyUrl = buildVerifyPinUrl(req);
   const dialStatusUrl = buildDialStatusUrl(req);
+  const bridgeFallbackBaseUrl = buildBridgeFallbackUrl(req);
   const { VoiceResponse } = twilio.twiml;
   const twimlResponse = new VoiceResponse();
 
@@ -275,14 +321,21 @@ async function callIncoming(req: Request, res: Response) {
       const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
       if (bridgeEnabled) {
         const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
+        const bridgeFallbackUrl = `${bridgeFallbackBaseUrl}?profileId=${encodeURIComponent(
+          profile.id
+        )}&to=${encodeURIComponent(toNumber)}&from=${encodeURIComponent(fromNumber)}`;
         const bridgeTarget = bridgeToProfile(
           twimlResponse,
           dialStatusUrl,
+          bridgeFallbackUrl,
           outboundCallerId,
           toNumber,
           profile
         );
         if (bridgeTarget) {
+          if (bridgeTarget.startsWith('client=')) {
+            await notifyStaleClientSession(profile);
+          }
           await logTrustedBridgeActivity({
             profileId: profile.id,
             caretakerId: profile.caretaker_id,
@@ -408,7 +461,7 @@ async function getProfileByToNumber(to?: string | null) {
   const { data: profile, error } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, caretaker_id, phone_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at'
+      'id, caretaker_id, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at, twilio_client_stale_notified_at'
     )
     .eq('twilio_virtual_number', to)
     .single();
@@ -425,6 +478,7 @@ async function verifyPin(req: Request, res: Response) {
   const fromNumber = payload.From ?? '';
   const callbackUrl = buildRecordingCallbackUrl(req);
   const dialStatusUrl = buildDialStatusUrl(req);
+  const bridgeFallbackBaseUrl = buildBridgeFallbackUrl(req);
   const { VoiceResponse } = twilio.twiml;
   const twimlResponse = new VoiceResponse();
 
@@ -443,14 +497,21 @@ async function verifyPin(req: Request, res: Response) {
     const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
     if (bridgeEnabled) {
       const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
+      const bridgeFallbackUrl = `${bridgeFallbackBaseUrl}?profileId=${encodeURIComponent(
+        profile.id
+      )}&to=${encodeURIComponent(toNumber)}&from=${encodeURIComponent(fromNumber)}`;
       const bridgeTarget = bridgeToProfile(
         twimlResponse,
         dialStatusUrl,
+        bridgeFallbackUrl,
         outboundCallerId,
         toNumber,
         profile
       );
       if (bridgeTarget) {
+        if (bridgeTarget.startsWith('client=')) {
+          await notifyStaleClientSession(profile);
+        }
         await logTrustedBridgeActivity({
           profileId: profile.id,
           caretakerId: profile.caretaker_id,
@@ -500,19 +561,30 @@ async function verifyPin(req: Request, res: Response) {
   const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
   if (isValid && bridgeEnabled) {
     const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
-    if (shouldUseTwilioClient(profile)) {
+    if (profile.twilio_client_identity) {
       const clientIdentity = getClientIdentity(profile);
+      const bridgeFallbackUrl = `${bridgeFallbackBaseUrl}?profileId=${encodeURIComponent(
+        profile.id
+      )}&to=${encodeURIComponent(toNumber)}&from=${encodeURIComponent(fromNumber)}`;
       logger.info(
         `Dialing client=${clientIdentity} callerId=${outboundCallerId}`
       );
-      appendClientBridge(twimlResponse, dialStatusUrl, outboundCallerId, clientIdentity);
+      appendClientBridge(
+        twimlResponse,
+        dialStatusUrl,
+        outboundCallerId,
+        clientIdentity,
+        bridgeFallbackUrl
+      );
+      await notifyStaleClientSession(profile);
       return res.type('text/xml').send(twimlResponse.toString());
     }
-    if (profile.phone_number) {
+    const fallbackNumber = profile.fallback_phone_number || profile.phone_number || null;
+    if (fallbackNumber) {
       logger.info(
-        `Dialing profile_number=${profile.phone_number} callerId=${outboundCallerId}`
+        `Dialing fallback_number=${fallbackNumber} callerId=${outboundCallerId}`
       );
-      appendNumberBridge(twimlResponse, dialStatusUrl, outboundCallerId, profile.phone_number);
+      appendNumberBridge(twimlResponse, dialStatusUrl, outboundCallerId, fallbackNumber);
       return res.type('text/xml').send(twimlResponse.toString());
     }
   }
@@ -531,6 +603,84 @@ function dialStatus(req: Request, res: Response) {
     `Dial status CallSid=${payload.CallSid} DialCallSid=${payload.DialCallSid} status=${payload.DialCallStatus} sip=${payload.SipResponseCode ?? 'n/a'}`
   );
   return res.status(204).end();
+}
+
+function shouldFallbackDial(status?: string, sipCode?: string | null) {
+  const normalized = String(status ?? '').toLowerCase();
+  if (['no-answer', 'busy', 'failed', 'canceled', 'cancelled'].includes(normalized)) {
+    return true;
+  }
+  const sip = Number.parseInt(String(sipCode ?? ''), 10);
+  if (!Number.isNaN(sip) && [480, 486, 603].includes(sip)) {
+    return true;
+  }
+  return false;
+}
+
+async function bridgeFallback(req: Request, res: Response) {
+  const payload = getPayload(req);
+  const profileId = payload.profileId ?? payload.profile_id;
+  const toNumber = payload.to ?? payload.To ?? '';
+  const fromNumber = payload.from ?? payload.From ?? '';
+  const dialStatus = payload.DialCallStatus;
+  const sipCode = payload.SipResponseCode;
+  const shouldFallback = shouldFallbackDial(dialStatus, sipCode);
+
+  const { VoiceResponse } = twilio.twiml;
+  const twimlResponse = new VoiceResponse();
+  if (!profileId || !shouldFallback) {
+    twimlResponse.hangup();
+    return res.type('text/xml').send(twimlResponse.toString());
+  }
+
+  const profile = await ensureProfileForFallback(profileId);
+  if (!profile) {
+    twimlResponse.hangup();
+    return res.type('text/xml').send(twimlResponse.toString());
+  }
+
+  const destination = profile.fallback_phone_number || profile.phone_number || null;
+  if (!destination) {
+    appendHangupMessage(
+      twimlResponse,
+      'We could not complete this call right now. Please try again later.'
+    );
+    return res.type('text/xml').send(twimlResponse.toString());
+  }
+
+  if (
+    numbersLikelyMatch(destination, profile.twilio_virtual_number) ||
+    numbersLikelyMatch(destination, toNumber)
+  ) {
+    logger.warn(`Skipping fallback loop profile=${profile.id} destination=${destination} to=${toNumber}`);
+    appendHangupMessage(
+      twimlResponse,
+      'We could not complete this call right now. Please try again later.'
+    );
+    return res.type('text/xml').send(twimlResponse.toString());
+  }
+
+  const dialStatusUrl = buildDialStatusUrl(req);
+  const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber || profile.twilio_virtual_number || destination;
+  logger.info(
+    `Bridge fallback dial profile=${profile.id} status=${dialStatus ?? 'n/a'} sip=${sipCode ?? 'n/a'} destination=${destination}`
+  );
+  appendNumberBridge(twimlResponse, dialStatusUrl, outboundCallerId, destination);
+  return res.type('text/xml').send(twimlResponse.toString());
+}
+
+async function ensureProfileForFallback(profileId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select(
+      'id, phone_number, fallback_phone_number, twilio_virtual_number'
+    )
+    .eq('id', profileId)
+    .maybeSingle();
+  if (error || !data) {
+    return null;
+  }
+  return data;
 }
 
 async function recordingReady(req: Request, res: Response) {
@@ -971,5 +1121,6 @@ export default {
   callIncoming,
   verifyPin,
   dialStatus,
+  bridgeFallback,
   recordingReady,
 };

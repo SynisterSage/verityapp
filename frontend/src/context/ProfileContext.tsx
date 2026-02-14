@@ -27,6 +27,7 @@ export type Profile = {
   first_name: string;
   last_name: string;
   phone_number: string | null;
+  fallback_phone_number?: string | null;
   twilio_virtual_number: string | null;
   has_passcode?: boolean | null;
   safety_pin?: string | null;

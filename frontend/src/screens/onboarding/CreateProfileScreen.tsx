@@ -65,6 +65,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
+  const [fallbackPhoneDigits, setFallbackPhoneDigits] = useState('');
   const [assignedNumber, setAssignedNumber] = useState(activeProfile?.twilio_virtual_number || '');
   const [isAssigningNumber, setIsAssigningNumber] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
@@ -77,6 +78,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const placeholderColor = withOpacity(theme.colors.textMuted, 0.7);
 
   const formattedPhone = useMemo(() => formatPhone(phoneDigits), [phoneDigits]);
+  const formattedFallbackPhone = useMemo(() => formatPhone(fallbackPhoneDigits), [fallbackPhoneDigits]);
   const isProfileInfoComplete = Boolean(firstName.trim() && lastName.trim() && phoneDigits.length === 10);
   const isFormValid = Boolean(assignedNumber); // Continue only enabled after number assigned
   const primaryDisabled = !isFormValid || isSubmitting;
@@ -121,6 +123,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           phone_number: phoneDigits ? `+1${phoneDigits}` : null,
+          fallback_phone_number: fallbackPhoneDigits ? `+1${fallbackPhoneDigits}` : null,
           twilio_virtual_number: null,
         };
         const profileData = await authorizedFetch('/profiles', {
@@ -265,6 +268,24 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
             returnKeyType="done"
           />
         </View>
+
+        <Text style={styles.inputLabel}>Reliable fallback number</Text>
+        <View style={styles.inputContainer}>
+          <Ionicons name="call-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
+          <Text style={styles.prefix}>+1</Text>
+          <TextInput
+            style={[styles.input, styles.phoneInput]}
+            placeholder="(000) 000-0000"
+            placeholderTextColor={placeholderColor}
+            keyboardType="phone-pad"
+            value={formattedFallbackPhone}
+            onChangeText={(value) => setFallbackPhoneDigits(value.replace(/\D/g, '').slice(0, 10))}
+            returnKeyType="done"
+          />
+        </View>
+        <Text style={styles.inputHint}>
+          Optional. Use a direct number that does not forward to the Verity line.
+        </Text>
 
         <Text style={styles.inputLabel}>Verity number</Text>
         {!assignedNumber ? (
@@ -419,6 +440,13 @@ const createProfileStyles = (theme: AppTheme) =>
       letterSpacing: 0.6,
       color: theme.colors.textMuted,
       marginBottom: 4,
+    },
+    inputHint: {
+      fontSize: 12,
+      color: theme.colors.textDim,
+      marginTop: -8,
+      marginBottom: 4,
+      lineHeight: 16,
     },
     inputContainer: {
       flexDirection: 'row',

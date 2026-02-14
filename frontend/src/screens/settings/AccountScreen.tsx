@@ -94,6 +94,7 @@ export default function AccountScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
+  const [fallbackPhoneDigits, setFallbackPhoneDigits] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [pinAction, setPinAction] = useState<PinAction>(null);
@@ -109,6 +110,7 @@ export default function AccountScreen() {
     setFirstName(activeProfile.first_name ?? '');
     setLastName(activeProfile.last_name ?? '');
     setPhoneDigits(normalizePhoneDigits(activeProfile.phone_number ?? ''));
+    setFallbackPhoneDigits(normalizePhoneDigits(activeProfile.fallback_phone_number ?? ''));
   }, [activeProfile]);
 
   const isReadOnly = !canManageProfile;
@@ -119,13 +121,18 @@ export default function AccountScreen() {
     return (
       firstName.trim() !== (activeProfile.first_name ?? '') ||
       lastName.trim() !== (activeProfile.last_name ?? '') ||
-      phoneDigits !== existingPhoneDigits
+      phoneDigits !== existingPhoneDigits ||
+      fallbackPhoneDigits !== normalizePhoneDigits(activeProfile.fallback_phone_number ?? '')
     );
-  }, [activeProfile, firstName, lastName, phoneDigits]);
+  }, [activeProfile, firstName, lastName, phoneDigits, fallbackPhoneDigits]);
 
   const formattedPhone = useMemo(
     () => (phoneDigits ? `+1 ${formatPhoneNumber(phoneDigits)}` : ''),
     [phoneDigits]
+  );
+  const formattedFallbackPhone = useMemo(
+    () => (fallbackPhoneDigits ? `+1 ${formatPhoneNumber(fallbackPhoneDigits)}` : ''),
+    [fallbackPhoneDigits]
   );
 
   const handlePhoneChange = (value: string) => {
@@ -179,12 +186,14 @@ export default function AccountScreen() {
     setIsSaving(true);
     try {
       const payloadPhone = phoneDigits ? `+1${phoneDigits}` : null;
+      const payloadFallbackPhone = fallbackPhoneDigits ? `+1${fallbackPhoneDigits}` : null;
       const data = await authorizedFetch(`/profiles/${activeProfile.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           first_name: firstName.trim(),
           last_name: lastName.trim(),
           phone_number: payloadPhone,
+          fallback_phone_number: payloadFallbackPhone,
         }),
       });
       if (data?.profile) {
@@ -350,6 +359,19 @@ export default function AccountScreen() {
               keyboardType="phone-pad"
               editable={!isReadOnly}
             />
+            <Text style={styles.inputLabel}>Reliable fallback number</Text>
+            <TextInput
+              style={[styles.input, isReadOnly && styles.inputDisabled]}
+              value={formattedFallbackPhone}
+              onChangeText={(value) => setFallbackPhoneDigits(normalizePhoneDigits(value))}
+              placeholder="+1 (000) 000-0000"
+              placeholderTextColor={theme.colors.textDim}
+              keyboardType="phone-pad"
+              editable={!isReadOnly}
+            />
+            <Text style={styles.helpText}>
+              Used if the in-app call cannot connect. Use a direct number, not one forwarded to Verity.
+            </Text>
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput
               style={[styles.input, styles.inputDisabled]}
@@ -632,6 +654,13 @@ const createAccountStyles = (theme: AppTheme) =>
     },
     inputDisabled: {
       opacity: 0.6,
+    },
+    helpText: {
+      color: theme.colors.textDim,
+      fontSize: 12,
+      lineHeight: 16,
+      marginTop: 2,
+      marginBottom: 2,
     },
     metaRow: {
       flexDirection: 'row',
