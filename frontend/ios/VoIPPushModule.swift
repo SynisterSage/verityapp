@@ -11,7 +11,13 @@ class VoIPPushModule: RCTEventEmitter {
   private let callKitCallController: CXCallController
 
   override init() {
-    let configuration = CXProviderConfiguration(localizedName: "Verity Protect")
+    let configuration: CXProviderConfiguration
+    if #available(iOS 14.0, *) {
+      configuration = CXProviderConfiguration()
+      configuration.localizedName = "Verity Protect"
+    } else {
+      configuration = CXProviderConfiguration(localizedName: "Verity Protect")
+    }
     configuration.supportsVideo = false
     configuration.maximumCallsPerCallGroup = 1
     configuration.supportedHandleTypes = [.phoneNumber]
@@ -29,7 +35,7 @@ class VoIPPushModule: RCTEventEmitter {
   }
 
   override func supportedEvents() -> [String]! {
-    return ["voipPushReceived", "voipTokenUpdated"]
+    return ["voipPushReceived", "voipTokenUpdated", "callAnswered", "callEnded"]
   }
 
   override static func requiresMainQueueSetup() -> Bool {
@@ -170,11 +176,23 @@ extension VoIPPushModule: CXProviderDelegate {
 
   func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
     print("[VoIPPush] User answered call")
+
+    // Notify React Native that the call was answered
+    sendEvent(withName: "callAnswered", body: [
+      "callUUID": action.callUUID.uuidString
+    ])
+
     action.fulfill()
   }
 
   func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
     print("[VoIPPush] User ended call")
+
+    // Notify React Native that the call was ended
+    sendEvent(withName: "callEnded", body: [
+      "callUUID": action.callUUID.uuidString
+    ])
+
     action.fulfill()
   }
 
