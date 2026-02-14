@@ -89,24 +89,30 @@ export async function sendVoIPPush(
     return false;
   }
 
-  // Create notification with MINIMAL configuration for VoIP
-  const notification = new apn.Notification();
+  // For VoIP pushes, we need raw data at root level (no 'aps' wrapper)
+  const notification: any = new apn.Notification();
   notification.topic = `${bundleId}.voip`;
   notification.priority = 10;
   notification.expiry = Math.floor(Date.now() / 1000) + 60;
 
-  // For VoIP pushes, set custom data using notification.payload
-  // Each key in payload becomes a root-level key in the push
-  notification.payload.call_sid = payload.callSid;
-  notification.payload.from_number = payload.fromNumber;
-  notification.payload.to_number = payload.toNumber;
-  notification.payload.call_uuid = payload.callUuid || payload.callSid;
-  notification.payload.profile_id = payload.profileId;
+  // VoIP pushes MUST have data at root level without 'aps' wrapper
+  // Override compile() to return raw payload structure for VoIP
+  const voipPayload = {
+    call_sid: payload.callSid,
+    from_number: payload.fromNumber,
+    to_number: payload.toNumber,
+    call_uuid: payload.callUuid || payload.callSid,
+    profile_id: payload.profileId,
+  };
+
+  notification.compile = function() {
+    return voipPayload;
+  };
 
   const isProduction = process.env.APNS_PRODUCTION === 'true';
   logger.info(`[VoIP] Sending: callSid=${payload.callSid} from=${payload.fromNumber}`);
   logger.info(`[VoIP] Config: token=${voipToken.substring(0, 16)}... env=${isProduction ? 'production' : 'development'} topic=${bundleId}.voip`);
-  logger.info(`[VoIP] Payload: ${JSON.stringify(notification.payload)}`);
+  logger.info(`[VoIP] Raw payload: ${JSON.stringify(voipPayload)}`);
 
   try {
     const result = await provider.send(notification, voipToken);
