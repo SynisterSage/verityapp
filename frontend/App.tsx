@@ -35,6 +35,7 @@ import ConfirmEmailScreen from './src/screens/auth/ConfirmEmailScreen';
 import HomeScreen from './src/screens/dashboard/HomeScreen';
 import CallsScreen from './src/screens/dashboard/CallsScreen';
 import CallDetailScreen from './src/screens/dashboard/CallDetailScreen';
+import ActiveCallScreen from './src/screens/dashboard/ActiveCallScreen';
 import CircleActivityScreen from './src/screens/dashboard/CircleActivityScreen';
 import AlertsScreen from './src/screens/dashboard/AlertsScreen';
 import SettingsScreen from './src/screens/settings/SettingsScreen';
@@ -372,6 +373,11 @@ function RootNavigator() {
               component={SupportResourceScreen}
               options={{ headerShown: false, presentation: 'modal' }}
             />
+            <RootStack.Screen
+              name="ActiveCallModal"
+              component={ActiveCallScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
           </>
         ) : (
           <>
@@ -403,6 +409,11 @@ function RootNavigator() {
             <RootStack.Screen
               name="CircleActivityModal"
               component={CircleActivityScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="ActiveCallModal"
+              component={ActiveCallScreen}
               options={{ headerShown: false, presentation: 'modal' }}
             />
           </>

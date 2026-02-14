@@ -23,6 +23,12 @@ export type RootStackParamList = {
   SupportModal: { ticketId?: string | null; profileId?: string | null; newTicket?: boolean; autoEnd?: boolean };
   SupportResource: { resource: SupportResourceType; title?: string };
   CircleActivityModal: { activities?: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };
+  ActiveCallModal: {
+    callSid?: string;
+    fromNumber?: string | null;
+    toNumber?: string | null;
+    status?: string;
+  };
 };
 
 export type TabParamList = {

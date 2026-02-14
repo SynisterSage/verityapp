@@ -34,3 +34,32 @@ export function navigateToSupportResource(params: SupportResourceParams) {
     rootNavigationRef.navigate('SupportResource', params);
   }
 }
+
+type ActiveCallParams = RootStackParamList['ActiveCallModal'];
+
+export function navigateToActiveCall(params: ActiveCallParams) {
+  if (!rootNavigationRef.isReady()) {
+    return;
+  }
+  const current = rootNavigationRef.getCurrentRoute();
+  if (current?.name === 'ActiveCallModal') {
+    const currentParams = (current.params ?? {}) as ActiveCallParams;
+    const isSameCall =
+      (params.callSid && currentParams.callSid && params.callSid === currentParams.callSid) ||
+      (!params.callSid && !currentParams.callSid);
+    if (isSameCall) {
+      return;
+    }
+  }
+  rootNavigationRef.navigate('ActiveCallModal', params);
+}
+
+export function dismissActiveCall() {
+  if (!rootNavigationRef.isReady()) {
+    return;
+  }
+  const current = rootNavigationRef.getCurrentRoute();
+  if (current?.name === 'ActiveCallModal') {
+    rootNavigationRef.goBack();
+  }
+}

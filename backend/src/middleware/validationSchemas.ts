@@ -107,6 +107,26 @@ export const recordClientHeartbeatSchema = z.object({
   status: z.enum(['active', 'idle', 'away']).optional(),
 });
 
+export const recordClientCallLifecycleSchema = z.object({
+  callSid: z.string().min(4, 'callSid is required'),
+  callUuid: z.string().optional(),
+  direction: z.enum(['incoming', 'outgoing']).optional(),
+  state: z.enum([
+    'ringing',
+    'connecting',
+    'connected',
+    'reconnecting',
+    'disconnected',
+    'failed',
+    'ended',
+  ]),
+  fromNumber: z.string().max(40).optional().nullable(),
+  toNumber: z.string().max(40).optional().nullable(),
+  toClientIdentity: z.string().max(120).optional().nullable(),
+  eventAt: z.string().datetime().optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+});
+
 // Number Assignment Schema
 export const assignNumberSchema = z.object({
   // Optional body - most data comes from URL params and auth
@@ -133,5 +153,6 @@ export type ChangeMemberRoleRequest = z.infer<typeof changeMemberRoleSchema>;
 export type RegisterDeviceTokenRequest = z.infer<typeof registerDeviceTokenSchema>;
 export type CreateClientTokenRequest = z.infer<typeof createClientTokenSchema>;
 export type RecordClientHeartbeatRequest = z.infer<typeof recordClientHeartbeatSchema>;
+export type RecordClientCallLifecycleRequest = z.infer<typeof recordClientCallLifecycleSchema>;
 export type AssignNumberRequest = z.infer<typeof assignNumberSchema>;
 export type CreateSupportMessageRequest = z.infer<typeof createSupportMessageSchema>;

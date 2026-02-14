@@ -20,6 +20,7 @@ import {
   registerDeviceTokenSchema,
   createClientTokenSchema,
   recordClientHeartbeatSchema,
+  recordClientCallLifecycleSchema,
 } from '@src/middleware/validationSchemas';
 
 const router = Router();
@@ -44,6 +45,14 @@ router.patch(PATHS.Profiles.Member, validateRequest(changeMemberRoleSchema), Pro
 router.delete(PATHS.Profiles.Member, ProfileMembersController.removeMember);
 router.post('/:profileId/twilio-client/token', validateRequest(createClientTokenSchema), TwilioClientController.createClientToken);
 router.post('/:profileId/twilio-client/heartbeat', validateRequest(recordClientHeartbeatSchema), TwilioClientController.recordClientHeartbeat);
+router.post(
+  '/:profileId/twilio-client/call-lifecycle',
+  validateRequest(recordClientCallLifecycleSchema),
+  (req, res) => TwilioClientController.recordCallLifecycle(req, res)
+);
+router.get('/:profileId/twilio-client/active-call', (req, res) =>
+  TwilioClientController.getActiveCall(req, res)
+);
 router.post(PATHS.Profiles.DeviceTokens, validateRequest(registerDeviceTokenSchema), ProfileDeviceTokensController.registerDeviceToken);
 router.get(PATHS.Profiles.ProfessionalLookup, ProfessionalLookupController.search);
 
