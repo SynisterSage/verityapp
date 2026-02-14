@@ -384,6 +384,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     const handleIncomingCall = (payload: VoIPPushPayload) => {
       console.info('[VoIPPush] Incoming call from push:', payload);
 
+      // Only navigate if we have a valid callSid (not empty/stale push)
+      if (!payload.callSid || !payload.callSid.trim()) {
+        console.warn('[VoIPPush] Ignoring VoIP push without valid callSid');
+        return;
+      }
+
       // Navigate to active call screen
       navigateToActiveCall({
         callSid: payload.callSid,
