@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '../../context/ThemeContext';
@@ -13,9 +13,10 @@ export type HowItWorksItem = {
 type Props = {
   caption?: string;
   items: HowItWorksItem[];
+  containerStyle?: ViewStyle;
 };
 
-export default function HowItWorksCard({ caption = 'HOW IT WORKS', items }: Props) {
+export default function HowItWorksCard({ caption = 'HOW IT WORKS', items, containerStyle }: Props) {
   const { theme } = useTheme();
   const defaultColor = theme.colors.accent;
   return (
@@ -26,6 +27,7 @@ export default function HowItWorksCard({ caption = 'HOW IT WORKS', items }: Prop
           backgroundColor: theme.colors.surface,
           borderColor: theme.colors.border,
         },
+        containerStyle,
       ]}
     >
       <Text style={[styles.caption, { color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily }]}>

@@ -34,7 +34,7 @@ const PIN_LENGTH = 6;
 const formatDigits = (digits: string[]) => digits.join('');
 
 export default function PasscodeScreen({ navigation }: { navigation: any }) {
-  const { activeProfile, setActiveProfile } = useProfile();
+  const { activeProfile, setActiveProfile, setPasscodeDraft } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createPasscodeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
@@ -173,6 +173,7 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
         method: 'POST',
         body: JSON.stringify({ pin: createValue }),
       });
+      setPasscodeDraft(createValue);
       setActiveProfile({ ...activeProfile, has_passcode: true, safety_pin: createValue });
       logEvent('passcode_setup_completed', { screen: 'Passcode' });
       navigation.navigate('OnboardingTrustedContacts');

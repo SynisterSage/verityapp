@@ -15,10 +15,12 @@ import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
+import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
+import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 
 const PLATFORM_OPTIONS: { value: 'ios' | 'droid' | 'home'; label: string }[] = [
   { value: 'ios', label: 'iOS' },
@@ -53,6 +55,10 @@ export default function OnboardingCallForwardingScreen({ navigation }: { navigat
   const twilioNumber = useMemo(
     () => activeProfile?.twilio_virtual_number ?? '',
     [activeProfile?.twilio_virtual_number]
+  );
+  const fallbackNumber = useMemo(
+    () => activeProfile?.fallback_phone_number ?? '',
+    [activeProfile?.fallback_phone_number]
   );
   const isIOS = Platform.OS === 'ios';
   const [copied, setCopied] = useState(false);
@@ -148,6 +154,12 @@ home: [
     setCopied(true);
   };
 
+  const handleCopyFallback = async () => {
+    if (!fallbackNumber) return;
+    await Clipboard.setStringAsync(fallbackNumber);
+    Haptics.selectionAsync();
+  };
+
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
       <OnboardingHeader chapter="Setup" activeStep={8} totalSteps={9} />
@@ -166,6 +178,27 @@ home: [
             Redirect calls to your Verity number to begin active screening.
           </Text>
         </View>
+
+        <HowItWorksCard
+          caption="HOW REDIRECT WORKS"
+          items={[
+            {
+              icon: 'shield-checkmark',
+              color: theme.colors.success,
+              text: 'People call your regular number. Your carrier sends the call to your Verity number first for screening.',
+            },
+            {
+              icon: 'call-outline',
+              color: theme.colors.accent,
+              text: 'Verity then tries to ring you in the app. If the app is unavailable, Verity uses your fallback number.',
+            },
+            {
+              icon: 'notifications-outline',
+              color: theme.colors.textMuted,
+              text: 'If your app has been inactive for a while, we send you a reminder so calls keep reaching you.',
+            },
+          ]}
+        />
 
         <Pressable
           style={({ pressed }) => [
@@ -192,6 +225,35 @@ home: [
               name={copied ? 'checkmark' : 'copy'}
               size={18}
               color={copied ? theme.colors.success : theme.colors.textMuted}
+            />
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.numberCard,
+            { backgroundColor: theme.colors.surface },
+            pressed && styles.numberCardPressed,
+          ]}
+          onPress={handleCopyFallback}
+        >
+          <View style={[styles.numberIcon, { backgroundColor: theme.colors.warning ?? theme.colors.accent }]}>
+            <Ionicons name="swap-horizontal-outline" size={18} color={theme.colors.surface} />
+          </View>
+          <View style={styles.numberText}>
+            <Text style={styles.numberLabel}>Reliable fallback number</Text>
+            <Text style={[styles.numberValue, !fallbackNumber && styles.missingValue]} numberOfLines={1}>
+              {fallbackNumber ? formatPhoneNumber(fallbackNumber, fallbackNumber) : 'Not set'}
+            </Text>
+            <Text style={styles.numberHint}>
+              {fallbackNumber ? 'Used if app calling is unavailable. Tap to copy.' : 'Set this in Profile setup or Settings → Account.'}
+            </Text>
+          </View>
+          <View style={styles.copyCircle}>
+            <Ionicons
+              name={fallbackNumber ? 'copy' : 'alert-circle-outline'}
+              size={18}
+              color={fallbackNumber ? theme.colors.textMuted : theme.colors.warning ?? theme.colors.textMuted}
             />
           </View>
         </Pressable>

@@ -7,6 +7,7 @@ import {
   View,
   Pressable,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -61,7 +62,7 @@ const formatFullPhone = (phoneNumber: string) => {
 
 export default function CreateProfileScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
-  const { activeProfile, setActiveProfile, setOnboardingComplete, refreshProfiles } = useProfile();
+  const { activeProfile, setActiveProfile, setOnboardingComplete } = useProfile();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -73,6 +74,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const phoneRef = useRef<TextInput | null>(null);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showCallFlowModal, setShowCallFlowModal] = useState(false);
   const { theme } = useTheme();
   const styles = useMemo(() => createProfileStyles(theme), [theme]);
   const placeholderColor = withOpacity(theme.colors.textMuted, 0.7);
@@ -149,13 +151,14 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
       
       if (response?.phoneNumber) {
         setAssignedNumber(response.phoneNumber);
-        // Update activeProfile with the assigned number
-        const updatedProfile = {
-          ...(activeProfile || {}),
-          id: profileId,
-          twilio_virtual_number: response.phoneNumber,
-        } as any;
-        setActiveProfile(updatedProfile);
+        // Pull a fresh profile snapshot without triggering global loading/navigation reset.
+        const profilesData = await authorizedFetch('/profiles');
+        const refreshedProfiles = (profilesData?.profiles ?? []) as Array<Record<string, any>>;
+        const refreshedProfile =
+          refreshedProfiles.find((profile) => profile.id === profileId) ?? null;
+        if (refreshedProfile) {
+          setActiveProfile(refreshedProfile as any);
+        }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
       } else {
         throw new Error('No phone number returned');
@@ -186,17 +189,20 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
     }
   };
 
-  const handleContinue = async () => {
-    if (!assignedNumber) {
-      setError('Please assign a Verity number first.');
-      return;
-    }
-    
-    // Reset navigation stack to prevent going back to profile creation
+  const proceedToPasscode = () => {
     navigation.reset({
       index: 0,
       routes: [{ name: 'OnboardingPasscode' }],
     });
+  };
+
+  const handleContinue = () => {
+    if (!assignedNumber) {
+      setError('Please assign a Verity number first.');
+      return;
+    }
+
+    setShowCallFlowModal(true);
   };
 
   const renderScrollContent = () => (
@@ -321,17 +327,17 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
                 {
                   icon: 'shield-checkmark',
                   color: theme.colors.success,
-                  text: 'Your Verity number lets us screen incoming calls before they reach you.',
+                  text: 'When someone calls your Verity number, we screen the call first to protect you from scams.',
                 },
                 {
                   icon: 'call-outline',
                   color: theme.colors.accent,
-                  text: 'It is not a replacement number; your phone stays the same while Verity guards the line.',
+                  text: 'If your app is ready, we ring you in the app first. If the app is unavailable, we call your fallback number.',
                 },
                 {
                   icon: 'settings-outline',
                   color: theme.colors.textMuted,
-                  text: 'In a bit, we will show you how to connect it to your Mobile number.',
+                  text: 'Use a direct fallback number that does not forward back to Verity, so calls never loop.',
                 },
               ]}
             />
@@ -394,6 +400,40 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           onPrimaryPress={handleContinue}
           primaryDisabled={primaryDisabled}
         />
+        <Modal visible={showCallFlowModal} transparent animationType="none" onRequestClose={() => setShowCallFlowModal(false)}>
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalCard}>
+              <Text style={styles.modalTitle}>How your calls will work</Text>
+              <Text style={styles.modalBody}>
+                Calls to your Verity number are screened first, then sent to you in the safest way.
+              </Text>
+
+              <View style={styles.modalRow}>
+                <Ionicons name="shield-checkmark" size={18} color={theme.colors.success} />
+                <Text style={styles.modalRowText}>We try your Verity app first for the best protection.</Text>
+              </View>
+              <View style={styles.modalRow}>
+                <Ionicons name="call-outline" size={18} color={theme.colors.accent} />
+                <Text style={styles.modalRowText}>If the app is unavailable, we call your fallback number.</Text>
+              </View>
+              <View style={styles.modalRow}>
+                <Ionicons name="notifications-outline" size={18} color={theme.colors.textMuted} />
+                <Text style={styles.modalRowText}>
+                  If your app has been inactive for a while, we send a reminder so your line stays ready.
+                </Text>
+              </View>
+
+              <View style={styles.modalActions}>
+                <Pressable style={styles.modalSecondaryButton} onPress={() => setShowCallFlowModal(false)}>
+                  <Text style={styles.modalSecondaryText}>Back</Text>
+                </Pressable>
+                <Pressable style={styles.modalPrimaryButton} onPress={proceedToPasscode}>
+                  <Text style={styles.modalPrimaryText}>Got it, continue</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -514,5 +554,81 @@ const createProfileStyles = (theme: AppTheme) =>
     keyboardAvoiding: {
       flex: 1,
       width: '100%',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: withOpacity(theme.colors.bg, 0.72),
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+    modalCard: {
+      borderRadius: 28,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 20,
+      paddingVertical: 22,
+      gap: 12,
+    },
+    modalTitle: {
+      color: theme.colors.text,
+      fontSize: 22,
+      fontWeight: '700',
+      textAlign: 'center',
+    },
+    modalBody: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: 'center',
+      marginBottom: 2,
+    },
+    modalRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+      backgroundColor: withOpacity(theme.colors.surface, 0.7),
+      borderRadius: 16,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    modalRowText: {
+      flex: 1,
+      color: theme.colors.text,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    modalSecondaryButton: {
+      flex: 1,
+      height: 46,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.surface, 0.55),
+    },
+    modalSecondaryText: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    modalPrimaryButton: {
+      flex: 1,
+      height: 46,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.accent,
+    },
+    modalPrimaryText: {
+      color: '#FFFFFF',
+      fontSize: 14,
+      fontWeight: '700',
     },
   });

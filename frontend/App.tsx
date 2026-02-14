@@ -321,7 +321,7 @@ function RootNavigator() {
             <RootStack.Screen
               name="OnboardingPasscode"
               component={PasscodeScreen}
-              options={{ headerShown: false }}
+              options={{ headerShown: false, animation: 'none' }}
             />
             <RootStack.Screen
               name="OnboardingTrustedContacts"

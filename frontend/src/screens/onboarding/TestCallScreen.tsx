@@ -1,9 +1,11 @@
 import { StyleSheet, Text, View, ScrollView, Pressable } from 'react-native';
-import { useLayoutEffect, useMemo } from 'react';
+import { useCallback, useLayoutEffect, useMemo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { authorizedFetch } from '../../services/backend';
 
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -12,16 +14,18 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
+import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 
 export default function TestCallScreen({ navigation }: { navigation: any }) {
-  const { activeProfile, refreshProfiles, setOnboardingComplete, setRedirectToSettings } =
+  const { activeProfile, passcodeDraft, setActiveProfile, setRedirectToSettings } =
     useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createTestCallStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
 
   const twilioNumber = activeProfile?.twilio_virtual_number ?? '';
-  const passcode = (activeProfile as any)?.safety_pin ?? '';
+  const redirectNumber = activeProfile?.fallback_phone_number ?? '';
+  const passcode = (activeProfile as any)?.safety_pin ?? passcodeDraft ?? '';
 
   const finishOnboarding = () => {
     setRedirectToSettings(false);
@@ -40,9 +44,38 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
     Haptics.selectionAsync();
   };
 
+  const handleCopyRedirectNumber = async () => {
+    if (!redirectNumber) return;
+    await Clipboard.setStringAsync(redirectNumber);
+    Haptics.selectionAsync();
+  };
+
   useLayoutEffect(() => {
     navigation.setOptions({ headerShown: false });
   }, [navigation]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+      const reloadActiveProfile = async () => {
+        if (!activeProfile?.id) return;
+        try {
+          const data = await authorizedFetch('/profiles');
+          const profiles = (data?.profiles ?? []) as Array<Record<string, any>>;
+          const refreshed = profiles.find((profile) => profile.id === activeProfile.id);
+          if (isActive && refreshed) {
+            setActiveProfile(refreshed as any);
+          }
+        } catch {
+          // keep local profile if refresh fails
+        }
+      };
+      void reloadActiveProfile();
+      return () => {
+        isActive = false;
+      };
+    }, [activeProfile?.id, setActiveProfile])
+  );
 
   const helperItems = useMemo(
     () => [
@@ -98,6 +131,27 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
             <Text style={styles.infoLabel}>Verity Number</Text>
             <Text style={styles.infoValue}>
               {twilioNumber || 'Configure in settings'}
+            </Text>
+          </View>
+          <View style={styles.copyIcon}>
+            <Ionicons name="copy-outline" size={18} color={theme.colors.textMuted} />
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.infoCard,
+            pressed && styles.infoCardPressed,
+          ]}
+          onPress={handleCopyRedirectNumber}
+        >
+          <View style={[styles.iconCircle, { backgroundColor: theme.colors.warning ?? theme.colors.accent }]}>
+            <Ionicons name="swap-horizontal-outline" size={20} color={theme.colors.surface} />
+          </View>
+          <View style={styles.infoContent}>
+            <Text style={styles.infoLabel}>Redirect Number</Text>
+            <Text style={styles.infoValue}>
+              {redirectNumber ? formatPhoneNumber(redirectNumber, redirectNumber) : 'Not set'}
             </Text>
           </View>
           <View style={styles.copyIcon}>

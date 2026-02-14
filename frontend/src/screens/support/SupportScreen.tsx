@@ -71,6 +71,11 @@ const QUICK_PROMPTS = [
       'How do I forward or pair the Verity Protect number to my phone/paired device so the calls ring through smoothly?',
   },
   {
+    label: 'Fallback calls',
+    message:
+      'Explain app-first and fallback calling in plain English, and help me choose the right fallback number so calls never loop.',
+  },
+  {
     label: 'General question',
     message: 'Something else about alerts, devices, or account settings—walk me through it.',
   },

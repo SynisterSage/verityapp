@@ -21,6 +21,8 @@ export const SYSTEM_BASICS_CONTENT: ResourceSection[] = [
       'Each profile pairs with a Twilio number. We record, analyze, and forward suspect calls, while also sending low-latency alerts to your phone. Add that number to your contacts so calls feel like a normal call from a trusted helper.',
     bullets: [
       'Link the Twilio number inside Settings → Paired Devices to see what hardware is listening.',
+      'Verity rings your app first. If the app is unavailable, Verity calls your reliable fallback number.',
+      'Set your fallback number to a direct number (not call-forwarded back to Verity) to prevent looped calls.',
       'If you answer through the Twilio number, Verity automatically logs duration, transcription, and risk scores.',
       'Lost your phone? Remove the device from the list so it stops receiving alerts and recordings.',
     ],
@@ -175,6 +177,17 @@ export const PRIVACY_CONTENT: ResourceSection[] = [
 ];
 
 export const FAQ_CONTENT: ResourceSection[] = [
+  {
+    id: 'faq-fallback',
+    title: 'How does call fallback work?',
+    body:
+      'Verity tries to ring your app first. If your app is not reachable, Verity calls your fallback number so trusted callers can still reach you.',
+    bullets: [
+      'Set your fallback number in Profile setup or Settings → Account.',
+      'Use a direct number only. Do not use a number that forwards back to your Verity line.',
+      'If you change phones or carriers, update your fallback number right away.',
+    ],
+  },
   {
     id: 'faq-response-time',
     title: 'When will I hear back?',

@@ -34,8 +34,11 @@ type SafetyActionKey = 'logout' | 'delete';
 
 const normalizePhoneDigits = (value = '') => {
   const digits = value.replace(/\D/g, '');
+  if (digits.length > 10 && digits.startsWith('1')) {
+    return digits.slice(1, 11);
+  }
   if (digits.length > 10) {
-    return digits.slice(-10);
+    return digits.slice(0, 10);
   }
   return digits;
 };
@@ -104,6 +107,7 @@ export default function AccountScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [safetyMessage, setSafetyMessage] = useState('');
   const lastPhoneKey = useRef<string | null>(null);
+  const lastFallbackPhoneKey = useRef<string | null>(null);
 
   useEffect(() => {
     if (!activeProfile) return;
@@ -127,11 +131,11 @@ export default function AccountScreen() {
   }, [activeProfile, firstName, lastName, phoneDigits, fallbackPhoneDigits]);
 
   const formattedPhone = useMemo(
-    () => (phoneDigits ? `+1 ${formatPhoneNumber(phoneDigits)}` : ''),
+    () => (phoneDigits ? formatPhoneNumber(phoneDigits) : ''),
     [phoneDigits]
   );
   const formattedFallbackPhone = useMemo(
-    () => (fallbackPhoneDigits ? `+1 ${formatPhoneNumber(fallbackPhoneDigits)}` : ''),
+    () => (fallbackPhoneDigits ? formatPhoneNumber(fallbackPhoneDigits) : ''),
     [fallbackPhoneDigits]
   );
 
@@ -147,6 +151,20 @@ export default function AccountScreen() {
 
   const handlePhoneKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
     lastPhoneKey.current = nativeEvent.key;
+  };
+
+  const handleFallbackPhoneChange = (value: string) => {
+    const digits = normalizePhoneDigits(value);
+    if (lastFallbackPhoneKey.current === 'Backspace' && digits.length === fallbackPhoneDigits.length) {
+      setFallbackPhoneDigits((prev) => prev.slice(0, -1));
+    } else {
+      setFallbackPhoneDigits(digits);
+    }
+    lastFallbackPhoneKey.current = null;
+  };
+
+  const handleFallbackPhoneKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
+    lastFallbackPhoneKey.current = nativeEvent.key;
   };
 
   const profileId = activeProfile?.id;
@@ -349,26 +367,33 @@ export default function AccountScreen() {
               editable={!isReadOnly}
             />
             <Text style={styles.inputLabel}>Recipient phone</Text>
-            <TextInput
-              style={[styles.input, isReadOnly && styles.inputDisabled]}
-              value={formattedPhone}
-              onChangeText={handlePhoneChange}
-              onKeyPress={handlePhoneKeyPress}
-              placeholder="+1 (000) 000-0000"
-              placeholderTextColor={theme.colors.textDim}
-              keyboardType="phone-pad"
-              editable={!isReadOnly}
-            />
+            <View style={[styles.inputWithPrefix, isReadOnly && styles.inputDisabled]}>
+              <Text style={styles.prefixText}>+1</Text>
+              <TextInput
+                style={styles.inputPrefixed}
+                value={formattedPhone}
+                onChangeText={handlePhoneChange}
+                onKeyPress={handlePhoneKeyPress}
+                placeholder="(000) 000-0000"
+                placeholderTextColor={theme.colors.textDim}
+                keyboardType="phone-pad"
+                editable={!isReadOnly}
+              />
+            </View>
             <Text style={styles.inputLabel}>Reliable fallback number</Text>
-            <TextInput
-              style={[styles.input, isReadOnly && styles.inputDisabled]}
-              value={formattedFallbackPhone}
-              onChangeText={(value) => setFallbackPhoneDigits(normalizePhoneDigits(value))}
-              placeholder="+1 (000) 000-0000"
-              placeholderTextColor={theme.colors.textDim}
-              keyboardType="phone-pad"
-              editable={!isReadOnly}
-            />
+            <View style={[styles.inputWithPrefix, isReadOnly && styles.inputDisabled]}>
+              <Text style={styles.prefixText}>+1</Text>
+              <TextInput
+                style={styles.inputPrefixed}
+                value={formattedFallbackPhone}
+                onChangeText={handleFallbackPhoneChange}
+                onKeyPress={handleFallbackPhoneKeyPress}
+                placeholder="(000) 000-0000"
+                placeholderTextColor={theme.colors.textDim}
+                keyboardType="phone-pad"
+                editable={!isReadOnly}
+              />
+            </View>
             <Text style={styles.helpText}>
               Used if the in-app call cannot connect. Use a direct number, not one forwarded to Verity.
             </Text>
@@ -651,6 +676,26 @@ const createAccountStyles = (theme: AppTheme) =>
       justifyContent: 'center',
       color: theme.colors.text,
       backgroundColor: theme.colors.surface,
+    },
+    inputWithPrefix: {
+      height: 60,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      borderRadius: 24,
+      paddingHorizontal: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surface,
+      gap: 8,
+    },
+    prefixText: {
+      color: theme.colors.textMuted,
+      fontWeight: '600',
+    },
+    inputPrefixed: {
+      flex: 1,
+      height: '100%',
+      color: theme.colors.text,
     },
     inputDisabled: {
       opacity: 0.6,
