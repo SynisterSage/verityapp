@@ -42,14 +42,21 @@ export default function ActiveCallScreen() {
 
   const [muted, setMuted] = useState(false);
   const [speakerOn, setSpeakerOn] = useState(false);
-  const [connectedAt] = useState(() => Date.now());
+  const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [elapsedLabel, setElapsedLabel] = useState('0:00');
   const [trustedDisplayName, setTrustedDisplayName] = useState<string | null>(null);
   const ringPulse = useRef(new Animated.Value(0)).current;
   const statusPulse = useRef(new Animated.Value(0)).current;
 
   const fromNumber = route.params?.fromNumber ?? '';
-  const status = route.params?.status || 'Connected';
+  const status = route.params?.status || 'Ringing';
+
+  // Start timer when call connects
+  useEffect(() => {
+    if (status === 'Connected' && !connectedAt) {
+      setConnectedAt(Date.now());
+    }
+  }, [status, connectedAt]);
   const callerTitle = trustedDisplayName || fromNumber || 'Active Call';
   const callerSubtitle = trustedDisplayName && fromNumber ? fromNumber : 'Protected line';
   const initials = useMemo(() => {
@@ -59,6 +66,10 @@ export default function ActiveCallScreen() {
   }, [callerTitle]);
 
   useEffect(() => {
+    if (!connectedAt) {
+      setElapsedLabel('0:00');
+      return;
+    }
     const interval = setInterval(() => {
       setElapsedLabel(formatElapsed(Date.now() - connectedAt));
     }, 1000);
@@ -230,7 +241,6 @@ export default function ActiveCallScreen() {
 
         <View style={styles.controlsGrid}>
           {renderControl('mute', muted ? 'mic-off' : 'mic', 'MUTE', muted, toggleMute)}
-          {renderControl('keypad', 'grid', 'KEYPAD', false, () => {})}
           {renderControl(
             'speaker',
             speakerOn ? 'volume-high' : 'volume-medium',
@@ -238,9 +248,6 @@ export default function ActiveCallScreen() {
             speakerOn,
             toggleSpeaker
           )}
-          {renderControl('invite', 'person-add', 'INVITE', false, () => {})}
-          {renderControl('security', 'shield-checkmark', 'SECURITY', false, () => {})}
-          {renderControl('help', 'help-buoy', 'HELP', false, () => {})}
         </View>
       </View>
 
@@ -363,11 +370,9 @@ const createStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
       letterSpacing: 1,
     },
     controlsGrid: {
-      width: 250,
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      columnGap: 22,
-      rowGap: 20,
+      justifyContent: 'center',
+      gap: 32,
     },
     controlSlot: {
       width: 68,

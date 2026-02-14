@@ -1,4 +1,4 @@
-import { AppState } from 'react-native';
+import { AppState, Platform, NativeModules, NativeEventEmitter } from 'react-native';
 import { useEffect, useRef } from 'react';
 import TwilioVoice from 'react-native-twilio-programmable-voice';
 
@@ -10,6 +10,8 @@ import {
   TwilioClientCallLifecycleState,
 } from '../../services/twilioClient';
 import { dismissActiveCall, navigateToActiveCall } from '../../navigation/rootNavigator';
+
+const { VoIPPushModule } = NativeModules;
 
 type TwilioEventData = {
   call_sid?: string;
@@ -303,6 +305,35 @@ export default function TwilioVoiceClientManager() {
       });
     };
   }, [activeProfile?.id, refreshTwilioClientSession, twilioClientIdentity]);
+
+  // Listen for CallKit answer events (iOS only)
+  useEffect(() => {
+    if (Platform.OS !== 'ios' || !VoIPPushModule) {
+      return;
+    }
+
+    const voipEmitter = new NativeEventEmitter(VoIPPushModule);
+
+    const handleCallAnswered = (data: { callUUID: string }) => {
+      console.info('[twilio-voice] CallKit answer detected, accepting Twilio call:', data.callUUID);
+      // TwilioVoice will automatically accept the incoming call when CallKit answer is detected
+      // The native Twilio SDK is configured to work with CallKit
+      TwilioVoice.accept();
+    };
+
+    const handleCallEnded = (data: { callUUID: string }) => {
+      console.info('[twilio-voice] CallKit end detected:', data.callUUID);
+      TwilioVoice.disconnect();
+    };
+
+    const answerListener = voipEmitter.addListener('callAnswered', handleCallAnswered);
+    const endListener = voipEmitter.addListener('callEnded', handleCallEnded);
+
+    return () => {
+      answerListener.remove();
+      endListener.remove();
+    };
+  }, []);
 
   useEffect(() => {
     const listener = AppState.addEventListener('change', (nextState: string) => {
