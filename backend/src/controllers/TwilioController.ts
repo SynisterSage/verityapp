@@ -253,8 +253,8 @@ async function bridgeToProfile(
       });
 
       const clientIdentity = getClientIdentity(profile);
-      // If VoIP push was sent, pause 3 seconds to let app wake up and register
-      const pauseDuration = voipPushSent ? 3 : 0;
+      // If VoIP push was sent, pause 5 seconds to let app wake up and register
+      const pauseDuration = voipPushSent ? 5 : 0;
       appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
       return `client=${clientIdentity} (loop-avoidance)`;
     }
@@ -566,8 +566,8 @@ async function verifyPin(req: Request, res: Response) {
       logger.info(
         `Dialing client=${clientIdentity} callerId=${outboundCallerId}`
       );
-      // If VoIP push was sent, pause 3 seconds to let app wake up and register
-      const pauseDuration = voipPushSent ? 3 : 0;
+      // If VoIP push was sent, pause 5 seconds to let app wake up and register
+      const pauseDuration = voipPushSent ? 5 : 0;
       appendClientBridge(
         twimlResponse,
         dialStatusUrl,
