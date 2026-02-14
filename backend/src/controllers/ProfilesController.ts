@@ -20,6 +20,87 @@ import { sanitizeProfile, sanitizeProfiles, sanitizeErrorResponse } from '@src/m
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];
 
+const SETUP_TICKET_ID = 'setup-help';
+const SETUP_TICKET_SUBJECT = 'Onboarding support';
+
+async function migrateSetupSupportToProfile(userId: string, profileId: string) {
+  const { count: profileCount } = await supabaseAdmin
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('caretaker_id', userId);
+
+  // Only merge for the user's first profile to avoid duplicating setup chat across profiles.
+  if ((profileCount ?? 0) !== 1) {
+    return;
+  }
+
+  const { data: setupMessages, error: setupError } = await supabaseAdmin
+    .from('support_setup_messages')
+    .select('id, email_snapshot, sender, content, category, metadata, is_read_by_user, is_read_by_agent, created_at')
+    .eq('user_id', userId)
+    .is('merged_profile_id', null)
+    .order('created_at', { ascending: true });
+
+  if (setupError) {
+    logger.err(setupError);
+    return;
+  }
+  if (!setupMessages || setupMessages.length === 0) {
+    return;
+  }
+
+  const rowsToInsert = setupMessages.map((message) => {
+    const sourceMetadata = (message.metadata ?? {}) as Record<string, unknown>;
+    const ticketId =
+      typeof sourceMetadata.ticketId === 'string' && sourceMetadata.ticketId.trim().length > 0
+        ? sourceMetadata.ticketId
+        : SETUP_TICKET_ID;
+    const ticketSubject =
+      typeof sourceMetadata.ticketSubject === 'string' && sourceMetadata.ticketSubject.trim().length > 0
+        ? sourceMetadata.ticketSubject
+        : SETUP_TICKET_SUBJECT;
+
+    return {
+      profile_id: profileId,
+      sender: message.sender,
+      content: message.content,
+      category: message.category ?? null,
+      metadata: {
+        ...sourceMetadata,
+        ticketId,
+        ticketSubject,
+        source: 'pre_profile',
+        setupMessageId: message.id,
+        setupEmailSnapshot: message.email_snapshot ?? null,
+      },
+      is_read_by_user: Boolean(message.is_read_by_user),
+      is_read_by_agent: Boolean(message.is_read_by_agent),
+      created_at: message.created_at,
+    };
+  });
+
+  const { error: insertError } = await supabaseAdmin
+    .from('support_messages')
+    .insert(rowsToInsert);
+  if (insertError) {
+    logger.err(insertError);
+    return;
+  }
+
+  const setupIds = setupMessages.map((row) => row.id);
+  const { error: markError } = await supabaseAdmin
+    .from('support_setup_messages')
+    .update({
+      merged_profile_id: profileId,
+      merged_at: new Date().toISOString(),
+    })
+    .in('id', setupIds);
+
+  if (markError) {
+    logger.err(markError);
+  }
+}
+
 function sanitizeProfileRow(row: Record<string, any>): Record<string, any> {
   if (!row) {
     return row;
@@ -130,6 +211,12 @@ async function createProfile(req: Request, res: Response) {
   if (error || !data) {
     logger.err(error ?? new Error('Failed to create profile'));
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to create profile' });
+  }
+
+  try {
+    await migrateSetupSupportToProfile(userId, data.id);
+  } catch (mergeError) {
+    logger.err(mergeError);
   }
 
   return res.status(HTTP_STATUS_CODES.Created).json({
