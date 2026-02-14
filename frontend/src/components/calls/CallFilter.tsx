@@ -24,9 +24,10 @@ type CallFilterProps = {
   value: CallFilterKey;
   onChange: (value: CallFilterKey) => void;
   style?: StyleProp<ViewStyle>;
+  showBottomScrim?: boolean;
 };
 
-export default function CallFilter({ value, onChange, style }: CallFilterProps) {
+export default function CallFilter({ value, onChange, style, showBottomScrim = false }: CallFilterProps) {
   const { theme } = useTheme();
   const activeStyles = useMemo(
     () =>
@@ -49,6 +50,15 @@ export default function CallFilter({ value, onChange, style }: CallFilterProps) 
         },
       }) as Record<CallFilterKey, ActiveStyle>,
     [theme]
+  );
+  const scrimColors = useMemo(
+    () =>
+      [
+        withOpacity(theme.colors.bg, 0.92),
+        withOpacity(theme.colors.bg, 0.18),
+        withOpacity(theme.colors.bg, 0),
+      ] as const,
+    [theme.colors.bg]
   );
 
   const handlePress = (option: CallFilterKey) => {
@@ -101,6 +111,7 @@ export default function CallFilter({ value, onChange, style }: CallFilterProps) 
 
 const styles = StyleSheet.create({
   container: {
+    position: 'relative',
     borderRadius: 22,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.08)',

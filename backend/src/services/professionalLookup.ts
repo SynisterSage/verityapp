@@ -172,6 +172,9 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
     if (mode === 'person' && nameParts.length >= 2) {
       params.set('first_name', nameParts[0]);
       params.set('last_name', nameParts.slice(1).join(' '));
+    } else if (mode === 'person' && nameParts.length === 1) {
+      // NPI registry UI commonly searches by last name + postal code.
+      params.set('last_name', nameParts[0]);
     }
     return params;
   };
@@ -196,7 +199,7 @@ async function fetchProviders(options: LookupOptions): Promise<ProfessionalLooku
 
   try {
     const candidateModes: NameMode[] = trimmedName
-      ? (nameParts.length >= 2 ? ['organization', 'person', 'none'] : ['organization', 'none'])
+      ? (nameParts.length >= 2 ? ['organization', 'person', 'none'] : ['person', 'organization', 'none'])
       : ['none'];
 
     let selectedBody: { result_count?: number; results?: any[] } = { results: [], result_count: 0 };

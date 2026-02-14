@@ -18,6 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { authorizedFetch } from '../../services/backend';
 import AlertCard from '../../components/alerts/AlertCard';
 import EmptyState from '../../components/common/EmptyState';
@@ -108,6 +109,15 @@ export default function AlertsScreen() {
   const [isTrayMounted, setIsTrayMounted] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
   const [trayProcessing, setTrayProcessing] = useState(false);
+  const topScrimColors = useMemo(
+    () =>
+      [
+        withOpacity(theme.colors.bg, 0.92),
+        withOpacity(theme.colors.bg, 0.18),
+        withOpacity(theme.colors.bg, 0),
+      ] as const,
+    [theme.colors.bg]
+  );
   const [activeTrayAction, setActiveTrayAction] = useState<'delete' | null>(null);
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
@@ -1068,6 +1078,7 @@ const loadMemberNames = useCallback(async () => {
         />
       </View>
       <View style={styles.listWrapper}>
+        <LinearGradient colors={topScrimColors} style={styles.topScrim} pointerEvents="none" />
         <ScrollView
           ref={listRef}
           contentContainerStyle={[
@@ -1194,6 +1205,14 @@ const createAlertStyles = (theme: AppTheme) =>
       flex: 1,
       position: 'relative',
       paddingTop: 0,
+    },
+    topScrim: {
+      position: 'absolute',
+      left: -24,
+      right: -24,
+      top: 0,
+      height: 56,
+      zIndex: 2,
     },
     scrollContent: {
       flexGrow: 1,

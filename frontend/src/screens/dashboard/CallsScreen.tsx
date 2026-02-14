@@ -794,14 +794,16 @@ const sections = useMemo<CallSection[]>(() => {
         title="Recent Calls"
         subtitle={`${headerCount} calls logged`}
         align="left"
+        showScrim={false}
         supportAction={{
           onPress: handleSupportPress,
           unreadCount: unreadAgentCount,
         }}
       />
       <View style={styles.filterBar}>
-        <CallFilter value={filter} onChange={setFilter} />
+        <CallFilter value={filter} onChange={setFilter} showBottomScrim />
       </View>
+      <View style={styles.listWrapper}>
         <SectionList<CallRow, CallSection>
           ref={listRef}
           sections={showTrustedOnly ? [] : sections}
@@ -873,7 +875,8 @@ const sections = useMemo<CallSection[]>(() => {
             </View>
           )
         }
-      />
+        />
+      </View>
       <Modal
         visible={isTrayMounted && Boolean(trayCall)}
         transparent
@@ -1064,6 +1067,11 @@ const createCallStyles = (theme: AppTheme) =>
       flex: 1,
       backgroundColor: theme.colors.bg,
     },
+    listWrapper: {
+      flex: 1,
+      position: 'relative',
+      zIndex: 1,
+    },
     list: {
       flex: 1,
     },
@@ -1071,6 +1079,9 @@ const createCallStyles = (theme: AppTheme) =>
       paddingTop: 12,
     },
     filterBar: {
+      position: 'relative',
+      zIndex: 4,
+      overflow: 'visible',
       marginTop: 20,
       marginBottom: 12,
       width: '100%',
@@ -1210,7 +1221,7 @@ const createCallStyles = (theme: AppTheme) =>
       paddingHorizontal: 0,
     },
     emptyStateWrapTrusted: {
-      marginTop: 40,
+      marginTop: 100,
     },
     skeletonList: {
       marginTop: 24,

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -424,6 +425,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     : 'Managed in settings';
 
   const bottomGap = Math.max(insets.bottom, 0) + 20;
+  const topScrimColors = useMemo(
+    () =>
+      [
+        withOpacity(theme.colors.bg, 0.92),
+        withOpacity(theme.colors.bg, 0.18),
+        withOpacity(theme.colors.bg, 0),
+      ] as const,
+    [theme.colors.bg]
+  );
 
   const handleViewAllPress = () => {
     triggerLightHaptic();
@@ -446,19 +456,21 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         />
       </View>
 
+      <View style={styles.scrollContainer}>
+        <LinearGradient colors={topScrimColors} style={styles.topScrim} pointerEvents="none" />
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={[styles.content, { paddingBottom: bottomGap + 40 }]}
           showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => loadStats(true)}
-            tintColor={refreshControlProps.tintColor}
-            colors={refreshControlProps.colors}
-            progressBackgroundColor={refreshControlProps.progressBackgroundColor}
-          />
-        }
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => loadStats(true)}
+              tintColor={refreshControlProps.tintColor}
+              colors={refreshControlProps.colors}
+              progressBackgroundColor={refreshControlProps.progressBackgroundColor}
+            />
+          }
         >
         {showSkeleton ? (
           <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>
@@ -630,7 +642,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <NeedAssistanceCard onPress={navigateToSupportPortal} />
           </View>
         </View>
-      </ScrollView>
+        </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -641,6 +654,18 @@ const createStyles = (theme: AppTheme) =>
       flex: 1,
       paddingHorizontal: 24,
       backgroundColor: theme.colors.bg,
+    },
+    scrollContainer: {
+      flex: 1,
+      position: 'relative',
+    },
+    topScrim: {
+      position: 'absolute',
+      left: -24,
+      right: -24,
+      top: 0,
+      height: 56,
+      zIndex: 2,
     },
     content: {
       paddingTop: 12,

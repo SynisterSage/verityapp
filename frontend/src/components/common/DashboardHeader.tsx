@@ -10,6 +10,7 @@ type DashboardHeaderProps = {
   subtitle?: string;
   right?: ReactNode;
   align?: 'left' | 'center';
+  showScrim?: boolean;
   supportAction?: {
     onPress: () => void;
     unreadCount?: number;
@@ -22,6 +23,7 @@ export default function DashboardHeader({
   subtitle,
   right,
   align = 'left',
+  showScrim = true,
   supportAction,
 }: DashboardHeaderProps) {
   const { theme } = useTheme();
@@ -85,7 +87,9 @@ export default function DashboardHeader({
           <View style={styles.spacer} />
         )}
       </View>
-      <LinearGradient colors={gradientColors} style={styles.gradient} pointerEvents="none" />
+      {showScrim ? (
+        <LinearGradient colors={gradientColors} style={styles.gradient} pointerEvents="none" />
+      ) : null}
     </View>
   );
 }

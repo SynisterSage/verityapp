@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -70,6 +71,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
   const [currentQuery, setCurrentQuery] = useState('');
   const [savingProviderId, setSavingProviderId] = useState<string | null>(null);
   const [deletingTrustedId, setDeletingTrustedId] = useState<string | null>(null);
+  const trustedShimmer = useRef(new Animated.Value(0.45)).current;
   const scrollViewRef = useRef<ScrollView>(null);
   const [canLoadMore, setCanLoadMore] = useState(false);
   const [lastPageSize, setLastPageSize] = useState(0);
@@ -77,16 +79,24 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
 
   const fetchTrusted = useCallback(async () => {
     if (!activeProfile?.id) {
+      setTrusted([]);
+      setLoadingTrusted(false);
       return;
     }
     setLoadingTrusted(true);
-    const professionals = await listTrustedProfessionals(activeProfile.id);
-    setTrusted(professionals);
-    setLoadingTrusted(false);
+    try {
+      const professionals = await listTrustedProfessionals(activeProfile.id);
+      setTrusted(professionals);
+    } catch (err) {
+      console.error('Doctor lookup trusted list error', err);
+      setTrusted([]);
+    } finally {
+      setLoadingTrusted(false);
+    }
   }, [activeProfile?.id]);
 
-  useMemo(() => {
-    fetchTrusted();
+  useEffect(() => {
+    void fetchTrusted();
   }, [fetchTrusted]);
 
   const executeLookup = useCallback(
@@ -297,6 +307,28 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
 
   const trustedSkeletonRows = useMemo(() => Array.from({ length: 3 }, (_, index) => `trusted-skeleton-${index}`), []);
   const showTrustedSkeleton = loadingTrusted && doctorTrusted.length === 0;
+  useEffect(() => {
+    if (!showTrustedSkeleton) {
+      trustedShimmer.setValue(0.45);
+      return;
+    }
+    const shimmerLoop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(trustedShimmer, {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+        Animated.timing(trustedShimmer, {
+          toValue: 0.45,
+          duration: 900,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    shimmerLoop.start();
+    return () => shimmerLoop.stop();
+  }, [showTrustedSkeleton, trustedShimmer]);
   const trustedSection = useMemo(
     () => (
       <View style={[styles.trustedWrapper, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
@@ -309,10 +341,16 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
         {showTrustedSkeleton ? (
           <View style={styles.trustedSkeletonList}>
             {trustedSkeletonRows.map((key) => (
-              <View key={key} style={[styles.trustedSkeletonCard, { backgroundColor: withOpacity(theme.colors.text, 0.08) }]}>
+              <Animated.View
+                key={key}
+                style={[
+                  styles.trustedSkeletonCard,
+                  { backgroundColor: withOpacity(theme.colors.text, 0.08), opacity: trustedShimmer },
+                ]}
+              >
                 <View style={[styles.trustedSkeletonLineShort, { backgroundColor: withOpacity(theme.colors.text, 0.2) }]} />
                 <View style={[styles.trustedSkeletonLineLong, { backgroundColor: withOpacity(theme.colors.text, 0.15) }]} />
-              </View>
+              </Animated.View>
             ))}
           </View>
         ) : doctorTrusted.length === 0 ? (
@@ -366,7 +404,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
         )}
       </View>
     ),
-    [handleRemove, theme.colors, doctorTrusted, colors.surfaceAlt, colors.surface, deletingTrustedId]
+    [handleRemove, theme.colors, doctorTrusted, colors.surfaceAlt, colors.surface, deletingTrustedId, showTrustedSkeleton, trustedSkeletonRows, trustedShimmer]
   );
 
   return (
@@ -422,7 +460,20 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
               returnKeyType="search"
             />
           </View>
-          {error ? <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text> : null}
+          {error ? (
+            <View
+              style={[
+                styles.errorBanner,
+                {
+                  backgroundColor: withOpacity(theme.colors.danger, 0.12),
+                  borderColor: withOpacity(theme.colors.danger, 0.35),
+                },
+              ]}
+            >
+              <Ionicons name="alert-circle-outline" size={14} color={theme.colors.danger} />
+              <Text style={[styles.errorText, { color: theme.colors.danger }]}>{error}</Text>
+            </View>
+          ) : null}
           <Pressable
             style={[styles.lookupButton, { backgroundColor: theme.colors.accent }]}
             onPress={handleLookup}
@@ -838,7 +889,20 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textTransform: 'uppercase',
   },
+  errorBanner: {
+    marginTop: 4,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   errorText: {
     fontSize: 13,
+    lineHeight: 18,
+    flex: 1,
   },
 });
