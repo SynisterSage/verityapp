@@ -193,7 +193,7 @@ export default function NotificationsScreen() {
             step={1}
             minimumTrackTintColor={theme.colors.accent}
             maximumTrackTintColor={withOpacity(theme.colors.text, 0.15)}
-            thumbTintColor={theme.colors.surface}
+            thumbTintColor={theme.colors.accent}
             onValueChange={setThreshold}
           />
           <View style={styles.sliderLabels}>

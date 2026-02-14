@@ -98,11 +98,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const { unreadAgentCount, assistantOnline } = useSupportContext();
   const refreshControlProps = useMemo(
     () => ({
-      tintColor: theme.colors.text,
-      colors: [theme.colors.text],
+      tintColor: theme.colors.accent,
+      colors: [theme.colors.accent],
       progressBackgroundColor: theme.colors.bg,
     }),
-    [theme]
+    [theme.colors.accent, theme.colors.bg]
   );
   const [recentCall, setRecentCall] = useState<CallRow | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);

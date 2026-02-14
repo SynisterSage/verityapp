@@ -86,11 +86,11 @@ export default function AlertsScreen() {
   const { unreadAgentCount } = useSupportContext();
   const refreshControlProps = useMemo(
     () => ({
-      tintColor: theme.colors.text,
-      colors: [theme.colors.text],
+      tintColor: theme.colors.accent,
+      colors: [theme.colors.accent],
       progressBackgroundColor: theme.colors.bg,
     }),
-    [theme]
+    [theme.colors.accent, theme.colors.bg]
   );
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [loading, setLoading] = useState(true);

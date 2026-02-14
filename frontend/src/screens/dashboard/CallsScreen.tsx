@@ -259,11 +259,11 @@ export default function CallsScreen({
   const { unreadAgentCount } = useSupportContext();
   const refreshControlProps = useMemo(
     () => ({
-      tintColor: theme.colors.text,
-      colors: [theme.colors.text],
+      tintColor: theme.colors.accent,
+      colors: [theme.colors.accent],
       progressBackgroundColor: theme.colors.bg,
     }),
-    [theme]
+    [theme.colors.accent, theme.colors.bg]
   );
   const [calls, setCalls] = useState<CallRow[]>([]);
   const [trustedActivity, setTrustedActivity] = useState<TrustedActivityRow[]>([]);

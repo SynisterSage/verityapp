@@ -38,6 +38,7 @@ type TrustedContactRow = {
   relationship_tag?: string | null;
   contact_name?: string | null;
   caller_hash?: string | null;
+  trusted_care_team?: boolean;
 };
 
 type ContactMapEntry = {
@@ -415,8 +416,11 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
     return (match ? match[0] : fallback).toUpperCase();
   };
 
-  const getRelationshipLabel = (contact: TrustedContactRow) =>
-    contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Trusted Safe Contact';
+  const getRelationshipLabel = (contact: TrustedContactRow) => {
+    const relationship = contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship;
+    if (relationship) return relationship;
+    return contact.trusted_care_team ? 'Trusted Professional' : 'Trusted Safe Contact';
+  };
 
   const safeList = useMemo(() => {
   const seen = new Set<string>();
@@ -605,8 +609,8 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
                       : getAvatarInitial(getContactDisplayName(trayContact as TrustedContactRow), 'T')}
                   </Text>
                 </View>
-                <View>
-                  <Text style={styles.trayName}>
+                <View style={styles.trayIdentityText}>
+                  <Text style={styles.trayName} numberOfLines={1} ellipsizeMode="tail">
                     {trayMode === 'import'
                       ? (trayContact as DeviceContact).name
                       : getContactDisplayName(trayContact as TrustedContactRow)}
@@ -929,6 +933,10 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       gap: 12,
       marginBottom: 12,
     },
+    trayIdentityText: {
+      flex: 1,
+      minWidth: 0,
+    },
     trayAvatar: {
       width: 48,
       height: 48,
@@ -946,6 +954,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       color: theme.colors.text,
       fontSize: 18,
       fontWeight: '700',
+      flexShrink: 1,
     },
     trayHint: {
       color: theme.colors.textMuted,
@@ -991,7 +1000,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       marginBottom: 12,
     },
     trayPrimaryText: {
-      color: theme.colors.surface,
+      color: '#FFFFFF',
       fontWeight: '700',
       fontSize: 16,
     },

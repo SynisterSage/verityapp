@@ -648,8 +648,11 @@ export default function TrustedContactsScreen() {
     const match = label.match(/[A-Za-z0-9]/);
     return (match ? match[0] : fallback).toUpperCase();
   };
-  const getRelationshipLabel = (contact: TrustedContactRow) =>
-    contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? 'Trusted Safe Contact';
+  const getRelationshipLabel = (contact: TrustedContactRow) => {
+    const relationship = contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship;
+    if (relationship) return relationship;
+    return contact.trusted_care_team ? 'Trusted Professional' : 'Trusted Safe Contact';
+  };
   const safeList = useMemo(() => {
     const seen = new Set<string>();
     return trustedList.filter((contact) => {
@@ -948,7 +951,7 @@ export default function TrustedContactsScreen() {
                             autoFocus
                           />
                         ) : (
-                          <Text style={styles.trayName}>
+                          <Text style={styles.trayName} numberOfLines={1} ellipsizeMode="tail">
                             {getManualContactDisplayName(manualTrayNumber)}
                           </Text>
                         )}
@@ -974,7 +977,9 @@ export default function TrustedContactsScreen() {
                             autoFocus
                           />
                         ) : (
-                          <Text style={styles.trayName}>{manualManageDisplayName}</Text>
+                          <Text style={styles.trayName} numberOfLines={1} ellipsizeMode="tail">
+                            {manualManageDisplayName}
+                          </Text>
                         )}
                         <Pressable
                           onPress={() => setManualNameEditing((prev) => !prev)}
@@ -988,7 +993,7 @@ export default function TrustedContactsScreen() {
                   ) : (
                     <>
                       <View style={styles.nameRow}>
-                        <Text style={styles.trayName}>
+                        <Text style={styles.trayName} numberOfLines={1} ellipsizeMode="tail">
                           {trayMode === 'import'
                             ? (trayContact as DeviceContact).name
                             : getContactDisplayName(trayContact as TrustedContactRow)}
@@ -1232,11 +1237,14 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
     },
     trayIdentityText: {
       gap: 4,
+      flex: 1,
+      minWidth: 0,
     },
     trayNameRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+      minWidth: 0,
     },
     trayManualInput: {
       borderBottomWidth: 1,
@@ -1399,6 +1407,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       color: theme.colors.text,
       fontSize: 18,
       fontWeight: '700',
+      flexShrink: 1,
     },
     trayHint: {
       color: theme.colors.textMuted,
@@ -1443,7 +1452,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       marginBottom: 12,
     },
     trayPrimaryText: {
-      color: theme.colors.surface,
+      color: '#FFFFFF',
       fontWeight: '700',
       fontSize: 16,
     },
