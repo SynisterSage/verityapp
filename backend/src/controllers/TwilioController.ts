@@ -310,7 +310,8 @@ async function callIncoming(req: Request, res: Response) {
     if (trustedCaller) {
       const bridgeEnabled = process.env.ENABLE_CALL_BRIDGE === 'true';
       if (bridgeEnabled) {
-        const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
+        // Use fromNumber as caller ID so the client sees who's actually calling
+        const outboundCallerId = fromNumber;
         const bridgeFallbackUrl = `${bridgeFallbackBaseUrl}?profileId=${encodeURIComponent(
           profile.id
         )}&to=${encodeURIComponent(toNumber)}&from=${encodeURIComponent(fromNumber)}`;
