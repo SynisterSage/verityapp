@@ -180,7 +180,7 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
             step={1}
             minimumTrackTintColor={theme.colors.accent}
             maximumTrackTintColor={sliderInactiveTrackColor}
-            thumbTintColor={theme.colors.surface}
+            thumbTintColor={theme.colors.accent}
             onValueChange={setThreshold}
           />
           <View style={styles.sliderLabels}>

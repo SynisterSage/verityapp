@@ -312,7 +312,7 @@ export default function AutomationScreen() {
               step={1}
               minimumTrackTintColor={theme.colors.accent}
               maximumTrackTintColor={sliderInactiveTrackColor}
-              thumbTintColor={theme.colors.surface}
+              thumbTintColor={theme.colors.accent}
               disabled={!autoMarkEnabled}
             />
             <Text style={styles.helper}>Recommended range: 85–95 for strict fraud catches.</Text>
@@ -331,7 +331,7 @@ export default function AutomationScreen() {
               step={1}
               minimumTrackTintColor={theme.colors.accent}
               maximumTrackTintColor={sliderInactiveTrackColor}
-              thumbTintColor={theme.colors.surface}
+              thumbTintColor={theme.colors.accent}
               disabled={!autoMarkEnabled}
             />
             <Text style={styles.helper}>Recommended range: 20–35 for clearly low-risk calls.</Text>

@@ -483,7 +483,9 @@ export default function InviteFamilyScreen({ navigation }: Props) {
               <Text style={styles.memberMeta}>{member.is_caretaker ? 'Account Owner' : 'Family'}</Text>
             </View>
             {isCurrentUser && (
-              <Text style={[styles.youBadge, styles.youBadgeRight]}>YOU</Text>
+              <View style={[styles.youBadge, styles.youBadgeRight]}>
+                <Text style={styles.youBadgeText}>YOU</Text>
+              </View>
             )}
             {canManageMember(member) && (
               <TouchableOpacity style={styles.menuButton} onPress={() => openMemberTray(member)} activeOpacity={0.7}>
@@ -829,7 +831,7 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       marginRight: 12,
     },
     avatarText: {
-      color: theme.colors.surface,
+      color: '#fff',
       fontWeight: '700',
     },
     memberInfo: {
@@ -857,6 +859,9 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       borderColor: theme.colors.accent,
       paddingHorizontal: 8,
       paddingVertical: 2,
+      overflow: 'hidden',
+    },
+    youBadgeText: {
       color: theme.colors.accent,
       fontSize: 10,
       fontWeight: '600',
@@ -913,7 +918,7 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       color: theme.colors.text,
     },
     roleLabelActive: {
-      color: theme.colors.surface,
+      color: '#fff',
     },
     roleSubLabel: {
       fontSize: 12,
@@ -921,7 +926,7 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       marginTop: 4,
     },
     roleSubLabelActive: {
-      color: theme.colors.surface,
+      color: '#fff',
     },
     error: {
       color: theme.colors.danger,
@@ -943,7 +948,7 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       opacity: 0.5,
     },
     buttonText: {
-      color: theme.colors.surface,
+      color: '#fff',
       fontWeight: '600',
     },
     skeletonWrapper: {

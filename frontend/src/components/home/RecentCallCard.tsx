@@ -94,7 +94,7 @@ export default function RecentCallCard({
         </Text>
       </View>
       <View style={styles.footerRow}>
-        <Text style={[styles.footerText, { color: theme.colors.accent }]}>Review Call Record</Text>
+        <Text style={[styles.footerText, { color: theme.colors.accent }]}>Review Call Recording</Text>
         <Ionicons name="chevron-forward" size={18} color={theme.colors.accent} style={styles.footerIcon} />
       </View>
     </TouchableOpacity>

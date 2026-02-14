@@ -465,9 +465,9 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
             ]}
             onPress={handleImport}
             disabled={importing}
-          >
+            >
             <View style={styles.importIcon}>
-              <Ionicons name="person-add" size={24} color={theme.colors.surface} />
+              <Ionicons name="person-add" size={24} color="#fff" />
             </View>
             <View style={styles.importText}>
               <Text style={styles.importTitle}>Import from Phone</Text>

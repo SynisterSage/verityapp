@@ -533,7 +533,9 @@ export default function MembersScreen() {
                           <Text style={styles.memberRole}>{roleLabel}</Text>
                         </View>
                         {isCurrentUser && (
-                          <Text style={[styles.youBadge, styles.youBadgeRight]}>You</Text>
+                          <View style={[styles.youBadge, styles.youBadgeRight]}>
+                            <Text style={styles.youBadgeText}>You</Text>
+                          </View>
                         )}
                         {canManageMember(member) && (
                           <TouchableOpacity
@@ -891,7 +893,7 @@ const createMembersStyles = (theme: AppTheme) =>
       justifyContent: 'center',
     },
     memberAvatarText: {
-      color: theme.colors.surface,
+      color: '#fff',
       fontWeight: '600',
     },
     memberContent: {
@@ -914,6 +916,9 @@ const createMembersStyles = (theme: AppTheme) =>
       borderColor: withOpacity(theme.colors.accent, 0.4),
       paddingHorizontal: 8,
       paddingVertical: 2,
+      overflow: 'hidden',
+    },
+    youBadgeText: {
       color: theme.colors.accent,
       fontSize: 10,
       fontWeight: '600',
@@ -1052,7 +1057,7 @@ const createMembersStyles = (theme: AppTheme) =>
       color: theme.colors.text,
     },
     roleLabelActive: {
-      color: theme.colors.surface,
+      color: '#fff',
     },
     roleLabelInactive: {
       color: theme.colors.textMuted,
@@ -1062,7 +1067,7 @@ const createMembersStyles = (theme: AppTheme) =>
       color: theme.colors.textMuted,
     },
     roleSubLabelActive: {
-      color: theme.colors.surface,
+      color: '#fff',
     },
     roleSubLabelInactive: {
       color: withOpacity(theme.colors.textMuted, 0.8),
@@ -1081,7 +1086,7 @@ const createMembersStyles = (theme: AppTheme) =>
       opacity: 0.5,
     },
     buttonText: {
-      color: theme.colors.surface,
+      color: '#fff',
       fontWeight: '600',
     },
     error: {

@@ -763,9 +763,9 @@ export default function TrustedContactsScreen() {
                   disabled={isSyncDisabled}
                 >
                   {syncing ? (
-                    <ActivityIndicator color={theme.colors.surface} />
+                    <ActivityIndicator color="#fff" />
                   ) : (
-                    <Ionicons name="sync-outline" size={18} color={theme.colors.surface} />
+                    <Ionicons name="sync-outline" size={18} color="#fff" />
                   )}
                   <Text style={styles.syncButtonText}>
                     {syncing ? 'Syncing contacts…' : 'Sync contacts'}
@@ -1143,7 +1143,7 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       opacity: 0.6,
     },
     syncButtonText: {
-      color: theme.colors.surface,
+      color: '#fff',
       fontWeight: '600',
     },
     inputRow: {
