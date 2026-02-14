@@ -93,7 +93,6 @@ export async function sendVoIPPush(
 
   // VoIP notifications are silent - they wake the app but don't show a banner
   notification.topic = `${bundleId}.voip`;
-  notification.pushType = 'voip';
   notification.priority = 10; // High priority
   notification.contentAvailable = true;
 
@@ -110,22 +109,19 @@ export async function sendVoIPPush(
     const result = await provider.send(notification, voipToken);
 
     if (result.failed.length > 0) {
-      logger.err('VoIP push failed:', {
-        token: `${voipToken.substring(0, 8)}...`,
-        reason: result.failed[0]?.response?.reason || 'unknown',
-        status: result.failed[0]?.status,
-      });
+      const failure = result.failed[0];
+      logger.err(
+        `VoIP push failed: token=${voipToken.substring(0, 8)}... reason=${failure?.response?.reason || 'unknown'} status=${failure?.status || 'unknown'}`
+      );
       return false;
     }
 
-    logger.info('VoIP push sent successfully', {
-      token: `${voipToken.substring(0, 8)}...`,
-      callSid: payload.callSid,
-      from: payload.fromNumber,
-    });
+    logger.info(
+      `VoIP push sent successfully: token=${voipToken.substring(0, 8)}... callSid=${payload.callSid} from=${payload.fromNumber}`
+    );
     return true;
   } catch (error) {
-    logger.err('VoIP push error:', error);
+    logger.err(`VoIP push error: ${error instanceof Error ? error.message : String(error)}`);
     return false;
   }
 }
@@ -144,7 +140,7 @@ export async function sendVoIPPushToProfile(
     .maybeSingle();
 
   if (error) {
-    logger.err('Failed to fetch profile VoIP token:', error);
+    logger.err(`Failed to fetch profile VoIP token: ${error.message}`);
     return false;
   }
 
