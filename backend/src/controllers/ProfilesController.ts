@@ -16,6 +16,7 @@ import {
 } from '@src/common/util/auth';
 import { recordCircleAlert } from '@src/services/circleAlerts';
 import { sanitizeProfile, sanitizeProfiles, sanitizeErrorResponse } from '@src/middleware/dataSanitizer';
+import { releaseNumberFromProfile } from '@src/services/twilioNumberPool';
 
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];
@@ -858,6 +859,12 @@ async function deleteProfile(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
+  // Ensure assigned Twilio number is returned to pool with correct availability metadata.
+  const released = await releaseNumberFromProfile(profileId);
+  if (!released) {
+    logger.warn(`Failed to release Twilio number before deleting profile ${profileId}`);
+  }
+
   const { error } = await supabaseAdmin
     .from('profiles')
     .delete()
@@ -866,6 +873,30 @@ async function deleteProfile(req: Request, res: Response) {
   if (error) {
     logger.err(error);
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to delete profile' });
+  }
+
+  // If user no longer owns or belongs to any profile, remove auth account as well.
+  const [{ count: ownedCount }, { count: memberCount }] = await Promise.all([
+    supabaseAdmin
+      .from('profiles')
+      .select('id', { count: 'exact', head: true })
+      .eq('caretaker_id', userId),
+    supabaseAdmin
+      .from('profile_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId),
+  ]);
+
+  if ((ownedCount ?? 0) === 0 && (memberCount ?? 0) === 0) {
+    const { error: deleteUserError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+    if (deleteUserError) {
+      logger.err(deleteUserError);
+      // Profile is already deleted; surface a warning but keep successful response.
+      return res.status(HTTP_STATUS_CODES.Ok).json({
+        ok: true,
+        warning: 'Profile deleted, but account record could not be fully removed.',
+      });
+    }
   }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
