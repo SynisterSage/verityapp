@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 
 import { useTheme } from '../../context/ThemeContext';
@@ -16,7 +17,7 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import { logEvent } from '../../services/sentry';
 
 export default function SignInScreen({ navigation }: { navigation: any }) {
-  const { signIn, signInWithGoogle, sendPasswordReset } = useAuth();
+  const { signIn, signInWithGoogle, signInWithApple, sendPasswordReset } = useAuth();
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -78,6 +79,20 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
   const handleGoogleSignIn = async () => {
     logEvent('login_google_attempt', { screen: 'SignIn' });
     await signInWithGoogle();
+  };
+
+  const handleAppleSignIn = async () => {
+    setLoginError('');
+    logEvent('login_apple_attempt', { screen: 'SignIn' });
+    const message = await signInWithApple();
+    if (message) {
+      setLoginError(message);
+      logEvent('login_apple_failed', {
+        level: 'warning',
+        screen: 'SignIn',
+        extra: { reason: message },
+      });
+    }
   };
 
   const inputBorderColor = (field: 'email' | 'password') =>
@@ -232,16 +247,23 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
         primaryLabel={isSubmitting ? 'Signing In…' : 'Sign In'}
         onPrimaryPress={handleSubmit}
         primaryLoading={isSubmitting}
-        secondaryLabel="Continue with Google"
-        onSecondaryPress={handleGoogleSignIn}
-        helperPrefix="New to Verity?"
-        helperActionLabel="Join Now"
-        onHelperPress={() => navigation.navigate('SignUp')}
+        secondaryLabel="Apple"
+        onSecondaryPress={handleAppleSignIn}
         secondaryIcon={
+          <View style={styles.appleIcon}>
+            <Ionicons name="logo-apple" size={16} color="#FFFFFF" />
+          </View>
+        }
+        tertiaryLabel="Google"
+        onTertiaryPress={handleGoogleSignIn}
+        tertiaryIcon={
           <View style={styles.googleIcon}>
             <Text style={styles.googleIconText}>G</Text>
           </View>
         }
+        helperPrefix="New to Verity?"
+        helperActionLabel="Join Now"
+        onHelperPress={() => navigation.navigate('SignUp')}
       />
     </SafeAreaView>
   );
@@ -335,6 +357,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#2d6df6',
+  },
+  appleIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loginError: {
     borderWidth: 1,

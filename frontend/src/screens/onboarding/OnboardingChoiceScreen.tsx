@@ -11,6 +11,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
 import { logEvent } from '../../services/sentry';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 
 type OnboardingChoiceTarget = 'OnboardingProfile' | 'OnboardingInviteCode';
 
@@ -118,7 +119,14 @@ export default function OnboardingChoiceScreen() {
         ]}
       >
         <Text style={styles.footerCaption}>Need help deciding?</Text>
-        <Text style={[styles.footerLink, { color: theme.colors.accent }]}>Speak with our team</Text>
+        <Pressable
+          onPress={navigateToSupportPortal}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="Speak with our team"
+        >
+          <Text style={[styles.footerLink, { color: theme.colors.accent }]}>Speak with our team</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );

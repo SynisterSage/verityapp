@@ -27,8 +27,11 @@ import { useSupportContext } from '../../context/SupportContext';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import {
+  createSetupSupportMessage,
   createSupportMessage,
+  fetchSetupSupportMessages,
   fetchSupportMessages,
+  markSetupSupportMessagesRead,
   markSupportMessagesRead,
   SupportMessage,
 } from '../../services/support';
@@ -80,6 +83,8 @@ function formatTimestamp(value?: string | null) {
   return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
+const SETUP_TICKET_ID = 'setup-help';
+
 export default function SupportScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SupportModal'>>();
   const route = useRoute<RouteProp<RootStackParamList, 'SupportModal'>>();
@@ -105,6 +110,7 @@ export default function SupportScreen() {
   const lastAgentIdRef = useRef<string | null>(null);
   const isNewTicket = route.params?.newTicket ?? false;
   const activeTicketId = route.params?.ticketId ?? currentTicketId;
+  const hasProfileSupport = Boolean(activeProfile?.id);
 
   const getTicketIdFromMetadata = useCallback((metadata?: Record<string, unknown> | null) => {
     const ticketId = metadata?.ticketId;
@@ -143,13 +149,8 @@ export default function SupportScreen() {
 
   const loadMessages = useCallback(
     async (opts?: { showLoading?: boolean; ticketId?: string | null }) => {
-      if (!activeProfile?.id) {
-        setMessages([]);
-        setLoading(false);
-        return;
-      }
     const showLoading = opts?.showLoading ?? true;
-    const ticketIdToUse = opts?.ticketId ?? currentTicketId;
+    const ticketIdToUse = opts?.ticketId ?? currentTicketId ?? SETUP_TICKET_ID;
     if (!ticketIdToUse) {
       setMessages([]);
       if (showLoading) {
@@ -161,7 +162,9 @@ export default function SupportScreen() {
         setLoading(true);
       }
       try {
-      const data = await fetchSupportMessages(activeProfile.id, ticketIdToUse);
+      const data = hasProfileSupport && activeProfile?.id
+        ? await fetchSupportMessages(activeProfile.id, ticketIdToUse)
+        : await fetchSetupSupportMessages(ticketIdToUse);
       setMessages(data);
         if (!opts?.ticketId && data.length > 0) {
           const inferredFromMetadata = data
@@ -171,7 +174,11 @@ export default function SupportScreen() {
             setCurrentTicketId((prev) => prev ?? inferredFromMetadata);
           }
         }
-      await markSupportMessagesRead(activeProfile.id);
+      if (hasProfileSupport && activeProfile?.id) {
+        await markSupportMessagesRead(activeProfile.id);
+      } else {
+        await markSetupSupportMessagesRead();
+      }
         await refreshUnread();
       } catch (err) {
       console.warn('Failed to load support conversation', err);
@@ -180,17 +187,14 @@ export default function SupportScreen() {
         setLoading(false);
       }
     }
-  }, [activeProfile?.id, currentTicketId, getTicketIdFromMetadata, refreshUnread, setCurrentTicketId]);
+  }, [activeProfile?.id, currentTicketId, getTicketIdFromMetadata, hasProfileSupport, refreshUnread, setCurrentTicketId]);
 
   const handleRefresh = useCallback(() => {
-    if (!activeProfile?.id) {
-      return;
-    }
     setRefreshing(true);
     void loadMessages({ showLoading: false, ticketId: activeTicketId }).finally(() =>
       setRefreshing(false)
     );
-  }, [activeProfile?.id, activeTicketId, loadMessages]);
+  }, [activeTicketId, loadMessages]);
 
   useEffect(() => {
     void loadMessages();
@@ -223,16 +227,13 @@ export default function SupportScreen() {
   }, [messages]);
 
   useEffect(() => {
-    if (!activeProfile?.id) {
-      return;
-    }
-    if (isNewTicket && !currentTicketId) {
+    if (hasProfileSupport && isNewTicket && !currentTicketId) {
       setMessages([]);
       setLoading(false);
       return;
     }
-    void loadMessages({ ticketId: activeTicketId });
-  }, [activeProfile?.id, activeTicketId, isNewTicket, loadMessages]);
+    void loadMessages({ ticketId: activeTicketId ?? SETUP_TICKET_ID });
+  }, [activeTicketId, currentTicketId, hasProfileSupport, isNewTicket, loadMessages]);
 
   useEffect(() => {
     const nextTicketId = route.params?.ticketId ?? null;
@@ -243,9 +244,6 @@ export default function SupportScreen() {
 
 
   const handleSend = useCallback(async () => {
-    if (!activeProfile?.id) {
-      return;
-    }
     const trimmed = composerText.trim();
     if (!trimmed) {
       return;
@@ -259,8 +257,10 @@ export default function SupportScreen() {
     if (selectedPrompt) {
       metadata.promptLabel = selectedPrompt;
     }
-    const payload = Object.keys(metadata).length > 0 ? { metadata } : undefined;
-    const message = await createSupportMessage(activeProfile.id, { content: trimmed, metadata });
+    const message =
+      hasProfileSupport && activeProfile?.id
+        ? await createSupportMessage(activeProfile.id, { content: trimmed, metadata })
+        : await createSetupSupportMessage({ content: trimmed, metadata });
       setComposerText('');
       setSelectedPrompt(null);
       const messageMetadata = message?.metadata as Record<string, unknown> | null;
@@ -268,14 +268,14 @@ export default function SupportScreen() {
       if (nextTicketId && nextTicketId !== currentTicketId) {
         setCurrentTicketId(nextTicketId);
       }
-      await loadMessages({ ticketId: nextTicketId });
+      await loadMessages({ ticketId: nextTicketId ?? SETUP_TICKET_ID });
       Keyboard.dismiss();
     } catch (err) {
       console.warn('Failed to send support message', err);
     } finally {
       setIsSending(false);
     }
-  }, [activeProfile?.id, composerText, currentTicketId, getTicketIdFromMetadata, loadMessages]);
+  }, [activeProfile?.id, composerText, currentTicketId, getTicketIdFromMetadata, hasProfileSupport, loadMessages]);
 
   const handlePromptPress = useCallback((prompt: { label: string; message: string }) => {
     setComposerText(prompt.message);
@@ -360,7 +360,7 @@ export default function SupportScreen() {
 
   const statusMessage = useMemo(() => {
     if (!activeProfile) {
-      return 'Support chat is available once your profile is ready. Finish onboarding to start a saved conversation.';
+      return 'We can help with setup now. Messages are tied to your account email until your first profile is ready.';
     }
     if (loading) {
       return 'Loading your chat history…';
@@ -377,7 +377,7 @@ export default function SupportScreen() {
   const composerInputBackground = theme.colors.surface;
   const styles = useMemo(() => createStyles(theme, mode), [theme, mode]);
 
-  const composerDisabled = isSending || !composerText.trim() || !activeProfile || ticketClosed;
+  const composerDisabled = isSending || !composerText.trim() || ticketClosed;
   const headerTitle = useMemo(() => {
     const ticketCandidate = [...messages]
       .slice()
@@ -618,15 +618,15 @@ export default function SupportScreen() {
                       borderColor: 'transparent',
                     },
                   ]}
-                  placeholder={activeProfile ? 'Message us…' : 'Finish onboarding to open chat'}
+                  placeholder="Message us…"
                   placeholderTextColor={withOpacity(theme.colors.text, 0.45)}
                   multiline
                   value={composerText}
                   onChangeText={setComposerText}
                   returnKeyType="send"
-                  editable={Boolean(activeProfile)}
+                  editable
                   onSubmitEditing={() => {
-                    if (Platform.OS === 'ios' && activeProfile) {
+                    if (Platform.OS === 'ios') {
                       void handleSend();
                     }
                   }}

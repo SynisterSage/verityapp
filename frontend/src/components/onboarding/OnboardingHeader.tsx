@@ -64,59 +64,63 @@ export default function OnboardingHeader({
             {
               // SafeAreaView already accounts for the notch/status bar; keep internal padding minimal.
               paddingTop: 8,
-              paddingBottom: 16,
-              paddingHorizontal: 32,
+              paddingBottom: 10,
+              paddingHorizontal: showBack ? 20 : 32,
               borderBottomColor: theme.colors.border,
             },
           ]}
         >
-          <View style={[styles.leftSlot, !showBack && styles.leftSlotHidden]}>
-            {showBack ? (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.backButton,
-                  {
-                    borderColor: theme.colors.border,
-                    backgroundColor: theme.colors.surfaceAlt,
-                    transform: [{ scale: pressed ? 0.9 : 1 }],
-                  },
-                ]}
-                onPress={() => navigation.goBack()}
-              >
-                <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
-              </Pressable>
-            ) : null}
-          </View>
-
-          <View style={[styles.chapterContainer, !showBack && styles.chapterContainerFlush]}>
-            <Text style={[styles.chapter, { color: theme.colors.text, opacity: 0.7 }]}>
-              {chapter.toUpperCase()}
-            </Text>
-          </View>
-
-          <View style={styles.progressRow}>
-            <View style={styles.progress}>
-              {steps.map((step) => {
-                const isActive = step < activeStep;
-                const width = animatedWidths[step];
-                return (
-                <Animated.View
-                  key={step}
-                  style={[
-                    styles.pill,
-                    step !== steps.length - 1 && styles.pillSpacing,
+          <View style={styles.topRow}>
+            <View style={[styles.leftSlot, !showBack && styles.leftSlotHidden]}>
+              {showBack ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.backButton,
                     {
-                      width,
-                      backgroundColor: isActive ? progressActiveColor : progressInactiveColor,
+                      borderColor: theme.colors.border,
+                      backgroundColor: theme.colors.surfaceAlt,
+                      transform: [{ scale: pressed ? 0.9 : 1 }],
                     },
                   ]}
-                />
-              );
-            })}
+                  onPress={() => navigation.goBack()}
+                >
+                  <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
+                </Pressable>
+              ) : null}
             </View>
+
+            <View style={[styles.chapterContainer, !showBack && styles.chapterContainerFlush]}>
+              <Text style={[styles.chapter, showBack && styles.chapterCompact, { color: theme.colors.text, opacity: 0.7 }]}>
+                {chapter.toUpperCase()}
+              </Text>
+            </View>
+
+            <View style={styles.progressRow}>
+              <View style={styles.progress}>
+                {steps.map((step) => {
+                  const isActive = step < activeStep;
+                  const width = animatedWidths[step];
+                  return (
+                    <Animated.View
+                      key={step}
+                      style={[
+                        styles.pill,
+                        step !== steps.length - 1 && styles.pillSpacing,
+                        {
+                          width,
+                          backgroundColor: isActive ? progressActiveColor : progressInactiveColor,
+                        },
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+            </View>
+
             <SupportButton
               onPress={navigateToSupportPortal}
               unreadCount={unreadAgentCount}
+              compact={showBack}
               style={styles.supportButton}
             />
           </View>
@@ -139,10 +143,12 @@ const styles = StyleSheet.create({
   },
   container: {
     borderBottomWidth: 1,
+    justifyContent: 'center',
+    minHeight: 88,
+  },
+  topRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    minHeight: 88,
   },
   leftSlot: {
     width: 40,
@@ -165,9 +171,13 @@ const styles = StyleSheet.create({
     letterSpacing: 6,
     fontWeight: '900',
   },
+  chapterCompact: {
+    letterSpacing: 3,
+  },
   chapterContainer: {
-    flex: 1,
     marginLeft: 12,
+    marginRight: 12,
+    flexShrink: 0,
     justifyContent: 'center',
   },
   chapterContainerFlush: {
@@ -186,11 +196,10 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   progressRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flex: 1,
+    minWidth: 0,
   },
   supportButton: {
-    marginLeft: 12,
+    marginLeft: 10,
   },
 });

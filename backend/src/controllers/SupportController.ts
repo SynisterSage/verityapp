@@ -18,6 +18,20 @@ type SupportMessageRow = {
   updated_at: string;
 };
 
+type SetupSupportMessageRow = {
+  id: string;
+  user_id: string;
+  email_snapshot: string | null;
+  sender: 'user' | 'agent';
+  content: string;
+  category: string | null;
+  metadata: Record<string, unknown> | null;
+  is_read_by_user: boolean;
+  is_read_by_agent: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
 type AccessibleProfileRow = {
   id: string;
   first_name: string | null;
@@ -105,6 +119,11 @@ const PROMPT_AUTO_REPLY: Record<string, string> = {
 const RESOURCE_AUTO_REPLY_TYPE = 'resource-suggestion';
 const RESOURCE_AUTO_REPLY_CONTENT =
   'Thanks for the note. An agent will be with you shortly, and the Resources tab in the Support portal highlights system basics, automation & alerts, members & roles, billing, and the FAQ while you wait.';
+const SETUP_DEFAULT_TICKET_ID = 'setup-help';
+const SETUP_DEFAULT_TICKET_SUBJECT = 'Onboarding support';
+const SETUP_GREETING = 'Hi there! We can help with setup even before your first profile is created.';
+const SETUP_AUTO_REPLY =
+  'Thanks for the message. Our team can help with onboarding, account setup, and getting your first profile ready.';
 
 function resolveTicketIdentifier(message: SupportMessageRow) {
   const metadataTicketId = (message.metadata as Record<string, unknown> | null)?.ticketId;
@@ -161,6 +180,15 @@ async function insertResourceAutoReply(profileId: string, ticketId: string, tick
   if (error) {
     console.warn('Failed to insert resource auto reply', error);
   }
+}
+
+async function getUserEmailSnapshot(userId: string) {
+  const { data, error } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (error) {
+    console.warn('Failed to fetch auth user for support setup', error);
+    return null;
+  }
+  return data?.user?.email ?? null;
 }
 
 export default class SupportController {
@@ -381,6 +409,164 @@ export default class SupportController {
     }
 
     return res.status(201).json({ ticketId, message: data });
+  }
+
+  static async listSetupMessages(req: Request, res: Response) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+    }
+
+    const ticketIdParam = typeof req.query?.ticketId === 'string' && req.query.ticketId.trim()
+      ? req.query.ticketId.trim()
+      : SETUP_DEFAULT_TICKET_ID;
+    const limitParam = Number(req.query?.limit ?? 200);
+    const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 2000) : 200;
+
+    const { data, error } = await supabaseAdmin
+      .from('support_setup_messages')
+      .select('id, sender, content, category, metadata, is_read_by_user, is_read_by_agent, created_at, updated_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(limit);
+
+    if (error) {
+      console.warn('Failed to load setup support messages', error);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to load messages' });
+    }
+
+    const rows = (data ?? []) as SetupSupportMessageRow[];
+    const filtered = rows.filter((row) => {
+      const rowTicketId = (row.metadata as Record<string, unknown> | null)?.ticketId;
+      if (typeof rowTicketId === 'string' && rowTicketId.trim().length > 0) {
+        return rowTicketId === ticketIdParam;
+      }
+      return ticketIdParam === SETUP_DEFAULT_TICKET_ID;
+    });
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({ messages: filtered });
+  }
+
+  static async createSetupMessage(req: Request, res: Response) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+    }
+
+    const { content, category, metadata } = (req as any).validatedBody as {
+      content: string;
+      category?: string;
+      metadata?: Record<string, unknown>;
+    };
+
+    const emailSnapshot = await getUserEmailSnapshot(userId);
+    const metadataTicketId = metadata?.ticketId;
+    const ticketId =
+      typeof metadataTicketId === 'string' && metadataTicketId.trim().length > 0
+        ? metadataTicketId.trim()
+        : SETUP_DEFAULT_TICKET_ID;
+    const ticketSubject =
+      typeof metadata?.ticketSubject === 'string' && metadata.ticketSubject.trim().length > 0
+        ? metadata.ticketSubject.trim()
+        : SETUP_DEFAULT_TICKET_SUBJECT;
+
+    const resolvedMetadata: Record<string, unknown> = {
+      ...(metadata ?? {}),
+      ticketId,
+      ticketSubject,
+      ticketState: metadata?.ticketState ?? 'open',
+      preProfile: true,
+    };
+
+    const { count: existingCount } = await supabaseAdmin
+      .from('support_setup_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .eq('metadata->>ticketId', ticketId);
+    const isNewTicket = (existingCount ?? 0) === 0;
+
+    const { data, error } = await supabaseAdmin
+      .from('support_setup_messages')
+      .insert([
+        {
+          user_id: userId,
+          email_snapshot: emailSnapshot,
+          sender: 'user',
+          content,
+          category: category ?? null,
+          metadata: resolvedMetadata,
+          is_read_by_user: true,
+          is_read_by_agent: false,
+        },
+      ])
+      .select('id, sender, content, category, metadata, is_read_by_user, is_read_by_agent, created_at, updated_at')
+      .single();
+
+    if (error) {
+      console.warn('Failed to insert setup support message', error);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to send message' });
+    }
+
+    if (isNewTicket) {
+      const { error: greetingError } = await supabaseAdmin
+        .from('support_setup_messages')
+        .insert([
+          {
+            user_id: userId,
+            email_snapshot: emailSnapshot,
+            sender: 'agent',
+            content: SETUP_GREETING,
+            category: 'auto',
+            metadata: resolvedMetadata,
+            is_read_by_user: false,
+            is_read_by_agent: true,
+          },
+        ]);
+      if (greetingError) {
+        console.warn('Failed to insert setup greeting', greetingError);
+      }
+    }
+
+    const { error: autoReplyError } = await supabaseAdmin
+      .from('support_setup_messages')
+      .insert([
+        {
+          user_id: userId,
+          email_snapshot: emailSnapshot,
+          sender: 'agent',
+          content: SETUP_AUTO_REPLY,
+          category: 'auto',
+          metadata: resolvedMetadata,
+          is_read_by_user: false,
+          is_read_by_agent: true,
+        },
+      ]);
+    if (autoReplyError) {
+      console.warn('Failed to insert setup auto reply', autoReplyError);
+    }
+
+    return res.status(HTTP_STATUS_CODES.Created).json({ message: data });
+  }
+
+  static async markSetupMessagesRead(req: Request, res: Response) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+    }
+
+    const { error } = await supabaseAdmin
+      .from('support_setup_messages')
+      .update({ is_read_by_user: true })
+      .eq('user_id', userId)
+      .eq('sender', 'agent')
+      .eq('is_read_by_user', false);
+
+    if (error) {
+      console.warn('Failed to mark setup messages as read', error);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to update messages' });
+    }
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
   }
 
   static async markAgentMessagesRead(req: Request, res: Response) {

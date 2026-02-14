@@ -357,6 +357,21 @@ function RootNavigator() {
               component={OnboardingInviteCodeScreen}
               options={{ headerShown: false }}
             />
+            <RootStack.Screen
+              name="SupportPortal"
+              component={SupportTicketsScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="SupportModal"
+              component={SupportScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="SupportResource"
+              component={SupportResourceScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
           </>
         ) : (
           <>

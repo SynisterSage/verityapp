@@ -13,6 +13,7 @@ type SupportMessage = {
 };
 
 const baseSupportPath = (profileId: string) => `/profiles/${profileId}/support`;
+const setupSupportPath = '/support/setup';
 
 async function fetchJson(path: string) {
   const data = await authorizedFetch(path);
@@ -55,6 +56,33 @@ export async function createSupportTicket(profileId: string) {
     method: 'POST',
   });
   return data as { ticketId: string; message: SupportMessage | null };
+}
+
+export async function fetchSetupSupportMessages(ticketId?: string | null, limit = 200) {
+  const query = new URLSearchParams({ limit: String(limit) });
+  if (ticketId) {
+    query.append('ticketId', ticketId);
+  }
+  const data = await fetchJson(`${setupSupportPath}/messages?${query.toString()}`);
+  return (data?.messages ?? []) as SupportMessage[];
+}
+
+export async function createSetupSupportMessage(payload: {
+  content: string;
+  category?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const data = await authorizedFetch(`${setupSupportPath}/messages`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return data?.message as SupportMessage;
+}
+
+export async function markSetupSupportMessagesRead() {
+  await authorizedFetch(`${setupSupportPath}/messages/mark-read`, {
+    method: 'PATCH',
+  });
 }
 
 export async function deleteSupportTicket(profileId: string, ticketId: string) {

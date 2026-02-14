@@ -19,6 +19,7 @@ type AuthContextValue = {
   signUp: (email: string, password: string) => Promise<SignUpResult>;
   sendPasswordReset: (email: string) => Promise<string | null>;
   signInWithGoogle: () => Promise<string | null>;
+  signInWithApple: () => Promise<string | null>;
   signOut: () => Promise<void>;
 };
 
@@ -32,29 +33,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const handleOAuthRedirect = async (url: string) => {
-    const hash = url.split('#')[1] ?? '';
-    if (hash) {
-      const params = new URLSearchParams(hash);
-      const accessToken = params.get('access_token');
-      const refreshToken = params.get('refresh_token');
-      if (accessToken && refreshToken) {
-        const { data, error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken,
-        });
-        if (error) {
-          console.warn('setSession error', error.message);
-        } else if (data?.session) {
-          setSession(data.session);
-        }
-        return;
+    if (!url) return;
+
+    const query = url.includes('?') ? url.slice(url.indexOf('?') + 1).split('#')[0] : '';
+    const hash = url.includes('#') ? url.split('#')[1] ?? '' : '';
+    const queryParams = new URLSearchParams(query);
+    const hashParams = new URLSearchParams(hash);
+
+    const accessToken =
+      hashParams.get('access_token') ?? queryParams.get('access_token');
+    const refreshToken =
+      hashParams.get('refresh_token') ?? queryParams.get('refresh_token');
+
+    if (accessToken && refreshToken) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (error) {
+        console.warn('setSession error', error.message);
+      } else if (data?.session) {
+        setSession(data.session);
       }
+      return;
+    }
+
+    const code = queryParams.get('code') ?? hashParams.get('code');
+    if (!code) {
+      return;
     }
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(url);
     if (error) {
       console.warn('exchangeCodeForSession error', error.message);
-    } else if (data?.session) {
+      return;
+    }
+    if (data?.session) {
       setSession(data.session);
     }
   };
@@ -146,6 +160,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
           } else {
             console.warn('OAuth session result', result);
+          }
+        }
+        return null;
+      },
+      signInWithApple: async () => {
+        const redirectTo = 'verityprotect://auth/callback';
+        console.info('[auth][apple] start', { redirectTo });
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'apple',
+          options: {
+            redirectTo,
+            scopes: 'name email',
+          },
+        });
+        if (error) {
+          console.warn('apple signInWithOAuth error', error.message);
+          return error.message;
+        }
+        if (!data?.url) {
+          return 'Could not start Apple sign in.';
+        }
+        if (data?.url) {
+          console.info('[auth][apple] oauth url created');
+          const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+          console.info('[auth][apple] browser result', { type: result.type });
+          if (result.type === 'success' && result.url) {
+            try {
+              console.info('[auth][apple] callback received', { url: result.url });
+              await handleOAuthRedirect(result.url);
+              const {
+                data: { session: latestSession },
+              } = await supabase.auth.getSession();
+              if (!latestSession) {
+                console.warn('[auth][apple] callback completed but session is empty');
+                return 'Apple sign in finished but no session was created.';
+              }
+              console.info('[auth][apple] session established');
+            } catch (err) {
+              console.warn('Apple OAuth session handling failed', err, {
+                redirectTo,
+                returnedUrl: result.url,
+              });
+              return 'Apple sign in failed while processing callback.';
+            }
+          } else {
+            console.warn('Apple OAuth session result', result);
+            if (result.type === 'cancel') {
+              return 'Apple sign in was cancelled.';
+            }
+            return 'Apple sign in did not complete.';
           }
         }
         return null;

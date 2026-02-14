@@ -65,7 +65,6 @@ function getTicketState(ticket: SupportTicketSummary) {
   return ticketState === 'closed' ? 'handled' : 'active';
 }
 
-
 export default function SupportTicketsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SupportPortal'>>();
   const { mode, theme } = useTheme();
@@ -224,7 +223,8 @@ export default function SupportTicketsScreen() {
 
   const handleStartNew = useCallback(async () => {
     if (profiles.length === 0) {
-      setError('Finish setting up a profile before contacting support.');
+      setError(null);
+      navigateToSupportModal({ ticketId: 'setup-help', newTicket: true });
       return;
     }
     const primaryProfile = profiles[0];

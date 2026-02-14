@@ -15,7 +15,7 @@ type AlertState = {
 };
 
 export default function SignUpScreen({ navigation }: { navigation: any }) {
-  const { signUp, signInWithGoogle } = useAuth();
+  const { signUp, signInWithGoogle, signInWithApple } = useAuth();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -174,6 +174,20 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const handleGoogleSignUp = async () => {
     logEvent('signup_google_attempt', { screen: 'SignUp' });
     await signInWithGoogle();
+  };
+
+  const handleAppleSignUp = async () => {
+    setAlert(null);
+    logEvent('signup_apple_attempt', { screen: 'SignUp' });
+    const message = await signInWithApple();
+    if (message) {
+      setAlert({ message, type: 'danger' });
+      logEvent('signup_apple_failed', {
+        level: 'warning',
+        screen: 'SignUp',
+        extra: { reason: message },
+      });
+    }
   };
 
   const renderEye = (visible: boolean) => (
@@ -428,16 +442,23 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         onPrimaryPress={handleSubmit}
         primaryLoading={isSubmitting}
         primaryDisabled={!acceptedLegal}
-        secondaryLabel="Continue with Google"
-        onSecondaryPress={handleGoogleSignUp}
-        helperPrefix="Already have an account?"
-        helperActionLabel="Sign In"
-        onHelperPress={() => navigation.navigate('SignIn')}
+        secondaryLabel="Apple"
+        onSecondaryPress={handleAppleSignUp}
         secondaryIcon={
+          <View style={styles.appleIcon}>
+            <Ionicons name="logo-apple" size={16} color="#FFFFFF" />
+          </View>
+        }
+        tertiaryLabel="Google"
+        onTertiaryPress={handleGoogleSignUp}
+        tertiaryIcon={
           <View style={styles.googleIcon}>
             <Text style={styles.googleIconText}>G</Text>
           </View>
         }
+        helperPrefix="Already have an account?"
+        helperActionLabel="Sign In"
+        onHelperPress={() => navigation.navigate('SignIn')}
       />
     </SafeAreaView>
   );
@@ -543,6 +564,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#2d6df6',
+  },
+  appleIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#111827',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   checkboxRow: {
     marginTop: 4,

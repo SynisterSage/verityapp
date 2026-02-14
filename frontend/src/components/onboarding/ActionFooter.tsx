@@ -19,6 +19,13 @@ type ActionFooterProps = {
   secondaryTextColor?: string;
   secondaryDisabled?: boolean;
   secondaryLoading?: boolean;
+  tertiaryLabel?: string;
+  onTertiaryPress?: () => void;
+  tertiaryIcon?: ReactNode;
+  tertiaryBackgroundColor?: string;
+  tertiaryTextColor?: string;
+  tertiaryDisabled?: boolean;
+  tertiaryLoading?: boolean;
   helperPrefix?: string;
   helperActionLabel?: string;
   onHelperPress?: () => void;
@@ -40,15 +47,22 @@ export default function ActionFooter({
   secondaryTextColor,
   secondaryDisabled,
   secondaryLoading,
+  tertiaryLabel,
+  onTertiaryPress,
+  tertiaryIcon,
+  tertiaryBackgroundColor,
+  tertiaryTextColor,
+  tertiaryDisabled,
+  tertiaryLoading,
   helperPrefix,
   helperActionLabel,
   onHelperPress,
   style,
 }: ActionFooterProps) {
-  const { theme, mode } = useTheme();
+  const { theme } = useTheme();
   const colors = theme.colors as { surfaceAlt?: string; surface: string; border: string };
   const insets = useSafeAreaInsets();
-  const defaultPrimaryTextColor = mode === 'light' ? theme.colors.text : theme.colors.surface;
+  const defaultPrimaryTextColor = '#FFFFFF';
 
   return (
     <View
@@ -92,30 +106,122 @@ export default function ActionFooter({
       ) : null}
 
       {secondaryLabel && onSecondaryPress ? (
+        tertiaryLabel && onTertiaryPress ? (
+          <View style={styles.secondaryRow}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.secondaryButton,
+                styles.secondaryButtonHalf,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: secondaryBackgroundColor ?? theme.colors.surfaceAlt,
+                  opacity: secondaryDisabled || secondaryLoading ? 0.5 : 1,
+                },
+              ]}
+              onPress={onSecondaryPress}
+              disabled={secondaryDisabled || secondaryLoading}
+            >
+              {secondaryIcon ? <View style={styles.secondaryIcon}>{secondaryIcon}</View> : null}
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.secondaryButtonText,
+                  {
+                    fontFamily: theme.typography.fontFamily,
+                    color: secondaryTextColor ?? theme.colors.text,
+                  },
+                ]}
+              >
+                {secondaryLoading ? 'Working…' : secondaryLabel}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={[
+                styles.secondaryButton,
+                styles.secondaryButtonHalf,
+                {
+                  borderColor: theme.colors.border,
+                  backgroundColor: tertiaryBackgroundColor ?? theme.colors.surfaceAlt,
+                  opacity: tertiaryDisabled || tertiaryLoading ? 0.5 : 1,
+                },
+              ]}
+              onPress={onTertiaryPress}
+              disabled={tertiaryDisabled || tertiaryLoading}
+            >
+              {tertiaryIcon ? <View style={styles.secondaryIcon}>{tertiaryIcon}</View> : null}
+              <Text
+                numberOfLines={1}
+                style={[
+                  styles.secondaryButtonText,
+                  {
+                    fontFamily: theme.typography.fontFamily,
+                    color: tertiaryTextColor ?? theme.colors.text,
+                  },
+                ]}
+              >
+                {tertiaryLoading ? 'Working…' : tertiaryLabel}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[
+              styles.secondaryButton,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: secondaryBackgroundColor ?? theme.colors.surfaceAlt,
+                opacity: secondaryDisabled || secondaryLoading ? 0.5 : 1,
+              },
+            ]}
+            onPress={onSecondaryPress}
+            disabled={secondaryDisabled || secondaryLoading}
+          >
+            {secondaryIcon ? <View style={styles.secondaryIcon}>{secondaryIcon}</View> : null}
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.secondaryButtonText,
+                {
+                  fontFamily: theme.typography.fontFamily,
+                  color: secondaryTextColor ?? theme.colors.text,
+                },
+              ]}
+            >
+              {secondaryLoading ? 'Working…' : secondaryLabel}
+            </Text>
+          </TouchableOpacity>
+        )
+      ) : null}
+
+      {!secondaryLabel && tertiaryLabel && onTertiaryPress ? (
         <TouchableOpacity
           activeOpacity={0.8}
           style={[
             styles.secondaryButton,
             {
               borderColor: theme.colors.border,
-              backgroundColor: secondaryBackgroundColor ?? theme.colors.surfaceAlt,
-              opacity: secondaryDisabled || secondaryLoading ? 0.5 : 1,
+              backgroundColor: tertiaryBackgroundColor ?? theme.colors.surfaceAlt,
+              opacity: tertiaryDisabled || tertiaryLoading ? 0.5 : 1,
             },
           ]}
-          onPress={onSecondaryPress}
-          disabled={secondaryDisabled || secondaryLoading}
+          onPress={onTertiaryPress}
+          disabled={tertiaryDisabled || tertiaryLoading}
         >
-          {secondaryIcon ? <View style={styles.secondaryIcon}>{secondaryIcon}</View> : null}
+          {tertiaryIcon ? <View style={styles.secondaryIcon}>{tertiaryIcon}</View> : null}
           <Text
+            numberOfLines={1}
             style={[
               styles.secondaryButtonText,
               {
                 fontFamily: theme.typography.fontFamily,
-                color: secondaryTextColor ?? theme.colors.text,
+                color: tertiaryTextColor ?? theme.colors.text,
               },
             ]}
           >
-            {secondaryLoading ? 'Working…' : secondaryLabel}
+            {tertiaryLoading ? 'Working…' : tertiaryLabel}
           </Text>
         </TouchableOpacity>
       ) : null}
@@ -188,9 +294,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
   },
+  secondaryRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 12,
+  },
+  secondaryButtonHalf: {
+    flex: 1,
+    minWidth: 0,
+    marginBottom: 0,
+  },
   secondaryButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
+    textAlign: 'center',
+    flexShrink: 1,
   },
   helperRow: {
     flexDirection: 'row',
@@ -206,7 +324,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   secondaryIcon: {
-    marginRight: 8,
+    marginRight: 6,
   },
   customFooter: {
     marginTop: 12,
