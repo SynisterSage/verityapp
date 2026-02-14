@@ -136,6 +136,8 @@ export async function sendVoIPPush(
         reject(err);
       });
 
+      const expirationTimestamp = Math.floor(Date.now() / 1000) + 60;
+
       const req = client.request({
         ':method': 'POST',
         ':path': path,
@@ -144,7 +146,7 @@ export async function sendVoIPPush(
         'apns-topic': `${bundleId}.voip`,
         'apns-push-type': 'voip',
         'apns-priority': '10',
-        'apns-expiration': '60',
+        'apns-expiration': String(expirationTimestamp),
       });
 
       req.setEncoding('utf8');
@@ -153,9 +155,15 @@ export async function sendVoIPPush(
 
       let responseData = '';
       let responseStatus = 0;
+      let responseHeaders: any = {};
 
       req.on('response', (headers) => {
         responseStatus = Number(headers[':status']) || 0;
+        responseHeaders = headers;
+        logger.info(`[VoIP] APNs response status: ${responseStatus}`);
+        if (headers['apns-id']) {
+          logger.info(`[VoIP] APNs ID: ${headers['apns-id']}`);
+        }
       });
 
       req.on('data', (chunk) => {
@@ -166,10 +174,12 @@ export async function sendVoIPPush(
         client.close();
 
         if (responseStatus === 200) {
-          logger.info(`[VoIP] Push sent successfully: token=${voipToken.substring(0, 8)}... callSid=${payload.callSid}`);
+          logger.info(`[VoIP] Push delivered to APNs: token=${voipToken.substring(0, 8)}... callSid=${payload.callSid}`);
           resolve(true);
         } else {
-          logger.err(`[VoIP] Push failed: status=${responseStatus} response=${responseData}`);
+          logger.err(`[VoIP] APNs rejected push: status=${responseStatus}`);
+          logger.err(`[VoIP] Response body: ${responseData}`);
+          logger.err(`[VoIP] Response headers: ${JSON.stringify(responseHeaders)}`);
           resolve(false);
         }
       });
