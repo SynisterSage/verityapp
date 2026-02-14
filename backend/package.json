@@ -11,6 +11,7 @@
     "test": "NODE_ENV=test vitest",
     "type-check": "tsc -b --noEmit",
     "retention:prune": "npx ts-node ./scripts/pruneRetention.ts",
+    "twilio-client:notify-stale": "ts-node ./scripts/notifyStaleTwilioClients.ts",
     "dev-support": "ts-node ./scripts/dev-support.ts",
     "sync-twilio-numbers": "ts-node ./scripts/syncTwilioNumbers.ts"
   },

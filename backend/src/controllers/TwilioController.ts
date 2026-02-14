@@ -16,7 +16,6 @@ import {
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
 import { dispatchAlertPush } from '@src/services/alertPushDispatcher';
-import { notifyProfileForAlert } from '@src/services/pushNotifications';
 
 const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call is being recorded for safety purposes.';
 const PUBLIC_API_URL = process.env.PUBLIC_API_URL?.replace(/\/+$/, '');
@@ -58,8 +57,6 @@ function extractPin(digits?: string, speechResult?: string) {
   return numeric.length >= 6 ? numeric.slice(0, 6) : '';
 }
 
-const CLIENT_SESSION_TTL_MS = Number(process.env.TWILIO_CLIENT_SESSION_TTL ?? '120') * 1000;
-
 async function isCallerTrusted(profileId: string, fromNumber?: string | null) {
   const trustedCaller = await getTrustedCaller(profileId, fromNumber);
   return Boolean(trustedCaller);
@@ -77,50 +74,6 @@ async function getTrustedCaller(profileId: string, fromNumber?: string | null) {
     .eq('caller_hash', callerHash)
     .maybeSingle();
   return data ?? null;
-}
-
-async function notifyStaleClientSession(profile: {
-  id: string;
-  twilio_client_last_seen_at?: string | null;
-  twilio_client_stale_notified_at?: string | null;
-}) {
-  if (!profile.twilio_client_last_seen_at) {
-    return;
-  }
-  const lastSeenAt = new Date(profile.twilio_client_last_seen_at);
-  if (Number.isNaN(lastSeenAt.getTime())) {
-    return;
-  }
-  if (Date.now() - lastSeenAt.getTime() < CLIENT_SESSION_TTL_MS) {
-    return;
-  }
-  const lastNotifiedAt = profile.twilio_client_stale_notified_at
-    ? new Date(profile.twilio_client_stale_notified_at)
-    : null;
-  if (lastNotifiedAt && !Number.isNaN(lastNotifiedAt.getTime())) {
-    // Notify at most once per 24h for this condition.
-    if (Date.now() - lastNotifiedAt.getTime() < 24 * 60 * 60 * 1000) {
-      return;
-    }
-  }
-
-  try {
-    await notifyProfileForAlert(profile.id, {
-      alertId: `twilio-stale-${Date.now()}`,
-      title: 'Open Verity to stay reachable',
-      body: 'Open Verity Protect so incoming protected calls can reach you in-app.',
-      data: {
-        alertType: 'twilio_client_stale',
-        routeTarget: 'calls_trusted',
-      },
-    });
-    await supabaseAdmin
-      .from('profiles')
-      .update({ twilio_client_stale_notified_at: new Date().toISOString() })
-      .eq('id', profile.id);
-  } catch (error) {
-    logger.err(error as Error);
-  }
 }
 
 async function logTrustedBridgeActivity(args: {
@@ -333,9 +286,6 @@ async function callIncoming(req: Request, res: Response) {
           profile
         );
         if (bridgeTarget) {
-          if (bridgeTarget.startsWith('client=')) {
-            await notifyStaleClientSession(profile);
-          }
           await logTrustedBridgeActivity({
             profileId: profile.id,
             caretakerId: profile.caretaker_id,
@@ -461,7 +411,7 @@ async function getProfileByToNumber(to?: string | null) {
   const { data: profile, error } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, caretaker_id, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at, twilio_client_stale_notified_at'
+      'id, caretaker_id, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at'
     )
     .eq('twilio_virtual_number', to)
     .single();
@@ -509,9 +459,6 @@ async function verifyPin(req: Request, res: Response) {
         profile
       );
       if (bridgeTarget) {
-        if (bridgeTarget.startsWith('client=')) {
-          await notifyStaleClientSession(profile);
-        }
         await logTrustedBridgeActivity({
           profileId: profile.id,
           caretakerId: profile.caretaker_id,
@@ -576,7 +523,6 @@ async function verifyPin(req: Request, res: Response) {
         clientIdentity,
         bridgeFallbackUrl
       );
-      await notifyStaleClientSession(profile);
       return res.type('text/xml').send(twimlResponse.toString());
     }
     const fallbackNumber = profile.fallback_phone_number || profile.phone_number || null;

@@ -1,0 +1,27 @@
+name: Notify stale Twilio clients
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch: {}
+
+jobs:
+  notify-stale-clients:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          npm install
+      - name: Send stale client reminders
+        env:
+          NODE_ENV: production
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          TWILIO_CLIENT_SESSION_TTL: ${{ vars.TWILIO_CLIENT_SESSION_TTL }}
+          TWILIO_CLIENT_STALE_NOTIFY_COOLDOWN_SECONDS: ${{ vars.TWILIO_CLIENT_STALE_NOTIFY_COOLDOWN_SECONDS }}
+        run: |
+          cd backend
+          npm run twilio-client:notify-stale
+
