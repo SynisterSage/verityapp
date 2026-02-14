@@ -49,6 +49,13 @@ export function navigateToActiveCall(params: ActiveCallParams) {
     return;
   }
 
+  console.info('[Navigation] Navigating to active call:', {
+    callSid: params.callSid,
+    fromNumber: params.fromNumber,
+    toNumber: params.toNumber,
+    status: params.status,
+  });
+
   const current = rootNavigationRef.getCurrentRoute();
   if (current?.name === 'ActiveCallModal') {
     const currentParams = (current.params ?? {}) as ActiveCallParams;

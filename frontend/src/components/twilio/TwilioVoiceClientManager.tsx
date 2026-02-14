@@ -53,6 +53,7 @@ export default function TwilioVoiceClientManager() {
   const lastInitAtRef = useRef(0);
   const lastRefreshAtRef = useRef(0);
   const activeCallSidRef = useRef<string | null>(null);
+  const isInitialMountRef = useRef(true);
   const REFRESH_MIN_INTERVAL_MS = 120_000;
   const INIT_MIN_INTERVAL_MS = 15_000;
 
@@ -349,6 +350,12 @@ export default function TwilioVoiceClientManager() {
   useEffect(() => {
     const listener = AppState.addEventListener('change', (nextState: string) => {
       if (nextState === 'active') {
+        // Skip hydration on initial app launch
+        if (isInitialMountRef.current) {
+          isInitialMountRef.current = false;
+          console.info('[twilio-voice] Skipping hydrate on initial mount');
+          return;
+        }
         refreshSessionIfNeeded('app_active');
         hydrateActiveCall();
       }
