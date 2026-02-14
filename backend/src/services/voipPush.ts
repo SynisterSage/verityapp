@@ -94,15 +94,16 @@ export async function sendVoIPPush(
   notification.topic = `${bundleId}.voip`;
   notification.priority = 10;
   notification.expiry = Math.floor(Date.now() / 1000) + 60;
+  notification.pushType = 'voip';
 
-  // For VoIP pushes, the payload must be at root level
-  // Access the internal compiled structure directly
-  const rawNotification: any = notification;
-  rawNotification.call_sid = payload.callSid;
-  rawNotification.from_number = payload.fromNumber;
-  rawNotification.to_number = payload.toNumber;
-  rawNotification.call_uuid = payload.callUuid || payload.callSid;
-  rawNotification.profile_id = payload.profileId;
+  // For VoIP pushes, payload must be at root level (not wrapped in 'aps')
+  notification.payload = {
+    call_sid: payload.callSid,
+    from_number: payload.fromNumber,
+    to_number: payload.toNumber,
+    call_uuid: payload.callUuid || payload.callSid,
+    profile_id: payload.profileId,
+  };
 
   const isProduction = process.env.APNS_PRODUCTION === 'true';
   logger.info(`[VoIP] Sending: callSid=${payload.callSid} from=${payload.fromNumber}`);
