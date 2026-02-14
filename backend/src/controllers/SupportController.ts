@@ -49,7 +49,13 @@ type SupportTicketSummary = {
   last_activity_at: string | null;
   ticket_id: string;
   ticket_subject: string | null;
+  ticket_state: string | null;
 };
+
+function resolveTicketState(metadata: Record<string, unknown> | null | undefined) {
+  const state = metadata?.ticketState;
+  return typeof state === 'string' && state.trim().length > 0 ? state : null;
+}
 
 async function fetchAccessibleProfiles(userId: string) {
   const { data: caretakerRows } = await supabaseAdmin
@@ -583,12 +589,20 @@ export default class SupportController {
       return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
     }
 
-    const { error } = await supabaseAdmin
+    const ticketIdParam =
+      typeof req.query?.ticketId === 'string' && req.query.ticketId.trim().length > 0
+        ? req.query.ticketId.trim()
+        : null;
+    let query = supabaseAdmin
       .from('support_setup_messages')
       .update({ is_read_by_user: true })
       .eq('user_id', userId)
       .eq('sender', 'agent')
       .eq('is_read_by_user', false);
+    if (ticketIdParam) {
+      query = query.eq('metadata->>ticketId', ticketIdParam);
+    }
+    const { error } = await query;
 
     if (error) {
       console.warn('Failed to mark setup messages as read', error);
@@ -614,12 +628,20 @@ export default class SupportController {
       return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
     }
 
-    const { error } = await supabaseAdmin
+    const ticketIdParam =
+      typeof req.query?.ticketId === 'string' && req.query.ticketId.trim().length > 0
+        ? req.query.ticketId.trim()
+        : null;
+    let query = supabaseAdmin
       .from('support_messages')
       .update({ is_read_by_user: true })
       .eq('profile_id', profileId)
       .eq('sender', 'agent')
       .eq('is_read_by_user', false);
+    if (ticketIdParam) {
+      query = query.eq('metadata->>ticketId', ticketIdParam);
+    }
+    const { error } = await query;
 
     if (error) {
       console.warn('Failed to mark agent messages as read', error);
@@ -705,6 +727,7 @@ export default class SupportController {
       }
       const messageMetadata = message.metadata as Record<string, unknown> | null;
       const ticketSubject = typeof messageMetadata?.ticketSubject === 'string' ? messageMetadata.ticketSubject : null;
+      const ticketState = resolveTicketState(messageMetadata);
       if (!existing) {
         ticketsMap.set(ticketId, {
           ticket_id: ticketId,
@@ -715,6 +738,7 @@ export default class SupportController {
           last_activity_at: message.created_at,
           unread_agent_messages: message.sender === 'agent' && !message.is_read_by_user ? 1 : 0,
           ticket_subject: ticketSubject,
+          ticket_state: ticketState,
         });
         return;
       }
@@ -727,6 +751,9 @@ export default class SupportController {
       }
       if (message.sender === 'agent' && !message.is_read_by_user) {
         existing.unread_agent_messages += 1;
+      }
+      if (!existing.ticket_state && ticketState) {
+        existing.ticket_state = ticketState;
       }
       ticketsMap.set(ticketId, existing);
     });
@@ -770,6 +797,7 @@ export default class SupportController {
         typeof metadata.ticketSubject === 'string' && metadata.ticketSubject.trim().length > 0
           ? metadata.ticketSubject
           : SETUP_DEFAULT_TICKET_SUBJECT;
+      const ticketState = resolveTicketState(metadata);
 
       const existing = ticketsMap.get(ticketId);
       const mappedLastMessage = {
@@ -795,6 +823,7 @@ export default class SupportController {
           last_activity_at: message.created_at,
           unread_agent_messages: message.sender === 'agent' && !message.is_read_by_user ? 1 : 0,
           ticket_subject: ticketSubject,
+          ticket_state: ticketState,
         });
         return;
       }
@@ -811,6 +840,9 @@ export default class SupportController {
       }
       if (message.sender === 'agent' && !message.is_read_by_user) {
         existing.unread_agent_messages += 1;
+      }
+      if (!existing.ticket_state && ticketState) {
+        existing.ticket_state = ticketState;
       }
       ticketsMap.set(ticketId, existing);
     });

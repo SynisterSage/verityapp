@@ -40,8 +40,9 @@ export async function createSupportMessage(
   return data?.message as SupportMessage;
 }
 
-export async function markSupportMessagesRead(profileId: string) {
-  await authorizedFetch(`${baseSupportPath(profileId)}/messages/mark-read`, {
+export async function markSupportMessagesRead(profileId: string, ticketId?: string | null) {
+  const query = ticketId ? `?ticketId=${encodeURIComponent(ticketId)}` : '';
+  await authorizedFetch(`${baseSupportPath(profileId)}/messages/mark-read${query}`, {
     method: 'PATCH',
   });
 }
@@ -79,8 +80,9 @@ export async function createSetupSupportMessage(payload: {
   return data?.message as SupportMessage;
 }
 
-export async function markSetupSupportMessagesRead() {
-  await authorizedFetch(`${setupSupportPath}/messages/mark-read`, {
+export async function markSetupSupportMessagesRead(ticketId?: string | null) {
+  const query = ticketId ? `?ticketId=${encodeURIComponent(ticketId)}` : '';
+  await authorizedFetch(`${setupSupportPath}/messages/mark-read${query}`, {
     method: 'PATCH',
   });
 }
@@ -102,6 +104,7 @@ export type SupportTicketSummary = {
   last_activity_at: string | null;
   ticket_id: string;
   ticket_subject: string | null;
+  ticket_state: string | null;
 };
 
 export async function fetchSupportTickets() {

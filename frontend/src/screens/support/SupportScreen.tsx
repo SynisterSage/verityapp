@@ -84,6 +84,8 @@ function formatTimestamp(value?: string | null) {
 }
 
 const SETUP_TICKET_ID = 'setup-help';
+const INITIAL_SUPPORT_GREETING = 'Hi there! What can we assist you with today?';
+const INITIAL_SETUP_GREETING = 'Hi there! We can help with setup even before your first profile is created.';
 
 export default function SupportScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SupportModal'>>();
@@ -175,9 +177,9 @@ export default function SupportScreen() {
           }
         }
       if (hasProfileSupport && activeProfile?.id) {
-        await markSupportMessagesRead(activeProfile.id);
+        await markSupportMessagesRead(activeProfile.id, ticketIdToUse);
       } else {
-        await markSetupSupportMessagesRead();
+        await markSetupSupportMessagesRead(ticketIdToUse);
       }
         await refreshUnread();
       } catch (err) {
@@ -367,19 +369,22 @@ export default function SupportScreen() {
   }, []);
 
   const statusMessage = useMemo(() => {
-    if (!activeProfile) {
-      return 'We can help with setup now. Messages are tied to your account email until your first profile is ready.';
-    }
     if (loading) {
       return 'Loading your chat history…';
     }
     if (messages.length === 0) {
-      return 'Send us a note and we will reply shortly.';
+      return null;
     }
     return null;
-  }, [activeProfile, loading, messages.length]);
+  }, [loading, messages.length]);
 
-  const headerSubtitle = statusMessage || 'Every message is stored in a ticket so you can revisit the timeline later.';
+  const fallbackSubtitle = activeProfile
+    ? INITIAL_SUPPORT_GREETING
+    : INITIAL_SETUP_GREETING;
+  const headerSubtitle =
+    messages.length === 0 && !loading
+      ? fallbackSubtitle
+      : statusMessage || 'Every message is stored in a ticket so you can revisit the timeline later.';
 
   const composerBackgroundColor = theme.colors.surface;
   const composerInputBackground = theme.colors.surface;

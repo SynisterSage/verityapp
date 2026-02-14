@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 import { useProfile } from '../../context/ProfileContext';
@@ -26,6 +26,8 @@ import {
   deleteSupportTicket,
   fetchSetupSupportTickets,
   fetchSupportTickets,
+  markSetupSupportMessagesRead,
+  markSupportMessagesRead,
   SupportTicketSummary,
 } from '../../services/support';
 import { navigateToSupportModal } from '../../navigation/rootNavigator';
@@ -67,6 +69,9 @@ function getRelativeLabel(value?: string | null) {
 }
 
 function getTicketState(ticket: SupportTicketSummary) {
+  if (ticket.ticket_state === 'closed') {
+    return 'handled';
+  }
   const metadata = ticket.last_message?.metadata as Record<string, unknown> | null;
   const ticketState = typeof metadata?.ticketState === 'string' ? metadata.ticketState : null;
   return ticketState === 'closed' ? 'handled' : 'active';
@@ -123,9 +128,30 @@ export default function SupportTicketsScreen() {
     void loadTickets();
   }, [loadTickets]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void loadTickets({ showLoading: false });
+    }, [loadTickets])
+  );
+
   const handleOpenChat = useCallback(
-    (ticketProfileId: string, ticketId: string) => {
+    async (ticketProfileId: string, ticketId: string) => {
+      setTickets((prev) =>
+        prev.map((ticket) =>
+          ticket.ticket_id === ticketId ? { ...ticket, unread_agent_messages: 0 } : ticket
+        )
+      );
       const profile = profiles.find((item) => item.id === ticketProfileId);
+      try {
+        if (profile) {
+          await markSupportMessagesRead(ticketProfileId, ticketId);
+          setActiveProfile(profile);
+        } else {
+          await markSetupSupportMessagesRead(ticketId);
+        }
+      } catch (error) {
+        console.warn('Failed to mark support ticket as read', error);
+      }
       if (profile) {
         setActiveProfile(profile);
       }
