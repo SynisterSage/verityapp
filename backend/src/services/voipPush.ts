@@ -91,13 +91,13 @@ export async function sendVoIPPush(
 
   const notification = new apn.Notification();
 
-  // VoIP notifications are silent - they wake the app but don't show a banner
+  // VoIP notifications have special handling - no 'aps' wrapper needed
   notification.topic = `${bundleId}.voip`;
   notification.priority = 10; // High priority
 
-  // For VoIP pushes, set the raw payload directly
-  // This bypasses the 'aps' wrapper and sends custom data at root level
-  notification.rawPayload = {
+  // For VoIP pushes in node-apn, custom data goes in payload
+  // but we access via dictionaryPayload on iOS which gives us root-level access
+  notification.payload = {
     call_sid: payload.callSid,
     from_number: payload.fromNumber,
     to_number: payload.toNumber,

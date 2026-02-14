@@ -390,6 +390,12 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
+      // CRITICAL: Refresh Twilio session when VoIP push arrives
+      // This ensures the client is ready to receive the incoming call
+      // even if the app was backgrounded and connection went stale
+      console.info('[VoIPPush] Refreshing Twilio session for incoming call');
+      void refreshTwilioClientSession();
+
       // Navigate to active call screen
       navigateToActiveCall({
         callSid: payload.callSid,

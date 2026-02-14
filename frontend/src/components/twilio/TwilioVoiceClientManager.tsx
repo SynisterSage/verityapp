@@ -148,6 +148,8 @@ export default function TwilioVoiceClientManager() {
   useEffect(() => {
     TwilioVoice.configureCallKit({
       appName: 'Verity Protect',
+      imageName: 'logo',
+      ringtoneSound: 'ringtone.wav',
     });
     console.info('[twilio-voice] callkit configured');
   }, []);
