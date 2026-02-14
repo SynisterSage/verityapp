@@ -11,13 +11,7 @@ class VoIPPushModule: RCTEventEmitter {
   private let callKitCallController: CXCallController
 
   override init() {
-    let configuration: CXProviderConfiguration
-    if #available(iOS 14.0, *) {
-      configuration = CXProviderConfiguration()
-      configuration.localizedName = "Verity Protect"
-    } else {
-      configuration = CXProviderConfiguration(localizedName: "Verity Protect")
-    }
+    let configuration = CXProviderConfiguration(localizedName: "Verity Protect")
     configuration.supportsVideo = false
     configuration.maximumCallsPerCallGroup = 1
     configuration.supportedHandleTypes = [.phoneNumber]
