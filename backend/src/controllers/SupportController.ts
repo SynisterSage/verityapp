@@ -748,6 +748,7 @@ export default class SupportController {
         existing.last_message = message;
         existing.last_activity_at = message.created_at;
         existing.ticket_subject = existing.ticket_subject ?? ticketSubject;
+        existing.ticket_state = ticketState ?? existing.ticket_state;
       }
       if (message.sender === 'agent' && !message.is_read_by_user) {
         existing.unread_agent_messages += 1;
@@ -834,6 +835,7 @@ export default class SupportController {
         existing.last_message = mappedLastMessage;
         existing.last_activity_at = message.created_at;
         existing.ticket_subject = existing.ticket_subject ?? ticketSubject;
+        existing.ticket_state = ticketState ?? existing.ticket_state;
         if (!existing.profile_name && message.email_snapshot) {
           existing.profile_name = message.email_snapshot;
         }

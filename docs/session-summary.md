@@ -172,3 +172,59 @@ Files touched
 Result
 - Long names in current safe lists now truncate instead of running off the right edge.
 - New doctor entries added from lookup are shorter by default, reducing repeated overflow issues.
+
+2026-02-13 to 2026-02-14
+
+Scope
+- Complete iOS VoIP + push setup for Twilio call bridging.
+- Stabilize local iOS build tooling (Ruby/CocoaPods/Xcode) for native device testing.
+- Ship alert push notifications (with deep links) and trusted-call activity surfacing.
+- Expand Support to work during onboarding (pre-profile) and carry state after profile creation.
+
+Platform and infra work
+- Completed Apple capability/config steps for iOS calling stack:
+  - Push Notifications enabled.
+  - Background Modes enabled for `Remote notifications` and `Voice over IP`.
+  - VoIP credential created/exported and uploaded to Twilio Mobile Push Credentials (APN).
+- Resolved local CocoaPods/Ruby environment churn by standardizing on rbenv-managed Ruby + working pod flow in project context.
+- Confirmed Twilio client token issuance includes push credential SID and periodic heartbeat.
+
+VoIP and call bridging outcomes
+- Twilio Voice client registration and incoming invite handling now works on physical iOS device.
+- Trusted caller bridge path now successfully dials `client:profile-...` and connects to in-app call flow.
+- Verified loop-avoidance behavior for trusted caller handling (bridge path no longer re-dials forwarded number flow).
+- Added/validated backend logging around bridge attempts, dial status, and token issuance.
+
+Push notification work
+- Added alert push dispatch pipeline for app alerts (server-side dispatcher + routing metadata).
+- Implemented push payload routing/deep-link mapping (fraud -> call detail, trusted -> calls filtered view, fallback -> alerts).
+- Added per-profile push rate limit behavior (target: max 1 per 60 seconds).
+- Device token registration/upsert confirmed in Supabase (`profile_device_tokens` rows created).
+
+Trusted activity and UI work
+- Added trusted bridge activity surfacing in app activity feeds.
+- Updated home/calls treatment for trusted activity cards (non-drilldown where intended, visual label cleanup).
+- Added long-press tray actions for trusted entries to support deletion flow similar to handled alerts.
+- Fixed section behavior so closed support conversations are classified into handled/muted section.
+
+Support system expansion
+- Added onboarding/pre-profile support message flow (setup tickets/messages).
+- Added setup assistant-status endpoint and setup ticket listing endpoint.
+- Added setup ticket creation with initial auto greeting.
+- Added merge behavior to carry onboarding support history into profile support context after profile creation.
+- Improved auto-reply logic so setup auto message triggers only on first user message in a ticket.
+- Fixed unread behavior to be ticket-scoped (opening one conversation only clears that conversation).
+
+Account/data lifecycle updates
+- Improved account deletion-related cleanup paths, including Twilio number release back to pool (`available`) during owner deletion flow.
+- Added/updated scripts/flows for Twilio number pool sync/upsert and release verification.
+
+Known issues and in-progress items
+- Sign in with Apple setup progressed (Identifiers/Service ID/keys/Supabase provider config), but end-to-end auth exchange had intermittent `Unable to exchange external code` errors during this session; needs final validation.
+- Expo debug log noise still appears in dev for `expo-notifications` appId validation (`"appId": Expected string, received null`) even when backend/device token registration succeeds; not blocking verified backend push dispatch but should be cleaned up.
+- Backend full TypeScript check still reports pre-existing test alias resolution issues in `backend/tests/*` (not introduced by support/voip changes in this session).
+
+Verification done
+- Call bridge test from trusted contacts completed with in-app incoming call and two-way audio connection.
+- Push dispatch logs show successful sends for generated alerts, and at least one closed-app push delivery was observed on device.
+- Setup support tickets/messages creation and history rendering tested, including handoff behavior post-onboarding.

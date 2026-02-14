@@ -145,7 +145,6 @@ export default function SupportTicketsScreen() {
       try {
         if (profile) {
           await markSupportMessagesRead(ticketProfileId, ticketId);
-          setActiveProfile(profile);
         } else {
           await markSetupSupportMessagesRead(ticketId);
         }
