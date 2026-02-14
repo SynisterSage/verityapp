@@ -133,26 +133,10 @@ extension VoIPPushModule: PKPushRegistryDelegate {
 
     print("[VoIPPush] Extracted: callSid=\(callSid) from=\(fromNumber) to=\(toNumber) uuid=\(callUUID)")
 
-    // CRITICAL: Report to CallKit IMMEDIATELY to keep app alive
-    // This creates the system call UI before React Native even starts
-    let uuid = UUID(uuidString: callUUID) ?? UUID()
-    let handle = CXHandle(type: .phoneNumber, value: fromNumber)
-
-    let update = CXCallUpdate()
-    update.remoteHandle = handle
-    update.hasVideo = false
-    update.localizedCallerName = fromNumber
-
-    print("[VoIPPush] Reporting incoming call to CallKit: \(callUUID)")
-
-    callKitProvider.reportNewIncomingCall(with: uuid, update: update) { error in
-      if let error = error {
-        print("[VoIPPush] CallKit error: \(error.localizedDescription)")
-      } else {
-        print("[VoIPPush] CallKit call reported successfully")
-      }
-      completion()
-    }
+    // VoIP push wakes the app and keeps it alive in background
+    // Twilio SDK will handle CallKit automatically when the actual call arrives
+    // This avoids duplicate CallKit calls and UUID mismatches
+    print("[VoIPPush] App woken by VoIP push, notifying React Native")
 
     // Notify React Native (for when app is already running)
     self.sendEvent(withName: "voipPushReceived", body: [
@@ -161,6 +145,9 @@ extension VoIPPushModule: PKPushRegistryDelegate {
       "toNumber": toNumber,
       "callUUID": callUUID
     ])
+
+    // Complete immediately to allow app to wake and initialize
+    completion()
   }
 
   func pushRegistry(_ registry: PKPushRegistry,
