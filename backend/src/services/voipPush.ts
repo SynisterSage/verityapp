@@ -89,26 +89,24 @@ export async function sendVoIPPush(
     return false;
   }
 
-  // BATTLE-TESTED VoIP push configuration for node-apn
+  // Create notification with MINIMAL configuration for VoIP
   const notification = new apn.Notification();
-
-  // VoIP push configuration
   notification.topic = `${bundleId}.voip`;
   notification.priority = 10;
-  notification.expiry = Math.floor(Date.now() / 1000) + 60; // Expire in 60 seconds
+  notification.expiry = Math.floor(Date.now() / 1000) + 60;
 
-  // Custom payload - node-apn will handle .voip topic correctly
-  notification.payload = {
-    call_sid: payload.callSid,
-    from_number: payload.fromNumber,
-    to_number: payload.toNumber,
-    call_uuid: payload.callUuid || payload.callSid,
-    profile_id: payload.profileId,
-  };
+  // For VoIP pushes, the payload must be at root level
+  // Access the internal compiled structure directly
+  const rawNotification: any = notification;
+  rawNotification.call_sid = payload.callSid;
+  rawNotification.from_number = payload.fromNumber;
+  rawNotification.to_number = payload.toNumber;
+  rawNotification.call_uuid = payload.callUuid || payload.callSid;
+  rawNotification.profile_id = payload.profileId;
 
   const isProduction = process.env.APNS_PRODUCTION === 'true';
   logger.info(`[VoIP] Sending: callSid=${payload.callSid} from=${payload.fromNumber}`);
-  logger.info(`[VoIP] Details: token=${voipToken.substring(0, 16)}... env=${isProduction ? 'production' : 'development'} topic=${bundleId}.voip`);
+  logger.info(`[VoIP] Config: token=${voipToken.substring(0, 16)}... env=${isProduction ? 'production' : 'development'} topic=${bundleId}.voip`);
 
   try {
     const result = await provider.send(notification, voipToken);
@@ -116,13 +114,13 @@ export async function sendVoIPPush(
     if (result.failed.length > 0) {
       const failure = result.failed[0];
       logger.err(
-        `VoIP push failed: token=${voipToken.substring(0, 8)}... reason=${failure?.response?.reason || 'unknown'} status=${failure?.status || 'unknown'}`
+        `VoIP push FAILED: token=${voipToken.substring(0, 8)}... reason=${failure?.response?.reason || 'unknown'} status=${failure?.status || 'unknown'}`
       );
       return false;
     }
 
     logger.info(
-      `VoIP push sent successfully: token=${voipToken.substring(0, 8)}... callSid=${payload.callSid} from=${payload.fromNumber}`
+      `VoIP push sent: token=${voipToken.substring(0, 8)}... callSid=${payload.callSid}`
     );
     return true;
   } catch (error) {
