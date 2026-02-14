@@ -41,6 +41,14 @@ export function navigateToActiveCall(params: ActiveCallParams) {
   if (!rootNavigationRef.isReady()) {
     return;
   }
+
+  // CRITICAL: Block navigation if no valid callSid
+  // Active call screen should ONLY show for actual calls with valid IDs
+  if (!params.callSid || params.callSid.trim() === '') {
+    console.warn('[Navigation] Blocked navigation to active call screen without valid callSid:', params);
+    return;
+  }
+
   const current = rootNavigationRef.getCurrentRoute();
   if (current?.name === 'ActiveCallModal') {
     const currentParams = (current.params ?? {}) as ActiveCallParams;
