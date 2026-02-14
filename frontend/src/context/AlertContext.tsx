@@ -15,6 +15,7 @@ type AlertRow = {
   id: string;
   processed?: boolean;
   status?: string | null;
+  risk_level?: string | null;
 };
 
 function isHandledByStatus(status?: string | null) {
@@ -26,6 +27,10 @@ function isHandledByStatus(status?: string | null) {
 
 function isHandledAlert(alert: AlertRow) {
   return alert.processed || isHandledByStatus(alert.status);
+}
+
+function isCriticalAlert(alert: AlertRow) {
+  return alert.risk_level?.toLowerCase() === 'critical';
 }
 
 export function AlertProvider({ children }: { children: React.ReactNode }) {
@@ -40,7 +45,8 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await authorizedFetch('/alerts?limit=50');
       const alerts = (data?.alerts ?? []) as AlertRow[];
-      const count = alerts.filter((alert) => !isHandledAlert(alert)).length;
+      // Only count unhandled CRITICAL alerts in the badge
+      const count = alerts.filter((alert) => !isHandledAlert(alert) && isCriticalAlert(alert)).length;
       setUnhandledCount(count);
     } catch {
       setUnhandledCount(0);
