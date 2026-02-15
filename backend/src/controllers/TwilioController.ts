@@ -253,10 +253,9 @@ async function bridgeToProfile(
       });
 
       const clientIdentity = getClientIdentity(profile);
-      // If VoIP push was sent, pause 3 seconds to let app wake up and register
-      // VoIP push wakes app immediately and reports to CallKit
-      // We just need a short delay for Twilio SDK to initialize
-      const pauseDuration = voipPushSent ? 3 : 0;
+      // If VoIP push was sent, pause 1 second to let app wake up
+      // VoIP push wakes app instantly, we just need minimal delay for Twilio SDK init
+      const pauseDuration = voipPushSent ? 1 : 0;
       appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
       return `client=${clientIdentity} (loop-avoidance)`;
     }

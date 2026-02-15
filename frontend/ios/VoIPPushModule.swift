@@ -133,18 +133,14 @@ extension VoIPPushModule: PKPushRegistryDelegate {
 
     print("[VoIPPush] Extracted: callSid=\(callSid) from=\(fromNumber) to=\(toNumber) uuid=\(callUUID)")
 
-    // CRITICAL: iOS 13+ requires reporting incoming call to CallKit IMMEDIATELY
-    // when receiving VoIP push, otherwise iOS will stop delivering future pushes
+    // CRITICAL: iOS 13+ requires reporting to CallKit immediately
+    // Report as connecting (not ringing yet) to prevent premature answering
     let uuid = UUID(uuidString: callUUID) ?? UUID()
     let handle = CXHandle(type: .phoneNumber, value: fromNumber)
     let callUpdate = CXCallUpdate()
     callUpdate.remoteHandle = handle
     callUpdate.hasVideo = false
     callUpdate.localizedCallerName = fromNumber
-    // Don't support holding - prevents user from answering before Twilio call arrives
-    callUpdate.supportsHolding = false
-    callUpdate.supportsGrouping = false
-    callUpdate.supportsUngrouping = false
 
     print("[VoIPPush] Reporting incoming call to CallKit: uuid=\(uuid)")
     callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
@@ -156,7 +152,14 @@ extension VoIPPushModule: PKPushRegistryDelegate {
 
       print("[VoIPPush] Successfully reported call to CallKit")
 
-      // Notify React Native AFTER CallKit is notified
+      // End this placeholder call immediately
+      // Twilio SDK will create the real CallKit call when the actual call arrives
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        self.callKitProvider.reportCall(with: uuid, endedAt: Date(), reason: .remoteEnded)
+        print("[VoIPPush] Ended placeholder CallKit call, Twilio will create the real one")
+      }
+
+      // Notify React Native
       self.sendEvent(withName: "voipPushReceived", body: [
         "callSid": callSid,
         "fromNumber": fromNumber,
