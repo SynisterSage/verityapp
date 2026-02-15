@@ -152,12 +152,9 @@ extension VoIPPushModule: PKPushRegistryDelegate {
 
       print("[VoIPPush] Successfully reported call to CallKit")
 
-      // End this placeholder call immediately
-      // Twilio SDK will create the real CallKit call when the actual call arrives
-      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-        self.callKitProvider.reportCall(with: uuid, endedAt: Date(), reason: .remoteEnded)
-        print("[VoIPPush] Ended placeholder CallKit call, Twilio will create the real one")
-      }
+      // Keep the CallKit call active - DON'T end it
+      // Twilio SDK will handle the call when it arrives
+      // This satisfies iOS requirement to maintain CallKit call after reporting
 
       // Notify React Native
       self.sendEvent(withName: "voipPushReceived", body: [
