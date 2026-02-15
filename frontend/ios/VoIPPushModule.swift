@@ -141,6 +141,10 @@ extension VoIPPushModule: PKPushRegistryDelegate {
     callUpdate.remoteHandle = handle
     callUpdate.hasVideo = false
     callUpdate.localizedCallerName = fromNumber
+    // Don't support holding - prevents user from answering before Twilio call arrives
+    callUpdate.supportsHolding = false
+    callUpdate.supportsGrouping = false
+    callUpdate.supportsUngrouping = false
 
     print("[VoIPPush] Reporting incoming call to CallKit: uuid=\(uuid)")
     callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
