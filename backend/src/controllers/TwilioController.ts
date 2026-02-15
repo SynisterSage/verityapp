@@ -253,10 +253,9 @@ async function bridgeToProfile(
       });
 
       const clientIdentity = getClientIdentity(profile);
-      // If VoIP push was sent, pause 2 seconds to let app wake up and Twilio SDK initialize
-      // Placeholder CallKit call ends after 0.5s, Twilio call must arrive before that
-      // 2 seconds gives reliable timing for Twilio to create the real CallKit call
-      const pauseDuration = voipPushSent ? 2 : 0;
+      // If VoIP push was sent, pause 1 second to let app wake up
+      // When user answers placeholder call, we end it and Twilio creates the real one
+      const pauseDuration = voipPushSent ? 1 : 0;
       appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
       return `client=${clientIdentity} (loop-avoidance)`;
     }
