@@ -384,25 +384,17 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     const handleIncomingCall = (payload: VoIPPushPayload) => {
       console.info('[VoIPPush] Incoming call from push:', payload);
 
-      // Only navigate if we have a valid callSid (not empty/stale push)
-      if (!payload.callSid || !payload.callSid.trim()) {
-        console.warn('[VoIPPush] Ignoring VoIP push without valid callSid');
-        return;
-      }
-
+      // VoIP push has already reported to CallKit (required by iOS)
+      // Now just refresh Twilio session so it's ready when the actual call arrives
       // CRITICAL: Refresh Twilio session when VoIP push arrives
       // This ensures the client is ready to receive the incoming call
       // even if the app was backgrounded and connection went stale
       console.info('[VoIPPush] Refreshing Twilio session for incoming call');
       void refreshTwilioClientSession();
 
-      // Navigate to active call screen
-      navigateToActiveCall({
-        callSid: payload.callSid,
-        fromNumber: payload.fromNumber,
-        toNumber: payload.toNumber,
-        status: 'Ringing',
-      });
+      // DO NOT navigate here - let Twilio SDK handle the call flow
+      // The Twilio SDK will automatically handle CallKit and navigation when the actual call arrives
+      // This avoids conflicts between our CallKit call and Twilio's CallKit call
 
       logEvent('voip_push_received', {
         level: 'info',
