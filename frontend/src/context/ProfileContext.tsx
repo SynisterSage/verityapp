@@ -21,7 +21,7 @@ import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 import { registerProfileDeviceToken } from '../services/notifications';
 import { logError, logEvent } from '../services/sentry';
-import { initializeVoIPPush, updateVoIPPushToken, endCall } from '../services/voipPush';
+import { initializeVoIPPush, updateVoIPPushToken } from '../services/voipPush';
 import type { VoIPPushPayload } from '../types/voip-push';
 import { navigateToActiveCall } from '../navigation/rootNavigator';
 
@@ -408,14 +408,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
     const handleCallAnswered = (callUUID: string) => {
       console.info('[VoIPPush] Call answered:', callUUID);
-
-      // User answered our placeholder CallKit call
-      // End it immediately - Twilio's real call will arrive shortly
-      console.info('[VoIPPush] Ending placeholder call, waiting for Twilio call');
-
-      endCall(callUUID).catch((err) => {
-        console.error('[VoIPPush] Failed to end placeholder call:', err);
-      });
+      // Twilio SDK handles CallKit, so this won't be called unless we create our own CallKit call
     };
 
     const handleCallEnded = (callUUID: string) => {
