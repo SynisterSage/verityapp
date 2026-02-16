@@ -983,6 +983,13 @@ const loadMemberNames = useCallback(async () => {
     handledAlerts.length > 0 ||
     circleActivity.length > 0;
 
+  // Check if there are any unhandled alerts to show (excluding handled)
+  const hasUnhandledAlerts =
+    priorityAlerts.length > 0 ||
+    systemHealthAlerts.length > 0 ||
+    circleActivity.length > 0 ||
+    remainingAlerts.length > 0;
+
   const renderOtherAlerts = () => {
     if (!recentAlerts.length) return null;
     return (
@@ -1104,7 +1111,7 @@ const loadMemberNames = useCallback(async () => {
           ref={listRef}
           contentContainerStyle={[
             styles.scrollContent,
-            !showSkeleton && !hasTopSections && remainingAlerts.length === 0 && styles.listEmptyContent,
+            !showSkeleton && !hasUnhandledAlerts && styles.listEmptyContent,
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -1133,7 +1140,7 @@ const loadMemberNames = useCallback(async () => {
           {renderCircleSection()}
           {renderHandledSection()}
           {renderOtherAlerts()}
-          {!hasTopSections && remainingAlerts.length === 0 && !showSkeleton ? (
+          {!hasUnhandledAlerts && !showSkeleton ? (
             <View style={styles.emptyStateWrap}>
               <EmptyState
                 icon="alert-circle-outline"
