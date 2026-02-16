@@ -987,8 +987,8 @@ const loadMemberNames = useCallback(async () => {
   const hasUnhandledAlerts =
     priorityAlerts.length > 0 ||
     systemHealthAlerts.length > 0 ||
-    circleActivity.length > 0 ||
-    remainingAlerts.length > 0;
+    circleActivity.filter((item) => !isHandledAlert(item.alertRow)).length > 0 ||
+    remainingAlerts.filter((alert) => !isHandledAlert(alert)).length > 0;
 
   const renderOtherAlerts = () => {
     if (!recentAlerts.length) return null;
