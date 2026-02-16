@@ -466,11 +466,14 @@ export default function CallsScreen({
     if (!trustedTrayItem) return;
     setTrustedTrayProcessing(true);
     try {
-      await authorizedFetch(`/alerts/${trustedTrayItem.id}`, { method: 'DELETE' });
+      console.log('[CallsScreen] Deleting trusted activity:', trustedTrayItem.id);
+      const response = await authorizedFetch(`/alerts/${trustedTrayItem.id}`, { method: 'DELETE' });
+      console.log('[CallsScreen] Delete response:', response);
       setTrustedActivity((prev) => prev.filter((row) => row.id !== trustedTrayItem.id));
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       hideTrustedTray();
-    } catch {
+    } catch (err) {
+      console.error('[CallsScreen] Delete failed:', err);
       Alert.alert('Delete failed', 'Could not delete the notification right now.');
       setTrustedTrayProcessing(false);
     }
