@@ -229,7 +229,7 @@ export default function TwilioVoiceClientManager() {
       console.info('TwilioVoice incoming invite', data);
       const parsed = parseTwilioEventData(data);
 
-      // Only navigate if we have a valid callSid (not stale/empty data)
+      // Only process if we have a valid callSid (not stale/empty data)
       if (!parsed.callSid) {
         console.warn('[twilio-voice] Ignoring incoming invite without callSid');
         return;
@@ -246,13 +246,10 @@ export default function TwilioVoiceClientManager() {
         clearPlaceholderCallUUID();
       }
 
+      // Report lifecycle but DON'T navigate yet - let CallKit handle the incoming call UI
+      // We'll navigate when user accepts and call starts connecting
       reportLifecycle('ringing', data);
-      navigateToActiveCall({
-        callSid: parsed.callSid,
-        fromNumber: parsed.fromNumber,
-        toNumber: parsed.toNumber,
-        status: 'Ringing',
-      });
+      console.info('[twilio-voice] Incoming call reported, waiting for user to accept via CallKit');
     };
     const handleDeviceReady = () => {
       console.info('TwilioVoice device ready');
