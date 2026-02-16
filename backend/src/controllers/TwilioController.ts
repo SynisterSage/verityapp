@@ -253,9 +253,9 @@ async function bridgeToProfile(
       });
 
       const clientIdentity = getClientIdentity(profile);
-      // No pause - dial Twilio immediately for tightest timing
+      // If VoIP push was sent, pause 2s for app cold start and Twilio SDK init
       // VoIP push creates placeholder CallKit call, ended when Twilio's call arrives
-      const pauseDuration = 0;
+      const pauseDuration = voipPushSent ? 2 : 0;
       appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
       return `client=${clientIdentity} (loop-avoidance)`;
     }
