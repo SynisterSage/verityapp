@@ -561,18 +561,20 @@ const loadMemberNames = useCallback(async () => {
     );
     return combined.map(({ order, ...rest }) => rest);
   }, [alerts, callNumberMap, contactNames, memberNames]);
+  // Count unhandled non-circle alerts (fraud, system health, etc.)
   const pendingAlertCount = useMemo(
-    () => alerts.filter((alert) => !isHandledAlert(alert)).length,
-    [alerts]
+    () => alerts.filter((alert) => !isHandledAlert(alert) && !isCircleActivityAlert(alert)).length,
+    [alerts, isCircleActivityAlert]
   );
 
-  // Only count unhandled circle activities as "new"
+  // Count unhandled circle activities separately
   // Processed activities (handled by circle members) shouldn't count
   const unhandledCircleCount = useMemo(
     () => circleActivity.filter((item) => !isHandledAlert(item.alertRow)).length,
     [circleActivity]
   );
 
+  // Total = non-circle alerts + circle alerts (no double counting)
   const newAlertsCount = pendingAlertCount + unhandledCircleCount;
 
   const handleDelete = useCallback(async (alertId: string) => {
