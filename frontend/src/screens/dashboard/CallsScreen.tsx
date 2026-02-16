@@ -315,8 +315,7 @@ export default function CallsScreen({
         .select('id, created_at, payload')
         .eq('profile_id', activeProfile.id)
         .eq('alert_type', 'trusted')
-        .order('created_at', { ascending: false })
-        .limit(3),
+        .order('created_at', { ascending: false }),
     ]);
     if (callsRes.error) {
       setError(callsRes.error.message);
@@ -466,9 +465,7 @@ export default function CallsScreen({
     if (!trustedTrayItem) return;
     setTrustedTrayProcessing(true);
     try {
-      console.log('[CallsScreen] Deleting trusted activity:', trustedTrayItem.id);
-      const response = await authorizedFetch(`/alerts/${trustedTrayItem.id}`, { method: 'DELETE' });
-      console.log('[CallsScreen] Delete response:', response);
+      await authorizedFetch(`/alerts/${trustedTrayItem.id}`, { method: 'DELETE' });
       setTrustedActivity((prev) => prev.filter((row) => row.id !== trustedTrayItem.id));
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       hideTrustedTray();
