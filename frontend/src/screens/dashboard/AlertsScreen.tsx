@@ -643,14 +643,15 @@ const loadMemberNames = useCallback(async () => {
 
   const handledAlerts = useMemo(() => {
     const systemHealthIds = new Set(systemHealthAlerts.map((alert) => alert.id));
-    // Show all alerts that aren't priority/system/circle in "Handled" section
-    // These appear as "Handled" on frontend but won't count toward "new alerts"
+    // Show fraud/risk alerts that aren't priority/system/circle/trusted
+    // Exclude trusted alerts - they're shown on home/calls screens
     return alerts
       .filter(
         (alert) =>
           !isCircleActivityAlert(alert) &&
           !priorityIds.has(alert.id) &&
-          !systemHealthIds.has(alert.id)
+          !systemHealthIds.has(alert.id) &&
+          (alert.alert_type ?? '').toLowerCase() !== 'trusted' // Exclude trusted alerts
       )
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [alerts, priorityIds, systemHealthAlerts, isCircleActivityAlert]);
@@ -956,12 +957,14 @@ const loadMemberNames = useCallback(async () => {
             const statusLabel = alert.processed ? 'Handled' : alert.status ?? 'Handled';
             const scoreLabel =
               typeof alert.payload?.score === 'number' ? `${Math.round(alert.payload.score)}%` : undefined;
+            // Build description without duplicating caller info
+            const description = reason || 'Previous alert';
             return (
                 <AlertCard
                   key={`handled-${alert.id}`}
                 categoryLabel="Handled alert"
                 title={nameOrNumber}
-                 description={`${reason} • ${callerName ? callerName : formatPhoneNumber(callerNumber)}`}
+                 description={description}
                 timestamp={timestamp}
                  metaLabel={statusLabel}
                  scoreLabel={scoreLabel}
