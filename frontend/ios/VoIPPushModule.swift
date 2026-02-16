@@ -11,8 +11,9 @@ class VoIPPushModule: RCTEventEmitter {
   private let callKitCallController: CXCallController
 
   override init() {
-    let configuration = CXProviderConfiguration()
-    // localizedName is read-only in iOS 14+ and uses app name from Info.plist
+    // Use deprecated initializer for now - iOS 14+ alternative is complex
+    // The deprecation warning is harmless and this works reliably
+    let configuration = CXProviderConfiguration(localizedName: "Verity Protect")
     configuration.supportsVideo = false
     configuration.maximumCallsPerCallGroup = 1
     configuration.supportedHandleTypes = [.phoneNumber]
