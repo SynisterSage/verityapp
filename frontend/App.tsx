@@ -691,6 +691,7 @@ function NavigationHost() {
     profileLoading,
   ]);
   const [splashVisible, setSplashVisible] = useState(true);
+  const [navigationReady, setNavigationReady] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -703,14 +704,12 @@ function NavigationHost() {
     return <SplashScreen />;
   }
 
-  if (isBusy) {
-    return <SplashScreen />;
-  }
   return (
     <NavigationContainer
       theme={navTheme}
       ref={rootNavigationRef}
       onReady={() => {
+        setNavigationReady(true);
         if (pendingNotificationRef.current) {
           resolvePendingNotification();
         }
@@ -718,6 +717,7 @@ function NavigationHost() {
     >
       <RootNavigator />
       <StatusBar style={statusBarStyle} />
+      {navigationReady && <TwilioVoiceClientManager />}
     </NavigationContainer>
   );
 }
@@ -726,7 +726,6 @@ function AppContent() {
   return (
     <ProfileProvider>
       <SupportProvider>
-        <TwilioVoiceClientManager />
         <InviteLinkHandler />
         <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
           <GestureHandlerRootView style={{ flex: 1 }}>

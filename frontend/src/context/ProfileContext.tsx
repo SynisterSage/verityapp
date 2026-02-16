@@ -109,6 +109,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const isRegisteringPushRef = useRef(false);
   const voipPushCleanupRef = useRef<(() => void) | null>(null);
   const voipTokenRef = useRef<string | null>(null);
+  const skipTwilioDelayRef = useRef(false);
 
   const refreshProfiles = useCallback(async () => {
     setIsLoading(true);
@@ -382,18 +383,21 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    const handleIncomingCall = (payload: VoIPPushPayload) => {
+    const handleIncomingCall = async (payload: VoIPPushPayload) => {
       console.info('[VoIPPush] Incoming call from push:', payload);
 
-      // VoIP push has already created a placeholder CallKit call (required by iOS)
+      // VoIP push module has already created the CallKit call (required by iOS)
       // Store the UUID so we can end it when Twilio's real call arrives
       if (payload.callUUID) {
         setPlaceholderCallUUID(payload.callUUID);
       }
 
-      // Refresh Twilio session so it's ready when the actual call arrives
-      console.info('[VoIPPush] Refreshing Twilio session for incoming call');
-      void refreshTwilioClientSession();
+      // Skip the startup delay for Twilio initialization
+      skipTwilioDelayRef.current = true;
+
+      // IMMEDIATELY refresh Twilio session - this is critical for calls when app is closed/background
+      console.info('[VoIPPush] Immediately refreshing Twilio session for incoming call');
+      await refreshTwilioClientSession();
 
       // DO NOT navigate here - let Twilio SDK handle the call flow
       // The Twilio SDK will automatically handle CallKit and navigation when the actual call arrives
@@ -471,17 +475,33 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     let cancelled = false;
-    (async () => {
-      try {
-        await refreshTwilioClientToken(activeProfile.id);
-      } catch (err) {
-        if (!cancelled) {
-          console.warn('Failed to refresh Twilio client token', err);
+
+    // Check if we should skip the delay (e.g., incoming VoIP call)
+    const shouldSkipDelay = skipTwilioDelayRef.current;
+    const delay = shouldSkipDelay ? 0 : 3000;
+
+    if (shouldSkipDelay) {
+      console.info('[twilio-client] Skipping startup delay due to incoming call');
+    }
+
+    // Delay Twilio initialization by 3 seconds on normal app startup
+    // This allows the UI to fully load before iOS shows the local network permission prompt
+    // Skip delay if a VoIP push arrived (incoming call needs immediate Twilio connection)
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      (async () => {
+        try {
+          await refreshTwilioClientToken(activeProfile.id);
+        } catch (err) {
+          if (!cancelled) {
+            console.warn('Failed to refresh Twilio client token', err);
+          }
         }
-      }
-    })();
+      })();
+    }, delay);
     return () => {
       cancelled = true;
+      clearTimeout(timer);
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
