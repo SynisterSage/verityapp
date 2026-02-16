@@ -285,6 +285,32 @@ export default function CallsScreen({
   const [isTrustedTrayMounted, setIsTrustedTrayMounted] = useState(false);
   const trustedTrayAnim = useRef(new Animated.Value(0)).current;
   const [trustedTrayProcessing, setTrustedTrayProcessing] = useState(false);
+
+  // Shimmer animation for skeleton loaders
+  const shimmer = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (loading && calls.length === 0) {
+      const shimmerLoop = Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmer, {
+            toValue: 1,
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmer, {
+            toValue: 0,
+            duration: 1200,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      shimmerLoop.start();
+      return () => shimmerLoop.stop();
+    }
+  }, [loading, calls.length, shimmer]);
+
   const handleSupportPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     navigateToSupportPortal();
@@ -856,11 +882,18 @@ const sections = useMemo<CallSection[]>(() => {
         ListFooterComponentStyle={styles.footer}
         ListEmptyComponent={
           showSkeleton ? (
-            <View style={styles.skeletonList}>
+            <Animated.View style={[styles.skeletonList, { opacity: shimmer.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.3, 0.6],
+            }) }]}>
               {[...Array(3)].map((_, idx) => (
-                <View key={idx} style={styles.skeletonCard} />
+                <View key={idx} style={styles.skeletonCard}>
+                  <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                  <View style={styles.skeletonLine} />
+                  <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                </View>
               ))}
-            </View>
+            </Animated.View>
           ) : showTrustedOnly && trustedActivity.length > 0 ? null : (
             <View style={[styles.emptyStateWrap, showTrustedOnly && styles.emptyStateWrapTrusted]}>
               <EmptyState
@@ -1092,6 +1125,7 @@ const createCallStyles = (theme: AppTheme) =>
     },
     trustedSection: {
       marginBottom: 8,
+      marginTop: 20,
     },
     trustedList: {
       marginTop: 4,
@@ -1225,14 +1259,29 @@ const createCallStyles = (theme: AppTheme) =>
     },
     skeletonList: {
       marginTop: 24,
+      marginBottom: 12,
     },
     skeletonCard: {
-      height: 82,
-      borderRadius: 32,
       backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      padding: 18,
       marginBottom: 12,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withOpacity(theme.colors.text, 0.08),
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+      minHeight: 100,
+    },
+    skeletonLine: {
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+      marginTop: 10,
+    },
+    skeletonLineShort: {
+      width: '50%',
+      marginTop: 2,
+    },
+    skeletonLineTiny: {
+      width: '40%',
     },
     footer: {
       marginTop: 24,
