@@ -26,6 +26,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useAlertContext } from '../../context/AlertContext';
 import { subscribeToCallUpdates } from '../../utils/callEvents';
 import DashboardHeader from '../../components/common/DashboardHeader';
 import { withOpacity } from '../../utils/color';
@@ -84,6 +85,7 @@ export default function AlertsScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createAlertStyles(theme), [theme]);
   const { unreadAgentCount } = useSupportContext();
+  const { refreshAlertCount } = useAlertContext();
   const refreshControlProps = useMemo(
     () => ({
       tintColor: theme.colors.accent,
@@ -353,6 +355,8 @@ const loadMemberNames = useCallback(async () => {
 
       setAlerts(enriched);
       setCallNumberMap(numberMap);
+      // Refresh badge count after loading alerts
+      refreshAlertCount();
     } catch {
       setAlerts([]);
     }
@@ -586,6 +590,8 @@ const loadMemberNames = useCallback(async () => {
     try {
       await authorizedFetch(`/alerts/${alertId}`, { method: 'DELETE' });
       setAlerts((prev) => prev.filter((alert) => alert.id !== alertId));
+      // Immediately refresh badge count
+      refreshAlertCount();
       logEvent('fraud_alert_dismissed', {
         screen: 'Alerts',
         extra: { alertId },
@@ -599,7 +605,7 @@ const loadMemberNames = useCallback(async () => {
       });
       return false;
     }
-  }, []);
+  }, [refreshAlertCount]);
 
   const confirmDelete = useCallback(
     (alertId: string) => {

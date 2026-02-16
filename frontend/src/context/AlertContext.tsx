@@ -5,9 +5,13 @@ import { useProfile } from './ProfileContext';
 
 export type AlertContextValue = {
   unhandledCount: number;
+  refreshAlertCount: () => void;
 };
 
-const AlertContext = createContext<AlertContextValue>({ unhandledCount: 0 });
+const AlertContext = createContext<AlertContextValue>({
+  unhandledCount: 0,
+  refreshAlertCount: () => {},
+});
 
 const HANDLED_STATUSES = new Set(['acknowledged', 'resolved']);
 
@@ -55,13 +59,20 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     void loadAlerts();
+    // Reduced polling interval to 30 seconds for faster updates
     const interval = setInterval(() => {
       void loadAlerts();
-    }, 60_000);
+    }, 30_000);
     return () => clearInterval(interval);
   }, [loadAlerts]);
 
-  const value = useMemo(() => ({ unhandledCount }), [unhandledCount]);
+  const value = useMemo(
+    () => ({
+      unhandledCount,
+      refreshAlertCount: loadAlerts,
+    }),
+    [unhandledCount, loadAlerts]
+  );
 
   return <AlertContext.Provider value={value}>{children}</AlertContext.Provider>;
 }
