@@ -275,12 +275,9 @@ export default function TwilioVoiceClientManager() {
       }
 
       reportLifecycle('connecting', data);
-      navigateToActiveCall({
-        callSid,
-        fromNumber: parsed.fromNumber,
-        toNumber: parsed.toNumber,
-        status: 'Connecting',
-      });
+      // Don't navigate yet - wait for full connection before showing active call screen
+      // This prevents showing controls before audio is established
+      console.info('[twilio-voice] Call connecting, waiting for full connection before navigation');
     };
     const handleConnect = (data: unknown) => {
       console.info('TwilioVoice connection connected', data);

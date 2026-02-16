@@ -1095,7 +1095,7 @@ const sections = useMemo<CallSection[]>(() => {
 }
 
 const createCallStyles = (theme: AppTheme) =>
-  StyleSheet.create({
+  StyleSheet.create({ 
     container: {
       flex: 1,
       backgroundColor: theme.colors.bg,

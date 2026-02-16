@@ -259,7 +259,7 @@ const loadMemberNames = useCallback(async () => {
     try {
       await loadContactNames();
       await loadMemberNames();
-      const data = await authorizedFetch('/alerts?limit=25');
+      const data = await authorizedFetch('/alerts?limit=100');
       const alerts = (data?.alerts ?? []) as AlertRow[];
       const callIds = alerts
         .map((alert) => alert.call_id)
