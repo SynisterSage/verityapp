@@ -984,14 +984,14 @@ const loadMemberNames = useCallback(async () => {
     handledAlerts.length > 0 ||
     circleActivity.length > 0;
 
-  // Check if there are any unhandled alerts to show (excluding handled)
-  // For empty state: only show when there are 0 unhandled priority/system/circle/recent alerts
-  // Handled alerts don't prevent empty state from showing
-  const hasUnhandledAlerts =
+  // For empty state: only show when there are literally NO alerts on screen
+  // Including handled alerts - if they're visible, don't show empty state
+  const hasAnyAlertsToShow =
     priorityAlerts.length > 0 ||
     systemHealthAlerts.length > 0 ||
-    circleActivity.filter((item) => !isHandledAlert(item.alertRow)).length > 0 ||
-    recentAlerts.filter((alert) => !isHandledAlert(alert)).length > 0;
+    circleActivity.length > 0 ||
+    handledAlerts.length > 0 ||
+    recentAlerts.length > 0;
 
   const renderOtherAlerts = () => {
     if (!recentAlerts.length) return null;
@@ -1114,7 +1114,7 @@ const loadMemberNames = useCallback(async () => {
           ref={listRef}
           contentContainerStyle={[
             styles.scrollContent,
-            !showSkeleton && !hasUnhandledAlerts && styles.listEmptyContent,
+            !showSkeleton && !hasAnyAlertsToShow && styles.listEmptyContent,
           ]}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -1143,7 +1143,7 @@ const loadMemberNames = useCallback(async () => {
           {renderCircleSection()}
           {renderHandledSection()}
           {renderOtherAlerts()}
-          {!hasUnhandledAlerts && !showSkeleton ? (
+          {!hasAnyAlertsToShow && !showSkeleton ? (
             <View style={styles.emptyStateWrap}>
               <EmptyState
                 icon="alert-circle-outline"
