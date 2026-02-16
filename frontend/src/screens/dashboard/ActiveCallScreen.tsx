@@ -60,7 +60,9 @@ export default function ActiveCallScreen() {
 
   // Start timer when call connects
   useEffect(() => {
-    if (status === 'Connected' && !connectedAt) {
+    const isConnected = status.toLowerCase() === 'connected';
+    if (isConnected && !connectedAt) {
+      console.log('[ActiveCallScreen] Call connected, starting timer');
       setConnectedAt(Date.now());
     }
   }, [status, connectedAt]);
