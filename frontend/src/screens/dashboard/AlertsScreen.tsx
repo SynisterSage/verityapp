@@ -643,13 +643,14 @@ const loadMemberNames = useCallback(async () => {
 
   const handledAlerts = useMemo(() => {
     const systemHealthIds = new Set(systemHealthAlerts.map((alert) => alert.id));
+    // Show all alerts that aren't priority/system/circle in "Handled" section
+    // These appear as "Handled" on frontend but won't count toward "new alerts"
     return alerts
       .filter(
         (alert) =>
           !isCircleActivityAlert(alert) &&
           !priorityIds.has(alert.id) &&
-          !systemHealthIds.has(alert.id) &&
-          isHandledAlert(alert) // Only include alerts that are actually handled
+          !systemHealthIds.has(alert.id)
       )
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [alerts, priorityIds, systemHealthAlerts, isCircleActivityAlert]);
@@ -984,11 +985,13 @@ const loadMemberNames = useCallback(async () => {
     circleActivity.length > 0;
 
   // Check if there are any unhandled alerts to show (excluding handled)
+  // For empty state: only show when there are 0 unhandled priority/system/circle/recent alerts
+  // Handled alerts don't prevent empty state from showing
   const hasUnhandledAlerts =
     priorityAlerts.length > 0 ||
     systemHealthAlerts.length > 0 ||
     circleActivity.filter((item) => !isHandledAlert(item.alertRow)).length > 0 ||
-    remainingAlerts.filter((alert) => !isHandledAlert(alert)).length > 0;
+    recentAlerts.filter((alert) => !isHandledAlert(alert)).length > 0;
 
   const renderOtherAlerts = () => {
     if (!recentAlerts.length) return null;
