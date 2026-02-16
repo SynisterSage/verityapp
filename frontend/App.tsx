@@ -695,7 +695,7 @@ function NavigationHost() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setSplashVisible(false);
-    }, 900);
+    }, 300);
     return () => clearTimeout(timer);
   }, []);
 
