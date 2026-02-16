@@ -133,24 +133,36 @@ extension VoIPPushModule: PKPushRegistryDelegate {
 
     print("[VoIPPush] Extracted: callSid=\(callSid) from=\(fromNumber) to=\(toNumber) uuid=\(callUUID)")
 
-    // TEST: Let Twilio SDK handle CallKit reporting entirely
-    // VoIP push wakes the app, we refresh Twilio session, then Twilio SDK
-    // creates the CallKit call when the actual call arrives (~1s later)
-    // This gives user one clean incoming call instead of two
-    //
-    // Risk: iOS may stop delivering VoIP pushes if we don't report to CallKit
-    // "immediately" - but we'll test if 1-2 seconds is acceptable
-    print("[VoIPPush] Notifying React Native, letting Twilio SDK handle CallKit")
+    // REQUIRED: iOS 13+ must report to CallKit immediately or future VoIP pushes are blocked
+    // Create placeholder CallKit call, will be ended when Twilio's real call arrives
+    let uuid = UUID(uuidString: callUUID) ?? UUID()
+    let handle = CXHandle(type: .phoneNumber, value: fromNumber)
+    let callUpdate = CXCallUpdate()
+    callUpdate.remoteHandle = handle
+    callUpdate.hasVideo = false
+    callUpdate.localizedCallerName = fromNumber
 
-    // Notify React Native to refresh Twilio session
-    sendEvent(withName: "voipPushReceived", body: [
-      "callSid": callSid,
-      "fromNumber": fromNumber,
-      "toNumber": toNumber,
-      "callUUID": callUUID
-    ])
+    print("[VoIPPush] Reporting placeholder call to CallKit: uuid=\(uuid)")
+    callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
+      if let error = error {
+        print("[VoIPPush] ERROR reporting call to CallKit: \(error.localizedDescription)")
+        completion()
+        return
+      }
 
-    completion()
+      print("[VoIPPush] Successfully reported placeholder call to CallKit")
+
+      // Notify React Native - Twilio's real call will arrive in ~500ms
+      // When it does, we'll end this placeholder call
+      self.sendEvent(withName: "voipPushReceived", body: [
+        "callSid": callSid,
+        "fromNumber": fromNumber,
+        "toNumber": toNumber,
+        "callUUID": uuid.uuidString
+      ])
+
+      completion()
+    }
   }
 
   func pushRegistry(_ registry: PKPushRegistry,

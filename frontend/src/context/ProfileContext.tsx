@@ -22,6 +22,7 @@ import { Platform } from 'react-native';
 import { registerProfileDeviceToken } from '../services/notifications';
 import { logError, logEvent } from '../services/sentry';
 import { initializeVoIPPush, updateVoIPPushToken } from '../services/voipPush';
+import { setPlaceholderCallUUID } from '../services/voipPlaceholderCall';
 import type { VoIPPushPayload } from '../types/voip-push';
 import { navigateToActiveCall } from '../navigation/rootNavigator';
 
@@ -384,17 +385,18 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     const handleIncomingCall = (payload: VoIPPushPayload) => {
       console.info('[VoIPPush] Incoming call from push:', payload);
 
-      // VoIP push has already reported to CallKit (required by iOS)
-      // Now just refresh Twilio session so it's ready when the actual call arrives
-      // CRITICAL: Refresh Twilio session when VoIP push arrives
-      // This ensures the client is ready to receive the incoming call
-      // even if the app was backgrounded and connection went stale
+      // VoIP push has already created a placeholder CallKit call (required by iOS)
+      // Store the UUID so we can end it when Twilio's real call arrives
+      if (payload.callUUID) {
+        setPlaceholderCallUUID(payload.callUUID);
+      }
+
+      // Refresh Twilio session so it's ready when the actual call arrives
       console.info('[VoIPPush] Refreshing Twilio session for incoming call');
       void refreshTwilioClientSession();
 
       // DO NOT navigate here - let Twilio SDK handle the call flow
       // The Twilio SDK will automatically handle CallKit and navigation when the actual call arrives
-      // This avoids conflicts between our CallKit call and Twilio's CallKit call
 
       logEvent('voip_push_received', {
         level: 'info',

@@ -10,6 +10,8 @@ import {
   TwilioClientCallLifecycleState,
 } from '../../services/twilioClient';
 import { dismissActiveCall, navigateToActiveCall } from '../../navigation/rootNavigator';
+import { getPlaceholderCallUUID, clearPlaceholderCallUUID } from '../../services/voipPlaceholderCall';
+import { endCall } from '../../services/voipPush';
 
 const { VoIPPushModule } = NativeModules;
 
@@ -231,6 +233,17 @@ export default function TwilioVoiceClientManager() {
       if (!parsed.callSid) {
         console.warn('[twilio-voice] Ignoring incoming invite without callSid');
         return;
+      }
+
+      // End placeholder CallKit call if one exists (from VoIP push)
+      // Twilio SDK has now created the real CallKit call, so we can remove the placeholder
+      const placeholderUUID = getPlaceholderCallUUID();
+      if (placeholderUUID) {
+        console.info('[twilio-voice] Ending placeholder call, Twilio call is now active');
+        endCall(placeholderUUID).catch((err) => {
+          console.warn('[twilio-voice] Failed to end placeholder call:', err);
+        });
+        clearPlaceholderCallUUID();
       }
 
       reportLifecycle('ringing', data);
