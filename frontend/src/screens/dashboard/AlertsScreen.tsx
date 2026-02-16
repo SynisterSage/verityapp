@@ -938,7 +938,13 @@ const loadMemberNames = useCallback(async () => {
         <Text style={styles.sectionLabel}>Handled alerts</Text>
         <View style={styles.sectionCards}>
           {handledAlerts.map((alert) => {
-            const reason = formatReason(alert) ?? alert.payload?.reason ?? 'This alert has been handled.';
+            const reason = formatReason(alert) ?? alert.payload?.reason ?? 'Suspicious call detected.';
+            const callerNumber =
+              (alert.payload?.callerNumber as string | undefined) ||
+              (alert.payload?.caller_number as string | undefined) ||
+              (alert.call_id ? callNumberMap[alert.call_id] : undefined);
+            const callerName = callerNumber ? contactNames[callerNumber] : '';
+            const nameOrNumber = callerName || formatPhoneNumber(callerNumber) || 'Unknown caller';
             const greyAccent = theme.colors.textDim;
             const greyBackground = withOpacity(greyAccent, 0.25);
             const handledTimestamp = alert.feedback_at ?? alert.created_at;
@@ -954,8 +960,8 @@ const loadMemberNames = useCallback(async () => {
                 <AlertCard
                   key={`handled-${alert.id}`}
                 categoryLabel="Handled alert"
-                title={formatDetectedTitle('Handled alert', alert.risk_label)}
-                 description={reason}
+                title={nameOrNumber}
+                 description={`${reason} • ${callerName ? callerName : formatPhoneNumber(callerNumber)}`}
                 timestamp={timestamp}
                  metaLabel={statusLabel}
                  scoreLabel={scoreLabel}
