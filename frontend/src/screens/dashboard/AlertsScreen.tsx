@@ -565,7 +565,15 @@ const loadMemberNames = useCallback(async () => {
     () => alerts.filter((alert) => !isHandledAlert(alert)).length,
     [alerts]
   );
-  const newAlertsCount = pendingAlertCount + circleActivity.length;
+
+  // Only count unhandled circle activities as "new"
+  // Processed activities (handled by circle members) shouldn't count
+  const unhandledCircleCount = useMemo(
+    () => circleActivity.filter((item) => !isHandledAlert(item.alertRow)).length,
+    [circleActivity]
+  );
+
+  const newAlertsCount = pendingAlertCount + unhandledCircleCount;
 
   const handleDelete = useCallback(async (alertId: string) => {
     try {
