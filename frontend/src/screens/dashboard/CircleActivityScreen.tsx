@@ -148,36 +148,33 @@ export default function CircleActivityScreen() {
     }
   }, []);
 
-  const circleActivitiesToDelete = useMemo(
-    () => activityList.filter((activity) => CIRCLE_ALERT_TYPES.has(activity.alertRow.alert_type ?? '')),
+  // All items in activityList are already circle alerts, so delete them all
+  const allActivityIds = useMemo(
+    () => activityList.map((activity) => activity.alertRow.id),
     [activityList]
-  );
-  const circleActivityIdsToDelete = useMemo(
-    () => new Set(circleActivitiesToDelete.map((activity) => activity.alertRow.id)),
-    [circleActivitiesToDelete]
   );
 
   const deleteAllActivities = useCallback(async () => {
-    if (circleActivityIdsToDelete.size === 0) {
+    if (allActivityIds.length === 0) {
       return;
     }
     setDeletingAll(true);
-    for (const alertId of Array.from(circleActivityIdsToDelete)) {
+    // Delete all alerts shown in this screen (all are circle alerts)
+    for (const alertId of allActivityIds) {
       try {
         await authorizedFetch(`/alerts/${alertId}`, { method: 'DELETE' });
       } catch {
         // ignore individual failures
       }
     }
-    setActivityList((prev) =>
-      prev.filter((activity) => !circleActivityIdsToDelete.has(activity.alertRow.id))
-    );
+    // Clear the entire list since we deleted everything
+    setActivityList([]);
     setDeletingAll(false);
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-  }, [circleActivityIdsToDelete]);
+  }, [allActivityIds]);
 
   const confirmDeleteAll = useCallback(() => {
-    if (circleActivityIdsToDelete.size === 0 || deletingAll) {
+    if (allActivityIds.length === 0 || deletingAll) {
       return;
     }
     Alert.alert(
@@ -188,7 +185,7 @@ export default function CircleActivityScreen() {
         { text: 'Delete all', style: 'destructive', onPress: deleteAllActivities },
       ]
     );
-  }, [circleActivityIdsToDelete, deletingAll, deleteAllActivities]);
+  }, [allActivityIds, deletingAll, deleteAllActivities]);
 
   const showTray = useCallback(
     (alert: AlertRow) => {
@@ -270,7 +267,7 @@ export default function CircleActivityScreen() {
           style={styles.headerAction}
           onPress={confirmDeleteAll}
           disabled={
-            !canManageProfile || deletingAll || circleActivitiesToDelete.length === 0
+            !canManageProfile || deletingAll || activityList.length === 0
           }
           activeOpacity={0.7}
         >
