@@ -63,6 +63,7 @@ export default function AlertCard({
       activeOpacity={0.85}
       onPress={onPress}
       onLongPress={onLongPress}
+      delayLongPress={500}
       disabled={!onPress && !onLongPress}
     >
       <View style={styles.content}>

@@ -1144,16 +1144,17 @@ const loadMemberNames = useCallback(async () => {
           ) : null}
         </ScrollView>
       </View>
-      <Modal visible={isTrayVisible} transparent animationType="none" onRequestClose={hideTray}>
-        <View style={styles.trayOverlay} pointerEvents="box-none">
-          <Animated.View
-            style={[
-              styles.trayBackdrop,
-              { opacity: trayBackdropOpacity, position: 'absolute', width: '100%', height: '100%' },
-            ]}
-          />
-          <Pressable style={StyleSheet.absoluteFill} onPress={hideTray} />
-          {trayAlert && (
+      {isTrayVisible && (
+        <Modal visible={isTrayVisible} transparent animationType="none" onRequestClose={hideTray}>
+          <View style={styles.trayOverlay} pointerEvents="box-none">
+            <Animated.View
+              style={[
+                styles.trayBackdrop,
+                { opacity: trayBackdropOpacity, position: 'absolute', width: '100%', height: '100%' },
+              ]}
+            />
+            <Pressable style={StyleSheet.absoluteFill} onPress={hideTray} />
+            {trayAlert && (
             <Animated.View
               style={[
                 styles.tray,
@@ -1197,7 +1198,8 @@ const loadMemberNames = useCallback(async () => {
             </Animated.View>
           )}
         </View>
-      </Modal>
+        </Modal>
+      )}
       <View style={styles.bottomMask} pointerEvents="none" />
     </SafeAreaView>
   );
