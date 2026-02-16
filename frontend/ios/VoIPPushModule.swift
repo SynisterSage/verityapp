@@ -12,7 +12,7 @@ class VoIPPushModule: RCTEventEmitter {
 
   override init() {
     let configuration = CXProviderConfiguration()
-    configuration.localizedName = "Verity Protect"
+    // localizedName is read-only in iOS 14+ and uses app name from Info.plist
     configuration.supportsVideo = false
     configuration.maximumCallsPerCallGroup = 1
     configuration.supportedHandleTypes = [.phoneNumber]
