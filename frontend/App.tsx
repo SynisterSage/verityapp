@@ -85,9 +85,9 @@ const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
 Sentry.init({
   dsn: sentryDsn,
 
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
+  // Disabled sendDefaultPii to prevent location permission request on startup
+  // We'll manually attach relevant user context as needed
+  sendDefaultPii: false,
 
   // Enable Logs
   enableLogs: true,
