@@ -561,9 +561,14 @@ const loadMemberNames = useCallback(async () => {
     );
     return combined.map(({ order, ...rest }) => rest);
   }, [alerts, callNumberMap, contactNames, memberNames]);
-  // Count unhandled non-circle alerts (fraud, system health, etc.)
+  // Count unhandled non-circle, non-trusted alerts (fraud, system health, etc.)
+  // Exclude trusted alerts since they're shown on home/calls screens
   const pendingAlertCount = useMemo(
-    () => alerts.filter((alert) => !isHandledAlert(alert) && !isCircleActivityAlert(alert)).length,
+    () => alerts.filter((alert) =>
+      !isHandledAlert(alert) &&
+      !isCircleActivityAlert(alert) &&
+      (alert.alert_type ?? '').toLowerCase() !== 'trusted'
+    ).length,
     [alerts, isCircleActivityAlert]
   );
 
@@ -637,10 +642,11 @@ const loadMemberNames = useCallback(async () => {
         (alert) =>
           !isCircleActivityAlert(alert) &&
           !priorityIds.has(alert.id) &&
-          !systemHealthIds.has(alert.id)
+          !systemHealthIds.has(alert.id) &&
+          isHandledAlert(alert) // Only include alerts that are actually handled
       )
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [alerts, priorityIds, systemHealthAlerts]);
+  }, [alerts, priorityIds, systemHealthAlerts, isCircleActivityAlert]);
 
   const handledIds = useMemo(
     () => new Set(handledAlerts.map((alert) => alert.id)),
@@ -969,8 +975,7 @@ const loadMemberNames = useCallback(async () => {
     priorityAlerts.length > 0 ||
     systemHealthAlerts.length > 0 ||
     handledAlerts.length > 0 ||
-    circleActivity.length > 0 ||
-    trustedAlerts.length > 0;
+    circleActivity.length > 0;
 
   const renderOtherAlerts = () => {
     if (!recentAlerts.length) return null;
@@ -1119,7 +1124,6 @@ const loadMemberNames = useCallback(async () => {
           ) : null}
           {renderPrioritySection()}
           {renderSystemSection()}
-          {renderTrustedSection()}
           {renderCircleSection()}
           {renderHandledSection()}
           {renderOtherAlerts()}
