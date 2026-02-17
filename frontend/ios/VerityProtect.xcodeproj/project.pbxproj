@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -54,17 +54,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		D7DE6DD62F3D555B003E8AC0 /* location */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
-			path = location;
-			sourceTree = "<group>";
-		};
+		D7DE6DD62F3D555B003E8AC0 /* location */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = location; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -216,9 +206,7 @@
 				LastUpgradeCheck = 1130;
 				TargetAttributes = {
 					13B07F861A680F5B00A75B9A = {
-						DevelopmentTeam = CAY3N8J725;
 						LastSwiftMigration = 1250;
-						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -420,9 +408,9 @@
 				CODE_SIGN_ENTITLEMENTS = VerityProtect/VerityProtect.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = CAY3N8J725;
+				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = CAY3N8J725;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -445,7 +433,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.lexferguson.verityprotect.com;
 				PRODUCT_NAME = VerityProtect;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Verity Protect Dev VoIP Test";
 				SWIFT_OBJC_BRIDGING_HEADER = "VerityProtect/VerityProtect-Bridging-Header.h";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_PRECOMPILE_BRIDGING_HEADER = NO;
@@ -464,9 +452,9 @@
 				CODE_SIGN_ENTITLEMENTS = VerityProtect/VerityProtect.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				"CODE_SIGN_IDENTITY[sdk=iphoneos*]" = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_STYLE = Manual;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = CAY3N8J725;
+				DEVELOPMENT_TEAM = "";
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = CAY3N8J725;
 				INFOPLIST_FILE = VerityProtect/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
@@ -484,7 +472,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.lexferguson.verityprotect.com;
 				PRODUCT_NAME = VerityProtect;
 				PROVISIONING_PROFILE_SPECIFIER = "";
-				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "";
+				"PROVISIONING_PROFILE_SPECIFIER[sdk=iphoneos*]" = "Verity Protect Dev VoIP Test";
 				SWIFT_OBJC_BRIDGING_HEADER = "VerityProtect/VerityProtect-Bridging-Header.h";
 				SWIFT_PRECOMPILE_BRIDGING_HEADER = NO;
 				SWIFT_VERSION = 5.0;

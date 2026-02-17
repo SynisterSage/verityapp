@@ -109,6 +109,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const isRegisteringPushRef = useRef(false);
   const voipPushCleanupRef = useRef<(() => void) | null>(null);
   const voipTokenRef = useRef<string | null>(null);
+  const syncedVoipTokenRef = useRef<string | null>(null);
+  const pendingVoipRefreshRef = useRef(false);
   const skipTwilioDelayRef = useRef(false);
 
   const refreshProfiles = useCallback(async () => {
@@ -203,6 +205,20 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
     await refreshTwilioClientToken(activeProfile.id);
   }, [activeProfile?.id, refreshTwilioClientToken]);
+
+  const syncVoipTokenToBackend = useCallback(async () => {
+    if (!session || !activeProfile?.id || !voipTokenRef.current) {
+      return;
+    }
+
+    const syncKey = `${activeProfile.id}:${voipTokenRef.current}`;
+    if (syncedVoipTokenRef.current === syncKey) {
+      return;
+    }
+
+    await updateVoIPPushToken(activeProfile.id, voipTokenRef.current);
+    syncedVoipTokenRef.current = syncKey;
+  }, [activeProfile?.id, session]);
 
   useEffect(() => {
     if (!session || !activeProfile?.id) {
@@ -357,7 +373,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
   // VoIP push registration (iOS only) - ensures calls wake the app from any state
   useEffect(() => {
-    if (Platform.OS !== 'ios' || !session || !activeProfile?.id) {
+    if (Platform.OS !== 'ios') {
       if (voipPushCleanupRef.current) {
         voipPushCleanupRef.current();
         voipPushCleanupRef.current = null;
@@ -366,14 +382,17 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
 
     const handleVoIPToken = async (token: string) => {
-      if (voipTokenRef.current === token) {
+      voipTokenRef.current = token;
+      syncedVoipTokenRef.current = null;
+
+      if (!session || !activeProfile?.id) {
+        console.info('[VoIPPush] Token received before profile/session is ready; deferring backend sync');
         return;
       }
-      voipTokenRef.current = token;
 
       console.info('[VoIPPush] Token received, updating backend');
       try {
-        await updateVoIPPushToken(activeProfile.id, token);
+        await syncVoipTokenToBackend();
       } catch (error) {
         console.error('[VoIPPush] Failed to update token on backend:', error);
         logError(error, {
@@ -394,10 +413,20 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
       // Skip the startup delay for Twilio initialization
       skipTwilioDelayRef.current = true;
+      pendingVoipRefreshRef.current = true;
 
       // IMMEDIATELY refresh Twilio session - this is critical for calls when app is closed/background
-      console.info('[VoIPPush] Immediately refreshing Twilio session for incoming call');
-      await refreshTwilioClientSession();
+      if (session && activeProfile?.id) {
+        try {
+          console.info('[VoIPPush] Immediately refreshing Twilio session for incoming call');
+          await refreshTwilioClientSession();
+          pendingVoipRefreshRef.current = false;
+        } catch (error) {
+          console.warn('[VoIPPush] Immediate Twilio refresh failed; will retry when profile is ready', error);
+        }
+      } else {
+        console.info('[VoIPPush] Incoming call arrived before profile/session was ready; queued refresh');
+      }
 
       // DO NOT navigate here - let Twilio SDK handle the call flow
       // The Twilio SDK will automatically handle CallKit and navigation when the actual call arrives
@@ -436,7 +465,43 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         voipPushCleanupRef.current = null;
       }
     };
-  }, [session, activeProfile?.id]);
+  }, [activeProfile?.id, refreshTwilioClientSession, session, syncVoipTokenToBackend]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    if (!session || !activeProfile?.id) {
+      return;
+    }
+
+    syncVoipTokenToBackend().catch((error) => {
+      console.error('[VoIPPush] Deferred token sync failed:', error);
+      logError(error, {
+        screen: 'ProfileContext',
+        extra: { reason: 'voip_token_sync_deferred_failed' },
+      });
+    });
+  }, [activeProfile?.id, session, syncVoipTokenToBackend]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    if (!session || !activeProfile?.id || !pendingVoipRefreshRef.current) {
+      return;
+    }
+
+    refreshTwilioClientSession()
+      .then(() => {
+        pendingVoipRefreshRef.current = false;
+      })
+      .catch((error) => {
+        console.warn('[VoIPPush] Deferred Twilio refresh failed:', error);
+      });
+  }, [activeProfile?.id, refreshTwilioClientSession, session]);
 
   useEffect(() => {
     if (!activeProfile?.id) {
@@ -478,6 +543,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
     // Check if we should skip the delay (e.g., incoming VoIP call)
     const shouldSkipDelay = skipTwilioDelayRef.current;
+    skipTwilioDelayRef.current = false;
     const delay = shouldSkipDelay ? 0 : 3000;
 
     if (shouldSkipDelay) {

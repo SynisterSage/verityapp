@@ -9,6 +9,8 @@ class VoIPPushModule: RCTEventEmitter {
   private var pushRegistry: PKPushRegistry?
   private let callKitProvider: CXProvider
   private let callKitCallController: CXCallController
+  private var latestVoIPToken: String?
+  private var lastVoIPPushPayload: [String: Any]?
 
   override init() {
     // Use deprecated initializer for now - iOS 14+ alternative is complex
@@ -24,6 +26,7 @@ class VoIPPushModule: RCTEventEmitter {
     super.init()
 
     self.callKitProvider.setDelegate(self, queue: nil)
+    self.registerForVoIPPushes()
   }
 
   override static func moduleName() -> String! {
@@ -45,7 +48,26 @@ class VoIPPushModule: RCTEventEmitter {
         self.pushRegistry = PKPushRegistry(queue: DispatchQueue.main)
         self.pushRegistry?.delegate = self
         self.pushRegistry?.desiredPushTypes = [.voIP]
+      } else {
+        self.pushRegistry?.desiredPushTypes = [.voIP]
       }
+    }
+  }
+
+  @objc
+  func getCurrentVoIPToken(_ resolver: @escaping RCTPromiseResolveBlock,
+                           rejecter: @escaping RCTPromiseRejectBlock) {
+    resolver(latestVoIPToken ?? NSNull())
+  }
+
+  @objc
+  func consumeLastVoIPPush(_ resolver: @escaping RCTPromiseResolveBlock,
+                           rejecter: @escaping RCTPromiseRejectBlock) {
+    if let payload = lastVoIPPushPayload {
+      resolver(payload)
+      lastVoIPPushPayload = nil
+    } else {
+      resolver(NSNull())
     }
   }
 
@@ -105,6 +127,7 @@ extension VoIPPushModule: PKPushRegistryDelegate {
     guard type == .voIP else { return }
 
     let token = pushCredentials.token.map { String(format: "%02x", $0) }.joined()
+    latestVoIPToken = token
     print("[VoIPPush] Token updated: \(token)")
 
     sendEvent(withName: "voipTokenUpdated", body: ["token": token])
@@ -134,6 +157,13 @@ extension VoIPPushModule: PKPushRegistryDelegate {
     let callUUID = payloadDict["call_uuid"] as? String ?? UUID().uuidString
 
     print("[VoIPPush] Extracted: callSid=\(callSid) from=\(fromNumber) to=\(toNumber) uuid=\(callUUID)")
+
+    lastVoIPPushPayload = [
+      "callSid": callSid,
+      "fromNumber": fromNumber,
+      "toNumber": toNumber,
+      "callUUID": callUUID
+    ]
 
     // REQUIRED: iOS 13+ must report to CallKit immediately or future VoIP pushes are blocked
     // Create placeholder CallKit call, will be ended when Twilio's real call arrives
@@ -170,6 +200,7 @@ extension VoIPPushModule: PKPushRegistryDelegate {
   func pushRegistry(_ registry: PKPushRegistry,
                     didInvalidatePushTokenFor type: PKPushType) {
     guard type == .voIP else { return }
+    latestVoIPToken = nil
     print("[VoIPPush] Token invalidated")
     sendEvent(withName: "voipTokenUpdated", body: ["token": nil])
   }

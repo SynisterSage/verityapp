@@ -2,6 +2,8 @@ declare module 'react-native' {
   interface NativeModulesStatic {
     VoIPPushModule: {
       registerForVoIPPushes(): void;
+      getCurrentVoIPToken?(): Promise<string | null>;
+      consumeLastVoIPPush?(): Promise<VoIPPushPayload | null>;
       reportIncomingCall(
         callUUID: string,
         callSid: string,

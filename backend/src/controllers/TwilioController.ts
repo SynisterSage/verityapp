@@ -219,6 +219,55 @@ function appendClientBridge(
   );
 }
 
+function clampPauseSeconds(value: number, fallback: number) {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(0, Math.min(10, Math.round(value)));
+}
+
+function parsePositiveSeconds(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return Math.round(parsed);
+}
+
+function resolveVoipWakePauseSeconds(
+  voipPushSent: boolean,
+  lastSeenAt?: string | null
+) {
+  if (!voipPushSent) {
+    return 0;
+  }
+
+  const warmPause = clampPauseSeconds(
+    Number(process.env.VOIP_PUSH_WARM_START_PAUSE_SECONDS ?? 1),
+    1
+  );
+  const coldPause = clampPauseSeconds(
+    Number(process.env.VOIP_PUSH_COLD_START_PAUSE_SECONDS ?? 6),
+    6
+  );
+  const freshSeconds = parsePositiveSeconds(
+    process.env.TWILIO_CLIENT_FRESH_SECONDS,
+    60
+  );
+
+  if (!lastSeenAt) {
+    return coldPause;
+  }
+
+  const parsed = new Date(lastSeenAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return coldPause;
+  }
+
+  const isFresh = Date.now() - parsed.getTime() <= freshSeconds * 1000;
+  return isFresh ? warmPause : coldPause;
+}
+
 async function bridgeToProfile(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
@@ -253,9 +302,11 @@ async function bridgeToProfile(
       });
 
       const clientIdentity = getClientIdentity(profile);
-      // If VoIP push was sent, pause 2s for app cold start and Twilio SDK init
-      // VoIP push creates placeholder CallKit call, ended when Twilio's call arrives
-      const pauseDuration = voipPushSent ? 2 : 0;
+      // Give the app enough time to bootstrap Twilio in cold-start scenarios.
+      const pauseDuration = resolveVoipWakePauseSeconds(
+        voipPushSent,
+        profile.twilio_client_last_seen_at
+      );
       appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
       return `client=${clientIdentity} (loop-avoidance)`;
     }
@@ -275,8 +326,10 @@ async function bridgeToProfile(
     });
 
     const clientIdentity = getClientIdentity(profile);
-    // If VoIP push was sent, pause 3 seconds to let app wake up and register
-    const pauseDuration = voipPushSent ? 3 : 0;
+    const pauseDuration = resolveVoipWakePauseSeconds(
+      voipPushSent,
+      profile.twilio_client_last_seen_at
+    );
     appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
     return `client=${clientIdentity}`;
   }

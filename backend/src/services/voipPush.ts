@@ -1,10 +1,12 @@
 import apn from 'apn';
 import http2 from 'http2';
 import jwt from 'jsonwebtoken';
+import { readFileSync } from 'fs';
 import logger from 'jet-logger';
 import supabaseAdmin from '@src/services/supabase';
 
 let apnProvider: apn.Provider | null = null;
+let apnsSigningKeyCache: string | null = null;
 
 /**
  * Initialize APNs provider for VoIP push notifications
@@ -71,19 +73,39 @@ export interface VoIPPushPayload {
   profileId: string;
 }
 
+function getApnsSigningKey(): string {
+  if (apnsSigningKeyCache) {
+    return apnsSigningKeyCache;
+  }
+
+  const inlineKey = process.env.APNS_AUTH_KEY;
+  if (inlineKey && inlineKey.trim().length > 0) {
+    // Render and other env providers often store newlines as "\n".
+    apnsSigningKeyCache = inlineKey.includes('\\n') ? inlineKey.replace(/\\n/g, '\n') : inlineKey;
+    return apnsSigningKeyCache;
+  }
+
+  const keyPath = process.env.APNS_AUTH_KEY_PATH;
+  if (keyPath && keyPath.trim().length > 0) {
+    apnsSigningKeyCache = readFileSync(keyPath, 'utf8');
+    return apnsSigningKeyCache;
+  }
+
+  throw new Error('Missing APNS_AUTH_KEY or APNS_AUTH_KEY_PATH');
+}
+
 /**
  * Generate APNs JWT token for authentication
  */
 function generateAPNsToken(): string {
-  const authKeyContent = process.env.APNS_AUTH_KEY;
   const authKeyId = process.env.APNS_AUTH_KEY_ID;
   const teamId = process.env.APNS_TEAM_ID;
 
-  if (!authKeyContent || !authKeyId || !teamId) {
+  if (!authKeyId || !teamId) {
     throw new Error('Missing APNs credentials');
   }
 
-  const token = jwt.sign({}, authKeyContent, {
+  const token = jwt.sign({}, getApnsSigningKey(), {
     algorithm: 'ES256',
     keyid: authKeyId,
     issuer: teamId,

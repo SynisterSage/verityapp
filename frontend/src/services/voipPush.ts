@@ -76,6 +76,33 @@ export function initializeVoIPPush(handlers: VoIPCallHandlers): () => void {
   VoIPPushModule.registerForVoIPPushes();
   console.info('[VoIPPush] Registered for VoIP push notifications');
 
+  // Recover state in case a push/token update happened before JS listeners were attached.
+  if (typeof VoIPPushModule.getCurrentVoIPToken === 'function') {
+    VoIPPushModule.getCurrentVoIPToken()
+      .then((token: string | null) => {
+        if (token) {
+          console.info('[VoIPPush] Recovered current token from native module');
+          handlers.onTokenUpdate(token);
+        }
+      })
+      .catch((error: unknown) => {
+        console.warn('[VoIPPush] Failed to recover current token:', error);
+      });
+  }
+
+  if (typeof VoIPPushModule.consumeLastVoIPPush === 'function') {
+    VoIPPushModule.consumeLastVoIPPush()
+      .then((payload: VoIPPushPayload | null) => {
+        if (payload?.callSid) {
+          console.info('[VoIPPush] Recovered pending incoming call from native module');
+          handlers.onIncomingCall(payload);
+        }
+      })
+      .catch((error: unknown) => {
+        console.warn('[VoIPPush] Failed to recover pending incoming call:', error);
+      });
+  }
+
   // Return cleanup function
   return () => {
     if (tokenListener) {
