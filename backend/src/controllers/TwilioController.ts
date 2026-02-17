@@ -193,7 +193,8 @@ function appendClientBridge(
   callerId: string,
   clientIdentity: string,
   actionUrl?: string,
-  pauseBeforeDial?: number
+  pauseBeforeDial?: number,
+  dialTimeoutSeconds?: number
 ) {
   twimlResponse.say({ voice: 'Polly.Joanna' }, 'Thank you. Connecting your call.');
 
@@ -204,7 +205,7 @@ function appendClientBridge(
 
   const dial = twimlResponse.dial({
     callerId,
-    timeout: 10,
+    timeout: dialTimeoutSeconds ?? 10,
     answerOnBridge: true,
     action: actionUrl,
     method: actionUrl ? 'POST' : undefined,
@@ -224,6 +225,13 @@ function clampPauseSeconds(value: number, fallback: number) {
     return fallback;
   }
   return Math.max(0, Math.min(10, Math.round(value)));
+}
+
+function clampDialTimeoutSeconds(value: number, fallback: number) {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(5, Math.min(60, Math.round(value)));
 }
 
 function parsePositiveSeconds(value: string | undefined, fallback: number) {
@@ -268,6 +276,44 @@ function resolveVoipWakePauseSeconds(
   return isFresh ? warmPause : coldPause;
 }
 
+function resolveClientDialTimeoutSeconds(
+  voipPushSent: boolean,
+  lastSeenAt?: string | null
+) {
+  const baseTimeout = clampDialTimeoutSeconds(
+    Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_SECONDS ?? 12),
+    12
+  );
+  if (!voipPushSent) {
+    return baseTimeout;
+  }
+
+  const warmTimeout = clampDialTimeoutSeconds(
+    Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_WARM_SECONDS ?? 16),
+    16
+  );
+  const coldTimeout = clampDialTimeoutSeconds(
+    Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_COLD_SECONDS ?? 24),
+    24
+  );
+  const freshSeconds = parsePositiveSeconds(
+    process.env.TWILIO_CLIENT_FRESH_SECONDS,
+    60
+  );
+
+  if (!lastSeenAt) {
+    return coldTimeout;
+  }
+
+  const parsed = new Date(lastSeenAt);
+  if (Number.isNaN(parsed.getTime())) {
+    return coldTimeout;
+  }
+
+  const isFresh = Date.now() - parsed.getTime() <= freshSeconds * 1000;
+  return isFresh ? warmTimeout : coldTimeout;
+}
+
 async function bridgeToProfile(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
@@ -307,7 +353,19 @@ async function bridgeToProfile(
         voipPushSent,
         profile.twilio_client_last_seen_at
       );
-      appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
+      const dialTimeoutSeconds = resolveClientDialTimeoutSeconds(
+        voipPushSent,
+        profile.twilio_client_last_seen_at
+      );
+      appendClientBridge(
+        twimlResponse,
+        dialStatusUrl,
+        callerId,
+        clientIdentity,
+        bridgeFallbackUrl,
+        pauseDuration,
+        dialTimeoutSeconds
+      );
       return `client=${clientIdentity} (loop-avoidance)`;
     }
     logger.warn(`Skipping bridge loop for to=${toNumber}; profile phone matches routed number`);
@@ -330,7 +388,19 @@ async function bridgeToProfile(
       voipPushSent,
       profile.twilio_client_last_seen_at
     );
-    appendClientBridge(twimlResponse, dialStatusUrl, callerId, clientIdentity, bridgeFallbackUrl, pauseDuration);
+    const dialTimeoutSeconds = resolveClientDialTimeoutSeconds(
+      voipPushSent,
+      profile.twilio_client_last_seen_at
+    );
+    appendClientBridge(
+      twimlResponse,
+      dialStatusUrl,
+      callerId,
+      clientIdentity,
+      bridgeFallbackUrl,
+      pauseDuration,
+      dialTimeoutSeconds
+    );
     return `client=${clientIdentity}`;
   }
   if (fallbackNumber) {

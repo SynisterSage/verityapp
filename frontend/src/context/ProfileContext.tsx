@@ -382,8 +382,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
 
     const handleVoIPToken = async (token: string) => {
+      const tokenChanged = voipTokenRef.current !== token;
       voipTokenRef.current = token;
-      syncedVoipTokenRef.current = null;
+      if (tokenChanged) {
+        syncedVoipTokenRef.current = null;
+      }
 
       if (!session || !activeProfile?.id) {
         console.info('[VoIPPush] Token received before profile/session is ready; deferring backend sync');
