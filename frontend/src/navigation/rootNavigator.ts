@@ -1,4 +1,4 @@
-import { createNavigationContainerRef } from '@react-navigation/native';
+import { CommonActions, createNavigationContainerRef } from '@react-navigation/native';
 
 import type { RootStackParamList } from './types';
 import type { SupportResourceType } from '../data/resourceSections';
@@ -63,6 +63,14 @@ export function navigateToActiveCall(params: ActiveCallParams) {
       (params.callSid && currentParams.callSid && params.callSid === currentParams.callSid) ||
       (!params.callSid && !currentParams.callSid);
     if (isSameCall) {
+      // Keep the same screen instance but merge updated call state (e.g. ringing -> connected).
+      rootNavigationRef.dispatch(
+        CommonActions.navigate({
+          name: 'ActiveCallModal',
+          params,
+          merge: true,
+        })
+      );
       return;
     }
   }
