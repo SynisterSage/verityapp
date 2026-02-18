@@ -14,6 +14,9 @@ class VoIPPushModule: RCTEventEmitter {
   private var lastVoIPPushPayload: [String: Any]?
   private var pendingCallActions: [[String: String]] = []
   private var hasJsListeners = false
+  private var nativeAutoAnswerDeadline: Date?
+  private var nativeAutoAnswerExcludedCallUUID: UUID?
+  private var nativeAutoAnswerWorkItem: DispatchWorkItem?
 
   override init() {
     // Use deprecated initializer for now - iOS 14+ alternative is complex
@@ -31,6 +34,98 @@ class VoIPPushModule: RCTEventEmitter {
 
     self.callKitProvider.setDelegate(self, queue: nil)
     self.registerForVoIPPushes()
+  }
+
+  private func findPendingIncomingCall(excluding excludedUUID: UUID? = nil) -> CXCall? {
+    let pendingCalls = callObserver.calls.filter { call in
+      if call.hasEnded || call.hasConnected || call.isOutgoing {
+        return false
+      }
+      if let excludedUUID, call.uuid == excludedUUID {
+        return false
+      }
+      return true
+    }
+    return pendingCalls.last
+  }
+
+  private func requestAnswerCall(_ callUUID: UUID, completion: @escaping (Bool) -> Void) {
+    let answerAction = CXAnswerCallAction(call: callUUID)
+    let transaction = CXTransaction(action: answerAction)
+    callKitCallController.request(transaction) { error in
+      if let error {
+        print("[VoIPPush] CallKit answer request failed: \(error.localizedDescription)")
+        completion(false)
+      } else {
+        completion(true)
+      }
+    }
+  }
+
+  private func requestEndCall(_ callUUID: UUID) {
+    let endCallAction = CXEndCallAction(call: callUUID)
+    let transaction = CXTransaction(action: endCallAction)
+    callKitCallController.request(transaction) { error in
+      if let error {
+        print("[VoIPPush] CallKit end request failed: \(error.localizedDescription)")
+      } else {
+        self.callKitProvider.reportCall(with: callUUID, endedAt: Date(), reason: .remoteEnded)
+      }
+    }
+  }
+
+  private func stopNativeAutoAnswer() {
+    nativeAutoAnswerWorkItem?.cancel()
+    nativeAutoAnswerWorkItem = nil
+    nativeAutoAnswerDeadline = nil
+    nativeAutoAnswerExcludedCallUUID = nil
+  }
+
+  private func scheduleNativeAutoAnswerRetry() {
+    let workItem = DispatchWorkItem { [weak self] in
+      self?.attemptNativeAutoAnswer()
+    }
+    nativeAutoAnswerWorkItem = workItem
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: workItem)
+  }
+
+  private func attemptNativeAutoAnswer() {
+    guard let deadline = nativeAutoAnswerDeadline else {
+      return
+    }
+    if Date() > deadline {
+      print("[VoIPPush] Native auto-answer window expired")
+      stopNativeAutoAnswer()
+      return
+    }
+
+    guard let targetCall = findPendingIncomingCall(excluding: nativeAutoAnswerExcludedCallUUID) else {
+      scheduleNativeAutoAnswerRetry()
+      return
+    }
+
+    requestAnswerCall(targetCall.uuid) { success in
+      if success {
+        let placeholderUUID = self.nativeAutoAnswerExcludedCallUUID
+        print("[VoIPPush] Native auto-answer succeeded for call \(targetCall.uuid.uuidString)")
+        self.stopNativeAutoAnswer()
+        if let placeholderUUID {
+          self.requestEndCall(placeholderUUID)
+        }
+        return
+      }
+
+      self.scheduleNativeAutoAnswerRetry()
+    }
+  }
+
+  private func startNativeAutoAnswer(excluding excludedUUID: UUID) {
+    nativeAutoAnswerExcludedCallUUID = excludedUUID
+    nativeAutoAnswerDeadline = Date().addingTimeInterval(25)
+    nativeAutoAnswerWorkItem?.cancel()
+    nativeAutoAnswerWorkItem = nil
+    print("[VoIPPush] Native auto-answer armed, waiting for Twilio call")
+    attemptNativeAutoAnswer()
   }
 
   override static func moduleName() -> String! {
@@ -95,28 +190,17 @@ class VoIPPushModule: RCTEventEmitter {
                                 resolver: @escaping RCTPromiseResolveBlock,
                                 rejecter: @escaping RCTPromiseRejectBlock) {
     let exclude = excludeCallUUID?.trimmingCharacters(in: .whitespacesAndNewlines)
-    let pendingCalls = callObserver.calls.filter { call in
-      if call.hasEnded || call.hasConnected || call.isOutgoing {
-        return false
-      }
-      if let exclude, !exclude.isEmpty, call.uuid.uuidString.caseInsensitiveCompare(exclude) == .orderedSame {
-        return false
-      }
-      return true
-    }
-
-    guard let targetCall = pendingCalls.last else {
+    let excludedUUID = exclude.flatMap { UUID(uuidString: $0) }
+    guard let targetCall = findPendingIncomingCall(excluding: excludedUUID) else {
       resolver(["success": false, "reason": "no_pending_call"])
       return
     }
 
-    let answerAction = CXAnswerCallAction(call: targetCall.uuid)
-    let transaction = CXTransaction(action: answerAction)
-    callKitCallController.request(transaction) { error in
-      if let error = error {
-        rejecter("CALLKIT_ERROR", "Failed to answer call: \(error.localizedDescription)", error)
-      } else {
+    requestAnswerCall(targetCall.uuid) { success in
+      if success {
         resolver(["success": true, "callUUID": targetCall.uuid.uuidString])
+      } else {
+        rejecter("CALLKIT_ERROR", "Failed to answer call", nil)
       }
     }
   }
@@ -193,6 +277,7 @@ extension VoIPPushModule: PKPushRegistryDelegate {
     }
 
     print("[VoIPPush] Received VoIP push: \(payload.dictionaryPayload)")
+    stopNativeAutoAnswer()
 
     // Log all keys to debug payload structure
     print("[VoIPPush] Payload keys: \(payload.dictionaryPayload.keys)")
@@ -204,16 +289,28 @@ extension VoIPPushModule: PKPushRegistryDelegate {
     let callSid = payloadDict["call_sid"] as? String ?? ""
     let fromNumber = payloadDict["from_number"] as? String ?? "Unknown"
     let toNumber = payloadDict["to_number"] as? String ?? ""
+    let callerName = (payloadDict["caller_name"] as? String)?
+      .trimmingCharacters(in: .whitespacesAndNewlines)
     let callUUID = payloadDict["call_uuid"] as? String ?? UUID().uuidString
+    let resolvedCallerName: String
+    if let callerName, !callerName.isEmpty {
+      resolvedCallerName = callerName
+    } else {
+      resolvedCallerName = fromNumber
+    }
 
-    print("[VoIPPush] Extracted: callSid=\(callSid) from=\(fromNumber) to=\(toNumber) uuid=\(callUUID)")
+    print("[VoIPPush] Extracted: callSid=\(callSid) from=\(fromNumber) to=\(toNumber) callerName=\(resolvedCallerName) uuid=\(callUUID)")
 
-    lastVoIPPushPayload = [
+    var persistedPayload: [String: Any] = [
       "callSid": callSid,
       "fromNumber": fromNumber,
       "toNumber": toNumber,
       "callUUID": callUUID
     ]
+    if let callerName, !callerName.isEmpty {
+      persistedPayload["callerName"] = callerName
+    }
+    lastVoIPPushPayload = persistedPayload
 
     // REQUIRED: iOS 13+ must report to CallKit immediately or future VoIP pushes are blocked
     // Create placeholder CallKit call, will be ended when Twilio's real call arrives
@@ -222,7 +319,7 @@ extension VoIPPushModule: PKPushRegistryDelegate {
     let callUpdate = CXCallUpdate()
     callUpdate.remoteHandle = handle
     callUpdate.hasVideo = false
-    callUpdate.localizedCallerName = fromNumber
+    callUpdate.localizedCallerName = resolvedCallerName
 
     print("[VoIPPush] Reporting placeholder call to CallKit: uuid=\(uuid)")
     callKitProvider.reportNewIncomingCall(with: uuid, update: callUpdate) { error in
@@ -236,12 +333,16 @@ extension VoIPPushModule: PKPushRegistryDelegate {
 
       // Notify React Native - Twilio's real call will arrive in ~500ms
       // When it does, we'll end this placeholder call
-      self.sendEvent(withName: "voipPushReceived", body: [
+      var eventBody: [String: Any] = [
         "callSid": callSid,
         "fromNumber": fromNumber,
         "toNumber": toNumber,
         "callUUID": uuid.uuidString
-      ])
+      ]
+      if let callerName, !callerName.isEmpty {
+        eventBody["callerName"] = callerName
+      }
+      self.sendEvent(withName: "voipPushReceived", body: eventBody)
 
       completion()
     }
@@ -261,6 +362,7 @@ extension VoIPPushModule: CXProviderDelegate {
 
   func providerDidReset(_ provider: CXProvider) {
     print("[VoIPPush] Provider reset")
+    stopNativeAutoAnswer()
   }
 
   func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
@@ -278,11 +380,15 @@ extension VoIPPushModule: CXProviderDelegate {
       ])
     }
 
+    startNativeAutoAnswer(excluding: action.callUUID)
     action.fulfill()
   }
 
   func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
     print("[VoIPPush] User ended call")
+    if action.callUUID == nativeAutoAnswerExcludedCallUUID {
+      stopNativeAutoAnswer()
+    }
 
     let payload = [
       "callUUID": action.callUUID.uuidString

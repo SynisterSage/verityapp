@@ -232,6 +232,7 @@ export default function TwilioVoiceClientManager() {
     const handleIncoming = (data: unknown) => {
       console.info('TwilioVoice incoming invite', data);
       const parsed = parseTwilioEventData(data);
+      const shouldAutoAccept = consumeAutoAcceptNextIncomingCall();
 
       // Only process if we have a valid callSid (not stale/empty data)
       if (!parsed.callSid) {
@@ -242,11 +243,14 @@ export default function TwilioVoiceClientManager() {
       // End placeholder CallKit call if one exists (from VoIP push)
       // Twilio SDK has now created the real CallKit call, so we can remove the placeholder
       const placeholderUUID = getPlaceholderCallUUID();
-      if (placeholderUUID) {
+      if (placeholderUUID && !shouldAutoAccept) {
         console.info('[twilio-voice] Ending placeholder call, Twilio call is now active');
         endCall(placeholderUUID).catch((err) => {
           console.warn('[twilio-voice] Failed to end placeholder call:', err);
         });
+        clearPlaceholderCallUUID();
+      } else if (placeholderUUID && shouldAutoAccept) {
+        console.info('[twilio-voice] Placeholder was answered; keeping handoff active for native auto-answer');
         clearPlaceholderCallUUID();
       }
 
@@ -257,7 +261,7 @@ export default function TwilioVoiceClientManager() {
 
       // If user already answered the placeholder CallKit call, immediately accept
       // this real Twilio invite to prevent a second ringing cycle.
-      if (consumeAutoAcceptNextIncomingCall()) {
+      if (shouldAutoAccept) {
         console.info('[twilio-voice] Auto-answering real call after placeholder answer');
         const excludedUUID = placeholderUUID ?? undefined;
         let attempts = 0;
@@ -267,6 +271,11 @@ export default function TwilioVoiceClientManager() {
             .then((ok) => {
               if (ok) {
                 console.info('[twilio-voice] Auto-answer request sent to CallKit');
+                if (placeholderUUID) {
+                  endCall(placeholderUUID).catch((err) => {
+                    console.warn('[twilio-voice] Failed to close placeholder after auto-answer:', err);
+                  });
+                }
                 return;
               }
               attempts += 1;

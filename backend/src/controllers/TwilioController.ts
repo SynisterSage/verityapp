@@ -194,7 +194,8 @@ function appendClientBridge(
   clientIdentity: string,
   actionUrl?: string,
   pauseBeforeDial?: number,
-  dialTimeoutSeconds?: number
+  dialTimeoutSeconds?: number,
+  callerName?: string
 ) {
   twimlResponse.say({ voice: 'Polly.Joanna' }, 'Thank you. Connecting your call.');
 
@@ -210,7 +211,7 @@ function appendClientBridge(
     action: actionUrl,
     method: actionUrl ? 'POST' : undefined,
   });
-  dial.client(
+  const clientDial = dial.client(
     {
       statusCallback: dialStatusUrl,
       statusCallbackEvent: ['initiated', 'ringing', 'answered', 'completed'],
@@ -218,6 +219,10 @@ function appendClientBridge(
     },
     clientIdentity
   );
+  const trimmedCallerName = callerName?.trim();
+  if (trimmedCallerName) {
+    clientDial.parameter({ name: 'CallerName', value: trimmedCallerName });
+  }
 }
 
 function clampPauseSeconds(value: number, fallback: number) {
@@ -322,6 +327,7 @@ async function bridgeToProfile(
   toNumber: string,
   fromNumber: string,
   callSid: string | undefined,
+  callerName: string | undefined,
   profile: {
     id: string;
     phone_number?: string | null;
@@ -342,6 +348,7 @@ async function bridgeToProfile(
         callSid: callSid || 'unknown',
         fromNumber: fromNumber || 'Unknown',
         toNumber,
+        callerName,
       }).catch((err) => {
         logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
         return false;
@@ -364,7 +371,8 @@ async function bridgeToProfile(
         clientIdentity,
         bridgeFallbackUrl,
         pauseDuration,
-        dialTimeoutSeconds
+        dialTimeoutSeconds,
+        callerName
       );
       return `client=${clientIdentity} (loop-avoidance)`;
     }
@@ -378,6 +386,7 @@ async function bridgeToProfile(
       callSid: callSid || 'unknown',
       fromNumber: fromNumber || 'Unknown',
       toNumber,
+      callerName,
     }).catch((err) => {
       logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
       return false;
@@ -399,7 +408,8 @@ async function bridgeToProfile(
       clientIdentity,
       bridgeFallbackUrl,
       pauseDuration,
-      dialTimeoutSeconds
+      dialTimeoutSeconds,
+      callerName
     );
     return `client=${clientIdentity}`;
   }
@@ -445,6 +455,7 @@ async function callIncoming(req: Request, res: Response) {
           toNumber,
           fromNumber,
           callSid,
+          trustedCaller.contact_name ?? undefined,
           profile
         );
         if (bridgeTarget) {
@@ -621,6 +632,7 @@ async function verifyPin(req: Request, res: Response) {
         toNumber,
         fromNumber,
         callSid,
+        trustedCaller.contact_name ?? undefined,
         profile
       );
       if (bridgeTarget) {

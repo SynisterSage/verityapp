@@ -69,6 +69,7 @@ export interface VoIPPushPayload {
   callSid: string;
   fromNumber: string;
   toNumber: string;
+  callerName?: string;
   callUuid?: string;
   profileId: string;
 }
@@ -136,6 +137,7 @@ export async function sendVoIPPush(
     call_sid: payload.callSid,
     from_number: payload.fromNumber,
     to_number: payload.toNumber,
+    caller_name: payload.callerName,
     call_uuid: payload.callUuid || payload.callSid,
     profile_id: payload.profileId,
   };

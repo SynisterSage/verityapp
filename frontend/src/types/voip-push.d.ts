@@ -26,6 +26,7 @@ export interface VoIPPushPayload {
   fromNumber: string;
   toNumber: string;
   callUUID: string;
+  callerName?: string;
 }
 
 export interface VoIPTokenUpdate {
