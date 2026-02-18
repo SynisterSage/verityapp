@@ -286,8 +286,8 @@ function resolveClientDialTimeoutSeconds(
   lastSeenAt?: string | null
 ) {
   const baseTimeout = clampDialTimeoutSeconds(
-    Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_SECONDS ?? 12),
-    12
+    Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_SECONDS ?? 24),
+    24
   );
   if (!voipPushSent) {
     return baseTimeout;
@@ -319,6 +319,20 @@ function resolveClientDialTimeoutSeconds(
   return isFresh ? warmTimeout : coldTimeout;
 }
 
+async function sendManualVoIPPushIfEnabled(
+  profileId: string,
+  payload: Parameters<typeof sendVoIPPushToProfile>[1]
+) {
+  if (process.env.ENABLE_MANUAL_VOIP_PUSH !== 'true') {
+    return false;
+  }
+
+  return sendVoIPPushToProfile(profileId, payload).catch((err) => {
+    logger.warn(`Manual VoIP push failed for profile ${profileId}:`, err);
+    return false;
+  });
+}
+
 async function bridgeToProfile(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
@@ -344,14 +358,11 @@ async function bridgeToProfile(
   if (loopTarget) {
     if (profile.twilio_client_identity) {
       // Send VoIP push to wake the app BEFORE dialing
-      const voipPushSent = await sendVoIPPushToProfile(profile.id, {
+      const voipPushSent = await sendManualVoIPPushIfEnabled(profile.id, {
         callSid: callSid || 'unknown',
         fromNumber: fromNumber || 'Unknown',
         toNumber,
         callerName,
-      }).catch((err) => {
-        logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
-        return false;
       });
 
       const clientIdentity = getClientIdentity(profile);
@@ -382,14 +393,11 @@ async function bridgeToProfile(
 
   if (profile.twilio_client_identity) {
     // Send VoIP push to wake the app BEFORE dialing
-    const voipPushSent = await sendVoIPPushToProfile(profile.id, {
+    const voipPushSent = await sendManualVoIPPushIfEnabled(profile.id, {
       callSid: callSid || 'unknown',
       fromNumber: fromNumber || 'Unknown',
       toNumber,
       callerName,
-    }).catch((err) => {
-      logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
-      return false;
     });
 
     const clientIdentity = getClientIdentity(profile);
@@ -687,13 +695,10 @@ async function verifyPin(req: Request, res: Response) {
     const outboundCallerId = process.env.OUTBOUND_CALLER_ID || toNumber;
     if (profile.twilio_client_identity) {
       // Send VoIP push to wake the app BEFORE dialing
-      const voipPushSent = await sendVoIPPushToProfile(profile.id, {
+      const voipPushSent = await sendManualVoIPPushIfEnabled(profile.id, {
         callSid: callSid || 'unknown',
         fromNumber: fromNumber || 'Unknown',
         toNumber,
-      }).catch((err) => {
-        logger.warn(`VoIP push failed for profile ${profile.id}:`, err);
-        return false;
       });
 
       const clientIdentity = getClientIdentity(profile);
@@ -703,17 +708,22 @@ async function verifyPin(req: Request, res: Response) {
       logger.info(
         `Dialing client=${clientIdentity} callerId=${outboundCallerId}`
       );
-      // If VoIP push was sent, pause 20 seconds to let app wake up and register
-      // App needs time to: wake from VoIP push, load React Native, initialize Twilio SDK
-      // This is CRITICAL for killed app scenario - don't reduce below 20 seconds
-      const pauseDuration = voipPushSent ? 20 : 0;
+      const pauseDuration = resolveVoipWakePauseSeconds(
+        voipPushSent,
+        profile.twilio_client_last_seen_at
+      );
+      const dialTimeoutSeconds = resolveClientDialTimeoutSeconds(
+        voipPushSent,
+        profile.twilio_client_last_seen_at
+      );
       appendClientBridge(
         twimlResponse,
         dialStatusUrl,
         outboundCallerId,
         clientIdentity,
         bridgeFallbackUrl,
-        pauseDuration
+        pauseDuration,
+        dialTimeoutSeconds
       );
       return res.type('text/xml').send(twimlResponse.toString());
     }
