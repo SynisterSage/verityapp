@@ -2,6 +2,8 @@ import supabaseAdmin from '@src/services/supabase';
 import { sendExpoPushNotifications, ExpoPushMessage } from './notifications';
 
 const INVALID_EXPO_ERRORS = ['DeviceNotRegistered', 'PushSubscriptionExpired'];
+const ACTIVITY_PUSH_SOUND = 'activity-notification.wav';
+const ACTIVITY_PUSH_CHANNEL_ID = 'activity-alerts';
 
 function shouldDeactivateToken(error: any) {
   if (!error) {
@@ -45,7 +47,8 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
     to: tokenRow.expo_push_token,
     title: payload.title,
     body: payload.body,
-    sound: 'default',
+    sound: ACTIVITY_PUSH_SOUND,
+    channelId: ACTIVITY_PUSH_CHANNEL_ID,
     data: {
       alertId: payload.alertId,
       ...(payload.callId ? { callId: payload.callId } : {}),

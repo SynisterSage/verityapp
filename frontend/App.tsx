@@ -13,7 +13,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, Platform, StyleSheet, View } from 'react-native';
 import {
   SafeAreaProvider,
   initialWindowMetrics,
@@ -109,6 +109,9 @@ type PendingNotificationData = {
   routeTarget?: 'call_detail' | 'calls_trusted' | 'circle_activity' | 'alerts';
   alertType?: string;
 };
+
+const ACTIVITY_PUSH_CHANNEL_ID = 'activity-alerts';
+const ACTIVITY_PUSH_SOUND = 'activity-notification.wav';
 
 function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'] {
   if (
@@ -722,6 +725,22 @@ function NavigationHost() {
 }
 
 function AppContent() {
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+    Notifications.setNotificationChannelAsync(ACTIVITY_PUSH_CHANNEL_ID, {
+      name: 'Activity Alerts',
+      importance: Notifications.AndroidImportance.HIGH,
+      sound: ACTIVITY_PUSH_SOUND,
+      vibrationPattern: [0, 250, 250, 250],
+      enableVibrate: true,
+      lightColor: '#3b82f6',
+    }).catch((err) => {
+      console.warn('[notifications] Failed to configure activity channel', err);
+    });
+  }, []);
+
   return (
     <ProfileProvider>
       <SupportProvider>

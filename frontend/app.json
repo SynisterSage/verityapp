@@ -43,6 +43,15 @@
     "plugins": [
       "expo-secure-store",
       [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/activity-notification.wav",
+            "./assets/sounds/support-notification.wav"
+          ]
+        }
+      ],
+      [
         "@sentry/react-native/expo",
         {
           "url": "https://sentry.io/",

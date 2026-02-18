@@ -5,7 +5,8 @@ type ExpoPushMessage = {
   to: string;
   title: string;
   body: string;
-  sound?: 'default';
+  sound?: string;
+  channelId?: string;
   data?: Record<string, string>;
 };
 
