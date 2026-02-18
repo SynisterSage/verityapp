@@ -292,6 +292,7 @@ export default function CallsScreen({
   const [isTrustedTrayMounted, setIsTrustedTrayMounted] = useState(false);
   const trustedTrayAnim = useRef(new Animated.Value(0)).current;
   const [trustedTrayProcessing, setTrustedTrayProcessing] = useState(false);
+  const [filterDeleteProcessing, setFilterDeleteProcessing] = useState(false);
 
   // Shimmer animation for skeleton loaders
   const shimmer = useRef(new Animated.Value(0)).current;
@@ -812,8 +813,191 @@ export default function CallsScreen({
       : filter === 'trusted'
       ? trustedActivity.length
       : filteredCalls.length;
+  const isNonAllFilter = filter !== 'all';
+  const showHeaderDelete = canManageProfile && isNonAllFilter;
+  const disableHeaderDelete = filterDeleteProcessing || !activeProfile;
+  const filterLabel = useMemo(() => {
+    switch (filter) {
+      case 'verified':
+        return 'Verified';
+      case 'risk':
+        return 'Risk';
+      case 'trusted':
+        return 'Trusted';
+      case 'handled':
+        return 'Handled';
+      case 'archived':
+        return 'Archived';
+      default:
+        return 'Calls';
+    }
+  }, [filter]);
   const showTrustedOnly = filter === 'trusted';
   const showTrustedSummary = filter === 'all' && trustedActivity.length > 0;
+
+  const resolveFilterDeleteTargets = useCallback(async () => {
+    if (!activeProfile) {
+      return {
+        ids: [] as string[],
+        deleteType: 'calls' as const,
+        itemNoun: 'call',
+      };
+    }
+
+    if (filter === 'trusted') {
+      const ids: string[] = [];
+      const pageSize = 1000;
+      for (let offset = 0; ; offset += pageSize) {
+        const { data, error } = await supabase
+          .from('alerts')
+          .select('id')
+          .eq('profile_id', activeProfile.id)
+          .eq('alert_type', 'trusted')
+          .range(offset, offset + pageSize - 1);
+        if (error) {
+          throw error;
+        }
+        const page = data ?? [];
+        ids.push(...page.map((row: any) => row.id as string));
+        if (page.length < pageSize) {
+          break;
+        }
+      }
+      return {
+        ids,
+        deleteType: 'alerts' as const,
+        itemNoun: 'trusted activity item',
+      };
+    }
+
+    const pageSize = 1000;
+    const rows: Array<{
+      id: string;
+      feedback_status: string | null;
+      fraud_risk_level: string | null;
+    }> = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from('calls')
+        .select('id, feedback_status, fraud_risk_level')
+        .eq('profile_id', activeProfile.id)
+        .range(offset, offset + pageSize - 1);
+      if (error) {
+        throw error;
+      }
+      const page = (data ?? []) as Array<{
+        id: string;
+        feedback_status: string | null;
+        fraud_risk_level: string | null;
+      }>;
+      rows.push(...page);
+      if (page.length < pageSize) {
+        break;
+      }
+    }
+
+    const ids = rows
+      .filter((row) => {
+        if (filter === 'handled') {
+          return isHandledStatus(row.feedback_status);
+        }
+        if (filter === 'archived') {
+          return isArchivedStatus(row.feedback_status);
+        }
+        if (isHandledStatus(row.feedback_status) || isArchivedStatus(row.feedback_status)) {
+          return false;
+        }
+        if (filter === 'verified' || filter === 'risk') {
+          const status = determineStatus(
+            {
+              id: row.id,
+              created_at: '',
+              transcript: null,
+              fraud_risk_level: row.fraud_risk_level,
+              fraud_score: null,
+              caller_number: null,
+              feedback_status: row.feedback_status,
+            },
+            theme
+          );
+          return status.group === filter;
+        }
+        return false;
+      })
+      .map((row) => row.id);
+
+    return {
+      ids,
+      deleteType: 'calls' as const,
+      itemNoun: 'call',
+    };
+  }, [activeProfile, filter, theme]);
+
+  const deleteResolvedTargets = useCallback(
+    async (ids: string[], deleteType: 'calls' | 'alerts') => {
+      if (ids.length === 0) {
+        return;
+      }
+      setFilterDeleteProcessing(true);
+      try {
+        const batchSize = 12;
+        for (let i = 0; i < ids.length; i += batchSize) {
+          const chunk = ids.slice(i, i + batchSize);
+          await Promise.all(
+            chunk.map((id) =>
+              authorizedFetch(deleteType === 'alerts' ? `/alerts/${id}` : `/calls/${id}`, {
+                method: 'DELETE',
+              })
+            )
+          );
+        }
+        await loadCalls(true);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch (err) {
+        Alert.alert('Delete failed', 'Could not delete all items for this filter right now.');
+      } finally {
+        setFilterDeleteProcessing(false);
+      }
+    },
+    [loadCalls]
+  );
+
+  const confirmDeleteCurrentFilter = useCallback(async () => {
+    if (!showHeaderDelete || disableHeaderDelete) {
+      return;
+    }
+    setFilterDeleteProcessing(true);
+    try {
+      const resolved = await resolveFilterDeleteTargets();
+      setFilterDeleteProcessing(false);
+      if (resolved.ids.length === 0) {
+        Alert.alert('Nothing to delete', `No items found in ${filterLabel}.`);
+        return;
+      }
+      Alert.alert(
+        `Delete ${filterLabel}`,
+        `Delete ${resolved.ids.length} ${resolved.itemNoun}${resolved.ids.length === 1 ? '' : 's'} in ${filterLabel}? This cannot be undone.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: () => void deleteResolvedTargets(resolved.ids, resolved.deleteType),
+          },
+        ],
+        { cancelable: true }
+      );
+    } catch (err) {
+      setFilterDeleteProcessing(false);
+      Alert.alert('Delete failed', 'Could not prepare this deletion right now.');
+    }
+  }, [
+    deleteResolvedTargets,
+    disableHeaderDelete,
+    filterLabel,
+    resolveFilterDeleteTargets,
+    showHeaderDelete,
+  ]);
 
   const bottomGap = Math.max(insets.bottom, 0) + 20;
   const refreshAccent = theme.colors.accent;
@@ -875,6 +1059,23 @@ export default function CallsScreen({
         subtitle={`${headerCount} calls logged`}
         align="left"
         showScrim={false}
+        right={
+          showHeaderDelete ? (
+            <Pressable
+              onPress={confirmDeleteCurrentFilter}
+              disabled={disableHeaderDelete}
+              style={({ pressed }) => [
+                styles.headerDeleteButton,
+                pressed && !disableHeaderDelete && styles.headerDeleteButtonPressed,
+                disableHeaderDelete && styles.headerDeleteButtonDisabled,
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={`Delete all ${filterLabel.toLowerCase()} items`}
+            >
+              <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
+            </Pressable>
+          ) : undefined
+        }
         supportAction={{
           onPress: handleSupportPress,
           unreadCount: unreadAgentCount,
@@ -1271,6 +1472,20 @@ const createCallStyles = (theme: AppTheme) =>
       marginTop: 20,
       marginBottom: 12,
       width: '100%',
+    },
+    headerDeleteButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    headerDeleteButtonPressed: {
+      transform: [{ scale: 0.98 }],
+    },
+    headerDeleteButtonDisabled: {
+      opacity: 0.45,
     },
     sectionHeader: {
       marginTop: 20,
