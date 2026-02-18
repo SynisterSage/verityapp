@@ -15,7 +15,7 @@ import {
   clearPlaceholderCallUUID,
   consumeAutoAcceptNextIncomingCall,
 } from '../../services/voipPlaceholderCall';
-import { endCall } from '../../services/voipPush';
+import { endCall, answerLatestIncomingCall } from '../../services/voipPush';
 
 const { VoIPPushModule } = NativeModules;
 
@@ -258,12 +258,29 @@ export default function TwilioVoiceClientManager() {
       // If user already answered the placeholder CallKit call, immediately accept
       // this real Twilio invite to prevent a second ringing cycle.
       if (consumeAutoAcceptNextIncomingCall()) {
-        console.info('[twilio-voice] Auto-accepting Twilio invite after placeholder answer');
-        try {
-          TwilioVoice.accept();
-        } catch (err) {
-          console.warn('[twilio-voice] Auto-accept failed', err);
-        }
+        console.info('[twilio-voice] Auto-answering real call after placeholder answer');
+        const excludedUUID = placeholderUUID ?? undefined;
+        let attempts = 0;
+        const maxAttempts = 8;
+        const attemptAnswer = () => {
+          answerLatestIncomingCall(excludedUUID)
+            .then((ok) => {
+              if (ok) {
+                console.info('[twilio-voice] Auto-answer request sent to CallKit');
+                return;
+              }
+              attempts += 1;
+              if (attempts < maxAttempts) {
+                setTimeout(attemptAnswer, 300);
+              } else {
+                console.warn('[twilio-voice] Auto-answer gave up after retries');
+              }
+            })
+            .catch((err) => {
+              console.warn('[twilio-voice] Auto-answer failed', err);
+            });
+        };
+        attemptAnswer();
       }
     };
     const handleDeviceReady = () => {

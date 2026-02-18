@@ -202,3 +202,21 @@ export async function endCall(callUUID: string): Promise<void> {
     console.error('[VoIPPush] Failed to end call:', error);
   }
 }
+
+export async function answerLatestIncomingCall(excludeCallUUID?: string): Promise<boolean> {
+  if (
+    Platform.OS !== 'ios' ||
+    !VoIPPushModule ||
+    typeof VoIPPushModule.answerLatestIncomingCall !== 'function'
+  ) {
+    return false;
+  }
+
+  try {
+    const result = await VoIPPushModule.answerLatestIncomingCall(excludeCallUUID ?? null);
+    return Boolean(result?.success);
+  } catch (error) {
+    console.warn('[VoIPPush] Failed to answer latest incoming call:', error);
+    return false;
+  }
+}

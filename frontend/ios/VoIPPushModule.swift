@@ -9,6 +9,7 @@ class VoIPPushModule: RCTEventEmitter {
   private var pushRegistry: PKPushRegistry?
   private let callKitProvider: CXProvider
   private let callKitCallController: CXCallController
+  private let callObserver: CXCallObserver
   private var latestVoIPToken: String?
   private var lastVoIPPushPayload: [String: Any]?
   private var pendingCallActions: [[String: String]] = []
@@ -24,6 +25,7 @@ class VoIPPushModule: RCTEventEmitter {
 
     self.callKitProvider = CXProvider(configuration: configuration)
     self.callKitCallController = CXCallController()
+    self.callObserver = CXCallObserver()
 
     super.init()
 
@@ -86,6 +88,37 @@ class VoIPPushModule: RCTEventEmitter {
                                  rejecter: @escaping RCTPromiseRejectBlock) {
     resolver(pendingCallActions)
     pendingCallActions.removeAll()
+  }
+
+  @objc
+  func answerLatestIncomingCall(_ excludeCallUUID: String?,
+                                resolver: @escaping RCTPromiseResolveBlock,
+                                rejecter: @escaping RCTPromiseRejectBlock) {
+    let exclude = excludeCallUUID?.trimmingCharacters(in: .whitespacesAndNewlines)
+    let pendingCalls = callObserver.calls.filter { call in
+      if call.hasEnded || call.hasConnected || call.isOutgoing {
+        return false
+      }
+      if let exclude, !exclude.isEmpty, call.uuid.uuidString.caseInsensitiveCompare(exclude) == .orderedSame {
+        return false
+      }
+      return true
+    }
+
+    guard let targetCall = pendingCalls.last else {
+      resolver(["success": false, "reason": "no_pending_call"])
+      return
+    }
+
+    let answerAction = CXAnswerCallAction(call: targetCall.uuid)
+    let transaction = CXTransaction(action: answerAction)
+    callKitCallController.request(transaction) { error in
+      if let error = error {
+        rejecter("CALLKIT_ERROR", "Failed to answer call: \(error.localizedDescription)", error)
+      } else {
+        resolver(["success": true, "callUUID": targetCall.uuid.uuidString])
+      }
+    }
   }
 
   @objc

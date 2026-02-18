@@ -5,6 +5,9 @@ declare module 'react-native' {
       getCurrentVoIPToken?(): Promise<string | null>;
       consumeLastVoIPPush?(): Promise<VoIPPushPayload | null>;
       consumePendingCallActions?(): Promise<VoIPCallActionEvent[]>;
+      answerLatestIncomingCall?(
+        excludeCallUUID?: string | null
+      ): Promise<{ success: boolean; callUUID?: string; reason?: string }>;
       reportIncomingCall(
         callUUID: string,
         callSid: string,
