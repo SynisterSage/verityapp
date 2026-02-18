@@ -11,6 +11,7 @@ type DashboardHeaderProps = {
   right?: ReactNode;
   align?: 'left' | 'center';
   showScrim?: boolean;
+  rightSupportSpacing?: number;
   supportAction?: {
     onPress: () => void;
     unreadCount?: number;
@@ -24,6 +25,7 @@ export default function DashboardHeader({
   right,
   align = 'left',
   showScrim = true,
+  rightSupportSpacing = 12,
   supportAction,
 }: DashboardHeaderProps) {
   const { theme } = useTheme();
@@ -66,7 +68,7 @@ export default function DashboardHeader({
             {right}
             {supportAction ? (
               <SupportButton
-                style={styles.supportActionSpacing}
+                style={[styles.supportActionSpacing, { marginLeft: rightSupportSpacing }]}
                 onPress={supportAction.onPress}
                 unreadCount={supportAction.unreadCount}
                 assistantOnline={supportAction.assistantOnline}

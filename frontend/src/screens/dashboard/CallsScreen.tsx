@@ -813,8 +813,8 @@ export default function CallsScreen({
       : filter === 'trusted'
       ? trustedActivity.length
       : filteredCalls.length;
-  const isNonAllFilter = filter !== 'all';
-  const showHeaderDelete = canManageProfile && isNonAllFilter;
+  const isDeletableFilter = filter === 'trusted' || filter === 'handled' || filter === 'archived';
+  const showHeaderDelete = canManageProfile && isDeletableFilter;
   const disableHeaderDelete = filterDeleteProcessing || !activeProfile;
   const filterLabel = useMemo(() => {
     switch (filter) {
@@ -837,6 +837,13 @@ export default function CallsScreen({
 
   const resolveFilterDeleteTargets = useCallback(async () => {
     if (!activeProfile) {
+      return {
+        ids: [] as string[],
+        deleteType: 'calls' as const,
+        itemNoun: 'call',
+      };
+    }
+    if (!isDeletableFilter) {
       return {
         ids: [] as string[],
         deleteType: 'calls' as const,
@@ -874,12 +881,11 @@ export default function CallsScreen({
     const rows: Array<{
       id: string;
       feedback_status: string | null;
-      fraud_risk_level: string | null;
     }> = [];
     for (let offset = 0; ; offset += pageSize) {
       const { data, error } = await supabase
         .from('calls')
-        .select('id, feedback_status, fraud_risk_level')
+        .select('id, feedback_status')
         .eq('profile_id', activeProfile.id)
         .range(offset, offset + pageSize - 1);
       if (error) {
@@ -888,7 +894,6 @@ export default function CallsScreen({
       const page = (data ?? []) as Array<{
         id: string;
         feedback_status: string | null;
-        fraud_risk_level: string | null;
       }>;
       rows.push(...page);
       if (page.length < pageSize) {
@@ -904,24 +909,6 @@ export default function CallsScreen({
         if (filter === 'archived') {
           return isArchivedStatus(row.feedback_status);
         }
-        if (isHandledStatus(row.feedback_status) || isArchivedStatus(row.feedback_status)) {
-          return false;
-        }
-        if (filter === 'verified' || filter === 'risk') {
-          const status = determineStatus(
-            {
-              id: row.id,
-              created_at: '',
-              transcript: null,
-              fraud_risk_level: row.fraud_risk_level,
-              fraud_score: null,
-              caller_number: null,
-              feedback_status: row.feedback_status,
-            },
-            theme
-          );
-          return status.group === filter;
-        }
         return false;
       })
       .map((row) => row.id);
@@ -931,7 +918,7 @@ export default function CallsScreen({
       deleteType: 'calls' as const,
       itemNoun: 'call',
     };
-  }, [activeProfile, filter, theme]);
+  }, [activeProfile, filter, isDeletableFilter]);
 
   const deleteResolvedTargets = useCallback(
     async (ids: string[], deleteType: 'calls' | 'alerts') => {
@@ -1059,6 +1046,7 @@ export default function CallsScreen({
         subtitle={`${headerCount} calls logged`}
         align="left"
         showScrim={false}
+        rightSupportSpacing={8}
         right={
           showHeaderDelete ? (
             <Pressable

@@ -96,6 +96,7 @@ export default function AlertsScreen() {
   );
   const [alerts, setAlerts] = useState<AlertRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [contactNames, setContactNames] = useState<Record<string, string>>({});
   const [callNumberMap, setCallNumberMap] = useState<Record<string, string>>({});
   const [memberNames, setMemberNames] = useState<Record<string, string>>({});
@@ -253,6 +254,12 @@ const loadMemberNames = useCallback(async () => {
 }, [activeProfile]);
 
   const loadAlerts = async (silent = false) => {
+    if (!activeProfile) {
+      setAlerts([]);
+      setCallNumberMap({});
+      setLoading(false);
+      return;
+    }
     if (!silent) {
       setLoading(true);
     }
@@ -359,9 +366,35 @@ const loadMemberNames = useCallback(async () => {
       refreshAlertCount();
     } catch {
       setAlerts([]);
+    } finally {
+      if (!silent) {
+        setLoading(false);
+      }
     }
-    setLoading(false);
   };
+
+  const handleRefresh = useCallback(async () => {
+    if (refreshing) {
+      return;
+    }
+    setRefreshing(true);
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    try {
+      await Promise.race([
+        loadAlerts(true),
+        new Promise<void>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error('alerts_refresh_timeout')), 15000);
+        }),
+      ]);
+    } catch (err) {
+      console.warn('[Alerts] Pull-to-refresh timed out or failed', err);
+    } finally {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      setRefreshing(false);
+    }
+  }, [loadAlerts, refreshing]);
 
   useEffect(() => {
     loadAlerts();
@@ -1128,8 +1161,8 @@ const loadMemberNames = useCallback(async () => {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={loading}
-              onRefresh={() => loadAlerts()}
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
               tintColor={refreshControlProps.tintColor}
               colors={refreshControlProps.colors}
               progressBackgroundColor={refreshControlProps.progressBackgroundColor}
