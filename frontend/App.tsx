@@ -717,7 +717,6 @@ function NavigationHost() {
     >
       <RootNavigator />
       <StatusBar style={statusBarStyle} />
-      {navigationReady && <TwilioVoiceClientManager />}
     </NavigationContainer>
   );
 }
@@ -727,6 +726,7 @@ function AppContent() {
     <ProfileProvider>
       <SupportProvider>
         <InviteLinkHandler />
+        <TwilioVoiceClientManager />
         <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <NavigationHost />
