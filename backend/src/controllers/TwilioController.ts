@@ -195,7 +195,8 @@ function appendClientBridge(
   actionUrl?: string,
   pauseBeforeDial?: number,
   dialTimeoutSeconds?: number,
-  callerName?: string
+  callerName?: string,
+  callerNumber?: string
 ) {
   twimlResponse.say({ voice: 'Polly.Joanna' }, 'Thank you. Connecting your call.');
 
@@ -222,6 +223,10 @@ function appendClientBridge(
   const trimmedCallerName = callerName?.trim();
   if (trimmedCallerName) {
     clientDial.parameter({ name: 'CallerName', value: trimmedCallerName });
+  }
+  const trimmedCallerNumber = callerNumber?.trim();
+  if (trimmedCallerNumber) {
+    clientDial.parameter({ name: 'CallerNumber', value: trimmedCallerNumber });
   }
 }
 
@@ -383,7 +388,8 @@ async function bridgeToProfile(
         bridgeFallbackUrl,
         pauseDuration,
         dialTimeoutSeconds,
-        callerName
+        callerName,
+        fromNumber
       );
       return `client=${clientIdentity} (loop-avoidance)`;
     }
@@ -417,7 +423,8 @@ async function bridgeToProfile(
       bridgeFallbackUrl,
       pauseDuration,
       dialTimeoutSeconds,
-      callerName
+      callerName,
+      fromNumber
     );
     return `client=${clientIdentity}`;
   }
