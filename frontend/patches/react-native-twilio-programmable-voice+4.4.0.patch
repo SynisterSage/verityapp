@@ -1,5 +1,5 @@
 diff --git a/node_modules/react-native-twilio-programmable-voice/ios/RNTwilioVoice/RNTwilioVoice.m b/node_modules/react-native-twilio-programmable-voice/ios/RNTwilioVoice/RNTwilioVoice.m
-index df4c381..8b4f12b 100644
+index df4c381..da0538e 100644
 --- a/node_modules/react-native-twilio-programmable-voice/ios/RNTwilioVoice/RNTwilioVoice.m
 +++ b/node_modules/react-native-twilio-programmable-voice/ios/RNTwilioVoice/RNTwilioVoice.m
 @@ -8,6 +8,7 @@
@@ -28,7 +28,31 @@ index df4c381..8b4f12b 100644
      if ([[NSProcessInfo processInfo] operatingSystemVersion].majorVersion < 13) {
          [self incomingPushHandled];
      }
-@@ -645,8 +649,6 @@ - (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAct
+@@ -460,7 +464,10 @@ - (void)callDidStartRinging:(TVOCall *)call {
+ #pragma mark - TVOCallDelegate
+ - (void)callDidConnect:(TVOCall *)call {
+      NSLog(@"callDidConnect");
+-  self.callKitCompletionCallback(YES);
++  if (self.callKitCompletionCallback) {
++    self.callKitCompletionCallback(YES);
++    self.callKitCompletionCallback = nil;
++  }
+ 
+   NSMutableDictionary *callParams = [[NSMutableDictionary alloc] init];
+   [callParams setObject:call.sid forKey:@"call_sid"];
+@@ -508,7 +515,10 @@ - (void)callDidReconnect:(TVOCall *)call {
+ - (void)call:(TVOCall *)call didFailToConnectWithError:(NSError *)error {
+   NSLog(@"Call failed to connect: %@", error);
+ 
+-  self.callKitCompletionCallback(NO);
++  if (self.callKitCompletionCallback) {
++    self.callKitCompletionCallback(NO);
++    self.callKitCompletionCallback = nil;
++  }
+     [self performEndCallActionWithUUID:call.uuid];
+     [self callDisconnected:call error:error];
+ }
+@@ -645,8 +655,6 @@ - (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAct
        [action fail];
      }
    }];
@@ -37,7 +61,7 @@ index df4c381..8b4f12b 100644
  }
  
  - (void)provider:(CXProvider *)provider performEndCallAction:(CXEndCallAction *)action {
-@@ -733,6 +735,7 @@ - (void)reportIncomingCallFrom:(NSString *)from withUUID:(NSUUID *)uuid {
+@@ -733,6 +741,7 @@ - (void)reportIncomingCallFrom:(NSString *)from withUUID:(NSUUID *)uuid {
  
    CXCallUpdate *callUpdate = [[CXCallUpdate alloc] init];
    callUpdate.remoteHandle = callHandle;
@@ -45,7 +69,7 @@ index df4c381..8b4f12b 100644
    callUpdate.supportsDTMF = YES;
    callUpdate.supportsHolding = YES;
    callUpdate.supportsGrouping = NO;
-@@ -781,10 +784,25 @@ - (void)performVoiceCallWithUUID:(NSUUID *)uuid
+@@ -781,10 +790,25 @@ - (void)performVoiceCallWithUUID:(NSUUID *)uuid
  }
  
  - (void)performAnswerVoiceCallWithUUID:(NSUUID *)uuid
@@ -74,7 +98,7 @@ index df4c381..8b4f12b 100644
      TVOAcceptOptions *acceptOptions = [TVOAcceptOptions optionsWithCallInvite:callInvite block:^(TVOAcceptOptionsBuilder *builder) {
          builder.uuid = callInvite.uuid;
      }];
-@@ -794,9 +812,9 @@ - (void)performAnswerVoiceCallWithUUID:(NSUUID *)uuid
+@@ -794,9 +818,9 @@ - (void)performAnswerVoiceCallWithUUID:(NSUUID *)uuid
      if (!call) {
          completionHandler(NO);
      } else {
@@ -85,7 +109,7 @@ index df4c381..8b4f12b 100644
      }
  
      [self.activeCallInvites removeObjectForKey:callInvite.uuid.UUIDString];
-@@ -806,6 +824,11 @@ - (void)performAnswerVoiceCallWithUUID:(NSUUID *)uuid
+@@ -806,6 +830,11 @@ - (void)performAnswerVoiceCallWithUUID:(NSUUID *)uuid
      }
  }
  
