@@ -76,49 +76,65 @@ export default function CallFilter({ value, onChange, style }: CallFilterProps) 
 
   return (
     <View style={[styles.container, style, { backgroundColor: theme.colors.surface }]}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
-      >
-        {CALL_FILTER_OPTIONS.map((option, index) => {
-          const active = option.key === value;
-          const activeStyle = activeStyles[option.key];
-          const isLast = index === CALL_FILTER_OPTIONS.length - 1;
-          return (
-            <Pressable
-              key={option.key}
-              accessibilityRole="button"
-              accessibilityState={{ selected: active }}
-              onPress={() => handlePress(option.key)}
-              style={({ pressed }) => [
-                styles.segment,
-                !isLast && styles.segmentSpacing,
-                { backgroundColor: theme.colors.surfaceAlt },
-                active && styles.segmentActive,
-                active && {
-                  shadowColor: activeStyle.shadowColor,
-                  shadowOpacity: 0.35,
-                  shadowRadius: 14,
-                  shadowOffset: { width: 0, height: 8 },
-                  elevation: 6,
-                },
-                pressed && styles.segmentPressed,
-              ]}
-            >
-              {active && (
-                <LinearGradient
-                  colors={activeStyle.gradient}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              )}
-              <Text style={[styles.label, active && styles.labelActive]}>{option.label}</Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
+      <View style={styles.scrollViewport}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.row}
+        >
+          {CALL_FILTER_OPTIONS.map((option, index) => {
+            const active = option.key === value;
+            const activeStyle = activeStyles[option.key];
+            const isLast = index === CALL_FILTER_OPTIONS.length - 1;
+            return (
+              <Pressable
+                key={option.key}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                onPress={() => handlePress(option.key)}
+                style={({ pressed }) => [
+                  styles.segment,
+                  !isLast && styles.segmentSpacing,
+                  { backgroundColor: theme.colors.surfaceAlt },
+                  active && styles.segmentActive,
+                  active && {
+                    shadowColor: activeStyle.shadowColor,
+                    shadowOpacity: 0.35,
+                    shadowRadius: 14,
+                    shadowOffset: { width: 0, height: 8 },
+                    elevation: 6,
+                  },
+                  pressed && styles.segmentPressed,
+                ]}
+              >
+                {active && (
+                  <LinearGradient
+                    colors={activeStyle.gradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                )}
+                <Text style={[styles.label, active && styles.labelActive]}>{option.label}</Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <LinearGradient
+          pointerEvents="none"
+          colors={[theme.colors.surface, withOpacity(theme.colors.surface, 0)]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.edgeFadeLeft}
+        />
+        <LinearGradient
+          pointerEvents="none"
+          colors={[withOpacity(theme.colors.surface, 0), theme.colors.surface]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.edgeFadeRight}
+        />
+      </View>
     </View>
   );
 }
@@ -136,10 +152,14 @@ const styles = StyleSheet.create({
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
   },
+  scrollViewport: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 6,
+    paddingHorizontal: 10,
   },
   segment: {
     minWidth: 88,
@@ -167,5 +187,19 @@ const styles = StyleSheet.create({
   },
   labelActive: {
     color: '#fff',
+  },
+  edgeFadeLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 16,
+  },
+  edgeFadeRight: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 16,
   },
 });

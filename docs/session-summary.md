@@ -228,3 +228,36 @@ Verification done
 - Call bridge test from trusted contacts completed with in-app incoming call and two-way audio connection.
 - Push dispatch logs show successful sends for generated alerts, and at least one closed-app push delivery was observed on device.
 - Setup support tickets/messages creation and history rendering tested, including handoff behavior post-onboarding.
+
+2026-02-18
+
+Scope
+- Clean up Calls/Alerts UX around filtering, trusted activity clarity, and destructive actions.
+- Remove stale Twilio wake-up reminder automation now that the newer call wake flow is in place.
+- Fix Alerts pull-to-refresh getting stuck and polish filter edge clipping.
+
+Frontend work
+- Calls filter expanded to include `Handled` and `Archived`; navigation types updated for new filter keys.
+- Calls `All` view now shows a compact trusted summary card with quick jump to `Trusted` instead of dumping full trusted history first.
+- Trusted visuals standardized across Calls and Home recent activity using a blue shield icon (`shield-checkmark`) and matching icon background treatment.
+- Activity row interaction updated to match call-card press behavior (scale-down press animation + consistent long-press timing).
+- Calls header destructive action refined:
+  - icon-only trash button styled to align with support action sizing.
+  - delete action shown only on `Trusted`, `Handled`, and `Archived`.
+  - deletion resolves targets from backend and deletes all matching items for that filter (not just currently rendered rows).
+- Alerts pull-to-refresh decoupled from generic loading state by introducing dedicated `refreshing` state and timeout-safe refresh handling to prevent stuck spinner behavior.
+- Call filter horizontal scroll polish:
+  - improved left/right inner padding,
+  - added edge fade treatment so pills do not hard-clip at container edges,
+  - fixed hook-order runtime issue by removing extra fade `useMemo` hooks and computing fade colors inline.
+
+Backend / automation cleanup
+- Removed stale Twilio client reminder GitHub Action:
+  - deleted `.github/workflows/notify-stale-twilio.yml`.
+- Removed stale notifier backend entry points:
+  - deleted `backend/scripts/notifyStaleTwilioClients.ts`.
+  - removed `twilio-client:notify-stale` script from `backend/package.json`.
+
+Verification
+- Frontend type checks passed after each major iteration (`cd frontend && npx tsc --noEmit`).
+- Confirmed no remaining references in backend/workflows to stale Twilio reminder automation.
