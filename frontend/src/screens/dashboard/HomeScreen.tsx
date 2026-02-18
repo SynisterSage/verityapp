@@ -602,38 +602,46 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               </View>
             ) : (
               <View style={styles.activityList}>
-                {recentActivity.map((item) => (
-                  <View key={item.id} style={styles.activityItem}>
-                    <ActivityRow
-                      type={item.type}
-                      label={item.label}
-                      createdAt={item.created_at}
-                      badge={item.badge}
-                      muted={item.muted}
-                      disabled={Boolean(item.viewOnly)}
-                      badgeLevel={
-                        item.badge === 'FRAUD'
-                          ? 'critical'
-                          : item.badge === 'SAFE'
-                          ? 'low'
-                          : item.badgeLevel
-                      }
-                      onPress={() => {
-                        if (item.viewOnly) {
-                          return;
+                {recentActivity.map((item) => {
+                  const isTrustedActivity = item.badge === 'TRUSTED';
+                  return (
+                    <View key={item.id} style={styles.activityItem}>
+                      <ActivityRow
+                        type={item.type}
+                        label={item.label}
+                        createdAt={item.created_at}
+                        badge={item.badge}
+                        iconName={isTrustedActivity ? 'shield-checkmark' : undefined}
+                        iconColor={isTrustedActivity ? theme.colors.accent : undefined}
+                        iconBackgroundColor={
+                          isTrustedActivity ? withOpacity(theme.colors.accent, 0.16) : undefined
                         }
-                        if (item.type === 'call') {
-                          navigation.navigate('CallsTab', {
-                            screen: 'Calls',
-                            params: { initialCallId: item.callId },
-                          });
-                          return;
+                        muted={item.muted}
+                        disabled={Boolean(item.viewOnly)}
+                        badgeLevel={
+                          item.badge === 'FRAUD'
+                            ? 'critical'
+                            : item.badge === 'SAFE'
+                            ? 'low'
+                            : item.badgeLevel
                         }
-                        navigation.navigate('AlertsTab');
-                      }}
-                    />
-                  </View>
-                ))}
+                        onPress={() => {
+                          if (item.viewOnly) {
+                            return;
+                          }
+                          if (item.type === 'call') {
+                            navigation.navigate('CallsTab', {
+                              screen: 'Calls',
+                              params: { initialCallId: item.callId },
+                            });
+                            return;
+                          }
+                          navigation.navigate('AlertsTab');
+                        }}
+                      />
+                    </View>
+                  );
+                })}
               </View>
             )}
           </View>

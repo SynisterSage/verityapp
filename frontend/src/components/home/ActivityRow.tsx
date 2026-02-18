@@ -1,4 +1,4 @@
-import { TouchableOpacity, Text, View, StyleSheet } from 'react-native';
+import { Pressable, Text, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -19,6 +19,9 @@ type ActivityRowProps = {
   muted?: boolean;
   disabled?: boolean;
   borderRadius?: number;
+  iconName?: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
+  iconBackgroundColor?: string;
   onLongPress?: () => void;
   onPress: () => void;
 };
@@ -37,6 +40,9 @@ export default function ActivityRow({
   muted = false,
   disabled = false,
   borderRadius = 22,
+  iconName,
+  iconColor,
+  iconBackgroundColor,
   onLongPress,
   onPress,
 }: ActivityRowProps) {
@@ -46,35 +52,42 @@ export default function ActivityRow({
   const mutedBackground = withOpacity(theme.colors.text, 0.08);
   const badgeBackground = muted ? mutedBackground : riskStyles.background;
   const badgeTextColor = muted ? mutedAccent : riskStyles.accent;
-  const iconBg = muted ? mutedBackground : withOpacity(riskStyles.accent, 0.12);
-  const iconColor = muted ? mutedAccent : riskStyles.accent;
+  const computedIconBg = muted ? mutedBackground : withOpacity(riskStyles.accent, 0.12);
+  const computedIconColor = muted ? mutedAccent : riskStyles.accent;
   const labelColor = muted ? theme.colors.textMuted : theme.colors.text;
   const metaColor = muted ? theme.colors.textDim : theme.colors.textMuted;
   const digitsOnly = label.replace(/\D/g, '');
   const shouldFormatPhone = digitsOnly.length >= 10 && !/[A-Za-z]/.test(label);
   const formattedLabel = shouldFormatPhone ? formatPhoneNumber(label, label) : label;
+  const touchableDisabled = disabled && !onLongPress;
   const handlePress = () => {
     if (disabled) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     onPress();
   };
   return (
-    <TouchableOpacity
-      style={[
+    <Pressable
+      style={({ pressed }) => [
         styles.row,
         {
           borderRadius,
           backgroundColor: theme.colors.surface,
           borderColor: theme.colors.border,
         },
+        pressed && !touchableDisabled && styles.rowPressed,
       ]}
+      disabled={touchableDisabled}
       onPress={handlePress}
       onLongPress={onLongPress}
-      activeOpacity={disabled ? 1 : 0.85}
+      delayLongPress={400}
     >
       <View style={styles.rowLeft}>
-        <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
-          <Ionicons name={ICONS[type]} size={18} color={iconColor} />
+        <View style={[styles.iconCircle, { backgroundColor: iconBackgroundColor ?? computedIconBg }]}>
+          <Ionicons
+            name={iconName ?? ICONS[type]}
+            size={18}
+            color={iconColor ?? computedIconColor}
+          />
         </View>
         <View style={styles.metaGroup}>
           <Text style={[styles.label, { color: labelColor }]} numberOfLines={1}>
@@ -95,7 +108,7 @@ export default function ActivityRow({
       >
         <Text style={[styles.badgeText, { color: badgeTextColor }]}>{badge}</Text>
       </View>
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 
@@ -107,6 +120,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+  },
+  rowPressed: {
+    transform: [{ scale: 0.98 }],
   },
   rowLeft: {
     flexDirection: 'row',

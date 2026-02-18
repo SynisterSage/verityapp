@@ -5,6 +5,7 @@ import {
   Easing,
   Modal,
   SectionList,
+  FlatList,
   SectionBase,
   RefreshControl,
   StyleSheet,
@@ -69,6 +70,12 @@ const formatSectionTitle = (title: string) => {
 };
 
 const handledStatuses = new Set(['marked_safe', 'marked_fraud']);
+
+const isHandledStatus = (feedbackStatus?: string | null) =>
+  handledStatuses.has((feedbackStatus ?? '').toLowerCase());
+
+const isArchivedStatus = (feedbackStatus?: string | null) =>
+  (feedbackStatus ?? '').toLowerCase() === 'archived';
 
 const formatE164 = (value?: string | null) => {
   if (!value) return null;
@@ -613,7 +620,16 @@ export default function CallsScreen({
     if (filter === 'all') {
       return calls;
     }
+    if (filter === 'handled') {
+      return calls.filter((call) => isHandledStatus(call.feedback_status));
+    }
+    if (filter === 'archived') {
+      return calls.filter((call) => isArchivedStatus(call.feedback_status));
+    }
     return calls.filter((call) => {
+      if (isHandledStatus(call.feedback_status) || isArchivedStatus(call.feedback_status)) {
+        return false;
+      }
       const status = determineStatus(call, theme);
       return status.group === filter;
     });
@@ -625,55 +641,53 @@ export default function CallsScreen({
     );
   }, [filteredCalls]);
 
-const sections = useMemo<CallSection[]>(() => {
-  const today = new Date();
-  const yesterday = new Date();
-  yesterday.setDate(yesterday.getDate() - 1);
-  const buckets: Record<string, CallRow[]> = { Today: [], Yesterday: [], Older: [] };
-  const handled: CallRow[] = [];
-  const archived: CallRow[] = [];
-  const archivedStatuses = new Set(['archived']);
+  const sections = useMemo<CallSection[]>(() => {
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const buckets: Record<string, CallRow[]> = { Today: [], Yesterday: [], Older: [] };
+    const handled: CallRow[] = [];
+    const archived: CallRow[] = [];
 
-  sortedCalls.forEach((call) => {
-    const feedback = (call.feedback_status ?? '').toLowerCase();
-    if (archivedStatuses.has(feedback)) {
-      archived.push(call);
-      return;
+    sortedCalls.forEach((call) => {
+      if (isArchivedStatus(call.feedback_status)) {
+        archived.push(call);
+        return;
+      }
+      if (isHandledStatus(call.feedback_status)) {
+        handled.push(call);
+        return;
+      }
+      const created = new Date(call.created_at);
+      if (isSameDay(created, today)) {
+        buckets.Today.push(call);
+      } else if (isSameDay(created, yesterday)) {
+        buckets.Yesterday.push(call);
+      } else {
+        buckets.Older.push(call);
+      }
+    });
+
+    const orderedBuckets = [
+      { title: 'Today', data: buckets.Today },
+      { title: 'Yesterday', data: buckets.Yesterday },
+      { title: 'Older', data: buckets.Older },
+    ];
+
+    const nextSections = orderedBuckets
+      .filter((bucket) => bucket.data.length > 0)
+      .map(({ title, data }) => ({ title, data }));
+
+    if (handled.length > 0) {
+      nextSections.push({ title: 'Handled', data: handled });
     }
-    if (handledStatuses.has(feedback)) {
-      handled.push(call);
-      return;
+
+    if (archived.length > 0) {
+      nextSections.push({ title: 'Archived', data: archived });
     }
-    const created = new Date(call.created_at);
-    if (isSameDay(created, today)) {
-      buckets.Today.push(call);
-    } else if (isSameDay(created, yesterday)) {
-      buckets.Yesterday.push(call);
-    } else {
-      buckets.Older.push(call);
-    }
-  });
 
-  const orderedBuckets = [
-    { title: 'Today', data: buckets.Today },
-    { title: 'Yesterday', data: buckets.Yesterday },
-    { title: 'Older', data: buckets.Older },
-  ];
-
-  const sections = orderedBuckets
-    .filter((bucket) => bucket.data.length > 0)
-    .map(({ title, data }) => ({ title, data }));
-
-  if (handled.length > 0) {
-    sections.push({ title: 'Handled', data: handled });
-  }
-
-  if (archived.length > 0) {
-    sections.push({ title: 'Archived', data: archived });
-  }
-
-  return sections;
-}, [sortedCalls]);
+    return nextSections;
+  }, [sortedCalls]);
 
   useFocusEffect(
     useCallback(() => {
@@ -741,25 +755,65 @@ const sections = useMemo<CallSection[]>(() => {
     [handleCallPress, theme, handleTrayLongPress]
   );
 
+  const renderTrustedItem = useCallback(
+    ({ item }: { item: TrustedActivityRow }) => (
+      <View style={styles.trustedItem}>
+        <ActivityRow
+          type="alert"
+          label={item.label}
+          createdAt={item.created_at}
+          badge="TRUSTED"
+          badgeLevel="circle"
+          iconName="shield-checkmark"
+          iconColor={theme.colors.accent}
+          iconBackgroundColor={withOpacity(theme.colors.accent, 0.16)}
+          borderRadius={32}
+          disabled
+          onLongPress={canManageProfile ? () => showTrustedTray(item) : undefined}
+          onPress={() => {}}
+        />
+      </View>
+    ),
+    [canManageProfile, showTrustedTray, styles, theme.colors.accent]
+  );
+
   const renderSectionHeader = ({ section }: { section: CallSection }) => (
     <View style={styles.sectionHeader}>
       <Text style={styles.sectionHeaderText}>{formatSectionTitle(section.title)}</Text>
     </View>
   );
 
-  const showSkeleton = loading && calls.length === 0;
+  const handleViewTrustedPress = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setFilter('trusted');
+  }, []);
+
+  const showSkeleton =
+    loading && (filter === 'trusted' ? trustedActivity.length === 0 : calls.length === 0);
   const emptyStateMessage = error
     ? error
     : filter === 'trusted'
     ? 'No trusted activity yet.'
+    : filter === 'handled'
+    ? 'No handled calls yet.'
+    : filter === 'archived'
+    ? 'No archived calls yet.'
     : filter === 'verified'
     ? 'No verified calls yet.'
     : filter === 'risk'
     ? 'No risk calls found.'
+    : filter === 'all' && trustedActivity.length > 0
+    ? 'No non-trusted calls yet.'
     : 'No calls recorded yet.';
 
-  const headerCount = filter === 'trusted' ? trustedActivity.length : filteredCalls.length;
+  const headerCount =
+    filter === 'all'
+      ? filteredCalls.length + trustedActivity.length
+      : filter === 'trusted'
+      ? trustedActivity.length
+      : filteredCalls.length;
   const showTrustedOnly = filter === 'trusted';
+  const showTrustedSummary = filter === 'all' && trustedActivity.length > 0;
 
   const bottomGap = Math.max(insets.bottom, 0) + 20;
   const refreshAccent = theme.colors.accent;
@@ -827,88 +881,187 @@ const sections = useMemo<CallSection[]>(() => {
         }}
       />
       <View style={styles.filterBar}>
-        <CallFilter value={filter} onChange={setFilter} showBottomScrim />
+        <CallFilter value={filter} onChange={setFilter} />
       </View>
       <View style={styles.listWrapper}>
-        <SectionList<CallRow, CallSection>
-          ref={listRef}
-          sections={showTrustedOnly ? [] : sections}
-          keyExtractor={(item) => item.id}
-          renderItem={renderCallItem}
-          renderSectionHeader={renderSectionHeader}
-        showsVerticalScrollIndicator={false}
-        stickySectionHeadersEnabled={false}
-        style={styles.list}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-            tintColor={refreshControlProps.tintColor}
-            colors={refreshControlProps.colors}
-            progressBackgroundColor={refreshControlProps.progressBackgroundColor}
-          />
-          }
-        contentContainerStyle={[
-          styles.content,
-          {
-            flexGrow: 1,
-            paddingBottom: bottomGap + 40,
-          },
-        ]}
-        ListHeaderComponent={
-          trustedActivity.length > 0 && (filter === 'all' || showTrustedOnly) ? (
-            <View style={styles.trustedSection}>
-              <Text style={styles.sectionHeaderText}>Trusted Activity</Text>
-              <View style={styles.trustedList}>
-                {trustedActivity.map((item) => (
-                  <View key={item.id} style={styles.trustedItem}>
-                    <ActivityRow
-                      type="alert"
-                      label={item.label}
-                      createdAt={item.created_at}
-                      badge="TRUSTED"
-                      badgeLevel="circle"
-                      borderRadius={32}
-                      disabled
-                      onLongPress={canManageProfile ? () => showTrustedTray(item) : undefined}
-                      onPress={() => {}}
-                    />
-                  </View>
-                ))}
-              </View>
-            </View>
-          ) : null
-        }
-        ListFooterComponentStyle={styles.footer}
-        ListEmptyComponent={
-          showSkeleton ? (
-            <Animated.View style={[styles.skeletonList, { opacity: shimmer.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.3, 0.6],
-            }) }]}>
-              {[...Array(3)].map((_, idx) => (
-                <View key={idx} style={styles.skeletonCard}>
-                  <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
-                  <View style={styles.skeletonLine} />
-                  <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
-                </View>
-              ))}
-            </Animated.View>
-          ) : showTrustedOnly && trustedActivity.length > 0 ? null : (
-            <View style={[styles.emptyStateWrap, showTrustedOnly && styles.emptyStateWrapTrusted]}>
-              <EmptyState
-                icon="call-outline"
-                title={emptyStateMessage}
-                body={
-                  showTrustedOnly
-                    ? 'Trusted caller bridges will show here.'
-                    : 'We will surface calls here as soon as they arrive.'
-                }
+        {showTrustedOnly ? (
+          <FlatList<TrustedActivityRow>
+            data={trustedActivity}
+            keyExtractor={(item) => item.id}
+            renderItem={renderTrustedItem}
+            showsVerticalScrollIndicator={false}
+            style={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={refreshControlProps.tintColor}
+                colors={refreshControlProps.colors}
+                progressBackgroundColor={refreshControlProps.progressBackgroundColor}
               />
-            </View>
-          )
-        }
-        />
+            }
+            contentContainerStyle={[
+              styles.content,
+              {
+                flexGrow: 1,
+                paddingBottom: bottomGap + 40,
+              },
+            ]}
+            ListHeaderComponent={
+              trustedActivity.length > 0 ? (
+                <View style={styles.trustedSection}>
+                  <Text style={styles.sectionHeaderText}>Trusted Activity</Text>
+                </View>
+              ) : null
+            }
+            ListFooterComponentStyle={styles.footer}
+            ListEmptyComponent={
+              showSkeleton ? (
+                <Animated.View
+                  style={[
+                    styles.skeletonList,
+                    {
+                      opacity: shimmer.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.3, 0.6],
+                      }),
+                    },
+                  ]}
+                >
+                  {[...Array(3)].map((_, idx) => (
+                    <View key={idx} style={styles.skeletonCard}>
+                      <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                      <View style={styles.skeletonLine} />
+                      <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                    </View>
+                  ))}
+                </Animated.View>
+              ) : (
+                <View style={[styles.emptyStateWrap, styles.emptyStateWrapTrusted]}>
+                  <EmptyState
+                    icon="call-outline"
+                    title={emptyStateMessage}
+                    body="Trusted caller bridges will show here."
+                  />
+                </View>
+              )
+            }
+            initialNumToRender={12}
+            maxToRenderPerBatch={12}
+            windowSize={8}
+            removeClippedSubviews
+          />
+        ) : (
+          <SectionList<CallRow, CallSection>
+            ref={listRef}
+            sections={sections}
+            keyExtractor={(item) => item.id}
+            renderItem={renderCallItem}
+            renderSectionHeader={renderSectionHeader}
+            showsVerticalScrollIndicator={false}
+            stickySectionHeadersEnabled={false}
+            style={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={refreshControlProps.tintColor}
+                colors={refreshControlProps.colors}
+                progressBackgroundColor={refreshControlProps.progressBackgroundColor}
+              />
+            }
+            contentContainerStyle={[
+              styles.content,
+              {
+                flexGrow: 1,
+                paddingBottom: bottomGap + 40,
+              },
+            ]}
+            ListHeaderComponent={
+              showTrustedSummary ? (
+                <View style={styles.trustedSummaryCard}>
+                  <View style={styles.trustedSummaryRow}>
+                    <View style={styles.trustedSummaryIconWrap}>
+                      <Ionicons
+                        name="shield-checkmark"
+                        size={20}
+                        color={theme.colors.accent}
+                      />
+                    </View>
+                    <View style={styles.trustedSummaryTextWrap}>
+                      <Text
+                        style={styles.trustedSummaryTitle}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        Trusted activity
+                      </Text>
+                      <Text
+                        style={styles.trustedSummaryBody}
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                      >
+                        {trustedActivity.length} trusted call
+                        {trustedActivity.length === 1 ? '' : 's'} logged
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={handleViewTrustedPress}
+                      style={({ pressed }) => [
+                        styles.trustedSummaryButton,
+                        pressed && styles.trustedSummaryButtonPressed,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="View trusted activity"
+                    >
+                      <Ionicons
+                        name="chevron-forward"
+                        size={16}
+                        color={theme.colors.accent}
+                      />
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null
+            }
+            ListFooterComponentStyle={styles.footer}
+            ListEmptyComponent={
+              showSkeleton ? (
+                <Animated.View
+                  style={[
+                    styles.skeletonList,
+                    {
+                      opacity: shimmer.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.3, 0.6],
+                      }),
+                    },
+                  ]}
+                >
+                  {[...Array(3)].map((_, idx) => (
+                    <View key={idx} style={styles.skeletonCard}>
+                      <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                      <View style={styles.skeletonLine} />
+                      <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                    </View>
+                  ))}
+                </Animated.View>
+              ) : (
+                <View style={styles.emptyStateWrap}>
+                  <EmptyState
+                    icon="call-outline"
+                    title={emptyStateMessage}
+                    body="We will surface calls here as soon as they arrive."
+                  />
+                </View>
+              )
+            }
+            initialNumToRender={10}
+            maxToRenderPerBatch={10}
+            windowSize={8}
+            removeClippedSubviews
+          />
+        )}
       </View>
       <Modal
         visible={isTrayMounted && Boolean(trayCall)}
@@ -1122,6 +1275,55 @@ const createCallStyles = (theme: AppTheme) =>
     sectionHeader: {
       marginTop: 20,
       marginBottom: 12,
+    },
+    trustedSummaryCard: {
+      marginTop: 20,
+      marginBottom: 12,
+      borderRadius: 32,
+      padding: 20,
+      backgroundColor: theme.colors.surface,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.1),
+    },
+    trustedSummaryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    trustedSummaryIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.16),
+      marginRight: 14,
+    },
+    trustedSummaryTextWrap: {
+      flex: 1,
+    },
+    trustedSummaryTitle: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+    trustedSummaryBody: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      marginTop: 3,
+    },
+    trustedSummaryButton: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.accent, 0.36),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 8,
+    },
+    trustedSummaryButtonPressed: {
+      opacity: 0.82,
     },
     trustedSection: {
       marginBottom: 8,

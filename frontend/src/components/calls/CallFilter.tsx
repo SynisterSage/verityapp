@@ -1,4 +1,12 @@
-import { StyleProp, StyleSheet, Text, View, ViewStyle, Pressable } from 'react-native';
+import {
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+  Pressable,
+  ScrollView,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useMemo } from 'react';
@@ -11,6 +19,8 @@ export const CALL_FILTER_OPTIONS = [
   { key: 'verified', label: 'Verified' },
   { key: 'risk', label: 'Risk' },
   { key: 'trusted', label: 'Trusted' },
+  { key: 'handled', label: 'Handled' },
+  { key: 'archived', label: 'Archived' },
 ] as const;
 
 export type CallFilterKey = (typeof CALL_FILTER_OPTIONS)[number]['key'];
@@ -24,10 +34,9 @@ type CallFilterProps = {
   value: CallFilterKey;
   onChange: (value: CallFilterKey) => void;
   style?: StyleProp<ViewStyle>;
-  showBottomScrim?: boolean;
 };
 
-export default function CallFilter({ value, onChange, style, showBottomScrim = false }: CallFilterProps) {
+export default function CallFilter({ value, onChange, style }: CallFilterProps) {
   const { theme } = useTheme();
   const activeStyles = useMemo(
     () =>
@@ -48,17 +57,16 @@ export default function CallFilter({ value, onChange, style, showBottomScrim = f
           gradient: [theme.colors.accent, withOpacity(theme.colors.accent, 0.75)],
           shadowColor: theme.colors.accent,
         },
+        handled: {
+          gradient: [theme.colors.warning, withOpacity(theme.colors.warning, 0.75)],
+          shadowColor: theme.colors.warning,
+        },
+        archived: {
+          gradient: [theme.colors.textDim, withOpacity(theme.colors.textDim, 0.82)],
+          shadowColor: theme.colors.textDim,
+        },
       }) as Record<CallFilterKey, ActiveStyle>,
-    [theme]
-  );
-  const scrimColors = useMemo(
-    () =>
-      [
-        withOpacity(theme.colors.bg, 0.92),
-        withOpacity(theme.colors.bg, 0.18),
-        withOpacity(theme.colors.bg, 0),
-      ] as const,
-    [theme.colors.bg]
+    [theme.colors.accent, theme.colors.success, theme.colors.danger, theme.colors.warning, theme.colors.textDim]
   );
 
   const handlePress = (option: CallFilterKey) => {
@@ -68,10 +76,15 @@ export default function CallFilter({ value, onChange, style, showBottomScrim = f
 
   return (
     <View style={[styles.container, style, { backgroundColor: theme.colors.surface }]}>
-      <View style={styles.row}>
-        {CALL_FILTER_OPTIONS.map((option) => {
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.row}
+      >
+        {CALL_FILTER_OPTIONS.map((option, index) => {
           const active = option.key === value;
           const activeStyle = activeStyles[option.key];
+          const isLast = index === CALL_FILTER_OPTIONS.length - 1;
           return (
             <Pressable
               key={option.key}
@@ -80,6 +93,7 @@ export default function CallFilter({ value, onChange, style, showBottomScrim = f
               onPress={() => handlePress(option.key)}
               style={({ pressed }) => [
                 styles.segment,
+                !isLast && styles.segmentSpacing,
                 { backgroundColor: theme.colors.surfaceAlt },
                 active && styles.segmentActive,
                 active && {
@@ -104,7 +118,7 @@ export default function CallFilter({ value, onChange, style, showBottomScrim = f
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -124,16 +138,19 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 6,
   },
   segment: {
-    flex: 1,
-    marginHorizontal: 4,
+    minWidth: 88,
     height: 44,
     borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+  },
+  segmentSpacing: {
+    marginRight: 8,
   },
   segmentActive: {
     backgroundColor: 'transparent',
@@ -143,7 +160,7 @@ const styles = StyleSheet.create({
   },
   label: {
     color: '#8aa0c6',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.2,
     textTransform: 'uppercase',

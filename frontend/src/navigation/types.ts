@@ -39,7 +39,12 @@ export type TabParamList = {
 };
 
 export type CallsStackParamList = {
-  Calls: { initialCallId?: string; initialFilter?: 'all' | 'verified' | 'risk' | 'trusted' } | undefined;
+  Calls:
+    | {
+        initialCallId?: string;
+        initialFilter?: 'all' | 'verified' | 'risk' | 'trusted' | 'handled' | 'archived';
+      }
+    | undefined;
   CallDetail: { callId: string };
 };
 
