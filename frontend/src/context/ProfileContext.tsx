@@ -26,6 +26,8 @@ import { setPlaceholderCallUUID, markPlaceholderCallAnswered } from '../services
 import type { VoIPPushPayload } from '../types/voip-push';
 import { navigateToActiveCall } from '../navigation/rootNavigator';
 
+const ENABLE_CUSTOM_VOIP_PUSH = process.env.EXPO_PUBLIC_ENABLE_CUSTOM_VOIP_PUSH === 'true';
+
 export type Profile = {
   id: string;
   first_name: string;
@@ -397,6 +399,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    if (!ENABLE_CUSTOM_VOIP_PUSH) {
+      if (voipPushCleanupRef.current) {
+        voipPushCleanupRef.current();
+        voipPushCleanupRef.current = null;
+      }
+      return;
+    }
+
     const handleVoIPToken = async (token: string) => {
       const tokenChanged = voipTokenRef.current !== token;
       voipTokenRef.current = token;
@@ -488,7 +498,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [activeProfile?.id, refreshTwilioClientSession, session, syncVoipTokenToBackend]);
 
   useEffect(() => {
-    if (Platform.OS !== 'ios') {
+    if (Platform.OS !== 'ios' || !ENABLE_CUSTOM_VOIP_PUSH) {
       return;
     }
 
@@ -506,7 +516,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [activeProfile?.id, session, syncVoipTokenToBackend]);
 
   useEffect(() => {
-    if (Platform.OS !== 'ios') {
+    if (Platform.OS !== 'ios' || !ENABLE_CUSTOM_VOIP_PUSH) {
       return;
     }
 
