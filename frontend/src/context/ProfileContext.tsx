@@ -571,18 +571,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     }
     let cancelled = false;
 
-    // Check if we should skip the delay (e.g., incoming VoIP call)
-    const shouldSkipDelay = skipTwilioDelayRef.current;
+    // Always initialize Twilio client token immediately to improve incoming-call
+    // reliability during cold start and CallKit answer handoff.
     skipTwilioDelayRef.current = false;
-    const delay = shouldSkipDelay ? 0 : 3000;
+    const delay = 0;
 
-    if (shouldSkipDelay) {
-      console.info('[twilio-client] Skipping startup delay due to incoming call');
-    }
-
-    // Delay Twilio initialization by 3 seconds on normal app startup
-    // This allows the UI to fully load before iOS shows the local network permission prompt
-    // Skip delay if a VoIP push arrived (incoming call needs immediate Twilio connection)
     const timer = setTimeout(() => {
       if (cancelled) return;
       (async () => {

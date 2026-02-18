@@ -170,7 +170,6 @@ export default function TwilioVoiceClientManager() {
       registeredTokenRef.current = null;
       registeredIdentityRef.current = null;
       initInFlightRef.current = false;
-      TwilioVoice.unregister();
       return;
     }
     if (
