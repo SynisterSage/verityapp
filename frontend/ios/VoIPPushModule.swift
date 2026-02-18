@@ -33,7 +33,6 @@ class VoIPPushModule: RCTEventEmitter {
     super.init()
 
     self.callKitProvider.setDelegate(self, queue: nil)
-    self.registerForVoIPPushes()
   }
 
   private func findPendingIncomingCall(excluding excludedUUID: UUID? = nil) -> CXCall? {
@@ -286,6 +285,11 @@ extension VoIPPushModule: PKPushRegistryDelegate {
     }
 
     let payloadDict = payload.dictionaryPayload
+    guard payloadDict["call_sid"] != nil else {
+      print("[VoIPPush] Ignoring non-custom VoIP push payload")
+      completion()
+      return
+    }
     let callSid = payloadDict["call_sid"] as? String ?? ""
     let fromNumber = payloadDict["from_number"] as? String ?? "Unknown"
     let toNumber = payloadDict["to_number"] as? String ?? ""
