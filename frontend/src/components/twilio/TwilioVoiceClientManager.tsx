@@ -10,7 +10,11 @@ import {
   TwilioClientCallLifecycleState,
 } from '../../services/twilioClient';
 import { dismissActiveCall, navigateToActiveCall } from '../../navigation/rootNavigator';
-import { getPlaceholderCallUUID, clearPlaceholderCallUUID } from '../../services/voipPlaceholderCall';
+import {
+  getPlaceholderCallUUID,
+  clearPlaceholderCallUUID,
+  consumeAutoAcceptNextIncomingCall,
+} from '../../services/voipPlaceholderCall';
 import { endCall } from '../../services/voipPush';
 
 const { VoIPPushModule } = NativeModules;
@@ -250,6 +254,17 @@ export default function TwilioVoiceClientManager() {
       // We'll navigate when user accepts and call starts connecting
       reportLifecycle('ringing', data);
       console.info('[twilio-voice] Incoming call reported, waiting for user to accept via CallKit');
+
+      // If user already answered the placeholder CallKit call, immediately accept
+      // this real Twilio invite to prevent a second ringing cycle.
+      if (consumeAutoAcceptNextIncomingCall()) {
+        console.info('[twilio-voice] Auto-accepting Twilio invite after placeholder answer');
+        try {
+          TwilioVoice.accept();
+        } catch (err) {
+          console.warn('[twilio-voice] Auto-accept failed', err);
+        }
+      }
     };
     const handleDeviceReady = () => {
       console.info('TwilioVoice device ready');

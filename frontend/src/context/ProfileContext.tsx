@@ -22,7 +22,7 @@ import { Platform } from 'react-native';
 import { registerProfileDeviceToken } from '../services/notifications';
 import { logError, logEvent } from '../services/sentry';
 import { initializeVoIPPush, updateVoIPPushToken } from '../services/voipPush';
-import { setPlaceholderCallUUID } from '../services/voipPlaceholderCall';
+import { setPlaceholderCallUUID, markPlaceholderCallAnswered } from '../services/voipPlaceholderCall';
 import type { VoIPPushPayload } from '../types/voip-push';
 import { navigateToActiveCall } from '../navigation/rootNavigator';
 
@@ -110,6 +110,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const voipPushCleanupRef = useRef<(() => void) | null>(null);
   const voipTokenRef = useRef<string | null>(null);
   const syncedVoipTokenRef = useRef<string | null>(null);
+  const voipTokenSyncInFlightRef = useRef<Promise<void> | null>(null);
   const pendingVoipRefreshRef = useRef(false);
   const skipTwilioDelayRef = useRef(false);
 
@@ -211,13 +212,28 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const syncKey = `${activeProfile.id}:${voipTokenRef.current}`;
+    const token = voipTokenRef.current;
+    const syncKey = `${activeProfile.id}:${token}`;
     if (syncedVoipTokenRef.current === syncKey) {
       return;
     }
 
-    await updateVoIPPushToken(activeProfile.id, voipTokenRef.current);
-    syncedVoipTokenRef.current = syncKey;
+    if (voipTokenSyncInFlightRef.current) {
+      await voipTokenSyncInFlightRef.current;
+      return;
+    }
+
+    const runSync = (async () => {
+      await updateVoIPPushToken(activeProfile.id, token);
+      syncedVoipTokenRef.current = syncKey;
+    })();
+
+    voipTokenSyncInFlightRef.current = runSync;
+    try {
+      await runSync;
+    } finally {
+      voipTokenSyncInFlightRef.current = null;
+    }
   }, [activeProfile?.id, session]);
 
   useEffect(() => {
@@ -446,7 +462,8 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
     const handleCallAnswered = (callUUID: string) => {
       console.info('[VoIPPush] Call answered:', callUUID);
-      // Twilio SDK handles CallKit, so this won't be called unless we create our own CallKit call
+      // Placeholder CallKit answer should map to accepting the next Twilio invite.
+      markPlaceholderCallAnswered(callUUID);
     };
 
     const handleCallEnded = (callUUID: string) => {

@@ -11,6 +11,8 @@ class VoIPPushModule: RCTEventEmitter {
   private let callKitCallController: CXCallController
   private var latestVoIPToken: String?
   private var lastVoIPPushPayload: [String: Any]?
+  private var pendingCallActions: [[String: String]] = []
+  private var hasJsListeners = false
 
   override init() {
     // Use deprecated initializer for now - iOS 14+ alternative is complex
@@ -41,6 +43,14 @@ class VoIPPushModule: RCTEventEmitter {
     return true
   }
 
+  override func startObserving() {
+    hasJsListeners = true
+  }
+
+  override func stopObserving() {
+    hasJsListeners = false
+  }
+
   @objc
   func registerForVoIPPushes() {
     DispatchQueue.main.async {
@@ -69,6 +79,13 @@ class VoIPPushModule: RCTEventEmitter {
     } else {
       resolver(NSNull())
     }
+  }
+
+  @objc
+  func consumePendingCallActions(_ resolver: @escaping RCTPromiseResolveBlock,
+                                 rejecter: @escaping RCTPromiseRejectBlock) {
+    resolver(pendingCallActions)
+    pendingCallActions.removeAll()
   }
 
   @objc
@@ -216,10 +233,17 @@ extension VoIPPushModule: CXProviderDelegate {
   func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
     print("[VoIPPush] User answered call")
 
-    // Notify React Native that the call was answered
-    sendEvent(withName: "callAnswered", body: [
+    let payload = [
       "callUUID": action.callUUID.uuidString
-    ])
+    ]
+    if hasJsListeners {
+      sendEvent(withName: "callAnswered", body: payload)
+    } else {
+      pendingCallActions.append([
+        "type": "callAnswered",
+        "callUUID": action.callUUID.uuidString
+      ])
+    }
 
     action.fulfill()
   }
@@ -227,10 +251,17 @@ extension VoIPPushModule: CXProviderDelegate {
   func provider(_ provider: CXProvider, perform action: CXEndCallAction) {
     print("[VoIPPush] User ended call")
 
-    // Notify React Native that the call was ended
-    sendEvent(withName: "callEnded", body: [
+    let payload = [
       "callUUID": action.callUUID.uuidString
-    ])
+    ]
+    if hasJsListeners {
+      sendEvent(withName: "callEnded", body: payload)
+    } else {
+      pendingCallActions.append([
+        "type": "callEnded",
+        "callUUID": action.callUUID.uuidString
+      ])
+    }
 
     action.fulfill()
   }

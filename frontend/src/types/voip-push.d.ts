@@ -4,6 +4,7 @@ declare module 'react-native' {
       registerForVoIPPushes(): void;
       getCurrentVoIPToken?(): Promise<string | null>;
       consumeLastVoIPPush?(): Promise<VoIPPushPayload | null>;
+      consumePendingCallActions?(): Promise<VoIPCallActionEvent[]>;
       reportIncomingCall(
         callUUID: string,
         callSid: string,
@@ -26,4 +27,9 @@ export interface VoIPPushPayload {
 
 export interface VoIPTokenUpdate {
   token: string | null;
+}
+
+export interface VoIPCallActionEvent {
+  type: 'callAnswered' | 'callEnded';
+  callUUID: string;
 }

@@ -1,5 +1,5 @@
 import { NativeModules, NativeEventEmitter, Platform } from 'react-native';
-import type { VoIPPushPayload, VoIPTokenUpdate } from '../types/voip-push';
+import type { VoIPCallActionEvent, VoIPPushPayload, VoIPTokenUpdate } from '../types/voip-push';
 import { authorizedFetch } from './backend';
 
 const { VoIPPushModule } = NativeModules;
@@ -100,6 +100,32 @@ export function initializeVoIPPush(handlers: VoIPCallHandlers): () => void {
       })
       .catch((error: unknown) => {
         console.warn('[VoIPPush] Failed to recover pending incoming call:', error);
+      });
+  }
+
+  if (typeof VoIPPushModule.consumePendingCallActions === 'function') {
+    VoIPPushModule.consumePendingCallActions()
+      .then((actions: VoIPCallActionEvent[] | null) => {
+        if (!actions || actions.length === 0) {
+          return;
+        }
+        actions.forEach((action) => {
+          if (!action?.callUUID) {
+            return;
+          }
+          if (action.type === 'callAnswered') {
+            console.info('[VoIPPush] Recovered pending CallKit answer action');
+            handlers.onCallAnswered?.(action.callUUID);
+            return;
+          }
+          if (action.type === 'callEnded') {
+            console.info('[VoIPPush] Recovered pending CallKit end action');
+            handlers.onCallEnded?.(action.callUUID);
+          }
+        });
+      })
+      .catch((error: unknown) => {
+        console.warn('[VoIPPush] Failed to recover pending call actions:', error);
       });
   }
 

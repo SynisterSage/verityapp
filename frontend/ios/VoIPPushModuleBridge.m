@@ -11,6 +11,9 @@ RCT_EXTERN_METHOD(getCurrentVoIPToken:(RCTPromiseResolveBlock)resolve
 RCT_EXTERN_METHOD(consumeLastVoIPPush:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)
 
+RCT_EXTERN_METHOD(consumePendingCallActions:(RCTPromiseResolveBlock)resolve
+                  rejecter:(RCTPromiseRejectBlock)reject)
+
 RCT_EXTERN_METHOD(reportIncomingCall:(NSString *)callUUID
                   callSid:(NSString *)callSid
                   fromNumber:(NSString *)fromNumber
