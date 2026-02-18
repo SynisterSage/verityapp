@@ -46,7 +46,11 @@ type CallAccessFailure = {
   message: string;
 };
 
-async function authorizeCallAccess(callId: string, userId: string): Promise<CallAccessSuccess | CallAccessFailure> {
+async function authorizeCallAccess(
+  callId: string,
+  userId: string,
+  requireManageAccess = false
+): Promise<CallAccessSuccess | CallAccessFailure> {
   const { data: callRow, error: callError } = await supabaseAdmin
     .from('calls')
     .select('profile_id, caller_number, caller_hash')
@@ -73,11 +77,14 @@ async function authorizeCallAccess(callId: string, userId: string): Promise<Call
   if (!isCaretaker) {
     const { data: memberRow } = await supabaseAdmin
       .from('profile_members')
-      .select('id')
+      .select('role')
       .eq('profile_id', callRow.profile_id)
       .eq('user_id', userId)
       .maybeSingle();
     if (!memberRow) {
+      return { status: HTTP_STATUS_CODES.Forbidden, message: 'Forbidden' };
+    }
+    if (requireManageAccess && memberRow.role !== 'admin') {
       return { status: HTTP_STATUS_CODES.Forbidden, message: 'Forbidden' };
     }
   }
@@ -168,7 +175,7 @@ async function submitFeedback(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid status' });
   }
 
-  const access = await authorizeCallAccess(callId, userId);
+  const access = await authorizeCallAccess(callId, userId, true);
   if ('status' in access) {
     return res.status(access.status).json({ error: access.message });
   }
@@ -273,7 +280,7 @@ async function submitVoiceFeedback(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid voice feedback' });
   }
 
-  const access = await authorizeCallAccess(callId, userId);
+  const access = await authorizeCallAccess(callId, userId, true);
   if ('status' in access) {
     return res.status(access.status).json({ error: access.message });
   }
@@ -304,7 +311,7 @@ async function deleteCall(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
   }
 
-  const access = await authorizeCallAccess(callId, userId);
+  const access = await authorizeCallAccess(callId, userId, true);
   if ('status' in access) {
     return res.status(access.status).json({ error: access.message });
   }

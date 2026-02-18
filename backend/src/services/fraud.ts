@@ -136,6 +136,11 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'account update required', weight: 28, category: 'identity' },
   { phrase: 'ownership verification', weight: 30, category: 'identity' },
   { phrase: 'identity compliance', weight: 26, category: 'identity' },
+  { phrase: 'identity number', weight: 32, category: 'identity' },
+  { phrase: 'identification number', weight: 32, category: 'identity' },
+  { phrase: 'id number', weight: 28, category: 'identity' },
+  { phrase: 'birthdate', weight: 26, category: 'identity' },
+  { phrase: 'banking details', weight: 32, category: 'identity' },
 
   // Banking & finance
   { phrase: 'wire money', weight: 20, category: 'banking' },
@@ -175,6 +180,9 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'fraud department', weight: 36, category: 'banking' },
   { phrase: 'fraud investigations', weight: 32, category: 'banking' },
   { phrase: 'bank investigator', weight: 32, category: 'banking' },
+  { phrase: 'financial security team', weight: 34, category: 'banking' },
+  { phrase: 'transaction records', weight: 30, category: 'banking' },
+  { phrase: 'primary banks', weight: 30, category: 'banking' },
   { phrase: 'bank of america', weight: 30, category: 'banking' },
   { phrase: 'chase bank', weight: 30, category: 'banking' },
   { phrase: 'wells fargo', weight: 30, category: 'banking' },
@@ -523,6 +531,11 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'pickup driver', weight: 26, category: 'courier' },
   { phrase: 'urgent courier', weight: 26, category: 'courier' },
   { phrase: 'delivery attempt', weight: 26, category: 'courier' },
+  { phrase: 'package held up', weight: 30, category: 'courier' },
+  { phrase: 'parcel is affected', weight: 28, category: 'courier' },
+  { phrase: 'incomplete address information', weight: 28, category: 'courier' },
+  { phrase: 'verify your current address', weight: 30, category: 'courier' },
+  { phrase: 'ensure correct delivery', weight: 28, category: 'courier' },
   { phrase: 'hold the line', weight: 24, category: 'courier' },
 
   // Charity, donation & emergency relief
@@ -1532,21 +1545,9 @@ const SENSITIVE_NOUNS = [
 ];
 
 const TECH_SUPPORT_PHRASES = [
-  'tech',
-  'support',
-  'help desk',
-  'help center',
-  'service desk',
-  'customer support',
-  'customer service',
-  'technical department',
-  'technical team',
   'tech support',
   'technical support',
-  'it support',
-  'it department',
-  'security team',
-  'security center',
+  'it helpdesk',
   'computer problem',
   'computer issue',
   'computer security',
@@ -1658,6 +1659,11 @@ const COURIER_TERMS = [
   'doorstep delivery fee',
   'parcel clearance',
   'international shipment hold',
+  'package held up',
+  'parcel is affected',
+  'incomplete address information',
+  'verify your current address',
+  'ensure correct delivery',
 ];
 
 const INVESTMENT_TERMS = [
@@ -1775,6 +1781,70 @@ const FUZZY_KEYWORD_MAP: Record<string, string[]> = {
   taxes: ['taxs', 'taxe', 'taxed'],
 };
 
+const TOKEN_ASR_VARIANT_MAP: Record<string, string[]> = {
+  account: ['acct'],
+  app: ['ap'],
+  code: ['codes'],
+  gift: ['gft'],
+  number: ['num', 'no'],
+  one: ['1'],
+  paypal: ['paypall', 'paypaul'],
+  routing: ['routeing'],
+  security: ['sec'],
+  zelle: ['zell', 'zele', 'zella'],
+};
+
+const TOKEN_INFLECTION_MAP: Record<string, string[]> = {
+  account: ['accounts'],
+  address: ['addresses', 'addressed', 'addressing'],
+  affect: ['affects', 'affected', 'affecting'],
+  bank: ['banks', 'banking'],
+  birthdate: ['birthdates'],
+  call: ['calls', 'called', 'calling'],
+  charge: ['charges', 'charged', 'charging'],
+  collect: ['collects', 'collected', 'collecting', 'collection'],
+  compromise: ['compromises', 'compromised', 'compromising'],
+  confirm: ['confirms', 'confirmed', 'confirming', 'confirmation'],
+  deliver: ['delivers', 'delivered', 'delivering', 'delivery', 'deliveries'],
+  detail: ['details'],
+  hold: ['holds', 'holding', 'held'],
+  install: ['installs', 'installed', 'installing', 'installation'],
+  lock: ['locks', 'locked', 'locking'],
+  number: ['numbers'],
+  provide: ['provides', 'provided', 'providing'],
+  record: ['records', 'recorded', 'recording'],
+  request: ['requests', 'requested', 'requesting'],
+  scan: ['scans', 'scanned', 'scanning'],
+  share: ['shares', 'shared', 'sharing'],
+  suspend: ['suspends', 'suspended', 'suspending', 'suspension'],
+  transaction: ['transactions'],
+  transfer: ['transfers', 'transferred', 'transferring'],
+  update: ['updates', 'updated', 'updating'],
+  verify: ['verifies', 'verified', 'verifying', 'verification', 'verifications'],
+};
+
+const PHRASE_ASR_VARIANT_MAP: Record<string, string[]> = {
+  'account number': ['acct number', 'account no', 'account num'],
+  anydesk: ['any desk'],
+  'bank account': ['bank acct'],
+  'cash app': ['cashapp'],
+  'credit card': ['creditcard'],
+  'gift card': ['giftcard'],
+  'gift card number': ['giftcard number', 'gift card code'],
+  irs: ['i r s'],
+  logmein: ['log me in'],
+  'one time code': ['one-time code', 'one time pass code', 'one time passcode', 'otp code'],
+  paypal: ['pay pal'],
+  'remote access': ['remote-access'],
+  'routing number': ['routeing number'],
+  'social security number': ['social security no', 'social security num', 'social sec number'],
+  ssn: ['s s n'],
+  teamviewer: ['team viewer'],
+  venmo: ['ven mo'],
+  'verification code': ['verify code', 'verification codes'],
+  zelle: ['zell', 'zele', 'zella'],
+};
+
 const PII_TERMS = [
   'birthday',
   'date of birth',
@@ -1801,6 +1871,17 @@ const PII_TERMS = [
   'four digit pin',
   'password reset',
   'one time passcode',
+  'identity number',
+  'identification number',
+  'id number',
+  'birthdate',
+  'full name',
+  'complete name',
+  'legal name',
+  'banking details',
+  'banking number',
+  'transaction records',
+  'primary banks',
   'salary slip',
   'salary slips',
   'salary statement',
@@ -1994,7 +2075,9 @@ const HARD_BLOCK_TERMS = [
 
 const PAYMENT_REQUEST_PATTERNS = [
   /\b(give|send|wire|pay)\s+me\s+(your\s+)?(zelle|cash app|venmo|paypal|bank|account|card|money)\b/i,
-  /\b(i\s+need\s+your)\s+(zelle|cash app|venmo|paypal|bank|account|card|money)\b/i,
+  /\b(i|we)\s+(?:need|needed|needing|require|required|requiring)\s+(your\s+)?(zelle|cash app|venmo|paypal|bank|account|card|money)\b/i,
+  /\b(i|we)\s+(?:need|needed|needing|require|required|requiring)\s+(your\s+)?(banking details|banking number|account number|routing number|identity number|identification number|transaction records|pin|birthdate|date of birth|full name|complete name)\b/i,
+  /\b(provide|provides|provided|providing|share|shares|shared|sharing|confirm|confirms|confirmed|confirming|verify|verifies|verified|verifying)\s+(your\s+)?(banking details|banking number|account number|routing number|identity number|identification number|transaction records|pin|birthdate|date of birth|full name|complete name)\b/i,
 ];
 
 const HARD_BLOCK_PATTERNS = [
@@ -2032,7 +2115,7 @@ const HARD_BLOCK_PATTERNS = [
   /\bremote\s+technician\b/i,
   /\btransfer\s+the\s+money\b/i,
   /\bcall\s+me\s+back\s+immediately\b/i,
-  /\butility\s+shut-off\b/i,
+  /\butility\s+shut(?:\s|-)?off\b/i,
   /\bsecurity\s+breach\b/i,
   /\baccount\s+disabled\b/i,
   /\bmtn\s+momo\b/i,
@@ -2208,6 +2291,10 @@ const BANK_FRAUD_TERMS = [
   'unauthorized transaction',
   'unauthorized charge',
   'verify your account',
+  'financial security team',
+  'banking details',
+  'transaction records',
+  'primary banks',
 ];
 
 function escapeRegExp(value: string) {
@@ -2222,6 +2309,79 @@ export function normalizeText(text: string) {
     .trim();
 }
 
+function buildPhraseRegex(
+  phrase: string,
+  options: {
+    global?: boolean;
+    allowInflections?: boolean;
+    allowAsrVariants?: boolean;
+    includePhraseVariants?: boolean;
+    maxInterveningWords?: number;
+  } = {}
+) {
+  const {
+    global = false,
+    allowInflections = true,
+    allowAsrVariants = true,
+    includePhraseVariants = true,
+    maxInterveningWords = 1,
+  } = options;
+  const cleaned = normalizeText(phrase);
+  if (!cleaned) {
+    return null;
+  }
+  const phraseVariants = includePhraseVariants ? PHRASE_ASR_VARIANT_MAP[cleaned] ?? [] : [];
+  const candidatePhrases = Array.from(
+    new Set([cleaned, ...phraseVariants.map((value) => normalizeText(value)).filter(Boolean)])
+  );
+  const candidatePatterns = candidatePhrases
+    .map((candidate) => {
+      const tokens = candidate.split(/\s+/).filter(Boolean);
+      if (tokens.length === 0) {
+        return null;
+      }
+      const tokenPatterns = tokens.map((token) => {
+        const alternatives = new Set<string>([token]);
+        if (allowInflections) {
+          for (const variant of TOKEN_INFLECTION_MAP[token] ?? []) {
+            const normalizedVariant = normalizeText(variant);
+            if (normalizedVariant) {
+              alternatives.add(normalizedVariant);
+            }
+          }
+        }
+        if (allowAsrVariants) {
+          for (const variant of TOKEN_ASR_VARIANT_MAP[token] ?? []) {
+            const normalizedVariant = normalizeText(variant);
+            if (normalizedVariant) {
+              alternatives.add(normalizedVariant);
+            }
+          }
+        }
+        const validAlternatives = Array.from(alternatives).filter((value) => !value.includes(' '));
+        if (validAlternatives.length <= 1) {
+          return escapeRegExp(token);
+        }
+        return `(?:${validAlternatives.map(escapeRegExp).join('|')})`;
+      });
+      if (tokenPatterns.length === 1) {
+        return tokenPatterns[0];
+      }
+      const gapPattern =
+        maxInterveningWords > 0
+          ? `(?:\\s+\\w+){0,${maxInterveningWords}}\\s+`
+          : '\\s+';
+      return tokenPatterns.join(gapPattern);
+    })
+    .filter((value): value is string => Boolean(value));
+  if (candidatePatterns.length === 0) {
+    return null;
+  }
+  const combinedPattern =
+    candidatePatterns.length > 1 ? `(?:${candidatePatterns.join('|')})` : candidatePatterns[0];
+  return new RegExp(`\\b${combinedPattern}\\b`, global ? 'gi' : 'i');
+}
+
 export function matchPhrases(text: string, phrases: string[]) {
   const normalized = normalizeText(text);
   if (!normalized || phrases.length === 0) {
@@ -2229,13 +2389,13 @@ export function matchPhrases(text: string, phrases: string[]) {
   }
   const matches = new Set<string>();
   for (const phrase of phrases) {
-    const cleaned = normalizeText(phrase);
-    if (!cleaned) {
-      continue;
-    }
-    const pattern = `\\b${escapeRegExp(cleaned).replace(/\\s+/g, '\\\\s+')}\\b`;
-    const regex = new RegExp(pattern, 'i');
-    if (regex.test(normalized)) {
+    const regex = buildPhraseRegex(phrase, {
+      allowInflections: false,
+      allowAsrVariants: false,
+      includePhraseVariants: false,
+      maxInterveningWords: 0,
+    });
+    if (regex && regex.test(normalized)) {
       matches.add(phrase);
     }
   }
@@ -2244,20 +2404,19 @@ export function matchPhrases(text: string, phrases: string[]) {
 
 function countPhraseHits(text: string, phrases: string[]) {
   return phrases.reduce((count, phrase) => {
-    const pattern = `\\b${escapeRegExp(phrase).replace(/\\s+/g, '\\\\s+')}\\b`;
-    const regex = new RegExp(pattern, 'i');
-    return regex.test(text) ? count + 1 : count;
+    const regex = buildPhraseRegex(phrase, { maxInterveningWords: 1 });
+    return regex && regex.test(text) ? count + 1 : count;
   }, 0);
 }
 
 function countCommandSensitiveCombos(text: string) {
   let hits = 0;
   for (const verb of ACTION_VERBS) {
-    const verbRegex = new RegExp(`\\b${escapeRegExp(verb)}\\b`, 'i');
-    if (!verbRegex.test(text)) continue;
+    const verbRegex = buildPhraseRegex(verb, { maxInterveningWords: 0 });
+    if (!verbRegex || !verbRegex.test(text)) continue;
     for (const noun of SENSITIVE_NOUNS) {
-      const nounRegex = new RegExp(`\\b${escapeRegExp(noun)}\\b`, 'i');
-      if (nounRegex.test(text)) {
+      const nounRegex = buildPhraseRegex(noun, { maxInterveningWords: 0 });
+      if (nounRegex && nounRegex.test(text)) {
         hits += 1;
         break;
       }
@@ -2269,8 +2428,8 @@ function countCommandSensitiveCombos(text: string) {
 function countTechSupportHits(text: string) {
   let hits = 0;
   for (const phrase of TECH_SUPPORT_PHRASES) {
-    const regex = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, 'i');
-    if (regex.test(text)) {
+    const regex = buildPhraseRegex(phrase, { maxInterveningWords: 1 });
+    if (regex && regex.test(text)) {
       hits += 1;
     }
   }
@@ -2307,16 +2466,24 @@ function findMatches(text: string, keywords: FraudKeyword[]) {
 
   // Fuzzy hits
   for (const [canonical, variants] of Object.entries(FUZZY_KEYWORD_MAP)) {
-    const pattern = `\\b(${[canonical, ...variants.map(escapeRegExp)].join('|')})\\b`;
-    const regex = new RegExp(pattern, 'gi');
-    if (regex.test(text)) {
+    const variantMatched = [canonical, ...variants].some((variant) => {
+      const regex = buildPhraseRegex(variant, {
+        allowInflections: false,
+        includePhraseVariants: false,
+        maxInterveningWords: 0,
+      });
+      return Boolean(regex && regex.test(text));
+    });
+    if (variantMatched) {
       matches.push({ phrase: canonical, weight: 8, category: 'fuzzy' });
     }
   }
 
   for (const keyword of keywords) {
-    const pattern = `\\b${escapeRegExp(keyword.phrase).replace(/\\s+/g, '\\\\s+')}\\b`;
-    const regex = new RegExp(pattern, 'gi');
+    const regex = buildPhraseRegex(keyword.phrase, { global: true, maxInterveningWords: 1 });
+    if (!regex) {
+      continue;
+    }
     let match = regex.exec(text);
     let matched = false;
     while (match) {
@@ -2343,7 +2510,10 @@ function findMatches(text: string, keywords: FraudKeyword[]) {
 function comboBoost(text: string) {
   let boost = 0;
   for (const rule of COMBO_RULES) {
-    if (rule.all.every((kw) => text.includes(kw))) {
+    if (rule.all.every((kw) => {
+      const regex = buildPhraseRegex(kw, { maxInterveningWords: 1 });
+      return regex ? regex.test(text) : false;
+    })) {
       boost += rule.add;
     }
   }
@@ -2725,12 +2895,27 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   const bankHardHits = matches.filter((kw) => bankHardTerms.has(kw.phrase)).length;
   const techSupportHits = heuristic.techSupportHits;
   const piiHarvestHits = heuristic.piiHarvestHits;
+  const strongHardBlockSignal =
+    heuristic.hardBlockHits >= 1 &&
+    (heuristic.paymentRequestHits >= 1 ||
+      heuristic.codeRequestHits >= 1 ||
+      heuristic.explicitScamHits >= 1 ||
+      heuristic.threatHits >= 1 ||
+      heuristic.accountAccessHits >= 1 ||
+      heuristic.impersonationHits >= 1 ||
+      criticalKeywordHits >= 2);
+  const strongTechSupportSignal =
+    techSupportHits >= 1 &&
+    (heuristic.remoteAccessHits >= 1 ||
+      heuristic.codeRequestHits >= 1 ||
+      heuristic.paymentRequestHits >= 1 ||
+      heuristic.accountAccessHits >= 1);
 
   if (heuristic.explicitScamHits >= 1) {
     score = Math.max(score, 90);
   }
   if (heuristic.hardBlockHits >= 1) {
-    score = Math.max(score, 95);
+    score = Math.max(score, strongHardBlockSignal ? 95 : 82);
   }
   // Override patterns: tax + payment
   if (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment'))) {
@@ -2758,13 +2943,13 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
     score = Math.max(score, 85);
   }
   if (matches.length >= 1) {
-    score = Math.max(score, 60);
+    score = Math.max(score, 35);
   }
   if (matches.length >= 2) {
-    score = Math.max(score, 70);
+    score = Math.max(score, 50);
   }
   if (matches.length >= 3) {
-    score = Math.max(score, 80);
+    score = Math.max(score, 65);
   }
   if (heuristic.jobLoanHits >= 1) {
     score = Math.max(score, 85);
@@ -2796,8 +2981,12 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   if (normalized.includes('donation') || normalized.includes('charity')) {
     score = Math.max(score, 60);
   }
-  if (techSupportHits >= 1) {
+  if (strongTechSupportSignal) {
     score = Math.max(score, 95);
+  } else if (techSupportHits >= 2) {
+    score = Math.max(score, 88);
+  } else if (techSupportHits >= 1) {
+    score = Math.max(score, 75);
   }
   if (piiHarvestHits >= 1 && actionBoost > 0) {
     score = Math.max(score, 80);
@@ -2819,7 +3008,7 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
     heuristic.hardBlockHits >= 1 ||
     (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment'))) ||
     voiceHardOverride;
-  const techSupportOverride = techSupportHits >= 1;
+  const techSupportOverride = strongTechSupportSignal || techSupportHits >= 3;
 
   const finalScore = Math.min(100, Math.round(score));
   return {

@@ -31,6 +31,10 @@ function normalizeCallerNumber(input?: string | null) {
   return `+${digits}`;
 }
 
+async function userCanManageProfile(userId: string, profileId: string) {
+  return (await userIsCaretaker(userId, profileId)) || (await userHasRole(userId, profileId, 'admin'));
+}
+
 
 async function listSafePhrases(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
@@ -74,7 +78,7 @@ async function addSafePhrase(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId or phrase' });
   }
 
-  const allowed = await userCanAccessProfile(userId, profileId);
+  const allowed = await userCanManageProfile(userId, profileId);
   if (!allowed) {
     logProfileAccessDenied('addSafePhrase', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
@@ -142,7 +146,7 @@ async function deleteSafePhrase(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Phrase not found' });
   }
 
-  const allowed = await userCanAccessProfile(userId, row.profile_id);
+  const allowed = await userCanManageProfile(userId, row.profile_id);
   if (!allowed) {
     logProfileAccessDenied('deleteSafePhrase', userId, row.profile_id);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
@@ -209,7 +213,7 @@ async function addBlockedCaller(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId or callerNumber' });
   }
 
-  const allowed = await userCanAccessProfile(userId, profileId);
+  const allowed = await userCanManageProfile(userId, profileId);
   if (!allowed) {
     logProfileAccessDenied('addBlockedCaller', userId, profileId);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
@@ -287,7 +291,7 @@ async function deleteBlockedCaller(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Block entry not found' });
   }
 
-  const allowed = await userCanAccessProfile(userId, row.profile_id);
+  const allowed = await userCanManageProfile(userId, row.profile_id);
   if (!allowed) {
     logProfileAccessDenied('deleteBlockedCaller', userId, row.profile_id);
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });

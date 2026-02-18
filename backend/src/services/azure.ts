@@ -34,6 +34,7 @@ export function transcribeWavBuffer(
   return new Promise((resolve, reject) => {
     const segments: string[] = [];
     let bestConfidence: number | undefined;
+    let detectedLocale: string | null = null;
     let settled = false;
 
     const finalize = () => {
@@ -43,7 +44,7 @@ export function transcribeWavBuffer(
       resolve({
         text: segments.join(' ').trim(),
         confidence: bestConfidence,
-        detectedLocale: null,
+        detectedLocale,
       });
     };
 
@@ -66,6 +67,11 @@ export function transcribeWavBuffer(
         const json = event.result.properties.getProperty(PropertyId.SpeechServiceResponse_JsonResult);
         if (json) {
           const parsed = JSON.parse(json);
+          const languageFromPayload =
+            parsed?.PrimaryLanguage?.Language ?? parsed?.Language ?? parsed?.language;
+          if (typeof languageFromPayload === 'string' && languageFromPayload.trim()) {
+            detectedLocale = languageFromPayload.trim();
+          }
           const first = parsed?.NBest?.[0];
           if (first && typeof first.Confidence === 'number') {
             bestConfidence = Math.max(bestConfidence ?? 0, first.Confidence);
@@ -73,6 +79,10 @@ export function transcribeWavBuffer(
         }
       } catch (err) {
         // Ignore parse errors; allow returning text without confidence.
+      }
+      const resultLocale = (event.result as { language?: string | undefined })?.language;
+      if (!detectedLocale && typeof resultLocale === 'string' && resultLocale.trim()) {
+        detectedLocale = resultLocale.trim();
       }
     };
 

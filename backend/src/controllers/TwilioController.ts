@@ -962,7 +962,7 @@ async function recordingReady(req: Request, res: Response) {
         }`
       );
     }
-    const { text, confidence } = await transcribeWavBuffer(recordingBuffer);
+    const { text, confidence, detectedLocale } = await transcribeWavBuffer(recordingBuffer);
     let safePhraseMatches: string[] = [];
     if (text) {
       const { data: safeRows, error: safeError } = await supabaseAdmin
@@ -990,6 +990,7 @@ async function recordingReady(req: Request, res: Response) {
           callDurationSeconds: recordingDurationSeconds,
           callTimestamp,
           repeatCallCount: previousCalls,
+          detectedLocale: detectedLocale ?? null,
           voiceSyntheticScore: voiceResult?.score ?? null,
           voiceAnalysis: voiceResult ?? undefined,
           safePhraseMatches,
@@ -1041,18 +1042,6 @@ async function recordingReady(req: Request, res: Response) {
       }
     }
 
-    if (text && fraudNotes) {
-      const dampening =
-        typeof fraudScore === 'number'
-          ? Math.min(20, safePhraseMatches.length * 8)
-          : 0;
-      fraudNotes.safePhraseMatches = safePhraseMatches;
-      fraudNotes.safePhraseDampening = dampening;
-      if (typeof fraudScore === 'number' && dampening > 0) {
-        fraudScore = Math.max(0, fraudScore - dampening);
-      }
-    }
-
     if (typeof fraudScore === 'number') {
       fraudRiskLevel = scoreToRiskLevel(fraudScore);
     }
@@ -1085,12 +1074,18 @@ async function recordingReady(req: Request, res: Response) {
         shouldTrustCaller = automationTrustEnabled;
       }
     }
+    const overrideAlertRequired = Boolean((fraudResult as { override?: boolean } | null)?.override);
+    const shouldCreateFraudAlert =
+      typeof fraudScore === 'number' &&
+      (fraudScore >= fraudThreshold || autoAlertRequired || overrideAlertRequired);
+
     await supabaseAdmin
       .from('calls')
       .update({
         storage_path: storagePath,
         transcript: text || null,
         transcript_confidence: confidence ?? null,
+        detected_locale: detectedLocale ?? null,
         transcribed_at: text ? new Date().toISOString() : null,
         caller_number: resolvedFrom || null,
         caller_country: callerMeta.country ?? null,
@@ -1103,81 +1098,62 @@ async function recordingReady(req: Request, res: Response) {
         fraud_risk_level: fraudRiskLevel,
         fraud_keywords: fraudKeywords,
         fraud_notes: fraudNotes,
-        fraud_alert_required:
-          typeof fraudScore === 'number'
-            ? fraudScore >= fraudThreshold ||
-              autoAlertRequired ||
-              Boolean((fraudResult as { override?: boolean })?.override)
-            : false,
+        fraud_alert_required: shouldCreateFraudAlert,
         feedback_status: autoFeedback ?? undefined,
       })
       .eq('id', callRow.id);
 
-    if (typeof fraudScore === 'number' && fraudScore >= fraudThreshold) {
+    if (shouldCreateFraudAlert) {
       const alertsEnabled =
         profile.enable_email_alerts || profile.enable_sms_alerts || profile.enable_push_alerts;
-    if (alertsEnabled) {
-      await supabaseAdmin
-        .from('alerts')
-        .upsert(
-          {
-            profile_id: profile.id,
-            caretaker_id: profile.caretaker_id,
-            call_id: callRow.id,
-            alert_type: 'fraud',
-            status: 'pending',
-            payload: {
-              score: fraudScore,
-              riskLevel: fraudRiskLevel,
-              keywords: fraudKeywords,
-              callerHash,
-            },
-          },
-          { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
-        );
-      if (profile.enable_push_alerts) {
-        const { data: recentAlerts } = await supabaseAdmin
+      if (alertsEnabled) {
+        await supabaseAdmin
           .from('alerts')
-          .select('id, call_id')
-          .eq('profile_id', profile.id)
-          .eq('call_id', callRow.id)
-          .eq('alert_type', 'fraud')
-          .order('created_at', { ascending: false })
-          .limit(1);
-        const latestAlert = recentAlerts?.[0];
-        if (latestAlert) {
-          const pushData: Record<string, string> = { type: 'fraud' };
-          if (fraudRiskLevel) {
-            pushData.riskLevel = fraudRiskLevel;
-          }
-          await dispatchAlertPush({
-            id: latestAlert.id,
-            profile_id: profile.id,
-            call_id: latestAlert.call_id ?? callRow.id,
-            alert_type: 'fraud',
-            payload: {
-              score: fraudScore,
-              riskLevel: fraudRiskLevel,
-              callerHash,
-              ...pushData,
+          .upsert(
+            {
+              profile_id: profile.id,
+              caretaker_id: profile.caretaker_id,
+              call_id: callRow.id,
+              alert_type: 'fraud',
+              status: 'pending',
+              payload: {
+                score: fraudScore,
+                riskLevel: fraudRiskLevel,
+                keywords: fraudKeywords,
+                callerHash,
+              },
             },
-          });
+            { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
+          );
+        if (profile.enable_push_alerts) {
+          const { data: recentAlerts } = await supabaseAdmin
+            .from('alerts')
+            .select('id, call_id')
+            .eq('profile_id', profile.id)
+            .eq('call_id', callRow.id)
+            .eq('alert_type', 'fraud')
+            .order('created_at', { ascending: false })
+            .limit(1);
+          const latestAlert = recentAlerts?.[0];
+          if (latestAlert) {
+            const pushData: Record<string, string> = { type: 'fraud' };
+            if (fraudRiskLevel) {
+              pushData.riskLevel = fraudRiskLevel;
+            }
+            await dispatchAlertPush({
+              id: latestAlert.id,
+              profile_id: profile.id,
+              call_id: latestAlert.call_id ?? callRow.id,
+              alert_type: 'fraud',
+              payload: {
+                score: fraudScore,
+                riskLevel: fraudRiskLevel,
+                callerHash,
+                ...pushData,
+              },
+            });
+          }
         }
-      }
-    }
-
-      const callBlockingEnabled = process.env.ENABLE_CALL_BLOCKING === 'true';
-      if (callBlockingEnabled && callerHash && automationBlockEnabled) {
-        await removeTrustedContact(profile.id, callerHash);
-        await supabaseAdmin.from('blocked_callers').upsert(
-          {
-            profile_id: profile.id,
-            caller_hash: callerHash,
-            caller_number: resolvedFrom || null,
-            reason: `auto_block_fraud_score_${fraudScore}`,
-          },
-          { onConflict: 'profile_id,caller_hash' }
-        );
       }
     }
 
@@ -1199,6 +1175,7 @@ async function recordingReady(req: Request, res: Response) {
     if (shouldBlockCaller && callerHash && typeof fraudScore === 'number') {
       const callBlockingEnabled = process.env.ENABLE_CALL_BLOCKING === 'true';
       if (callBlockingEnabled) {
+        await removeTrustedContact(profile.id, callerHash);
         await supabaseAdmin.from('blocked_callers').upsert(
           {
             profile_id: profile.id,
