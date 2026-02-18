@@ -1,0 +1,74 @@
+diff --git a/node_modules/react-native-twilio-programmable-voice/ios/RNTwilioVoice/RNTwilioVoice.m b/node_modules/react-native-twilio-programmable-voice/ios/RNTwilioVoice/RNTwilioVoice.m
+index df4c381..0d27b23 100644
+--- a/node_modules/react-native-twilio-programmable-voice/ios/RNTwilioVoice/RNTwilioVoice.m
++++ b/node_modules/react-native-twilio-programmable-voice/ios/RNTwilioVoice/RNTwilioVoice.m
+@@ -352,9 +352,9 @@ - (void)callInviteReceived:(TVOCallInvite *)callInvite {
+     if (callInvite.customParameters[kCallerNameCustomParameter]) {
+         from = callInvite.customParameters[kCallerNameCustomParameter];
+     }
+-    // Always report to CallKit
+-    [self reportIncomingCallFrom:from withUUID:callInvite.uuid];
+     self.activeCallInvites[[callInvite.uuid UUIDString]] = callInvite;
++    // Store first, then report to CallKit to avoid a race if user answers immediately.
++    [self reportIncomingCallFrom:from withUUID:callInvite.uuid];
+     if ([[NSProcessInfo processInfo] operatingSystemVersion].majorVersion < 13) {
+         [self incomingPushHandled];
+     }
+@@ -645,8 +645,6 @@ - (void)provider:(CXProvider *)provider performAnswerCallAction:(CXAnswerCallAct
+       [action fail];
+     }
+   }];
+-
+-  [action fulfill];
+ }
+ 
+ - (void)provider:(CXProvider *)provider performEndCallAction:(CXEndCallAction *)action {
+@@ -733,6 +731,7 @@ - (void)reportIncomingCallFrom:(NSString *)from withUUID:(NSUUID *)uuid {
+ 
+   CXCallUpdate *callUpdate = [[CXCallUpdate alloc] init];
+   callUpdate.remoteHandle = callHandle;
++  callUpdate.localizedCallerName = from;
+   callUpdate.supportsDTMF = YES;
+   callUpdate.supportsHolding = YES;
+   callUpdate.supportsGrouping = NO;
+@@ -781,10 +780,25 @@ - (void)performVoiceCallWithUUID:(NSUUID *)uuid
+ }
+ 
+ - (void)performAnswerVoiceCallWithUUID:(NSUUID *)uuid
+-                            completion:(void(^)(BOOL success))completionHandler {
+-
++                               attempts:(NSInteger)attempts
++                             completion:(void(^)(BOOL success))completionHandler {
+     TVOCallInvite *callInvite = self.activeCallInvites[uuid.UUIDString];
+-    NSAssert(callInvite, @"No CallInvite matches the UUID");
++    if (!callInvite) {
++        if (attempts >= 8) {
++            NSLog(@"No CallInvite found after retries for UUID %@", uuid.UUIDString);
++            completionHandler(NO);
++            return;
++        }
++        NSLog(@"No CallInvite matches UUID yet, retrying shortly...");
++        dispatch_after(
++            dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.25 * NSEC_PER_SEC)),
++            dispatch_get_main_queue(),
++            ^{
++                [self performAnswerVoiceCallWithUUID:uuid attempts:attempts + 1 completion:completionHandler];
++            }
++        );
++        return;
++    }
+     TVOAcceptOptions *acceptOptions = [TVOAcceptOptions optionsWithCallInvite:callInvite block:^(TVOAcceptOptionsBuilder *builder) {
+         builder.uuid = callInvite.uuid;
+     }];
+@@ -806,6 +820,11 @@ - (void)performAnswerVoiceCallWithUUID:(NSUUID *)uuid
+     }
+ }
+ 
++- (void)performAnswerVoiceCallWithUUID:(NSUUID *)uuid
++                            completion:(void(^)(BOOL success))completionHandler {
++    [self performAnswerVoiceCallWithUUID:uuid attempts:0 completion:completionHandler];
++}
++
+ - (void)handleAppTerminateNotification {
+   NSLog(@"handleAppTerminateNotification called");
+ 
