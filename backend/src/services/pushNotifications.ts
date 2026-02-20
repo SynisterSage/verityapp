@@ -5,6 +5,8 @@ import { sendExpoPushNotifications, ExpoPushMessage } from './notifications';
 const INVALID_EXPO_ERRORS = ['DeviceNotRegistered', 'PushSubscriptionExpired'];
 const ACTIVITY_PUSH_SOUND = 'activity-notification.wav';
 const ACTIVITY_PUSH_CHANNEL_ID = 'activity-alerts';
+const SUPPORT_PUSH_SOUND = 'support-notification.wav';
+const SUPPORT_PUSH_CHANNEL_ID = 'support-updates';
 const CIRCLE_ALERT_TYPES = new Set<string>([
   'circle_invite',
   'pin_change',
@@ -38,6 +40,22 @@ type AlertPushPayload = {
   title: string;
   body: string;
   data?: Record<string, string>;
+};
+
+type SupportReplyPushPayload = {
+  title: string;
+  body: string;
+  ticketId?: string;
+  messageId?: string;
+  data?: Record<string, string>;
+};
+
+type DeviceTokenRow = { id: string; user_id: string | null; expo_push_token: string };
+
+type PushRecipient = {
+  id: string;
+  expo_push_token: string;
+  notificationPreferences: Record<string, unknown> | null;
 };
 
 function readBooleanPref(value: unknown, key: string): boolean | null {
@@ -85,6 +103,26 @@ function canReceivePushForAlertType(args: {
   return true;
 }
 
+function canReceivePushForSupportReply(args: {
+  profileDefaultPushEnabled: boolean;
+  notificationPreferences?: Record<string, unknown> | null;
+}) {
+  const { profileDefaultPushEnabled, notificationPreferences } = args;
+
+  const globalPushPref = readBooleanPref(notificationPreferences, 'enable_push_alerts');
+  const globalPushEnabled =
+    globalPushPref === null ? profileDefaultPushEnabled : globalPushPref;
+  if (!globalPushEnabled) {
+    return false;
+  }
+
+  const supportReplyPref = readBooleanPref(
+    notificationPreferences,
+    'enable_push_support_replies'
+  );
+  return supportReplyPref === null ? true : supportReplyPref;
+}
+
 function isMissingUserIdColumnError(error: unknown) {
   const message = String(
     (error as { message?: string; details?: string } | null)?.message ??
@@ -97,7 +135,39 @@ function isMissingUserIdColumnError(error: unknown) {
   );
 }
 
-export async function notifyProfileForAlert(profileId: string, payload: AlertPushPayload) {
+function normalizePushData(data?: Record<string, string>) {
+  return Object.fromEntries(
+    Object.entries(data ?? {})
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => [key, String(value)])
+  );
+}
+
+async function deactivateInvalidTokens(
+  recipients: Array<{ id: string; expo_push_token: string }>,
+  messages: ExpoPushMessage[]
+) {
+  const responses = await sendExpoPushNotifications(messages);
+  const tokensToDeactivate: string[] = [];
+
+  responses.forEach((response, index) => {
+    if (response.status === 'error' && shouldDeactivateToken(response.error)) {
+      const tokenId = recipients[index]?.id;
+      if (tokenId) {
+        tokensToDeactivate.push(tokenId);
+      }
+    }
+  });
+
+  if (tokensToDeactivate.length > 0) {
+    await supabaseAdmin
+      .from('profile_device_tokens')
+      .update({ is_active: false })
+      .in('id', tokensToDeactivate);
+  }
+}
+
+async function fetchPushRecipientsForProfile(profileId: string) {
   const { data: profileRow } = await supabaseAdmin
     .from('profiles')
     .select('caretaker_id, enable_push_alerts')
@@ -105,8 +175,6 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
     .maybeSingle();
 
   const defaultPushEnabled = profileRow?.enable_push_alerts !== false;
-  const caretakerId = profileRow?.caretaker_id ?? null;
-  const alertType = normalizeAlertType(payload.data?.alertType);
 
   const { data: tokensWithUser, error: tokensError } = await supabaseAdmin
     .from('profile_device_tokens')
@@ -118,10 +186,9 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
     logger.err(
       `[push-notify] failed loading tokens profile=${profileId} message=${tokensError.message}`
     );
-    return;
+    return { defaultPushEnabled, recipients: [] as PushRecipient[] };
   }
 
-  type DeviceTokenRow = { id: string; user_id: string | null; expo_push_token: string };
   let tokens: DeviceTokenRow[] = [];
 
   if (tokensError && isMissingUserIdColumnError(tokensError)) {
@@ -138,7 +205,7 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
       logger.err(
         `[push-notify] failed loading legacy tokens profile=${profileId} message=${legacyTokensError.message}`
       );
-      return;
+      return { defaultPushEnabled, recipients: [] as PushRecipient[] };
     }
 
     tokens = (legacyTokens ?? []).map((row) => ({
@@ -155,7 +222,7 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
   }
 
   if (!tokens || tokens.length === 0) {
-    return;
+    return { defaultPushEnabled, recipients: [] as PushRecipient[] };
   }
 
   const memberUserIds = Array.from(
@@ -166,7 +233,7 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
     )
   );
 
-  let memberNotificationPrefs = new Map<string, Record<string, unknown> | null>();
+  const memberNotificationPrefs = new Map<string, Record<string, unknown> | null>();
   if (memberUserIds.length > 0) {
     const { data: memberRows } = await supabaseAdmin
       .from('profile_members')
@@ -174,54 +241,46 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
       .eq('profile_id', profileId)
       .in('user_id', memberUserIds);
 
-    memberNotificationPrefs = new Map(
-      (memberRows ?? []).map((row) => [
+    (memberRows ?? []).forEach((row) => {
+      memberNotificationPrefs.set(
         row.user_id,
-        row.notification_preferences as Record<string, unknown> | null,
-      ])
-    );
+        row.notification_preferences as Record<string, unknown> | null
+      );
+    });
   }
 
-  const validTokens = tokens
-    .filter(
-      (token): token is { id: string; user_id: string | null; expo_push_token: string } =>
-        Boolean(token.expo_push_token)
-    )
-    .filter((token) => {
-      if (!token.user_id) {
-        return canReceivePushForAlertType({
-          alertType,
-          profileDefaultPushEnabled: defaultPushEnabled,
-          notificationPreferences: null,
-        });
-      }
-      if (memberNotificationPrefs.has(token.user_id)) {
-        return canReceivePushForAlertType({
-          alertType,
-          profileDefaultPushEnabled: defaultPushEnabled,
-          notificationPreferences: memberNotificationPrefs.get(token.user_id) ?? null,
-        });
-      }
-      if (caretakerId && token.user_id === caretakerId) {
-        return canReceivePushForAlertType({
-          alertType,
-          profileDefaultPushEnabled: defaultPushEnabled,
-          notificationPreferences: null,
-        });
-      }
-      return canReceivePushForAlertType({
-        alertType,
-        profileDefaultPushEnabled: defaultPushEnabled,
-        notificationPreferences: null,
-      });
-    });
+  const recipients: PushRecipient[] = tokens
+    .filter((token): token is DeviceTokenRow => Boolean(token.expo_push_token))
+    .map((token) => ({
+      id: token.id,
+      expo_push_token: token.expo_push_token,
+      notificationPreferences:
+        token.user_id && memberNotificationPrefs.has(token.user_id)
+          ? memberNotificationPrefs.get(token.user_id) ?? null
+          : null,
+    }));
 
-  if (validTokens.length === 0) {
+  return { defaultPushEnabled, recipients };
+}
+
+export async function notifyProfileForAlert(profileId: string, payload: AlertPushPayload) {
+  const { defaultPushEnabled, recipients } = await fetchPushRecipientsForProfile(profileId);
+  const alertType = normalizeAlertType(payload.data?.alertType);
+
+  const validRecipients = recipients.filter((recipient) =>
+    canReceivePushForAlertType({
+      alertType,
+      profileDefaultPushEnabled: defaultPushEnabled,
+      notificationPreferences: recipient.notificationPreferences,
+    })
+  );
+
+  if (validRecipients.length === 0) {
     return;
   }
 
-  const messages: ExpoPushMessage[] = validTokens.map((tokenRow) => ({
-    to: tokenRow.expo_push_token,
+  const messages: ExpoPushMessage[] = validRecipients.map((recipient) => ({
+    to: recipient.expo_push_token,
     title: payload.title,
     body: payload.body,
     sound: ACTIVITY_PUSH_SOUND,
@@ -229,27 +288,44 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
     data: {
       alertId: payload.alertId,
       ...(payload.callId ? { callId: payload.callId } : {}),
-      ...Object.fromEntries(
-        Object.entries(payload.data ?? {}).filter(
-          ([, value]) => value !== undefined && value !== null
-        ).map(([key, value]) => [key, String(value)])
-      ),
+      ...normalizePushData(payload.data),
     },
   }));
 
-  const responses = await sendExpoPushNotifications(messages);
-  const tokensToDeactivate: string[] = [];
+  await deactivateInvalidTokens(validRecipients, messages);
+}
 
-  responses.forEach((response, index) => {
-    if (response.status === 'error' && shouldDeactivateToken(response.error)) {
-      tokensToDeactivate.push(validTokens[index].id);
-    }
-  });
+export async function notifyProfileForSupportReply(
+  profileId: string,
+  payload: SupportReplyPushPayload
+) {
+  const { defaultPushEnabled, recipients } = await fetchPushRecipientsForProfile(profileId);
 
-  if (tokensToDeactivate.length > 0) {
-    await supabaseAdmin
-      .from('profile_device_tokens')
-      .update({ is_active: false })
-      .in('id', tokensToDeactivate);
+  const validRecipients = recipients.filter((recipient) =>
+    canReceivePushForSupportReply({
+      profileDefaultPushEnabled: defaultPushEnabled,
+      notificationPreferences: recipient.notificationPreferences,
+    })
+  );
+
+  if (validRecipients.length === 0) {
+    return;
   }
+
+  const messages: ExpoPushMessage[] = validRecipients.map((recipient) => ({
+    to: recipient.expo_push_token,
+    title: payload.title,
+    body: payload.body,
+    sound: SUPPORT_PUSH_SOUND,
+    channelId: SUPPORT_PUSH_CHANNEL_ID,
+    data: {
+      routeTarget: 'support_portal',
+      profileId,
+      ...(payload.ticketId ? { supportTicketId: payload.ticketId } : {}),
+      ...(payload.messageId ? { supportMessageId: payload.messageId } : {}),
+      ...normalizePushData(payload.data),
+    },
+  }));
+
+  await deactivateInvalidTokens(validRecipients, messages);
 }

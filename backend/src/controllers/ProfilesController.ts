@@ -136,6 +136,7 @@ function applyNotificationPreferences(
       | 'enable_push_alerts'
       | 'enable_push_trusted_activity'
       | 'enable_push_circle_activity'
+      | 'enable_push_support_replies'
       | 'enable_email_weekly_reports'
       | 'auto_mark_enabled'
       | 'auto_mark_fraud_threshold'
@@ -150,6 +151,7 @@ function applyNotificationPreferences(
     { key: 'enable_push_alerts', type: 'boolean' },
     { key: 'enable_push_trusted_activity', type: 'boolean' },
     { key: 'enable_push_circle_activity', type: 'boolean' },
+    { key: 'enable_push_support_replies', type: 'boolean' },
     { key: 'enable_email_weekly_reports', type: 'boolean' },
     { key: 'auto_mark_enabled', type: 'boolean' },
     { key: 'auto_mark_fraud_threshold', type: 'number' },
@@ -516,6 +518,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
     enable_push_alerts,
     enable_push_trusted_activity,
     enable_push_circle_activity,
+    enable_push_support_replies,
     enable_email_weekly_reports,
     auto_mark_enabled,
     auto_mark_fraud_threshold,
@@ -561,6 +564,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
           enable_push_alerts: true,
           enable_push_trusted_activity: true,
           enable_push_circle_activity: true,
+          enable_push_support_replies: true,
           enable_email_weekly_reports: true,
           alert_threshold_score: 50,
           auto_mark_enabled: false,
@@ -607,6 +611,9 @@ async function updateAlertPrefs(req: Request, res: Response) {
   }
   if (typeof enable_push_circle_activity === 'boolean') {
     updatedPrefs.enable_push_circle_activity = enable_push_circle_activity;
+  }
+  if (typeof enable_push_support_replies === 'boolean') {
+    updatedPrefs.enable_push_support_replies = enable_push_support_replies;
   }
   if (typeof enable_email_weekly_reports === 'boolean') {
     updatedPrefs.enable_email_weekly_reports = enable_email_weekly_reports;
@@ -712,6 +719,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
     enable_push_alerts: updatedPrefs.enable_push_alerts,
     enable_push_trusted_activity: updatedPrefs.enable_push_trusted_activity,
     enable_push_circle_activity: updatedPrefs.enable_push_circle_activity,
+    enable_push_support_replies: updatedPrefs.enable_push_support_replies,
     enable_email_weekly_reports: updatedPrefs.enable_email_weekly_reports,
     auto_mark_enabled: updatedPrefs.auto_mark_enabled,
     auto_mark_fraud_threshold: updatedPrefs.auto_mark_fraud_threshold,

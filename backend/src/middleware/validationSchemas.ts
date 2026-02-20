@@ -77,6 +77,7 @@ export const updateAlertPrefsSchema = z.object({
   enable_push_alerts: z.boolean().optional(),
   enable_push_trusted_activity: z.boolean().optional(),
   enable_push_circle_activity: z.boolean().optional(),
+  enable_push_support_replies: z.boolean().optional(),
   enable_email_weekly_reports: z.boolean().optional(),
   alert_threshold_score: z.number().min(0).max(100).optional(),
   auto_mark_enabled: z.boolean().optional(),

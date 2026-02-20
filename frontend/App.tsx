@@ -106,19 +106,27 @@ enableScreens(true);
 type PendingNotificationData = {
   callId?: string;
   alertId?: string;
-  routeTarget?: 'call_detail' | 'calls_trusted' | 'circle_activity' | 'alerts';
+  routeTarget?:
+    | 'call_detail'
+    | 'calls_trusted'
+    | 'circle_activity'
+    | 'alerts'
+    | 'support_portal';
   alertType?: string;
 };
 
 const ACTIVITY_PUSH_CHANNEL_ID = 'activity-alerts';
 const ACTIVITY_PUSH_SOUND = 'activity-notification.wav';
+const SUPPORT_PUSH_CHANNEL_ID = 'support-updates';
+const SUPPORT_PUSH_SOUND = 'support-notification.wav';
 
 function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'] {
   if (
     value === 'call_detail' ||
     value === 'calls_trusted' ||
     value === 'circle_activity' ||
-    value === 'alerts'
+    value === 'alerts' ||
+    value === 'support_portal'
   ) {
     return value;
   }
@@ -609,6 +617,10 @@ function NavigationHost() {
       rootNavigationRef.current.navigate('CircleActivityModal', { activities: [] });
       return;
     }
+    if (payload.routeTarget === 'support_portal') {
+      rootNavigationRef.current.navigate('SupportPortal');
+      return;
+    }
     if (payload.alertId || payload.routeTarget === 'alerts' || payload.alertType) {
       rootNavigationRef.current.dispatch(
         CommonActions.navigate({
@@ -736,9 +748,20 @@ function AppContent() {
       vibrationPattern: [0, 250, 250, 250],
       enableVibrate: true,
       lightColor: '#3b82f6',
-    }).catch((err) => {
-      console.warn('[notifications] Failed to configure activity channel', err);
-    });
+    })
+      .then(() =>
+        Notifications.setNotificationChannelAsync(SUPPORT_PUSH_CHANNEL_ID, {
+          name: 'Support Updates',
+          importance: Notifications.AndroidImportance.HIGH,
+          sound: SUPPORT_PUSH_SOUND,
+          vibrationPattern: [0, 250, 250, 250],
+          enableVibrate: true,
+          lightColor: '#3b82f6',
+        })
+      )
+      .catch((err) => {
+        console.warn('[notifications] Failed to configure notification channels', err);
+      });
   }, []);
 
   return (

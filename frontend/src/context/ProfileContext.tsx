@@ -43,6 +43,7 @@ export type Profile = {
   enable_push_alerts?: boolean | null;
   enable_push_trusted_activity?: boolean | null;
   enable_push_circle_activity?: boolean | null;
+  enable_push_support_replies?: boolean | null;
   enable_email_weekly_reports?: boolean | null;
   auto_mark_enabled?: boolean | null;
   auto_mark_fraud_threshold?: number | null;

@@ -3,6 +3,7 @@ import { format } from 'node:util';
 
 import supabaseAdmin from '@src/services/supabase';
 import { ASSISTANT_STATUS_ID } from '@src/constants/assistantStatus';
+import { notifyProfileForSupportReply } from '@src/services/pushNotifications';
 
 type SupportMessageRow = {
   id: string;
@@ -434,20 +435,47 @@ async function sendReply(ticketRef: string, message: string) {
     return;
   }
 
+  let insertedId: string | null = null;
   if (result.scope === 'profile') {
-    await supabaseAdmin.from('support_messages').insert({
-      profile_id: result.profileId,
-      sender: 'agent',
-      content: message,
-      metadata: { ticketId: result.ticketId, ticketState: 'open' },
-    });
+    const { data, error } = await supabaseAdmin
+      .from('support_messages')
+      .insert({
+        profile_id: result.profileId,
+        sender: 'agent',
+        content: message,
+        metadata: { ticketId: result.ticketId, ticketState: 'open' },
+        category: 'agent',
+        is_read_by_user: false,
+        is_read_by_agent: true,
+      })
+      .select('id')
+      .single();
+    if (error) {
+      throw error;
+    }
+    insertedId = data?.id ?? null;
   } else {
-    await supabaseAdmin.from('support_setup_messages').insert({
+    const { error } = await supabaseAdmin.from('support_setup_messages').insert({
       user_id: result.userId,
       email_snapshot: null,
       sender: 'agent',
       content: message,
       metadata: { ticketId: result.ticketId, ticketState: 'open', preProfile: true },
+      category: 'agent',
+      is_read_by_user: false,
+      is_read_by_agent: true,
+    });
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (result.scope === 'profile') {
+    await notifyProfileForSupportReply(result.profileId, {
+      title: 'Support replied',
+      body: 'A live support agent sent a new message.',
+      ticketId: result.ticketId,
+      messageId: insertedId ?? undefined,
     });
   }
 
@@ -470,20 +498,48 @@ async function closeTicket(ticketRef: string, note?: string) {
     metadata.preProfile = true;
   }
 
+  const closeMessage = note ?? 'Closing this conversation';
+  let insertedId: string | null = null;
   if (result.scope === 'profile') {
-    await supabaseAdmin.from('support_messages').insert({
-      profile_id: result.profileId,
-      sender: 'agent',
-      content: note ?? 'Closing this conversation',
-      metadata,
-    });
+    const { data, error } = await supabaseAdmin
+      .from('support_messages')
+      .insert({
+        profile_id: result.profileId,
+        sender: 'agent',
+        content: closeMessage,
+        metadata,
+        category: 'agent',
+        is_read_by_user: false,
+        is_read_by_agent: true,
+      })
+      .select('id')
+      .single();
+    if (error) {
+      throw error;
+    }
+    insertedId = data?.id ?? null;
   } else {
-    await supabaseAdmin.from('support_setup_messages').insert({
+    const { error } = await supabaseAdmin.from('support_setup_messages').insert({
       user_id: result.userId,
       email_snapshot: null,
       sender: 'agent',
-      content: note ?? 'Closing this conversation',
+      content: closeMessage,
       metadata,
+      category: 'agent',
+      is_read_by_user: false,
+      is_read_by_agent: true,
+    });
+    if (error) {
+      throw error;
+    }
+  }
+
+  if (result.scope === 'profile') {
+    await notifyProfileForSupportReply(result.profileId, {
+      title: 'Support replied',
+      body: 'A live support agent sent a new message.',
+      ticketId: result.ticketId,
+      messageId: insertedId ?? undefined,
     });
   }
 

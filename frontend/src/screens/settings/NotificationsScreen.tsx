@@ -34,6 +34,7 @@ function isLegacyAlertPrefsError(err: unknown) {
     message.includes('Unrecognized keys') &&
     (message.includes('enable_push_trusted_activity') ||
       message.includes('enable_push_circle_activity') ||
+      message.includes('enable_push_support_replies') ||
       message.includes('enable_email_weekly_reports'))
   );
 }
@@ -41,6 +42,7 @@ function isLegacyAlertPrefsError(err: unknown) {
 type PreferenceKey =
   | 'trusted_activity'
   | 'circle_activity'
+  | 'support_replies'
   | 'weekly_email';
 
 type PreferenceItem = {
@@ -64,6 +66,9 @@ export default function NotificationsScreen() {
   const [pushCircleActivity, setPushCircleActivity] = useState(
     activeProfile?.enable_push_circle_activity ?? true
   );
+  const [pushSupportReplies, setPushSupportReplies] = useState(
+    activeProfile?.enable_push_support_replies ?? true
+  );
   const [weeklyEmailReports, setWeeklyEmailReports] = useState(
     activeProfile?.enable_email_weekly_reports ?? true
   );
@@ -77,6 +82,7 @@ export default function NotificationsScreen() {
     setThreshold(activeProfile.alert_threshold_score ?? 90);
     setPushTrustedActivity(activeProfile.enable_push_trusted_activity ?? true);
     setPushCircleActivity(activeProfile.enable_push_circle_activity ?? true);
+    setPushSupportReplies(activeProfile.enable_push_support_replies ?? true);
     setWeeklyEmailReports(activeProfile.enable_email_weekly_reports ?? true);
   }, [activeProfile]);
 
@@ -104,8 +110,15 @@ export default function NotificationsScreen() {
         icon: 'people-outline',
         active: pushCircleActivity,
       },
+      {
+        key: 'support_replies',
+        title: 'Support replies',
+        description: 'Message notifications when a live support agent responds',
+        icon: 'chatbubbles-outline',
+        active: pushSupportReplies,
+      },
     ],
-    [pushCircleActivity, pushTrustedActivity]
+    [pushCircleActivity, pushSupportReplies, pushTrustedActivity]
   );
 
   const emailItems = useMemo<PreferenceItem[]>(
@@ -130,6 +143,10 @@ export default function NotificationsScreen() {
       setPushCircleActivity((prev) => !prev);
       return;
     }
+    if (key === 'support_replies') {
+      setPushSupportReplies((prev) => !prev);
+      return;
+    }
     setWeeklyEmailReports((prev) => !prev);
   }, []);
 
@@ -141,16 +158,19 @@ export default function NotificationsScreen() {
       pushTrustedActivity !== (activeProfile.enable_push_trusted_activity ?? true);
     const circleChanged =
       pushCircleActivity !== (activeProfile.enable_push_circle_activity ?? true);
+    const supportRepliesChanged =
+      pushSupportReplies !== (activeProfile.enable_push_support_replies ?? true);
     const emailChanged =
       weeklyEmailReports !== (activeProfile.enable_email_weekly_reports ?? true);
 
     return canManageProfile
-      ? thresholdChanged || trustedChanged || circleChanged || emailChanged
-      : thresholdChanged || trustedChanged || circleChanged;
+      ? thresholdChanged || trustedChanged || circleChanged || supportRepliesChanged || emailChanged
+      : thresholdChanged || trustedChanged || circleChanged || supportRepliesChanged;
   }, [
     activeProfile,
     canManageProfile,
     pushCircleActivity,
+    pushSupportReplies,
     pushTrustedActivity,
     threshold,
     weeklyEmailReports,
@@ -169,6 +189,7 @@ export default function NotificationsScreen() {
         enable_push_alerts: true,
         enable_push_trusted_activity: pushTrustedActivity,
         enable_push_circle_activity: pushCircleActivity,
+        enable_push_support_replies: pushSupportReplies,
       };
 
       if (canManageProfile) {
@@ -213,6 +234,7 @@ export default function NotificationsScreen() {
         enable_push_alerts: true,
         enable_push_trusted_activity: pushTrustedActivity,
         enable_push_circle_activity: pushCircleActivity,
+        enable_push_support_replies: pushSupportReplies,
         enable_email_weekly_reports: canManageProfile
           ? weeklyEmailReports
           : activeProfile.enable_email_weekly_reports,
@@ -228,6 +250,7 @@ export default function NotificationsScreen() {
           threshold: roundedThreshold,
           pushTrustedActivity,
           pushCircleActivity,
+          pushSupportReplies,
           weeklyEmailReports: canManageProfile ? weeklyEmailReports : undefined,
         },
       });
