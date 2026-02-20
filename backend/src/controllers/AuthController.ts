@@ -25,11 +25,26 @@ export async function checkEmailExists(req: Request, res: Response) {
     });
   }
 
-  // Always return a generic response to avoid account enumeration.
+  const normalizedEmail = email.trim().toLowerCase();
+
+  const { data, error } = await supabaseAdmin
+    .from('auth.users')
+    .select('id')
+    .eq('email', normalizedEmail)
+    .maybeSingle();
+
+  if (error) {
+    logger.err(`checkEmailExists error: ${error.message}`);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({
+      error: 'Unable to check email right now',
+    });
+  }
+
+  const exists = Boolean(data?.id);
   return res.status(HTTP_STATUS_CODES.Ok).json({
-    email,
-    exists: false,
-    message: 'Continue signup to complete verification.',
+    email: normalizedEmail,
+    exists,
+    message: exists ? 'Email is already in use.' : 'Email is available.',
   });
 }
 

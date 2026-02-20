@@ -26,6 +26,16 @@ type AlertState = {
   type: 'warning' | 'danger';
 };
 
+type EmailAvailabilityState =
+  | 'idle'
+  | 'invalid'
+  | 'checking'
+  | 'available'
+  | 'taken'
+  | 'error';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export default function SignUpScreen({ navigation }: { navigation: any }) {
   const { signUp, signInWithGoogle, signInWithApple } = useAuth();
   const { theme } = useTheme();
@@ -43,6 +53,8 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const [legalModalVisible, setLegalModalVisible] = useState(false);
   const [legalScrolledToEnd, setLegalScrolledToEnd] = useState(false);
   const [legalVersions, setLegalVersions] = useState(FALLBACK_LEGAL_VERSIONS);
+  const [emailAvailability, setEmailAvailability] =
+    useState<EmailAvailabilityState>('idle');
 
   useEffect(() => {
     let active = true;
@@ -55,6 +67,54 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) {
+      setEmailAvailability('idle');
+      return;
+    }
+
+    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      setEmailAvailability('invalid');
+      return;
+    }
+
+    const baseUrl =
+      process.env.EXPO_PUBLIC_API_URL ?? process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+    if (!baseUrl) {
+      setEmailAvailability('idle');
+      return;
+    }
+
+    const controller = new AbortController();
+    setEmailAvailability('checking');
+    const timeoutId = setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `${baseUrl}/auth/check-email?email=${encodeURIComponent(normalizedEmail)}`,
+          {
+            signal: controller.signal,
+          }
+        );
+        if (!response.ok) {
+          throw new Error(`check-email failed (${response.status})`);
+        }
+        const body = (await response.json()) as { exists?: boolean };
+        setEmailAvailability(body?.exists ? 'taken' : 'available');
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setEmailAvailability('error');
+      }
+    }, 450);
+
+    return () => {
+      controller.abort();
+      clearTimeout(timeoutId);
+    };
+  }, [email]);
 
   const inputBorderColor = (field: 'email' | 'password' | 'confirm') =>
     focusField === field ? theme.colors.accent : theme.colors.border;
@@ -72,6 +132,20 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
 
   const handleSubmit = async () => {
     setAlert(null);
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!EMAIL_PATTERN.test(normalizedEmail)) {
+      setAlert({ message: 'Enter a valid email address.', type: 'warning' });
+      return;
+    }
+
+    if (emailAvailability === 'taken') {
+      setAlert({
+        message: 'This email is already in use. Please sign in instead.',
+        type: 'warning',
+      });
+      return;
+    }
 
     if (!acceptedLegal) {
       setAlert({
@@ -115,7 +189,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
 
     setIsSubmitting(true);
     logEvent('signup_attempt', { screen: 'SignUp' });
-    const result = await signUp(email.trim(), password, {
+    const result = await signUp(normalizedEmail, password, {
       termsVersion: legalVersions.termsVersion,
       privacyVersion: legalVersions.privacyVersion,
       acceptedAt: new Date().toISOString(),
@@ -134,7 +208,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
     }
     if (result.needsConfirmation) {
       logEvent('signup_needs_confirmation', { screen: 'SignUp' });
-      navigation.navigate('ConfirmEmail', { email: email.trim() });
+      navigation.navigate('ConfirmEmail', { email: normalizedEmail });
       return;
     }
     logEvent('signup_success', { screen: 'SignUp' });
@@ -192,6 +266,21 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
     setLegalModalVisible(true);
   };
 
+  const emailStatusMessage =
+    emailAvailability === 'taken'
+      ? 'This email is already in use. Try signing in.'
+      : emailAvailability === 'checking'
+      ? 'Checking email...'
+      : emailAvailability === 'error'
+      ? 'Could not verify this email right now.'
+      : null;
+  const emailStatusColor =
+    emailAvailability === 'taken'
+      ? theme.colors.danger
+      : emailAvailability === 'error'
+      ? theme.colors.warning
+      : theme.colors.textDim;
+
   return (
     <SafeAreaView
       style={[
@@ -248,6 +337,11 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
               onFocus={() => setFocusField('email')}
               onBlur={() => setFocusField((prev) => (prev === 'email' ? null : prev))}
             />
+            {emailStatusMessage ? (
+              <Text style={[styles.emailStatusText, { color: emailStatusColor }]}>
+                {emailStatusMessage}
+              </Text>
+            ) : null}
           </View>
 
         <View style={styles.fieldWrapper}>
@@ -504,7 +598,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         primaryLabel={isSubmitting ? 'Creating…' : 'Create Account'}
         onPrimaryPress={handleSubmit}
         primaryLoading={isSubmitting}
-        primaryDisabled={!acceptedLegal}
+        primaryDisabled={!acceptedLegal || emailAvailability === 'taken'}
         secondaryLabel="Apple"
         onSecondaryPress={handleAppleSignUp}
         secondaryIcon={
@@ -581,6 +675,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
     letterSpacing: 0.2,
+  },
+  emailStatusText: {
+    marginTop: 8,
+    fontSize: 12,
+    fontWeight: '500',
+    letterSpacing: 0.2,
+    paddingLeft: 4,
   },
   input: {
     height: 60,
