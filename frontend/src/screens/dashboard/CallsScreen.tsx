@@ -120,7 +120,7 @@ const determineStatus = (call: CallRow, theme: AppTheme) => {
     return { label: severityLabel, color: severityStyles.accent, group: 'risk' as const };
   }
   if (severity === 'low') {
-    return { label: 'Low', color: severityStyles.accent, group: 'all' as const };
+    return { label: 'Low', color: severityStyles.accent, group: 'verified' as const };
   }
   return { label: 'Call', color: theme.colors.textMuted, group: 'all' as const };
 };
@@ -446,6 +446,8 @@ export default function CallsScreen({
   const showTray = useCallback((call: CallRow) => {
     setTrayCall(call);
     setIsTrayMounted(true);
+    setTrayProcessing(false);
+    setActiveTrayAction(null);
     trayAnim.setValue(0);
     Animated.timing(trayAnim, {
       toValue: 1,
@@ -465,6 +467,8 @@ export default function CallsScreen({
     }).start(() => {
       setIsTrayMounted(false);
       setTrayCall(null);
+      setTrayProcessing(false);
+      setActiveTrayAction(null);
     });
   }, [trayAnim]);
 
@@ -1020,7 +1024,7 @@ export default function CallsScreen({
   const refreshAccentPortion = withOpacity(refreshAccent, 0.18);
   const trayTranslateY = trayAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [300, 0],
+    outputRange: [420, 0],
     extrapolate: 'clamp',
   });
   const trayBackdropOpacity = trayAnim.interpolate({
@@ -1030,7 +1034,7 @@ export default function CallsScreen({
   });
   const trustedTrayTranslateY = trustedTrayAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [300, 0],
+    outputRange: [420, 0],
     extrapolate: 'clamp',
   });
   const trustedTrayBackdropOpacity = trustedTrayAnim.interpolate({
@@ -1514,8 +1518,6 @@ const createCallStyles = (theme: AppTheme) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.surfaceAlt,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withOpacity(theme.colors.danger, 0.32),
     },
     headerDeleteSpinner: {
       transform: [{ scale: 0.95 }],

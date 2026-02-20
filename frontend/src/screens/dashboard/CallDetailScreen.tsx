@@ -838,7 +838,12 @@ export default function CallDetailScreen({
     <SafeAreaView style={[styles.container, { paddingTop: containerPaddingTop }]} edges={[]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
+          <Ionicons
+            name="chevron-back"
+            size={22}
+            color={theme.colors.text}
+            style={styles.popupBackIcon}
+          />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Call Details</Text>
@@ -1233,6 +1238,9 @@ const createCallDetailStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: withOpacity(theme.colors.text, 0.1),
+    },
+    popupBackIcon: {
+      transform: [{ rotate: '90deg' }],
     },
     headerTitle: {
       color: theme.colors.text,

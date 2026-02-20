@@ -101,14 +101,24 @@ type ProfileRecord = {
   auto_mark_safe_threshold: number | null;
 };
 
+function readBooleanPref(
+  notificationPreferences: Record<string, unknown> | null | undefined,
+  key: string
+) {
+  if (!notificationPreferences || typeof notificationPreferences !== 'object') {
+    return null;
+  }
+  const value = notificationPreferences[key];
+  return typeof value === 'boolean' ? value : null;
+}
+
 async function main() {
   const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
   const { data: profiles, error } = await supabaseAdmin
     .from('profiles')
     .select(
       'id, first_name, last_name, caretaker_id, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold'
-    )
-    .eq('enable_email_alerts', true);
+    );
   if (error) {
     logger.err(error);
     logger.warn('Failed to load profiles for weekly alerts');
@@ -121,11 +131,40 @@ async function main() {
   }
   for (const profile of profiles as ProfileRecord[]) {
     try {
-      const caretakerEmail = await getCaretakerEmail(profile.caretaker_id);
-      if (!caretakerEmail) {
-        logger.warn(`No email for caretaker ${profile.caretaker_id}, skipping profile ${profile.id}`);
+      const { data: adminMembers, error: memberError } = await supabaseAdmin
+        .from('profile_members')
+        .select('user_id, role, notification_preferences')
+        .eq('profile_id', profile.id)
+        .eq('role', 'admin');
+      if (memberError) {
+        logger.err(memberError);
+        logger.warn(`Failed to load admins for profile ${profile.id}`);
         continue;
       }
+
+      const adminRows =
+        (adminMembers ?? []) as Array<{
+          user_id: string;
+          role: 'admin';
+          notification_preferences?: Record<string, unknown> | null;
+        }>;
+      const adminPrefMap = new Map(
+        adminRows.map((row) => [row.user_id, row.notification_preferences ?? null])
+      );
+
+      const recipientUserIds = Array.from(
+        new Set([profile.caretaker_id, ...adminRows.map((row) => row.user_id)])
+      );
+      const eligibleRecipientIds = recipientUserIds.filter((userId) => {
+        const memberPref = adminPrefMap.get(userId) ?? null;
+        const enabled = readBooleanPref(memberPref, 'enable_email_weekly_reports');
+        return enabled === null ? true : enabled;
+      });
+      if (eligibleRecipientIds.length === 0) {
+        logger.info(`Weekly summary disabled for all recipients profile=${profile.id}`);
+        continue;
+      }
+
       const profileName = formatProfileName(profile);
       const callCount = await countRows('calls', profile.id, since);
       const blockedCount = await countRows('blocked_callers', profile.id, since);
@@ -150,12 +189,22 @@ async function main() {
         automationNotes,
         supportLink: SUPPORT_LINK,
       });
-      await sendEmail({
-        to: caretakerEmail,
-        subject: `Weekly safety summary for ${profileName}`,
-        html: content,
-      });
-      logger.info(`Sent weekly safety summary to ${caretakerEmail} for profile ${profile.id}`);
+
+      for (const recipientId of eligibleRecipientIds) {
+        const recipientEmail = await getCaretakerEmail(recipientId);
+        if (!recipientEmail) {
+          logger.warn(`No email for user ${recipientId}, skipping profile ${profile.id}`);
+          continue;
+        }
+        await sendEmail({
+          to: recipientEmail,
+          subject: `Weekly safety summary for ${profileName}`,
+          html: content,
+        });
+        logger.info(
+          `Sent weekly safety summary to ${recipientEmail} for profile ${profile.id}`
+        );
+      }
     } catch (err) {
       logger.err(err as Error);
       logger.warn(`Failed to send weekly summary for profile ${profile.id}`);

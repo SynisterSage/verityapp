@@ -28,111 +28,208 @@ const LEVELS = [
   { label: 'Maximum', breakpoint: 100 },
 ];
 
-type NotificationChannel = {
-  key: 'phone' | 'email' | 'sms';
+function isLegacyAlertPrefsError(err: unknown) {
+  const message = err instanceof Error ? err.message : String(err ?? '');
+  return (
+    message.includes('Unrecognized keys') &&
+    (message.includes('enable_push_trusted_activity') ||
+      message.includes('enable_push_circle_activity') ||
+      message.includes('enable_email_weekly_reports'))
+  );
+}
+
+type PreferenceKey =
+  | 'trusted_activity'
+  | 'circle_activity'
+  | 'weekly_email';
+
+type PreferenceItem = {
+  key: PreferenceKey;
   title: string;
   description: string;
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   active: boolean;
 };
 
 export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
-  const { activeProfile, setActiveProfile } = useProfile();
+  const { activeProfile, setActiveProfile, canManageProfile } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createNotificationStyles(theme), [theme]);
+
   const [threshold, setThreshold] = useState(activeProfile?.alert_threshold_score ?? 90);
-  const [emailAlerts, setEmailAlerts] = useState(activeProfile?.enable_email_alerts ?? true);
-  const [pushAlerts, setPushAlerts] = useState(activeProfile?.enable_push_alerts ?? true);
-  const [smsAlerts, setSmsAlerts] = useState(activeProfile?.enable_sms_alerts ?? false);
+  const [pushTrustedActivity, setPushTrustedActivity] = useState(
+    activeProfile?.enable_push_trusted_activity ?? true
+  );
+  const [pushCircleActivity, setPushCircleActivity] = useState(
+    activeProfile?.enable_push_circle_activity ?? true
+  );
+  const [weeklyEmailReports, setWeeklyEmailReports] = useState(
+    activeProfile?.enable_email_weekly_reports ?? true
+  );
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [levelLabel, setLevelLabel] = useState(() => getLevelLabel(threshold));
+  const [useLegacyAlertPrefsApi, setUseLegacyAlertPrefsApi] = useState(false);
 
   useEffect(() => {
     if (!activeProfile) return;
     setThreshold(activeProfile.alert_threshold_score ?? 90);
-    setEmailAlerts(activeProfile.enable_email_alerts ?? true);
-    setSmsAlerts(activeProfile.enable_sms_alerts ?? false);
-    setPushAlerts(activeProfile.enable_push_alerts ?? true);
+    setPushTrustedActivity(activeProfile.enable_push_trusted_activity ?? true);
+    setPushCircleActivity(activeProfile.enable_push_circle_activity ?? true);
+    setWeeklyEmailReports(activeProfile.enable_email_weekly_reports ?? true);
   }, [activeProfile]);
 
   useEffect(() => {
     const nextLabel = getLevelLabel(threshold);
     if (nextLabel !== levelLabel) {
-      Haptics.selectionAsync();
+      Haptics.selectionAsync().catch(() => null);
       setLevelLabel(nextLabel);
     }
   }, [threshold, levelLabel]);
 
-  const notificationChannels = useMemo<NotificationChannel[]>(() => {
-    return [
+  const pushItems = useMemo<PreferenceItem[]>(
+    () => [
       {
-        key: 'phone',
-        title: 'Phone alerts',
-        description: 'Instant notifications',
-        icon: 'notifications-outline',
-        active: pushAlerts,
+        key: 'trusted_activity',
+        title: 'Trusted call activity',
+        description: 'Connected trusted callers and verified bridge updates',
+        icon: 'shield-checkmark-outline',
+        active: pushTrustedActivity,
       },
       {
-        key: 'email',
-        title: 'Email reports',
-        description: 'Weekly summaries',
-        icon: 'mail-outline',
-        active: emailAlerts,
+        key: 'circle_activity',
+        title: 'Circle activity',
+        description: 'Member changes, safe phrases, blocks, and security actions',
+        icon: 'people-outline',
+        active: pushCircleActivity,
       },
-      {
-        key: 'sms',
-        title: 'SMS alerts',
-        description: 'Delivered when we detect urgent risk',
-        icon: 'chatbubble-ellipses-outline',
-        active: smsAlerts,
-      },
-    ];
-  }, [emailAlerts, pushAlerts, smsAlerts]);
+    ],
+    [pushCircleActivity, pushTrustedActivity]
+  );
 
-  const handleToggle = useCallback((key: NotificationChannel['key']) => {
-    if (key === 'email') {
-      setEmailAlerts((prev) => !prev);
-    } else if (key === 'phone') {
-      setPushAlerts((prev) => !prev);
-    } else if (key === 'sms') {
-      setSmsAlerts((prev) => !prev);
+  const emailItems = useMemo<PreferenceItem[]>(
+    () => [
+      {
+        key: 'weekly_email',
+        title: 'Weekly summary email',
+        description: 'Owner and admins get one weekly account summary',
+        icon: 'mail-outline',
+        active: weeklyEmailReports,
+      },
+    ],
+    [weeklyEmailReports]
+  );
+
+  const handleToggle = useCallback((key: PreferenceKey) => {
+    if (key === 'trusted_activity') {
+      setPushTrustedActivity((prev) => !prev);
+      return;
     }
+    if (key === 'circle_activity') {
+      setPushCircleActivity((prev) => !prev);
+      return;
+    }
+    setWeeklyEmailReports((prev) => !prev);
   }, []);
 
   const hasChanges = useMemo(() => {
     if (!activeProfile) return false;
-    return (
-      threshold !== (activeProfile.alert_threshold_score ?? 90) ||
-      emailAlerts !== (activeProfile.enable_email_alerts ?? true) ||
-      smsAlerts !== (activeProfile.enable_sms_alerts ?? false) ||
-      pushAlerts !== (activeProfile.enable_push_alerts ?? true)
-    );
-  }, [activeProfile, threshold, emailAlerts, smsAlerts, pushAlerts]);
+
+    const thresholdChanged = threshold !== (activeProfile.alert_threshold_score ?? 90);
+    const trustedChanged =
+      pushTrustedActivity !== (activeProfile.enable_push_trusted_activity ?? true);
+    const circleChanged =
+      pushCircleActivity !== (activeProfile.enable_push_circle_activity ?? true);
+    const emailChanged =
+      weeklyEmailReports !== (activeProfile.enable_email_weekly_reports ?? true);
+
+    return canManageProfile
+      ? thresholdChanged || trustedChanged || circleChanged || emailChanged
+      : thresholdChanged || trustedChanged || circleChanged;
+  }, [
+    activeProfile,
+    canManageProfile,
+    pushCircleActivity,
+    pushTrustedActivity,
+    threshold,
+    weeklyEmailReports,
+  ]);
 
   const savePrefs = async () => {
     if (!activeProfile) return;
     setError('');
     Keyboard.dismiss();
     setSaving(true);
+
     try {
       const roundedThreshold = Math.round(threshold);
-      const data = await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          alert_threshold_score: roundedThreshold,
-          enable_email_alerts: emailAlerts,
-          enable_sms_alerts: smsAlerts,
-          enable_push_alerts: pushAlerts,
-        }),
-      });
-      if (data?.profile) {
-        setActiveProfile(data.profile);
+      const body: Record<string, number | boolean> = {
+        alert_threshold_score: roundedThreshold,
+        enable_push_alerts: true,
+        enable_push_trusted_activity: pushTrustedActivity,
+        enable_push_circle_activity: pushCircleActivity,
+      };
+
+      if (canManageProfile) {
+        body.enable_email_weekly_reports = weeklyEmailReports;
       }
-      logEvent('alert_threshold_changed', {
+
+      const legacyBody: Record<string, number | boolean> = {
+        alert_threshold_score: roundedThreshold,
+        enable_push_alerts: true,
+      };
+      if (canManageProfile) {
+        legacyBody.enable_email_alerts = weeklyEmailReports;
+      }
+
+      let data: any;
+      if (useLegacyAlertPrefsApi) {
+        data = await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
+          method: 'PATCH',
+          body: JSON.stringify(legacyBody),
+        });
+      } else {
+        try {
+          data = await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
+            method: 'PATCH',
+            body: JSON.stringify(body),
+          });
+        } catch (err) {
+          if (!isLegacyAlertPrefsError(err)) {
+            throw err;
+          }
+          setUseLegacyAlertPrefsApi(true);
+          data = await authorizedFetch(`/profiles/${activeProfile.id}/alerts`, {
+            method: 'PATCH',
+            body: JSON.stringify(legacyBody),
+          });
+        }
+      }
+
+      const mergedProfile = {
+        ...(data?.profile ?? activeProfile),
+        alert_threshold_score: roundedThreshold,
+        enable_push_alerts: true,
+        enable_push_trusted_activity: pushTrustedActivity,
+        enable_push_circle_activity: pushCircleActivity,
+        enable_email_weekly_reports: canManageProfile
+          ? weeklyEmailReports
+          : activeProfile.enable_email_weekly_reports,
+        enable_email_alerts: canManageProfile
+          ? weeklyEmailReports
+          : (data?.profile ?? activeProfile).enable_email_alerts,
+      };
+      setActiveProfile(mergedProfile);
+
+      logEvent('notification_preferences_changed', {
         screen: 'Notifications',
-        extra: { threshold: Math.round(threshold) },
+        extra: {
+          threshold: roundedThreshold,
+          pushTrustedActivity,
+          pushCircleActivity,
+          weeklyEmailReports: canManageProfile ? weeklyEmailReports : undefined,
+        },
       });
     } catch (err: any) {
       setError(err?.message || 'Failed to update preferences.');
@@ -148,22 +245,25 @@ export default function NotificationsScreen() {
   const helperItems = useMemo(
     () => [
       {
-        icon: 'speedometer',
-        color: theme.colors.success,
-        text: 'Higher settings stop more suspicious calls before your phone rings.',
+        icon: 'notifications-outline',
+        color: theme.colors.danger,
+        text: 'Turn on only the alert types you want to receive.',
       },
       {
-        icon: 'notifications-outline',
+        icon: 'settings',
         color: theme.colors.accent,
-        text: 'Choose which channels you want to receive alerts through.',
+        text: 'Use the toggles to reduce non-critical activity updates.',
       },
     ],
-    [theme.colors.accent, theme.colors.success]
+    [theme.colors.accent, theme.colors.danger]
   );
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <SettingsHeader title="Notifications" subtitle="Manage your personal alert preferences" />
+      <SettingsHeader
+        title="Notifications"
+        subtitle="Choose how much activity you want to receive"
+      />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -174,15 +274,15 @@ export default function NotificationsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerSection}>
-          <Text style={styles.title}>Safety Level</Text>
+          <Text style={styles.title}>Alert Delivery</Text>
           <Text style={styles.subtitle}>
-            Choose how strictly Verity filters calls and when you receive alerts.
+            Control which alerts reach you and how strict call screening should be.
           </Text>
         </View>
 
         <View style={styles.sensitivityCard}>
           <View style={styles.sensitivityHeader}>
-            <Text style={styles.sensitivityLabel}>SENSITIVITY</Text>
+            <Text style={styles.sensitivityLabel}>CALL SCREENING LEVEL</Text>
             <Text style={styles.sensitivityValue}>{levelLabel}</Text>
           </View>
           <Slider
@@ -203,55 +303,32 @@ export default function NotificationsScreen() {
         </View>
 
         <View style={styles.notificationsSection}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-          {notificationChannels.map((channel) => (
-            <View
-              key={channel.key}
-              style={[
-                styles.notificationRow,
-                channel.active ? styles.notificationRowActive : styles.notificationRowInactive,
-              ]}
-            >
-              <View
-                style={[
-                  styles.iconBox,
-                  channel.active ? styles.iconBoxActive : styles.iconBoxInactive,
-                ]}
-              >
-                <Ionicons
-                  name={channel.icon as any}
-                  size={20}
-                  color={channel.active ? theme.colors.surface : theme.colors.textMuted}
-                />
-              </View>
-              <View style={styles.notificationText}>
-                <Text
-                  style={[
-                    styles.notificationTitle,
-                    channel.active && styles.notificationTitleActive,
-                  ]}
-                >
-                  {channel.title}
-                </Text>
-                <Text style={styles.notificationSubtitle}>{channel.description}</Text>
-              </View>
-              <TouchableOpacity
-                style={[
-                  styles.toggle,
-                  channel.active ? styles.toggleActive : styles.toggleInactive,
-                ]}
-                onPress={() => handleToggle(channel.key)}
-              >
-                <View
-                  style={[
-                    styles.toggleThumb,
-                    channel.active ? styles.toggleThumbActive : styles.toggleThumbInactive,
-                  ]}
-                />
-              </TouchableOpacity>
-            </View>
+          <Text style={styles.sectionTitle}>Push Updates</Text>
+          {pushItems.map((item) => (
+            <PreferenceToggleRow
+              key={item.key}
+              item={item}
+              onPress={() => handleToggle(item.key)}
+              styles={styles}
+              theme={theme}
+            />
           ))}
         </View>
+
+        {canManageProfile ? (
+          <View style={styles.notificationsSection}>
+            <Text style={styles.sectionTitle}>Email Summary</Text>
+            {emailItems.map((item) => (
+              <PreferenceToggleRow
+                key={item.key}
+                item={item}
+                onPress={() => handleToggle(item.key)}
+                styles={styles}
+                theme={theme}
+              />
+            ))}
+          </View>
+        ) : null}
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -268,13 +345,49 @@ export default function NotificationsScreen() {
   );
 }
 
+function PreferenceToggleRow({
+  item,
+  onPress,
+  styles,
+  theme,
+}: {
+  item: PreferenceItem;
+  onPress: () => void;
+  styles: ReturnType<typeof createNotificationStyles>;
+  theme: AppTheme;
+}) {
+  return (
+    <View style={styles.notificationRow}>
+      <View style={styles.iconBox}>
+        <Ionicons name={item.icon} size={20} color={theme.colors.accent} />
+      </View>
+      <View style={styles.notificationText}>
+        <Text style={styles.notificationTitle}>{item.title}</Text>
+        <Text style={styles.notificationSubtitle}>{item.description}</Text>
+      </View>
+      <TouchableOpacity
+        style={[
+          styles.toggle,
+          item.active ? styles.toggleActive : styles.toggleInactive,
+        ]}
+        onPress={onPress}
+      >
+        <View
+          style={[
+            styles.toggleThumb,
+            item.active ? styles.toggleThumbActive : styles.toggleThumbInactive,
+          ]}
+        />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 function getLevelLabel(value: number) {
   if (value <= LEVELS[0].breakpoint) return LEVELS[0].label;
   if (value <= LEVELS[1].breakpoint) return LEVELS[1].label;
   return LEVELS[2].label;
 }
-
-
 
 const createNotificationStyles = (theme: AppTheme) =>
   StyleSheet.create({
@@ -285,41 +398,41 @@ const createNotificationStyles = (theme: AppTheme) =>
     content: {
       paddingHorizontal: 28,
       paddingTop: 28,
-      gap: 24,
+      gap: 22,
     },
     headerSection: {
-      marginBottom: 16,
+      marginBottom: 10,
     },
     title: {
-      fontSize: 34,
+      fontSize: 32,
       fontWeight: '700',
       letterSpacing: -0.35,
       color: theme.colors.text,
       marginBottom: 6,
     },
     subtitle: {
-      fontSize: 17,
+      fontSize: 16,
       fontWeight: '500',
       color: theme.colors.textMuted,
     },
     sensitivityCard: {
       backgroundColor: theme.colors.surface,
-      borderRadius: 40,
-      padding: 20,
+      borderRadius: 32,
+      padding: 18,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      elevation: 5,
+      marginTop: 2,
     },
     sensitivityHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 12,
+      marginBottom: 10,
     },
     sensitivityLabel: {
       fontSize: 10,
-      letterSpacing: 1.5,
-      fontWeight: '900',
+      letterSpacing: 1.2,
+      fontWeight: '800',
       color: theme.colors.textMuted,
     },
     sensitivityValue: {
@@ -329,7 +442,7 @@ const createNotificationStyles = (theme: AppTheme) =>
     },
     slider: {
       width: '100%',
-      height: 40,
+      height: 38,
     },
     sliderLabels: {
       flexDirection: 'row',
@@ -343,60 +456,50 @@ const createNotificationStyles = (theme: AppTheme) =>
     },
     notificationsSection: {
       gap: 12,
+      marginTop: 2,
     },
     sectionTitle: {
       fontSize: 11,
-      letterSpacing: 2,
+      letterSpacing: 1.8,
       color: theme.colors.textMuted,
       fontWeight: '700',
       marginBottom: 8,
+      textTransform: 'uppercase',
     },
     notificationRow: {
-      height: 92,
-      borderRadius: 32,
+      minHeight: 90,
+      borderRadius: 28,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 16,
-    },
-    notificationRowActive: {
-      borderColor: theme.colors.accent,
-      backgroundColor: withOpacity(theme.colors.accent, 0.12),
-    },
-    notificationRowInactive: {
-      backgroundColor: theme.colors.surfaceAlt,
+      paddingHorizontal: 14,
+      paddingVertical: 14,
     },
     iconBox: {
-      width: 44,
-      height: 44,
+      width: 40,
+      height: 40,
       borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: 16,
-    },
-    iconBoxActive: {
-      backgroundColor: theme.colors.accent,
-    },
-    iconBoxInactive: {
-      backgroundColor: theme.colors.surfaceAlt,
+      marginRight: 12,
+      backgroundColor: withOpacity(theme.colors.accent, 0.14),
     },
     notificationText: {
       flex: 1,
+      paddingRight: 10,
     },
     notificationTitle: {
-      fontSize: 17,
+      fontSize: 16,
       fontWeight: '700',
       color: theme.colors.text,
     },
-    notificationTitleActive: {
-      color: theme.colors.text,
-    },
     notificationSubtitle: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '600',
       color: theme.colors.textMuted,
+      marginTop: 2,
     },
     toggle: {
       width: 51,
@@ -427,6 +530,6 @@ const createNotificationStyles = (theme: AppTheme) =>
     },
     error: {
       color: theme.colors.danger,
-      marginTop: 12,
+      marginTop: 8,
     },
   });

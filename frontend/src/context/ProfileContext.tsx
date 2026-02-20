@@ -41,6 +41,9 @@ export type Profile = {
   enable_email_alerts?: boolean | null;
   enable_sms_alerts?: boolean | null;
   enable_push_alerts?: boolean | null;
+  enable_push_trusted_activity?: boolean | null;
+  enable_push_circle_activity?: boolean | null;
+  enable_email_weekly_reports?: boolean | null;
   auto_mark_enabled?: boolean | null;
   auto_mark_fraud_threshold?: number | null;
   auto_mark_safe_threshold?: number | null;
@@ -266,9 +269,6 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     if (!session || !activeProfile?.id) {
       return;
     }
-    if (activeProfile.enable_push_alerts === false) {
-      return;
-    }
     if (isRegisteringPushRef.current) {
       return;
     }
@@ -383,7 +383,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     } finally {
       isRegisteringPushRef.current = false;
     }
-  }, [activeProfile?.enable_push_alerts, activeProfile?.id, session]);
+  }, [activeProfile?.id, session]);
 
   useEffect(() => {
     registerPushTokenForProfile();

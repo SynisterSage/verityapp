@@ -1104,56 +1104,50 @@ async function recordingReady(req: Request, res: Response) {
       .eq('id', callRow.id);
 
     if (shouldCreateFraudAlert) {
-      const alertsEnabled =
-        profile.enable_email_alerts || profile.enable_sms_alerts || profile.enable_push_alerts;
-      if (alertsEnabled) {
-        await supabaseAdmin
-          .from('alerts')
-          .upsert(
-            {
-              profile_id: profile.id,
-              caretaker_id: profile.caretaker_id,
-              call_id: callRow.id,
-              alert_type: 'fraud',
-              status: 'pending',
-              payload: {
-                score: fraudScore,
-                riskLevel: fraudRiskLevel,
-                keywords: fraudKeywords,
-                callerHash,
-              },
+      await supabaseAdmin
+        .from('alerts')
+        .upsert(
+          {
+            profile_id: profile.id,
+            caretaker_id: profile.caretaker_id,
+            call_id: callRow.id,
+            alert_type: 'fraud',
+            status: 'pending',
+            payload: {
+              score: fraudScore,
+              riskLevel: fraudRiskLevel,
+              keywords: fraudKeywords,
+              callerHash,
             },
-            { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
-          );
-        if (profile.enable_push_alerts) {
-          const { data: recentAlerts } = await supabaseAdmin
-            .from('alerts')
-            .select('id, call_id')
-            .eq('profile_id', profile.id)
-            .eq('call_id', callRow.id)
-            .eq('alert_type', 'fraud')
-            .order('created_at', { ascending: false })
-            .limit(1);
-          const latestAlert = recentAlerts?.[0];
-          if (latestAlert) {
-            const pushData: Record<string, string> = { type: 'fraud' };
-            if (fraudRiskLevel) {
-              pushData.riskLevel = fraudRiskLevel;
-            }
-            await dispatchAlertPush({
-              id: latestAlert.id,
-              profile_id: profile.id,
-              call_id: latestAlert.call_id ?? callRow.id,
-              alert_type: 'fraud',
-              payload: {
-                score: fraudScore,
-                riskLevel: fraudRiskLevel,
-                callerHash,
-                ...pushData,
-              },
-            });
-          }
+          },
+          { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
+        );
+      const { data: recentAlerts } = await supabaseAdmin
+        .from('alerts')
+        .select('id, call_id')
+        .eq('profile_id', profile.id)
+        .eq('call_id', callRow.id)
+        .eq('alert_type', 'fraud')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      const latestAlert = recentAlerts?.[0];
+      if (latestAlert) {
+        const pushData: Record<string, string> = { type: 'fraud' };
+        if (fraudRiskLevel) {
+          pushData.riskLevel = fraudRiskLevel;
         }
+        await dispatchAlertPush({
+          id: latestAlert.id,
+          profile_id: profile.id,
+          call_id: latestAlert.call_id ?? callRow.id,
+          alert_type: 'fraud',
+          payload: {
+            score: fraudScore,
+            riskLevel: fraudRiskLevel,
+            callerHash,
+            ...pushData,
+          },
+        });
       }
     }
 

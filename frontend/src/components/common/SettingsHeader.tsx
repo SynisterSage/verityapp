@@ -10,9 +10,15 @@ type Props = {
   title: string;
   subtitle?: string;
   showBack?: boolean;
+  popupBackIcon?: boolean;
 };
 
-export default function SettingsHeader({ title, subtitle, showBack = true }: Props) {
+export default function SettingsHeader({
+  title,
+  subtitle,
+  showBack = true,
+  popupBackIcon = false,
+}: Props) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
@@ -40,7 +46,12 @@ export default function SettingsHeader({ title, subtitle, showBack = true }: Pro
             ]}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
+            <Ionicons
+              name="chevron-back"
+              size={22}
+              color={theme.colors.text}
+              style={popupBackIcon ? styles.popupBackIcon : undefined}
+            />
           </Pressable>
         ) : (
           <View style={styles.backButtonPlaceholder} />
@@ -80,6 +91,9 @@ const styles = StyleSheet.create({
   backButtonPlaceholder: {
     width: 40,
     height: 40,
+  },
+  popupBackIcon: {
+    transform: [{ rotate: '90deg' }],
   },
   textStack: {
     flex: 1,

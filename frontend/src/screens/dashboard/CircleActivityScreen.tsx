@@ -258,7 +258,12 @@ export default function CircleActivityScreen() {
     <SafeAreaView style={[styles.container, { paddingTop: Math.max(28, insets.top + 12)}]} edges={[]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <Ionicons name="chevron-back" size={22} color={theme.colors.text} />
+          <Ionicons
+            name="chevron-back"
+            size={22}
+            color={theme.colors.text}
+            style={styles.popupBackIcon}
+          />
         </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Circle activity</Text>
@@ -393,6 +398,9 @@ const createCircleStyles = (theme: AppTheme) =>
       padding: 8,
       borderRadius: 18,
       backgroundColor: withOpacity(theme.colors.text, 0.04),
+    },
+    popupBackIcon: {
+      transform: [{ rotate: '90deg' }],
     },
     headerContent: {
       flex: 1,

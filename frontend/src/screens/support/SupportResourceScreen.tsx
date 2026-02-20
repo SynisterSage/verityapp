@@ -60,6 +60,7 @@ export default function SupportResourceScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.bg }]} edges={[]}>
       <SettingsHeader
         title={computedTitle}
+        popupBackIcon
         subtitle={
           resourceType === 'privacy'
             ? 'Ownership and Transparency'

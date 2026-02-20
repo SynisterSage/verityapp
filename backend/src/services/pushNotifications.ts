@@ -5,6 +5,20 @@ import { sendExpoPushNotifications, ExpoPushMessage } from './notifications';
 const INVALID_EXPO_ERRORS = ['DeviceNotRegistered', 'PushSubscriptionExpired'];
 const ACTIVITY_PUSH_SOUND = 'activity-notification.wav';
 const ACTIVITY_PUSH_CHANNEL_ID = 'activity-alerts';
+const CIRCLE_ALERT_TYPES = new Set<string>([
+  'circle_invite',
+  'pin_change',
+  'safe_phrase_added',
+  'trusted_contact_added',
+  'blocked_caller_added',
+  'security_password',
+  'member_joined',
+  'member_role_changed',
+  'member_removed',
+  'automation_settings_updated',
+  'data_exported',
+  'data_cleared',
+]);
 
 function shouldDeactivateToken(error: any) {
   if (!error) {
@@ -26,12 +40,49 @@ type AlertPushPayload = {
   data?: Record<string, string>;
 };
 
-function readPushPref(value: unknown): boolean | null {
+function readBooleanPref(value: unknown, key: string): boolean | null {
   if (!value || typeof value !== 'object') {
     return null;
   }
-  const enabled = (value as { enable_push_alerts?: unknown }).enable_push_alerts;
+  const enabled = (value as Record<string, unknown>)[key];
   return typeof enabled === 'boolean' ? enabled : null;
+}
+
+function normalizeAlertType(value: unknown) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function canReceivePushForAlertType(args: {
+  alertType: string;
+  profileDefaultPushEnabled: boolean;
+  notificationPreferences?: Record<string, unknown> | null;
+}) {
+  const { alertType, profileDefaultPushEnabled, notificationPreferences } = args;
+
+  const globalPushPref = readBooleanPref(notificationPreferences, 'enable_push_alerts');
+  const globalPushEnabled =
+    globalPushPref === null ? profileDefaultPushEnabled : globalPushPref;
+  if (!globalPushEnabled) {
+    return false;
+  }
+
+  if (alertType === 'trusted') {
+    const trustedActivityPref = readBooleanPref(
+      notificationPreferences,
+      'enable_push_trusted_activity'
+    );
+    return trustedActivityPref === null ? true : trustedActivityPref;
+  }
+
+  if (CIRCLE_ALERT_TYPES.has(alertType)) {
+    const circleActivityPref = readBooleanPref(
+      notificationPreferences,
+      'enable_push_circle_activity'
+    );
+    return circleActivityPref === null ? true : circleActivityPref;
+  }
+
+  return true;
 }
 
 function isMissingUserIdColumnError(error: unknown) {
@@ -55,6 +106,7 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
 
   const defaultPushEnabled = profileRow?.enable_push_alerts !== false;
   const caretakerId = profileRow?.caretaker_id ?? null;
+  const alertType = normalizeAlertType(payload.data?.alertType);
 
   const { data: tokensWithUser, error: tokensError } = await supabaseAdmin
     .from('profile_device_tokens')
@@ -114,7 +166,7 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
     )
   );
 
-  let memberPushPref = new Map<string, boolean>();
+  let memberNotificationPrefs = new Map<string, Record<string, unknown> | null>();
   if (memberUserIds.length > 0) {
     const { data: memberRows } = await supabaseAdmin
       .from('profile_members')
@@ -122,13 +174,11 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
       .eq('profile_id', profileId)
       .in('user_id', memberUserIds);
 
-    memberPushPref = new Map(
-      (memberRows ?? [])
-        .map((row) => {
-          const enabled = readPushPref(row.notification_preferences);
-          return enabled === null ? null : ([row.user_id, enabled] as const);
-        })
-        .filter((row): row is readonly [string, boolean] => Boolean(row))
+    memberNotificationPrefs = new Map(
+      (memberRows ?? []).map((row) => [
+        row.user_id,
+        row.notification_preferences as Record<string, unknown> | null,
+      ])
     );
   }
 
@@ -139,15 +189,31 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
     )
     .filter((token) => {
       if (!token.user_id) {
-        return defaultPushEnabled;
+        return canReceivePushForAlertType({
+          alertType,
+          profileDefaultPushEnabled: defaultPushEnabled,
+          notificationPreferences: null,
+        });
       }
-      if (memberPushPref.has(token.user_id)) {
-        return memberPushPref.get(token.user_id) === true;
+      if (memberNotificationPrefs.has(token.user_id)) {
+        return canReceivePushForAlertType({
+          alertType,
+          profileDefaultPushEnabled: defaultPushEnabled,
+          notificationPreferences: memberNotificationPrefs.get(token.user_id) ?? null,
+        });
       }
       if (caretakerId && token.user_id === caretakerId) {
-        return defaultPushEnabled;
+        return canReceivePushForAlertType({
+          alertType,
+          profileDefaultPushEnabled: defaultPushEnabled,
+          notificationPreferences: null,
+        });
       }
-      return defaultPushEnabled;
+      return canReceivePushForAlertType({
+        alertType,
+        profileDefaultPushEnabled: defaultPushEnabled,
+        notificationPreferences: null,
+      });
     });
 
   if (validTokens.length === 0) {
