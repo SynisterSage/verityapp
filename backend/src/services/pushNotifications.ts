@@ -1,4 +1,5 @@
 import supabaseAdmin from '@src/services/supabase';
+import logger from 'jet-logger';
 import { sendExpoPushNotifications, ExpoPushMessage } from './notifications';
 
 const INVALID_EXPO_ERRORS = ['DeviceNotRegistered', 'PushSubscriptionExpired'];
@@ -33,6 +34,18 @@ function readPushPref(value: unknown): boolean | null {
   return typeof enabled === 'boolean' ? enabled : null;
 }
 
+function isMissingUserIdColumnError(error: unknown) {
+  const message = String(
+    (error as { message?: string; details?: string } | null)?.message ??
+      (error as { message?: string; details?: string } | null)?.details ??
+      ''
+  );
+  return (
+    message.includes("Could not find the 'user_id' column of 'profile_device_tokens'") ||
+    message.includes('profile_device_tokens.user_id')
+  );
+}
+
 export async function notifyProfileForAlert(profileId: string, payload: AlertPushPayload) {
   const { data: profileRow } = await supabaseAdmin
     .from('profiles')
@@ -43,11 +56,51 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
   const defaultPushEnabled = profileRow?.enable_push_alerts !== false;
   const caretakerId = profileRow?.caretaker_id ?? null;
 
-  const { data: tokens } = await supabaseAdmin
+  const { data: tokensWithUser, error: tokensError } = await supabaseAdmin
     .from('profile_device_tokens')
     .select('id, user_id, expo_push_token')
     .eq('profile_id', profileId)
     .eq('is_active', true);
+
+  if (tokensError && !isMissingUserIdColumnError(tokensError)) {
+    logger.err(
+      `[push-notify] failed loading tokens profile=${profileId} message=${tokensError.message}`
+    );
+    return;
+  }
+
+  type DeviceTokenRow = { id: string; user_id: string | null; expo_push_token: string };
+  let tokens: DeviceTokenRow[] = [];
+
+  if (tokensError && isMissingUserIdColumnError(tokensError)) {
+    logger.warn(
+      `[push-notify] profile_device_tokens.user_id missing for profile=${profileId}; falling back to legacy token query`
+    );
+    const { data: legacyTokens, error: legacyTokensError } = await supabaseAdmin
+      .from('profile_device_tokens')
+      .select('id, expo_push_token')
+      .eq('profile_id', profileId)
+      .eq('is_active', true);
+
+    if (legacyTokensError) {
+      logger.err(
+        `[push-notify] failed loading legacy tokens profile=${profileId} message=${legacyTokensError.message}`
+      );
+      return;
+    }
+
+    tokens = (legacyTokens ?? []).map((row) => ({
+      id: row.id,
+      user_id: null,
+      expo_push_token: row.expo_push_token,
+    }));
+  } else {
+    tokens = (tokensWithUser ?? []).map((row) => ({
+      id: row.id,
+      user_id: row.user_id ?? null,
+      expo_push_token: row.expo_push_token,
+    }));
+  }
 
   if (!tokens || tokens.length === 0) {
     return;
@@ -80,11 +133,6 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
   }
 
   const validTokens = tokens
-    .map((tokenRow) => ({
-      id: tokenRow.id,
-      user_id: tokenRow.user_id ?? null,
-      expo_push_token: tokenRow.expo_push_token,
-    }))
     .filter(
       (token): token is { id: string; user_id: string | null; expo_push_token: string } =>
         Boolean(token.expo_push_token)
