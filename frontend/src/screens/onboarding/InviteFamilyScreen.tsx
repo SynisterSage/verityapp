@@ -678,9 +678,6 @@ export default function InviteFamilyScreen({ navigation }: Props) {
                   Code: {selectedInvite.short_code ?? selectedInvite.id}
                 </Text>
               </View>
-              <Pressable onPress={closeInviteActions} style={styles.actionClose}>
-                <Ionicons name="close" size={20} color={theme.colors.text} />
-              </Pressable>
             </View>
             <TouchableOpacity
               style={styles.actionButton}
@@ -735,9 +732,6 @@ export default function InviteFamilyScreen({ navigation }: Props) {
                 <Text style={styles.memberTrayTitle}>Manage member</Text>
                 <Text style={styles.memberTraySubtitle}>{resolveDisplayName(memberTrayMember)}</Text>
               </View>
-              <Pressable onPress={closeMemberTray} style={styles.actionClose}>
-                <Ionicons name="close" size={20} color={theme.colors.text} />
-              </Pressable>
             </View>
             {memberTrayMember.role !== 'editor' && !memberTrayMember.is_caretaker && (
               <TouchableOpacity
@@ -1075,10 +1069,7 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       marginBottom: 16,
     },
     actionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: 16,
+      marginBottom: 18,
     },
     actionTitle: {
       color: theme.colors.text,
@@ -1087,14 +1078,7 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
     },
     actionCode: {
       color: theme.colors.textDim,
-      marginTop: 4,
-    },
-    actionClose: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
+      marginTop: 6,
     },
     actionButton: {
       backgroundColor: theme.colors.surfaceAlt,
@@ -1141,9 +1125,6 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       width: '100%',
     },
     memberTrayHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
       marginBottom: 16,
     },
     memberTrayTitle: {

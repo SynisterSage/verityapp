@@ -791,9 +791,6 @@ export default function MembersScreen() {
                   Code: {selectedInvite.short_code ?? selectedInvite.id}
                 </Text>
               </View>
-              <Pressable onPress={closeInviteActions} style={styles.actionClose}>
-                <Ionicons name="close" size={20} color={theme.colors.text} />
-              </Pressable>
             </View>
             <TouchableOpacity
               style={styles.actionButton}
@@ -853,9 +850,6 @@ export default function MembersScreen() {
                 <Text style={styles.memberTrayTitle}>Manage member</Text>
                 <Text style={styles.memberTraySubtitle}>{resolveDisplayName(memberTrayMember)}</Text>
               </View>
-              <Pressable onPress={closeMemberTray} style={styles.actionClose}>
-                <Ionicons name="close" size={20} color={theme.colors.text} />
-              </Pressable>
             </View>
             {memberTrayMember.role !== 'editor' && !memberTrayMember.is_caretaker && (
               <TouchableOpacity
@@ -1330,9 +1324,7 @@ const createMembersStyles = (theme: AppTheme) =>
       paddingBottom: 14,
     },
     actionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      marginBottom: 16,
     },
     actionTitle: {
       color: theme.colors.text,
@@ -1342,13 +1334,7 @@ const createMembersStyles = (theme: AppTheme) =>
     actionCode: {
       color: theme.colors.accent,
       fontSize: 14,
-    },
-    actionClose: {
-      width: 36,
-      height: 36,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
+      marginTop: 6,
     },
     actionButton: {
       borderRadius: 16,

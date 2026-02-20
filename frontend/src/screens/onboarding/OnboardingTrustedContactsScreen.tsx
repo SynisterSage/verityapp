@@ -597,9 +597,6 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
                 <Text style={styles.trayTitle}>
                   {trayMode === 'import' ? 'Tag Contact' : 'Manage Contact'}
                 </Text>
-                <Pressable onPress={closeTray}>
-                  <Ionicons name="close" size={20} color={theme.colors.text} />
-                </Pressable>
               </View>
               <View style={styles.trayIdentity}>
                 <View style={styles.trayAvatar}>
@@ -917,9 +914,6 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       marginBottom: 16,
     },
     trayHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
       marginBottom: 16,
     },
     trayTitle: {
