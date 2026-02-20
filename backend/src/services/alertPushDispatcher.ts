@@ -173,8 +173,11 @@ export async function dispatchAlertPush(alert: AlertLike) {
       body: content.body,
       data: {
         alertType: normalizedAlertType,
+        alert_type: normalizedAlertType,
         routeTarget,
+        route_target: routeTarget,
         ...(callId ? { callId } : {}),
+        ...(callId ? { call_id: callId } : {}),
       },
     });
     logger.info(

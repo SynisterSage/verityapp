@@ -125,19 +125,35 @@ function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'
   if (!normalized) {
     return undefined;
   }
-  if (normalized === 'call_detail' || normalized === 'calldetail') {
+  if (
+    normalized === 'call_detail' ||
+    normalized === 'calldetail' ||
+    normalized === 'call-detail'
+  ) {
     return 'call_detail';
   }
-  if (normalized === 'calls_trusted' || normalized === 'callstrusted') {
+  if (
+    normalized === 'calls_trusted' ||
+    normalized === 'callstrusted' ||
+    normalized === 'calls-trusted'
+  ) {
     return 'calls_trusted';
   }
-  if (normalized === 'circle_activity' || normalized === 'circleactivity') {
+  if (
+    normalized === 'circle_activity' ||
+    normalized === 'circleactivity' ||
+    normalized === 'circle-activity'
+  ) {
     return 'circle_activity';
   }
   if (normalized === 'alerts' || normalized === 'alert') {
     return 'alerts';
   }
-  if (normalized === 'support_portal' || normalized === 'supportportal') {
+  if (
+    normalized === 'support_portal' ||
+    normalized === 'supportportal' ||
+    normalized === 'support-portal'
+  ) {
     return 'support_portal';
   }
   return undefined;
@@ -154,6 +170,68 @@ function readDataString(
     }
   }
   return undefined;
+}
+
+const CIRCLE_ALERT_TYPES = new Set<string>([
+  'circle_invite',
+  'pin_change',
+  'safe_phrase_added',
+  'trusted_contact_added',
+  'blocked_caller_added',
+  'security_password',
+  'member_joined',
+  'member_role_changed',
+  'member_removed',
+  'automation_settings_updated',
+  'data_exported',
+  'data_cleared',
+]);
+
+function inferRouteTargetFromPayload(args: {
+  callId?: string;
+  alertId?: string;
+  alertType?: string;
+  hasSupportTicketData: boolean;
+}): PendingNotificationData['routeTarget'] {
+  const { callId, alertId, alertType, hasSupportTicketData } = args;
+  const normalizedAlertType = (alertType ?? '').trim().toLowerCase();
+
+  if (hasSupportTicketData) {
+    return 'support_portal';
+  }
+  if (callId) {
+    return 'call_detail';
+  }
+  if (normalizedAlertType === 'trusted') {
+    return 'calls_trusted';
+  }
+  if (CIRCLE_ALERT_TYPES.has(normalizedAlertType)) {
+    return 'circle_activity';
+  }
+  if (alertId || normalizedAlertType) {
+    return 'alerts';
+  }
+  return undefined;
+}
+
+function parseNotificationPayload(data: Record<string, unknown>): PendingNotificationData {
+  const callId = readDataString(data, 'callId', 'call_id');
+  const alertId = readDataString(data, 'alertId', 'alert_id');
+  const alertType = readDataString(data, 'alertType', 'alert_type');
+  const supportTicketId = readDataString(data, 'supportTicketId', 'support_ticket_id');
+  const supportMessageId = readDataString(data, 'supportMessageId', 'support_message_id');
+  const parsedRoute = parseRouteTarget(readDataString(data, 'routeTarget', 'route_target', 'route'));
+
+  const routeTarget =
+    parsedRoute ??
+    inferRouteTargetFromPayload({
+      callId,
+      alertId,
+      alertType,
+      hasSupportTicketData: Boolean(supportTicketId || supportMessageId),
+    });
+
+  return { callId, alertId, alertType, routeTarget };
 }
 
 const RootStack = createStackNavigator<RootStackParamList>();
@@ -661,12 +739,7 @@ function NavigationHost() {
           return;
         }
         const data = response.notification.request.content.data as Record<string, unknown>;
-        pendingNotificationRef.current = {
-          callId: readDataString(data, 'callId', 'call_id'),
-          alertId: readDataString(data, 'alertId', 'alert_id'),
-          routeTarget: parseRouteTarget(readDataString(data, 'routeTarget', 'route_target')),
-          alertType: readDataString(data, 'alertType', 'alert_type'),
-        };
+        pendingNotificationRef.current = parseNotificationPayload(data);
         resolvePendingNotification();
       })
       .catch(() => null);
@@ -676,12 +749,7 @@ function NavigationHost() {
     notificationListenerRef.current = Notifications.addNotificationResponseReceivedListener(
       (response) => {
         const data = response.notification.request.content.data as Record<string, unknown>;
-        const payload: PendingNotificationData = {
-          callId: readDataString(data, 'callId', 'call_id'),
-          alertId: readDataString(data, 'alertId', 'alert_id'),
-          routeTarget: parseRouteTarget(readDataString(data, 'routeTarget', 'route_target')),
-          alertType: readDataString(data, 'alertType', 'alert_type'),
-        };
+        const payload = parseNotificationPayload(data);
         if (!payload.callId && !payload.alertId && !payload.routeTarget && !payload.alertType) {
           return;
         }

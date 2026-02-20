@@ -287,7 +287,9 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
     channelId: ACTIVITY_PUSH_CHANNEL_ID,
     data: {
       alertId: payload.alertId,
+      alert_id: payload.alertId,
       ...(payload.callId ? { callId: payload.callId } : {}),
+      ...(payload.callId ? { call_id: payload.callId } : {}),
       ...normalizePushData(payload.data),
     },
   }));
@@ -320,9 +322,13 @@ export async function notifyProfileForSupportReply(
     channelId: SUPPORT_PUSH_CHANNEL_ID,
     data: {
       routeTarget: 'support_portal',
+      route_target: 'support_portal',
       profileId,
+      profile_id: profileId,
       ...(payload.ticketId ? { supportTicketId: payload.ticketId } : {}),
+      ...(payload.ticketId ? { support_ticket_id: payload.ticketId } : {}),
       ...(payload.messageId ? { supportMessageId: payload.messageId } : {}),
+      ...(payload.messageId ? { support_message_id: payload.messageId } : {}),
       ...normalizePushData(payload.data),
     },
   }));
