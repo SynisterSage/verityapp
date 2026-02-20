@@ -52,6 +52,21 @@ type SupportTicketSummary = {
   ticket_state: string | null;
 };
 
+type SupportBugReportRow = {
+  id: string;
+  profile_id: string;
+  reporter_user_id: string;
+  reporter_role: string;
+  topic: string;
+  details: string;
+  metadata: Record<string, unknown> | null;
+  status: 'open' | 'resolved';
+  resolution_note: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 function resolveTicketState(metadata: Record<string, unknown> | null | undefined) {
   const state = metadata?.ticketState;
   return typeof state === 'string' && state.trim().length > 0 ? state : null;
@@ -195,6 +210,34 @@ async function getUserEmailSnapshot(userId: string) {
     return null;
   }
   return data?.user?.email ?? null;
+}
+
+async function resolveReporterRole(userId: string, profileId: string) {
+  const { data: profileRow, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('caretaker_id')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (!profileError && profileRow?.caretaker_id === userId) {
+    return 'owner';
+  }
+
+  const { data: memberRow, error: memberError } = await supabaseAdmin
+    .from('profile_members')
+    .select('role')
+    .eq('profile_id', profileId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (!memberError && typeof memberRow?.role === 'string') {
+    const normalized = memberRow.role.trim().toLowerCase();
+    if (normalized === 'admin' || normalized === 'editor') {
+      return normalized;
+    }
+  }
+
+  return 'member';
 }
 
 export default class SupportController {
@@ -368,6 +411,59 @@ export default class SupportController {
     }
 
     return res.status(201).json({ message: data });
+  }
+
+  static async createBugReport(req: Request, res: Response) {
+    const userId = await getAuthenticatedUserId(req);
+    if (!userId) {
+      return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+    }
+
+    const { profileId } = req.params;
+    if (!profileId) {
+      return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+    }
+
+    const allowed = await userCanAccessProfile(userId, profileId);
+    if (!allowed) {
+      return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+    }
+
+    const { topic, details, metadata } = (req as any).validatedBody as {
+      topic: string;
+      details: string;
+      metadata?: Record<string, unknown>;
+    };
+
+    const reporterRole = await resolveReporterRole(userId, profileId);
+    const normalizedTopic = topic.trim();
+    const normalizedDetails = details.trim();
+    const normalizedMetadata = metadata && typeof metadata === 'object' ? metadata : null;
+
+    const { data, error } = await supabaseAdmin
+      .from('support_bug_reports')
+      .insert([
+        {
+          profile_id: profileId,
+          reporter_user_id: userId,
+          reporter_role: reporterRole,
+          topic: normalizedTopic,
+          details: normalizedDetails,
+          metadata: normalizedMetadata,
+          status: 'open',
+        },
+      ])
+      .select(
+        'id, profile_id, reporter_user_id, reporter_role, topic, details, metadata, status, resolution_note, resolved_at, created_at, updated_at'
+      )
+      .single();
+
+    if (error) {
+      console.warn('Failed to insert support bug report', error);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to submit bug report' });
+    }
+
+    return res.status(HTTP_STATUS_CODES.Created).json({ bugReport: data as SupportBugReportRow });
   }
 
   static async createTicket(req: Request, res: Response) {

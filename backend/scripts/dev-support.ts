@@ -30,6 +30,21 @@ type SetupSupportMessageRow = {
   updated_at: string;
 };
 
+type SupportBugReportRow = {
+  id: string;
+  profile_id: string;
+  reporter_user_id: string;
+  reporter_role: string;
+  topic: string;
+  details: string;
+  metadata: Record<string, unknown> | null;
+  status: 'open' | 'resolved';
+  resolution_note: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 type TicketScope = 'profile' | 'setup';
 
 type TicketSummary = {
@@ -67,6 +82,9 @@ const USAGE = `Available commands:
   reply <ticketRef>   Send an agent reply (typing or passing text after the ref)
   close <ticketRef>   Close a ticket with an optional closing note
   feedback <ticketRef> Show feedback/ratings for a ticket
+  bugs [all|open|resolved]      List bug reports
+  bug-view <bugId>              Show full bug report details
+  bug-resolve <bugId> [note]    Mark a bug report as resolved
   status [online|offline|show]  Toggle or display assistant status
   mark-read <ticketRef>         Mark user messages as read by agent
   help                Show this message
@@ -594,6 +612,113 @@ async function markTicketRead(ticketRef: string) {
   console.log('User messages marked as read by agent.');
 }
 
+async function listBugReports(filter: 'all' | 'open' | 'resolved' = 'open') {
+  let query = supabaseAdmin
+    .from('support_bug_reports')
+    .select(
+      'id, profile_id, reporter_user_id, reporter_role, topic, details, metadata, status, resolution_note, resolved_at, created_at, updated_at'
+    )
+    .order('created_at', { ascending: false })
+    .limit(200);
+
+  if (filter !== 'all') {
+    query = query.eq('status', filter);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw error;
+  }
+
+  const rows = (data ?? []) as SupportBugReportRow[];
+  if (rows.length === 0) {
+    console.log('No bug reports found.');
+    return;
+  }
+
+  const profileIds = Array.from(new Set(rows.map((row) => row.profile_id)));
+  const profileNames = await fetchProfileNames(profileIds);
+
+  console.table(
+    rows.map((row) => ({
+      Id: row.id,
+      Profile: profileNames.get(row.profile_id) ?? row.profile_id,
+      Topic: row.topic,
+      Status: row.status,
+      Reporter: row.reporter_role,
+      Created: formatDate(row.created_at),
+    }))
+  );
+}
+
+async function viewBugReport(reportId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('support_bug_reports')
+    .select(
+      'id, profile_id, reporter_user_id, reporter_role, topic, details, metadata, status, resolution_note, resolved_at, created_at, updated_at'
+    )
+    .eq('id', reportId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    console.log(`Bug report ${reportId} not found.`);
+    return;
+  }
+
+  const report = data as SupportBugReportRow;
+  const profileNames = await fetchProfileNames([report.profile_id]);
+  const profileLabel = profileNames.get(report.profile_id) ?? report.profile_id;
+
+  console.log(`Bug ${report.id}`);
+  console.log(`Profile: ${profileLabel}`);
+  console.log(`Status: ${report.status}`);
+  console.log(`Topic: ${report.topic}`);
+  console.log(`Reporter: ${report.reporter_role} (${report.reporter_user_id})`);
+  console.log(`Created: ${formatDate(report.created_at)}`);
+  if (report.resolved_at) {
+    console.log(`Resolved: ${formatDate(report.resolved_at)}`);
+  }
+  if (report.resolution_note) {
+    console.log(`Resolution note: ${report.resolution_note}`);
+  }
+  console.log('Details:');
+  console.log(report.details);
+  if (report.metadata && Object.keys(report.metadata).length > 0) {
+    console.log('Metadata:');
+    console.log(JSON.stringify(report.metadata, null, 2));
+  }
+}
+
+async function resolveBugReport(reportId: string, note?: string) {
+  const resolvedAt = new Date().toISOString();
+  const updates: Record<string, unknown> = {
+    status: 'resolved',
+    resolution_note: note?.trim() || null,
+    resolved_at: resolvedAt,
+    updated_at: resolvedAt,
+  };
+
+  const { data, error } = await supabaseAdmin
+    .from('support_bug_reports')
+    .update(updates)
+    .eq('id', reportId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+  if (!data) {
+    console.log(`Bug report ${reportId} not found.`);
+    return;
+  }
+
+  console.log(`Bug report ${reportId} marked resolved.`);
+}
+
 async function getAssistantStatus() {
   const { data } = await supabaseAdmin
     .from('assistant_status')
@@ -695,6 +820,34 @@ async function repl() {
             break;
           }
           await showFeedback(ticketRef);
+          break;
+        }
+        case 'bugs': {
+          const filterArg = (args[0] ?? 'open').toLowerCase();
+          if (filterArg !== 'all' && filterArg !== 'open' && filterArg !== 'resolved') {
+            console.log('bugs accepts: all | open | resolved');
+            break;
+          }
+          await listBugReports(filterArg);
+          break;
+        }
+        case 'bug-view': {
+          const bugId = args[0];
+          if (!bugId) {
+            console.log('bug-view requires a bugId');
+            break;
+          }
+          await viewBugReport(bugId);
+          break;
+        }
+        case 'bug-resolve': {
+          const bugId = args[0];
+          if (!bugId) {
+            console.log('bug-resolve requires a bugId');
+            break;
+          }
+          const note = args.slice(1).join(' ') || undefined;
+          await resolveBugReport(bugId, note);
           break;
         }
         case 'status': {

@@ -166,6 +166,14 @@ export const createSupportMessageSchema = z.object({
   metadata: z.record(z.any(), z.string()).optional(),
 });
 
+export const createSupportBugReportSchema = z
+  .object({
+    topic: z.string().min(1, 'Topic is required').max(80, 'Topic is too long'),
+    details: z.string().min(10, 'Details are too short').max(3000, 'Details are too long'),
+    metadata: z.record(z.string(), z.any()).optional(),
+  })
+  .strict();
+
 // Type exports for use in controllers
 export type ResetPasswordRequest = z.infer<typeof resetPasswordSchema>;
 export type CreateProfileRequest = z.infer<typeof createProfileSchema>;
@@ -183,3 +191,4 @@ export type RecordClientHeartbeatRequest = z.infer<typeof recordClientHeartbeatS
 export type RecordClientCallLifecycleRequest = z.infer<typeof recordClientCallLifecycleSchema>;
 export type AssignNumberRequest = z.infer<typeof assignNumberSchema>;
 export type CreateSupportMessageRequest = z.infer<typeof createSupportMessageSchema>;
+export type CreateSupportBugReportRequest = z.infer<typeof createSupportBugReportSchema>;

@@ -12,6 +12,21 @@ type SupportMessage = {
   updated_at: string;
 };
 
+type SupportBugReport = {
+  id: string;
+  profile_id: string;
+  reporter_user_id: string;
+  reporter_role: string;
+  topic: string;
+  details: string;
+  metadata: Record<string, unknown> | null;
+  status: 'open' | 'resolved';
+  resolution_note: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 const baseSupportPath = (profileId: string) => `/profiles/${profileId}/support`;
 const setupSupportPath = '/support/setup';
 
@@ -57,6 +72,17 @@ export async function createSupportTicket(profileId: string) {
     method: 'POST',
   });
   return data as { ticketId: string; message: SupportMessage | null };
+}
+
+export async function createSupportBugReport(
+  profileId: string,
+  payload: { topic: string; details: string; metadata?: Record<string, unknown> }
+) {
+  const data = await authorizedFetch(`${baseSupportPath(profileId)}/bug-reports`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+  return data?.bugReport as SupportBugReport;
 }
 
 export async function fetchSetupSupportMessages(ticketId?: string | null, limit = 200) {
@@ -123,3 +149,5 @@ export async function createSetupSupportTicket() {
   });
   return data as { ticketId: string; message: SupportMessage | null };
 }
+
+export type { SupportBugReport };
