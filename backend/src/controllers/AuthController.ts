@@ -11,6 +11,8 @@ import { getAuthenticatedUserId } from '@src/common/util/auth';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, '') ?? '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
+const CHECK_EMAIL_USERS_SCAN_LIMIT = Number(process.env.CHECK_EMAIL_USERS_SCAN_LIMIT ?? '4000');
+const CHECK_EMAIL_USERS_PAGE_SIZE = 200;
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
   throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY for auth controller');
@@ -26,21 +28,51 @@ export async function checkEmailExists(req: Request, res: Response) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const maxPages = Math.max(
+    1,
+    Math.ceil(CHECK_EMAIL_USERS_SCAN_LIMIT / CHECK_EMAIL_USERS_PAGE_SIZE)
+  );
+  let exists = false;
+  let page = 1;
+  let scanned = 0;
+  let lastPage: number | null = null;
 
-  const { data, error } = await supabaseAdmin
-    .from('auth.users')
-    .select('id')
-    .eq('email', normalizedEmail)
-    .maybeSingle();
-
-  if (error) {
-    logger.err(`checkEmailExists error: ${error.message}`);
-    return res.status(HTTP_STATUS_CODES.InternalServerError).json({
-      error: 'Unable to check email right now',
+  while (page <= maxPages && (lastPage === null || page <= lastPage)) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({
+      page,
+      perPage: CHECK_EMAIL_USERS_PAGE_SIZE,
     });
+
+    if (error) {
+      logger.err(`checkEmailExists error: ${error.message}`);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({
+        error: 'Unable to check email right now',
+      });
+    }
+
+    const users = data?.users ?? [];
+    if (users.length === 0) {
+      break;
+    }
+
+    scanned += users.length;
+    exists = users.some((user) => (user.email ?? '').trim().toLowerCase() === normalizedEmail);
+    if (exists) {
+      break;
+    }
+
+    if (typeof data?.lastPage === 'number' && data.lastPage > 0) {
+      lastPage = data.lastPage;
+    }
+    page += 1;
   }
 
-  const exists = Boolean(data?.id);
+  if (!exists && scanned >= CHECK_EMAIL_USERS_SCAN_LIMIT) {
+    logger.warn(
+      `checkEmailExists reached scan limit (${CHECK_EMAIL_USERS_SCAN_LIMIT}) without match`
+    );
+  }
+
   return res.status(HTTP_STATUS_CODES.Ok).json({
     email: normalizedEmail,
     exists,
