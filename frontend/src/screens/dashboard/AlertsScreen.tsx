@@ -7,6 +7,7 @@ import {
   Easing,
   Modal,
   Pressable,
+  PanResponder,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -112,6 +113,7 @@ export default function AlertsScreen() {
   const [trayAlert, setTrayAlert] = useState<AlertRow | null>(null);
   const [isTrayMounted, setIsTrayMounted] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
+  const trayDragY = useRef(new Animated.Value(0)).current;
   const [trayProcessing, setTrayProcessing] = useState(false);
   const topScrimColors = useMemo(
     () =>
@@ -806,6 +808,7 @@ const loadMemberNames = useCallback(async () => {
       setTrayProcessing(false);
       setActiveTrayAction(null);
       trayAnim.setValue(0);
+      trayDragY.setValue(0);
       Animated.timing(trayAnim, {
         toValue: 1,
         duration: 220,
@@ -813,7 +816,7 @@ const loadMemberNames = useCallback(async () => {
         useNativeDriver: true,
       }).start();
     },
-    [trayAnim]
+    [trayAnim, trayDragY]
   );
 
   const hideTray = useCallback(() => {
@@ -824,12 +827,54 @@ const loadMemberNames = useCallback(async () => {
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
+      trayDragY.setValue(0);
       setIsTrayMounted(false);
       setTrayAlert(null);
       setTrayProcessing(false);
       setActiveTrayAction(null);
     });
-  }, [trayAnim]);
+  }, [trayAnim, trayDragY]);
+
+  const trayHandlePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onMoveShouldSetPanResponderCapture: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderGrant: () => {
+          trayDragY.stopAnimation();
+        },
+        onPanResponderMove: (_evt, gestureState) => {
+          trayDragY.setValue(Math.max(0, gestureState.dy));
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          if (gestureState.dy > 64 || gestureState.vy > 1.1) {
+            hideTray();
+            return;
+          }
+          Animated.spring(trayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(trayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [hideTray, trayDragY]
+  );
 
   const handleTrayDelete = useCallback(async () => {
     if (!trayAlert) return;
@@ -982,6 +1027,7 @@ const loadMemberNames = useCallback(async () => {
     outputRange: [300, 0],
     extrapolate: 'clamp',
   });
+  const trayTranslateWithDrag = Animated.add(trayTranslateY, trayDragY);
   const trayBackdropOpacity = trayAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 0.45],
@@ -1104,12 +1150,14 @@ const loadMemberNames = useCallback(async () => {
               style={[
                 styles.tray,
                 {
-                  transform: [{ translateY: trayTranslateY }],
+                  transform: [{ translateY: trayTranslateWithDrag }],
                 },
               ]}
             >
               <View style={styles.trayContent}>
-                <View style={styles.trayHandle} />
+                <View style={styles.trayHandleHitArea} {...trayHandlePanResponder.panHandlers}>
+                  <View style={styles.trayHandle} />
+                </View>
                 <Text style={styles.trayTitle}>{circleTrayCopy.title}</Text>
                 <Text style={styles.traySubtitle}>{circleTrayCopy.subtitle}</Text>
                 {circleTrayCopy.detail ? (
@@ -1335,7 +1383,12 @@ const createAlertStyles = (theme: AppTheme) =>
       borderRadius: 2,
       backgroundColor: withOpacity(theme.colors.text, 0.3),
       alignSelf: 'center',
-      marginBottom: 12,
+      marginBottom: 4,
+    },
+    trayHandleHitArea: {
+      alignSelf: 'stretch',
+      paddingTop: 10,
+      paddingBottom: 14,
     },
     trayTitle: {
       color: theme.colors.text,

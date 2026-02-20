@@ -95,6 +95,10 @@ export default function SupportInfoScreen() {
             <Ionicons name="mail-outline" size={20} color={theme.colors.textMuted} />
             <Text style={[styles.detailValue, { color: theme.colors.text }]}>support@verityprotect.com</Text>
           </Pressable>
+          <Pressable style={styles.detailRow} onPress={() => Linking.openURL('tel:+17326558391')}>
+            <Ionicons name="call-outline" size={20} color={theme.colors.textMuted} />
+            <Text style={[styles.detailValue, { color: theme.colors.text }]}>(732) 655-8391</Text>
+          </Pressable>
           <View style={styles.detailRow}>
             <Ionicons name="time-outline" size={20} color={theme.colors.textMuted} />
             <Text style={[styles.detailValue, { color: theme.colors.textMuted }]}>Available 7am–10pm PT</Text>

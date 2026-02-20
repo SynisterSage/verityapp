@@ -15,6 +15,7 @@ import {
   Pressable,
   AppState,
   AppStateStatus,
+  PanResponder,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -295,6 +296,7 @@ export default function CallsScreen({
   const [trayCall, setTrayCall] = useState<CallRow | null>(null);
   const [isTrayMounted, setIsTrayMounted] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
+  const trayDragY = useRef(new Animated.Value(0)).current;
   const [trayProcessing, setTrayProcessing] = useState(false);
   const [activeTrayAction, setActiveTrayAction] = useState<
     'archive' | 'unarchive' | 'delete' | 'block' | 'trust' | null
@@ -302,6 +304,7 @@ export default function CallsScreen({
   const [trustedTrayItem, setTrustedTrayItem] = useState<TrustedActivityRow | null>(null);
   const [isTrustedTrayMounted, setIsTrustedTrayMounted] = useState(false);
   const trustedTrayAnim = useRef(new Animated.Value(0)).current;
+  const trustedTrayDragY = useRef(new Animated.Value(0)).current;
   const [trustedTrayProcessing, setTrustedTrayProcessing] = useState(false);
   const [filterDeleteProcessing, setFilterDeleteProcessing] = useState(false);
 
@@ -449,13 +452,14 @@ export default function CallsScreen({
     setTrayProcessing(false);
     setActiveTrayAction(null);
     trayAnim.setValue(0);
+    trayDragY.setValue(0);
     Animated.timing(trayAnim, {
       toValue: 1,
       duration: 220,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [trayAnim]);
+  }, [trayAnim, trayDragY]);
 
   const hideTray = useCallback(() => {
     void Haptics.selectionAsync();
@@ -465,12 +469,13 @@ export default function CallsScreen({
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
+      trayDragY.setValue(0);
       setIsTrayMounted(false);
       setTrayCall(null);
       setTrayProcessing(false);
       setActiveTrayAction(null);
     });
-  }, [trayAnim]);
+  }, [trayAnim, trayDragY]);
 
   const canOpenTray = useCallback(() => canManageProfile, [canManageProfile]);
 
@@ -488,13 +493,14 @@ export default function CallsScreen({
     setIsTrustedTrayMounted(true);
     setTrustedTrayProcessing(false);
     trustedTrayAnim.setValue(0);
+    trustedTrayDragY.setValue(0);
     Animated.timing(trustedTrayAnim, {
       toValue: 1,
       duration: 220,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [trustedTrayAnim]);
+  }, [trustedTrayAnim, trustedTrayDragY]);
 
   const hideTrustedTray = useCallback(() => {
     void Haptics.selectionAsync();
@@ -504,11 +510,94 @@ export default function CallsScreen({
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
+      trustedTrayDragY.setValue(0);
       setIsTrustedTrayMounted(false);
       setTrustedTrayItem(null);
       setTrustedTrayProcessing(false);
     });
-  }, [trustedTrayAnim]);
+  }, [trustedTrayAnim, trustedTrayDragY]);
+
+  const trayHandlePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onMoveShouldSetPanResponderCapture: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderGrant: () => {
+          trayDragY.stopAnimation();
+        },
+        onPanResponderMove: (_evt, gestureState) => {
+          trayDragY.setValue(Math.max(0, gestureState.dy));
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          if (gestureState.dy > 64 || gestureState.vy > 1.1) {
+            hideTray();
+            return;
+          }
+          Animated.spring(trayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(trayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [hideTray, trayDragY]
+  );
+
+  const trustedTrayHandlePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onMoveShouldSetPanResponderCapture: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderGrant: () => {
+          trustedTrayDragY.stopAnimation();
+        },
+        onPanResponderMove: (_evt, gestureState) => {
+          trustedTrayDragY.setValue(Math.max(0, gestureState.dy));
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          if (gestureState.dy > 64 || gestureState.vy > 1.1) {
+            hideTrustedTray();
+            return;
+          }
+          Animated.spring(trustedTrayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(trustedTrayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [hideTrustedTray, trustedTrayDragY]
+  );
 
   const deleteTrustedActivity = useCallback(async () => {
     if (!trustedTrayItem) return;
@@ -1027,6 +1116,7 @@ export default function CallsScreen({
     outputRange: [420, 0],
     extrapolate: 'clamp',
   });
+  const trayTranslateWithDrag = Animated.add(trayTranslateY, trayDragY);
   const trayBackdropOpacity = trayAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 0.45],
@@ -1037,6 +1127,7 @@ export default function CallsScreen({
     outputRange: [420, 0],
     extrapolate: 'clamp',
   });
+  const trustedTrayTranslateWithDrag = Animated.add(trustedTrayTranslateY, trustedTrayDragY);
   const trustedTrayBackdropOpacity = trustedTrayAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 0.45],
@@ -1313,12 +1404,14 @@ export default function CallsScreen({
               style={[
                 styles.tray,
                 {
-                  transform: [{ translateY: trayTranslateY }],
+                  transform: [{ translateY: trayTranslateWithDrag }],
                 },
               ]}
             >
               <View style={styles.trayContent}>
-                <View style={styles.trayHandle} />
+                <View style={styles.trayHandleHitArea} {...trayHandlePanResponder.panHandlers}>
+                  <View style={styles.trayHandle} />
+                </View>
                 <Text style={styles.trayTitle}>Call options</Text>
                 <Text style={styles.traySubtitle}>
                   {formatPhoneNumber(trayCall.caller_number, 'Recent call')}
@@ -1427,12 +1520,14 @@ export default function CallsScreen({
               style={[
                 styles.tray,
                 {
-                  transform: [{ translateY: trustedTrayTranslateY }],
+                  transform: [{ translateY: trustedTrayTranslateWithDrag }],
                 },
               ]}
             >
               <View style={styles.trayContent}>
-                <View style={styles.trayHandle} />
+                <View style={styles.trayHandleHitArea} {...trustedTrayHandlePanResponder.panHandlers}>
+                  <View style={styles.trayHandle} />
+                </View>
                 <Text style={styles.trayTitle}>Trusted activity options</Text>
                 <Text style={styles.traySubtitle}>{trustedTrayItem.label}</Text>
                 <Text style={styles.trayDetail}>
@@ -1778,7 +1873,12 @@ const createCallStyles = (theme: AppTheme) =>
       borderRadius: 2,
       backgroundColor: withOpacity(theme.colors.text, 0.3),
       alignSelf: 'center',
-      marginBottom: 12,
+      marginBottom: 4,
+    },
+    trayHandleHitArea: {
+      alignSelf: 'stretch',
+      paddingTop: 10,
+      paddingBottom: 14,
     },
     trayTitle: {
       color: theme.colors.text,

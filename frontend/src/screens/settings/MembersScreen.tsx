@@ -5,6 +5,7 @@ import {
   Animated,
   Easing,
   Linking,
+  PanResponder,
   Pressable,
   ScrollView,
   Share,
@@ -113,9 +114,11 @@ export default function MembersScreen() {
   const [memberTrayMember, setMemberTrayMember] = useState<Member | null>(null);
   const [isMemberTrayMounted, setIsMemberTrayMounted] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
+  const memberTrayDragY = useRef(new Animated.Value(0)).current;
   const [selectedInvite, setSelectedInvite] = useState<Invite | null>(null);
   const shimmer = useRef(new Animated.Value(0.6)).current;
   const actionAnim = useRef(new Animated.Value(0)).current;
+  const actionTrayDragY = useRef(new Animated.Value(0)).current;
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `member-${i}`), []);
   const showMembersSkeleton = loadingMembers && members.length === 0;
   const currentMembership = members.find((member) => member.user_id === sessionUserId);
@@ -144,13 +147,14 @@ export default function MembersScreen() {
   const showMemberTray = useCallback(() => {
     setIsMemberTrayMounted(true);
     trayAnim.setValue(0);
+    memberTrayDragY.setValue(0);
     Animated.timing(trayAnim, {
       toValue: 1,
       duration: 220,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [trayAnim]);
+  }, [memberTrayDragY, trayAnim]);
 
   const hideMemberTray = useCallback(
     (callback?: () => void) => {
@@ -160,12 +164,13 @@ export default function MembersScreen() {
         easing: Easing.in(Easing.cubic),
         useNativeDriver: true,
       }).start(() => {
+        memberTrayDragY.setValue(0);
         setIsMemberTrayMounted(false);
         setMemberTrayMember(null);
         callback?.();
       });
     },
-    [trayAnim]
+    [memberTrayDragY, trayAnim]
   );
 
   const openMemberTray = useCallback(
@@ -179,6 +184,47 @@ export default function MembersScreen() {
   const closeMemberTray = useCallback(() => {
     hideMemberTray();
   }, [hideMemberTray]);
+
+  const memberTrayHandlePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onMoveShouldSetPanResponderCapture: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderGrant: () => {
+          memberTrayDragY.stopAnimation();
+        },
+        onPanResponderMove: (_evt, gestureState) => {
+          memberTrayDragY.setValue(Math.max(0, gestureState.dy));
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          if (gestureState.dy > 64 || gestureState.vy > 1.1) {
+            closeMemberTray();
+            return;
+          }
+          Animated.spring(memberTrayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(memberTrayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [closeMemberTray, memberTrayDragY]
+  );
 
   const fetchMembers = useCallback(async () => {
     if (!activeProfile) {
@@ -279,13 +325,15 @@ export default function MembersScreen() {
   const openInviteActions = useCallback(
     (invite: Invite) => {
       setSelectedInvite(invite);
+      actionAnim.setValue(0);
+      actionTrayDragY.setValue(0);
       Animated.timing(actionAnim, {
         toValue: 1,
         duration: 250,
         useNativeDriver: true,
       }).start();
     },
-    [actionAnim]
+    [actionAnim, actionTrayDragY]
   );
 
   const closeInviteActions = useCallback(() => {
@@ -295,10 +343,52 @@ export default function MembersScreen() {
       useNativeDriver: true,
     }).start(({ finished }) => {
       if (finished) {
+        actionTrayDragY.setValue(0);
         setSelectedInvite(null);
       }
     });
-  }, [actionAnim]);
+  }, [actionAnim, actionTrayDragY]);
+
+  const inviteTrayHandlePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onMoveShouldSetPanResponderCapture: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderGrant: () => {
+          actionTrayDragY.stopAnimation();
+        },
+        onPanResponderMove: (_evt, gestureState) => {
+          actionTrayDragY.setValue(Math.max(0, gestureState.dy));
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          if (gestureState.dy > 64 || gestureState.vy > 1.1) {
+            closeInviteActions();
+            return;
+          }
+          Animated.spring(actionTrayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(actionTrayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [actionTrayDragY, closeInviteActions]
+  );
 
   const shareViaSMS = async (invite: Invite) => {
     const code = invite.short_code ?? invite.id ?? '';
@@ -667,28 +757,33 @@ export default function MembersScreen() {
           <View style={{ height: Math.max(insets.bottom, 32) }} />
         </ScrollView>
       </SafeAreaView>
-      {selectedInvite && (
+	      {selectedInvite && (
         <View style={styles.actionOverlay} pointerEvents="box-none">
           <TouchableWithoutFeedback onPress={closeInviteActions}>
             <View style={styles.actionBackdrop} />
           </TouchableWithoutFeedback>
-          <Animated.View
-            style={[
-              styles.tray,
-              {
-                opacity: actionAnim,
-                transform: [
-                  {
-                    translateY: actionAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [260, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.trayHandle} />
+	          <Animated.View
+	            style={[
+	              styles.tray,
+	              {
+	                opacity: actionAnim,
+	                transform: [
+	                  {
+	                    translateY: Animated.add(
+	                      actionAnim.interpolate({
+	                        inputRange: [0, 1],
+	                        outputRange: [260, 0],
+	                      }),
+	                      actionTrayDragY
+	                    ),
+	                  },
+	                ],
+	              },
+	            ]}
+	          >
+	            <View style={styles.trayHandleHitArea} {...inviteTrayHandlePanResponder.panHandlers}>
+	              <View style={styles.trayHandle} />
+	            </View>
             <View style={styles.actionHeader}>
               <View>
                 <Text style={styles.actionTitle}>Invite Link</Text>
@@ -731,23 +826,28 @@ export default function MembersScreen() {
           <TouchableWithoutFeedback onPress={closeMemberTray}>
             <View style={styles.memberTrayBackdrop} />
           </TouchableWithoutFeedback>
-          <Animated.View
-            style={[
-              styles.memberTray,
-              {
-                opacity: trayAnim,
-                transform: [
-                  {
-                    translateY: trayAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [260, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            <View style={styles.trayHandle} />
+	          <Animated.View
+	            style={[
+	              styles.memberTray,
+	              {
+	                opacity: trayAnim,
+	                transform: [
+	                  {
+	                    translateY: Animated.add(
+	                      trayAnim.interpolate({
+	                        inputRange: [0, 1],
+	                        outputRange: [260, 0],
+	                      }),
+	                      memberTrayDragY
+	                    ),
+	                  },
+	                ],
+	              },
+	            ]}
+	          >
+	            <View style={styles.trayHandleHitArea} {...memberTrayHandlePanResponder.panHandlers}>
+	              <View style={styles.trayHandle} />
+	            </View>
             <View style={styles.memberTrayHeader}>
               <View>
                 <Text style={styles.memberTrayTitle}>Manage member</Text>
@@ -1221,7 +1321,13 @@ const createMembersStyles = (theme: AppTheme) =>
       borderRadius: 2,
       backgroundColor: withOpacity(theme.colors.text, 0.3),
       alignSelf: 'center',
-      marginBottom: 12,
+      marginBottom: 4,
+    },
+    trayHandleHitArea: {
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      paddingTop: 10,
+      paddingBottom: 14,
     },
     actionHeader: {
       flexDirection: 'row',

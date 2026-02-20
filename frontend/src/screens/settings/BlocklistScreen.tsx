@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Modal,
+  PanResponder,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -84,6 +85,7 @@ export default function BlocklistScreen() {
   const [isRemoving, setIsRemoving] = useState(false);
 
   const trayAnim = useRef(new Animated.Value(0)).current;
+  const trayDragY = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.65)).current;
 
   const { theme } = useTheme();
@@ -192,6 +194,7 @@ export default function BlocklistScreen() {
     setTrayContact(caller);
     setIsTrayMounted(true);
     trayAnim.setValue(0);
+    trayDragY.setValue(0);
     Animated.timing(trayAnim, {
       toValue: 1,
       duration: 240,
@@ -207,10 +210,52 @@ export default function BlocklistScreen() {
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
+      trayDragY.setValue(0);
       setIsTrayMounted(false);
       setTrayContact(null);
     });
   };
+
+  const trayHandlePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onMoveShouldSetPanResponderCapture: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderGrant: () => {
+          trayDragY.stopAnimation();
+        },
+        onPanResponderMove: (_evt, gestureState) => {
+          trayDragY.setValue(Math.max(0, gestureState.dy));
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          if (gestureState.dy > 64 || gestureState.vy > 1.1) {
+            closeTray();
+            return;
+          }
+          Animated.spring(trayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(trayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [trayDragY]
+  );
 
   const handleRemove = async () => {
     if (!trayContact || !canManageProfile) return;
@@ -321,6 +366,11 @@ export default function BlocklistScreen() {
     inputRange: [0, 1],
     outputRange: [0, 1],
   });
+  const trayTranslateY = trayAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [250, 0],
+  });
+  const trayTranslateWithDrag = Animated.add(trayTranslateY, trayDragY);
 
   return (
     <SafeAreaView style={styles.container} edges={[]}>
@@ -386,16 +436,15 @@ export default function BlocklistScreen() {
                   paddingBottom: trayPaddingBottom,
                   transform: [
                     {
-                      translateY: trayAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [250, 0],
-                      }),
+                      translateY: trayTranslateWithDrag,
                     },
                   ],
                 },
               ]}
             >
-              <View style={styles.trayHandle} />
+              <View style={styles.trayHandleHitArea} {...trayHandlePanResponder.panHandlers}>
+                <View style={styles.trayHandle} />
+              </View>
               <View style={styles.trayContent}>
                 <Text style={styles.trayTitle}>Manage blocked caller</Text>
                 <Text style={styles.trayNumber}>
@@ -625,7 +674,13 @@ const createBlocklistStyles = (theme: AppTheme) =>
       height: 4,
       borderRadius: 2,
       backgroundColor: theme.colors.border,
-      marginBottom: 12,
+      marginBottom: 4,
+    },
+    trayHandleHitArea: {
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      paddingTop: 10,
+      paddingBottom: 14,
     },
     trayContent: {
       gap: 6,

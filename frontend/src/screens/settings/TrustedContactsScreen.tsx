@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -123,6 +124,7 @@ export default function TrustedContactsScreen() {
   const [isSavingTag, setIsSavingTag] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const trayAnim = useRef(new Animated.Value(0)).current;
+  const trayDragY = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.65)).current;
   const manageRestrictedMessage = 'Only caretakers or admins can manage trusted contacts.';
 
@@ -220,6 +222,7 @@ export default function TrustedContactsScreen() {
   const showTray = () => {
     setIsTrayMounted(true);
     trayAnim.setValue(0);
+    trayDragY.setValue(0);
     Animated.timing(trayAnim, {
       toValue: 1,
       duration: 220,
@@ -235,10 +238,63 @@ export default function TrustedContactsScreen() {
       easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
     }).start(() => {
+      trayDragY.setValue(0);
       setIsTrayMounted(false);
       callback?.();
     });
   };
+
+  const closeTray = useCallback(() => {
+    hideTray(() => {
+      setTrayMode(null);
+      setTrayContact(null);
+      setPendingImports([]);
+      setSelectedTag('Friend');
+      setManualContactName('');
+      setManualNameEditing(false);
+    });
+  }, [hideTray]);
+
+  const trayHandlePanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onMoveShouldSetPanResponderCapture: (_evt, gestureState) =>
+          Math.abs(gestureState.dy) > 2 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx),
+        onPanResponderGrant: () => {
+          trayDragY.stopAnimation();
+        },
+        onPanResponderMove: (_evt, gestureState) => {
+          trayDragY.setValue(Math.max(0, gestureState.dy));
+        },
+        onPanResponderRelease: (_evt, gestureState) => {
+          if (gestureState.dy > 64 || gestureState.vy > 1.1) {
+            closeTray();
+            return;
+          }
+          Animated.spring(trayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+        onPanResponderTerminate: () => {
+          Animated.spring(trayDragY, {
+            toValue: 0,
+            damping: 18,
+            stiffness: 220,
+            mass: 0.35,
+            useNativeDriver: true,
+          }).start();
+        },
+      }),
+    [closeTray, trayDragY]
+  );
 
   useEffect(() => {
     let active = true;
@@ -395,17 +451,6 @@ export default function TrustedContactsScreen() {
       setManualNameEditing(false);
     }
     showTray();
-  };
-
-  const closeTray = () => {
-    hideTray(() => {
-      setTrayMode(null);
-      setTrayContact(null);
-      setPendingImports([]);
-      setSelectedTag('Friend');
-      setManualContactName('');
-      setManualNameEditing(false);
-    });
   };
 
   const handleTagSave = async () => {
@@ -904,17 +949,22 @@ export default function TrustedContactsScreen() {
                 {
                   transform: [
                     {
-                      translateY: trayAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [220, 0],
-                      }),
+                      translateY: Animated.add(
+                        trayAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [220, 0],
+                        }),
+                        trayDragY
+                      ),
                     },
                   ],
                   opacity: trayAnim,
                 },
               ]}
             >
-              <View style={styles.trayHandle} />
+              <View style={styles.trayHandleHitArea} {...trayHandlePanResponder.panHandlers}>
+                <View style={styles.trayHandle} />
+              </View>
               <View style={styles.trayHeader}>
                 <Text style={styles.trayTitle}>
                   {trayMode === 'import' ? 'Tag Contact' : 'Manage Contact'}
@@ -1371,7 +1421,12 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       borderRadius: 2,
       backgroundColor: theme.colors.border,
       alignSelf: 'center',
-      marginBottom: 16,
+      marginBottom: 4,
+    },
+    trayHandleHitArea: {
+      alignSelf: 'stretch',
+      paddingTop: 10,
+      paddingBottom: 14,
     },
     trayHeader: {
       flexDirection: 'row',

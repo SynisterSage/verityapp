@@ -27,6 +27,12 @@ import type { VoIPPushPayload } from '../types/voip-push';
 import { navigateToActiveCall } from '../navigation/rootNavigator';
 
 const ENABLE_CUSTOM_VOIP_PUSH = process.env.EXPO_PUBLIC_ENABLE_CUSTOM_VOIP_PUSH === 'true';
+const EXPO_PUSH_BASE_URL = 'https://exp.host/--/api/v2/';
+// We manage push token registration ourselves via backend APIs.
+// Disable Expo's automatic token updater to avoid noisy appId:null dev warnings.
+void Notifications.setAutoServerRegistrationEnabledAsync(false).catch((err) => {
+  console.warn('[push] Failed to disable Expo auto registration', err);
+});
 
 export type Profile = {
   id: string;
@@ -79,7 +85,7 @@ type ProfileContextValue = {
   authInvalid: boolean;
   passcodeDraft: string;
   redirectToSettings: boolean;
-  refreshProfiles: () => Promise<void>;
+  refreshProfiles: (options?: { silent?: boolean }) => Promise<void>;
   setActiveProfile: (profile: Profile | null) => void;
   setOnboardingComplete: (value: boolean) => void;
   setPasscodeDraft: (value: string) => void;
@@ -120,8 +126,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const pendingVoipRefreshRef = useRef(false);
   const skipTwilioDelayRef = useRef(false);
 
-  const refreshProfiles = useCallback(async () => {
-    setIsLoading(true);
+  const refreshProfiles = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setIsLoading(true);
+    }
     if (!session) {
       setProfiles([]);
       setActiveProfile(null);
@@ -335,6 +343,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       const tokenResult = await Notifications.getExpoPushTokenAsync({
         projectId: expoProjectId,
         applicationId: String(applicationId),
+        // Passing an explicit base URL avoids expo-notifications auto-registration,
+        // which can emit noisy appId:null warnings in some dev-client builds.
+        baseUrl: EXPO_PUSH_BASE_URL,
       });
       const pushToken = tokenResult?.data;
       console.info('[push] token generated', {
@@ -549,7 +560,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
           filter: `id=eq.${activeProfile.id}`,
         },
         () => {
-          refreshProfiles();
+          void refreshProfiles({ silent: true });
         }
       )
       .subscribe();
