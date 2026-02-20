@@ -3,6 +3,7 @@ import fetch from 'node-fetch';
 
 import logger from 'jet-logger';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
+import { CURRENT_LEGAL_VERSIONS } from '@src/common/constants/LEGAL';
 import supabaseAdmin from '@src/services/supabase';
 import { createRefreshToken, validateAndRotateRefreshToken } from '@src/services/refreshTokens';
 import { clearLoginAttempts, checkAccountLock, recordFailedLoginAttempt } from '@src/services/loginLockout';
@@ -30,6 +31,10 @@ export async function checkEmailExists(req: Request, res: Response) {
     exists: false,
     message: 'Continue signup to complete verification.',
   });
+}
+
+export async function getLegalVersions(req: Request, res: Response) {
+  return res.status(HTTP_STATUS_CODES.Ok).json(CURRENT_LEGAL_VERSIONS);
 }
 
 export async function resetPassword(req: Request, res: Response) {
@@ -157,6 +162,15 @@ export async function recordLegalAcceptance(req: Request, res: Response) {
 
   const userAgent = req.header('user-agent') ?? null;
   const ipAddress = req.ip ?? null;
+
+  if (
+    terms_version !== CURRENT_LEGAL_VERSIONS.termsVersion ||
+    privacy_version !== CURRENT_LEGAL_VERSIONS.privacyVersion
+  ) {
+    logger.warn(
+      `[Legal] Non-current legal acceptance submitted terms=${terms_version} privacy=${privacy_version} currentTerms=${CURRENT_LEGAL_VERSIONS.termsVersion} currentPrivacy=${CURRENT_LEGAL_VERSIONS.privacyVersion}`
+    );
+  }
 
   const { error } = await supabaseAdmin.from('legal_acceptances').upsert(
     {

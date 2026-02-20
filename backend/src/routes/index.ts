@@ -14,6 +14,7 @@ import SupportSetupRoutes from './SupportSetupRoutes';
 import TwilioNumberPoolController from '@src/controllers/TwilioNumberPoolController';
 import { validateRequest } from '@src/middleware/validateRequest';
 import { assignNumberSchema } from '@src/middleware/validationSchemas';
+import { requireInternalOpsAccess } from '@src/middleware/internalOpsAuth';
 
 /******************************************************************************
                                 Setup
@@ -58,7 +59,7 @@ apiRouter.use(PATHS.Auth._, AuthRoutes);
 
 // Twilio number pool endpoints
 apiRouter.post('/profiles/:profileId/assign-number', assignNumberLimiter, validateRequest(assignNumberSchema), TwilioNumberPoolController.assignNumber);
-apiRouter.get('/admin/twilio-numbers/stats', TwilioNumberPoolController.getStats);
+apiRouter.get('/admin/twilio-numbers/stats', requireInternalOpsAccess, TwilioNumberPoolController.getStats);
 
 /******************************************************************************
                                 Export default

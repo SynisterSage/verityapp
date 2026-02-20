@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Linking,
   Modal,
@@ -18,15 +18,13 @@ import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { logEvent } from '../../services/sentry';
+import { FALLBACK_LEGAL_VERSIONS, fetchCurrentLegalVersions } from '../../services/legal';
 import { withOpacity } from '../../utils/color';
 
 type AlertState = {
   message: string;
   type: 'warning' | 'danger';
 };
-
-const TERMS_VERSION = '2026-02-20';
-const PRIVACY_VERSION = '2026-02-20';
 
 export default function SignUpScreen({ navigation }: { navigation: any }) {
   const { signUp, signInWithGoogle, signInWithApple } = useAuth();
@@ -44,6 +42,19 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [legalModalVisible, setLegalModalVisible] = useState(false);
   const [legalScrolledToEnd, setLegalScrolledToEnd] = useState(false);
+  const [legalVersions, setLegalVersions] = useState(FALLBACK_LEGAL_VERSIONS);
+
+  useEffect(() => {
+    let active = true;
+    fetchCurrentLegalVersions().then((versions) => {
+      if (active) {
+        setLegalVersions(versions);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const inputBorderColor = (field: 'email' | 'password' | 'confirm') =>
     focusField === field ? theme.colors.accent : theme.colors.border;
@@ -105,22 +116,19 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
     setIsSubmitting(true);
     logEvent('signup_attempt', { screen: 'SignUp' });
     const result = await signUp(email.trim(), password, {
-      termsVersion: TERMS_VERSION,
-      privacyVersion: PRIVACY_VERSION,
+      termsVersion: legalVersions.termsVersion,
+      privacyVersion: legalVersions.privacyVersion,
       acceptedAt: new Date().toISOString(),
       source: 'mobile_signup',
     });
     setIsSubmitting(false);
 
     if (result.error) {
-      // Check if it's an "account already exists" error
-      const isAccountExists = result.error.toLowerCase().includes('already exists');
-      
       setAlert({ message: result.error, type: 'danger' });
       logEvent('signup_failed', {
         level: 'warning',
         screen: 'SignUp',
-        extra: { reason: result.error, accountExists: isAccountExists },
+        extra: { reason: result.error },
       });
       return;
     }
@@ -382,17 +390,6 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
             >
               <Text style={[styles.loginErrorText, { color: alertColor }]}>
                 {alert.message}
-                {alert.message.toLowerCase().includes('already exists') && (
-                  <>
-                    {' '}
-                    <Text
-                      style={[styles.linkText, { color: alertColor, fontWeight: '700' }]}
-                      onPress={() => navigation.navigate('SignIn')}
-                    >
-                      Sign in instead
-                    </Text>
-                  </>
-                )}
               </Text>
             </View>
           ) : null}
@@ -455,12 +452,12 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
                 You can open the full legal documents below before accepting.
               </Text>
               <View style={styles.legalLinksGroup}>
-                <Pressable onPress={() => Linking.openURL('https://verityprotect.com/terms')}>
+                <Pressable onPress={() => Linking.openURL(legalVersions.termsUrl)}>
                   <Text style={[styles.linkText, styles.legalLinkText, { color: theme.colors.accent }]}>
                     Open Terms of Service
                   </Text>
                 </Pressable>
-                <Pressable onPress={() => Linking.openURL('https://verityprotect.com/privacy')}>
+                <Pressable onPress={() => Linking.openURL(legalVersions.privacyUrl)}>
                   <Text style={[styles.linkText, styles.legalLinkText, { color: theme.colors.accent }]}>
                     Open Privacy Policy
                   </Text>

@@ -78,15 +78,37 @@ async function assignNumber(req: Request, res: Response) {
  * GET /admin/twilio-numbers/stats
  */
 async function getStats(req: Request, res: Response) {
-  // TODO: Add proper admin auth check when admin system is built
-  // For now, just return stats for any authenticated user
-  
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
   }
 
   try {
+    const [{ count: caretakerCount, error: caretakerError }, { count: adminCount, error: adminError }] =
+      await Promise.all([
+        supabaseAdmin
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('caretaker_id', userId),
+        supabaseAdmin
+          .from('profile_members')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .eq('role', 'admin'),
+      ]);
+
+    if (caretakerError || adminError) {
+      logger.err(caretakerError ?? adminError);
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({
+        error: 'Failed to verify access',
+      });
+    }
+
+    const hasElevatedRole = (caretakerCount ?? 0) > 0 || (adminCount ?? 0) > 0;
+    if (!hasElevatedRole) {
+      return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+    }
+
     const stats = await getPoolStats();
 
     return res.status(HTTP_STATUS_CODES.Ok).json(stats);

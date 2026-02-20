@@ -121,7 +121,7 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
               { color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily },
             ]}
           >
-            Sign into your secure account.
+            Sign into your Verity account.
           </Text>
         </View>
 

@@ -21,6 +21,7 @@ import HTTP_STATUS_CODES, {
 } from '@src/common/constants/HTTP_STATUS_CODES';
 import { RouteError } from '@src/common/util/route-errors';
 import { NODE_ENVS } from '@src/common/constants';
+import { requireInternalOpsAccess } from '@src/middleware/internalOpsAuth';
 
 
 /******************************************************************************
@@ -38,16 +39,66 @@ app.set('trust proxy', 1);
 
 // **** Middleware **** //
 
-const corsOrigin = (process.env.CORS_ORIGIN ?? '')
+const PROD_DEFAULT_CORS_ORIGINS = [
+  'https://verityprotect.com',
+  'https://www.verityprotect.com',
+  'https://api.verityprotect.com',
+];
+
+const DEV_DEFAULT_CORS_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:8081',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:8081',
+  'exp://localhost:*',
+  'exp://127.0.0.1:*',
+];
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function originMatches(pattern: string, origin: string) {
+  if (pattern === '*') {
+    return true;
+  }
+  const regex = new RegExp(`^${escapeRegex(pattern).replace(/\\\*/g, '.*')}$`);
+  return regex.test(origin);
+}
+
+const configuredCorsOrigins = (process.env.CORS_ORIGIN ?? '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
+const defaultCorsOrigins =
+  ENV.NodeEnv === NODE_ENVS.Production ? PROD_DEFAULT_CORS_ORIGINS : DEV_DEFAULT_CORS_ORIGINS;
+const allowedCorsOrigins =
+  configuredCorsOrigins.length > 0 ? configuredCorsOrigins : defaultCorsOrigins;
+
+if (configuredCorsOrigins.length === 0 && ENV.NodeEnv === NODE_ENVS.Production) {
+  logger.warn(
+    `[Security] CORS_ORIGIN not set in production. Falling back to strict defaults: ${allowedCorsOrigins.join(
+      ', '
+    )}`
+  );
+}
+
 const corsOptions: CorsOptions = {
   origin: (requestOrigin, cb) => {
-    if (!requestOrigin || corsOrigin.length === 0 || corsOrigin.includes(requestOrigin)) {
+    // Allow non-browser clients that do not send Origin.
+    if (!requestOrigin) {
       cb(null, true);
       return;
     }
+
+    const isAllowed = allowedCorsOrigins.some((originPattern) =>
+      originMatches(originPattern, requestOrigin)
+    );
+    if (isAllowed) {
+      cb(null, true);
+      return;
+    }
+
     cb(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
@@ -80,8 +131,12 @@ app.use(helmet());
 // Add APIs, must be after middleware
 app.use(Paths._, apiLimiter, BaseRouter);
 
-// Add Sentry test routes
-app.use('/sentry-test', sentryTestRoutes);
+// Add Sentry test routes only for non-production, unless explicitly re-enabled.
+const enableSentryTestRoutes =
+  ENV.NodeEnv !== NODE_ENVS.Production || process.env.ENABLE_SENTRY_TEST_ROUTES === 'true';
+if (enableSentryTestRoutes) {
+  app.use('/sentry-test', requireInternalOpsAccess, sentryTestRoutes);
+}
 
 // Add Sentry error handler (must be before other error handlers)
 app.use(sentryErrorHandler());

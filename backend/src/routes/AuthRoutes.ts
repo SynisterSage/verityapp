@@ -8,6 +8,7 @@ import {
   refreshToken,
   login,
   recordLegalAcceptance,
+  getLegalVersions,
 } from '@src/controllers/AuthController';
 import { validateRequest } from '@src/middleware/validateRequest';
 import {
@@ -34,12 +35,14 @@ router.get('/health', (req, res) => {
       'POST /refresh-token',
       'POST /reset-password',
       'GET /check-email',
+      'GET /legal-versions',
       'POST /legal-acceptance',
     ],
   });
 });
 
 router.get('/check-email', checkEmailLimiter, validateRequest(checkEmailSchema), checkEmailExists);
+router.get('/legal-versions', getLegalVersions);
 router.post('/legal-acceptance', validateRequest(legalAcceptanceSchema), recordLegalAcceptance);
 router.post('/login', login);
 router.post(PATHS.Auth.ResetPassword, validateRequest(resetPasswordSchema), resetPassword);
