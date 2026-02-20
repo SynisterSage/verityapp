@@ -765,7 +765,7 @@ const loadMemberNames = useCallback(async () => {
         <Text style={[styles.circleViewAllText, { color: theme.colors.accent }]}>View all</Text>
         <Ionicons
           name="chevron-forward"
-          size={14}
+          size={12}
           color={theme.colors.accent}
           style={styles.circleViewAllIcon}
         />
@@ -1221,15 +1221,16 @@ const createAlertStyles = (theme: AppTheme) =>
       fontWeight: '600',
       letterSpacing: 0.4,
       textTransform: 'uppercase',
-      marginBottom: 8,
     },
     sectionHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      marginBottom: 8,
     },
     sectionHeaderRight: {
       marginLeft: 12,
+      alignSelf: 'flex-end',
     },
     sectionCards: {
       marginTop: 12,
@@ -1255,17 +1256,21 @@ const createAlertStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.bg,
     },
     circleViewAllButton: {
-      marginTop: 12,
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'baseline',
       justifyContent: 'center',
     },
     circleViewAllText: {
-      fontSize: 14,
+      fontSize: 12,
       fontWeight: '600',
+      letterSpacing: 0.4,
+      lineHeight: 14,
+      textTransform: 'uppercase',
+      includeFontPadding: false,
     },
     circleViewAllIcon: {
       marginLeft: 4,
+      marginBottom: 1,
     },
     emptyStateWrap: {
       marginTop: -60,

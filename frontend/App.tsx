@@ -121,14 +121,37 @@ const SUPPORT_PUSH_CHANNEL_ID = 'support-updates';
 const SUPPORT_PUSH_SOUND = 'support-notification.wav';
 
 function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'] {
-  if (
-    value === 'call_detail' ||
-    value === 'calls_trusted' ||
-    value === 'circle_activity' ||
-    value === 'alerts' ||
-    value === 'support_portal'
-  ) {
-    return value;
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!normalized) {
+    return undefined;
+  }
+  if (normalized === 'call_detail' || normalized === 'calldetail') {
+    return 'call_detail';
+  }
+  if (normalized === 'calls_trusted' || normalized === 'callstrusted') {
+    return 'calls_trusted';
+  }
+  if (normalized === 'circle_activity' || normalized === 'circleactivity') {
+    return 'circle_activity';
+  }
+  if (normalized === 'alerts' || normalized === 'alert') {
+    return 'alerts';
+  }
+  if (normalized === 'support_portal' || normalized === 'supportportal') {
+    return 'support_portal';
+  }
+  return undefined;
+}
+
+function readDataString(
+  data: Record<string, unknown>,
+  ...keys: string[]
+): string | undefined {
+  for (const key of keys) {
+    const value = data[key];
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
   }
   return undefined;
 }
@@ -639,10 +662,10 @@ function NavigationHost() {
         }
         const data = response.notification.request.content.data as Record<string, unknown>;
         pendingNotificationRef.current = {
-          callId: typeof data.callId === 'string' ? data.callId : undefined,
-          alertId: typeof data.alertId === 'string' ? data.alertId : undefined,
-          routeTarget: parseRouteTarget(data.routeTarget),
-          alertType: typeof data.alertType === 'string' ? data.alertType : undefined,
+          callId: readDataString(data, 'callId', 'call_id'),
+          alertId: readDataString(data, 'alertId', 'alert_id'),
+          routeTarget: parseRouteTarget(readDataString(data, 'routeTarget', 'route_target')),
+          alertType: readDataString(data, 'alertType', 'alert_type'),
         };
         resolvePendingNotification();
       })
@@ -654,10 +677,10 @@ function NavigationHost() {
       (response) => {
         const data = response.notification.request.content.data as Record<string, unknown>;
         const payload: PendingNotificationData = {
-          callId: typeof data.callId === 'string' ? data.callId : undefined,
-          alertId: typeof data.alertId === 'string' ? data.alertId : undefined,
-          routeTarget: parseRouteTarget(data.routeTarget),
-          alertType: typeof data.alertType === 'string' ? data.alertType : undefined,
+          callId: readDataString(data, 'callId', 'call_id'),
+          alertId: readDataString(data, 'alertId', 'alert_id'),
+          routeTarget: parseRouteTarget(readDataString(data, 'routeTarget', 'route_target')),
+          alertType: readDataString(data, 'alertType', 'alert_type'),
         };
         if (!payload.callId && !payload.alertId && !payload.routeTarget && !payload.alertType) {
           return;

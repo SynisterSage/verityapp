@@ -472,7 +472,7 @@ async function sendReply(ticketRef: string, message: string) {
 
   if (result.scope === 'profile') {
     await notifyProfileForSupportReply(result.profileId, {
-      title: 'Support replied',
+      title: 'Support Replied',
       body: 'A live support agent sent a new message.',
       ticketId: result.ticketId,
       messageId: insertedId ?? undefined,
@@ -536,7 +536,7 @@ async function closeTicket(ticketRef: string, note?: string) {
 
   if (result.scope === 'profile') {
     await notifyProfileForSupportReply(result.profileId, {
-      title: 'Support replied',
+      title: 'Support Replied',
       body: 'A live support agent sent a new message.',
       ticketId: result.ticketId,
       messageId: insertedId ?? undefined,

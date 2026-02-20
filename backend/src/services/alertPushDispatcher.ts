@@ -38,15 +38,30 @@ function coerceString(value: unknown) {
   return value.trim();
 }
 
-function buildPushRoute(alertType: string): PushRouteTarget {
-  if (alertType === 'fraud') return 'call_detail';
+function normalizeAlertType(value: unknown) {
+  return coerceString(value).toLowerCase();
+}
+
+function normalizePushSentence(value: unknown, fallback: string) {
+  const normalized = coerceString(value).replace(/\s+/g, ' ').trim();
+  if (!normalized) {
+    return fallback;
+  }
+  const compact = normalized.slice(0, 120).trim();
+  return compact.endsWith('.') || compact.endsWith('!') || compact.endsWith('?')
+    ? compact
+    : `${compact}.`;
+}
+
+function buildPushRoute(alertType: string, callId?: string | null): PushRouteTarget {
   if (alertType === 'trusted') return 'calls_trusted';
   if (CIRCLE_ALERT_TYPES.has(alertType)) return 'circle_activity';
+  if (callId) return 'call_detail';
   return 'alerts';
 }
 
 function buildPushContent(alert: AlertLike) {
-  const alertType = coerceString(alert.alert_type).toLowerCase();
+  const alertType = normalizeAlertType(alert.alert_type);
   const payload = (alert.payload ?? {}) as Record<string, unknown>;
 
   if (alertType === 'fraud') {
@@ -57,12 +72,16 @@ function buildPushContent(alert: AlertLike) {
         : typeof scoreRaw === 'string'
         ? Number.parseInt(scoreRaw, 10)
         : null;
-    const riskLevel = coerceString(payload.riskLevel);
+    const riskLevel = normalizeAlertType(payload.riskLevel);
+    const isCritical = riskLevel === 'critical' || (typeof score === 'number' && score >= 85);
     return {
-      title: score ? `Urgent Safety Alert (${score}%)` : 'Urgent Safety Alert',
-      body: riskLevel
-        ? `We detected a possible ${riskLevel} risk call.`
-        : 'We detected a possible fraud call.',
+      title: isCritical ? 'Critical Call Alert' : 'Call Risk Alert',
+      body: normalizePushSentence(
+        payload.message,
+        isCritical
+          ? 'Possible scam detected. Review this call now.'
+          : 'Possible scam detected. Review this call.'
+      ),
     };
   }
 
@@ -70,28 +89,39 @@ function buildPushContent(alert: AlertLike) {
     const contactName = coerceString(payload.contactName);
     const callerNumber = coerceString(payload.callerNumber);
     return {
-      title: 'Trusted Caller Connected',
-      body: contactName || callerNumber || 'A trusted caller reached this profile.',
+      title: 'Trusted Call Connected',
+      body: normalizePushSentence(
+        payload.message,
+        contactName || callerNumber
+          ? `${contactName || callerNumber} was marked trusted`
+          : 'A trusted caller reached this profile'
+      ),
     };
   }
 
   if (alertType === 'pin_change') {
     return {
-      title: 'Safety PIN Updated',
-      body: coerceString(payload.message) || 'Someone in your circle updated the Safety PIN.',
+      title: 'Safety Pin Updated',
+      body: normalizePushSentence(
+        payload.message,
+        'Someone in your circle updated the safety pin'
+      ),
     };
   }
 
   if (CIRCLE_ALERT_TYPES.has(alertType)) {
     return {
       title: 'Circle Activity Update',
-      body: coerceString(payload.message) || 'There is a new update in your circle.',
+      body: normalizePushSentence(payload.message, 'There is a new update in your circle'),
     };
   }
 
   return {
-    title: 'New Alert',
-    body: coerceString(payload.message) || 'Open Verity Protect to review this alert.',
+    title: 'New Alert Available',
+    body: normalizePushSentence(
+      payload.message,
+      'Open Verity Protect to review this alert'
+    ),
   };
 }
 
@@ -126,12 +156,13 @@ export async function dispatchAlertPush(alert: AlertLike) {
     return;
   }
 
-  const routeTarget = buildPushRoute(alert.alert_type);
-  const content = buildPushContent(alert);
+  const normalizedAlertType = normalizeAlertType(alert.alert_type);
   const callId = alert.call_id ?? undefined;
+  const routeTarget = buildPushRoute(normalizedAlertType, callId);
+  const content = buildPushContent(alert);
 
   logger.info(
-    `[push-dispatch] send start profile=${alert.profile_id} alert=${alert.id} type=${alert.alert_type} route=${routeTarget}`
+    `[push-dispatch] send start profile=${alert.profile_id} alert=${alert.id} type=${normalizedAlertType} route=${routeTarget}`
   );
 
   try {
@@ -141,7 +172,7 @@ export async function dispatchAlertPush(alert: AlertLike) {
       title: content.title,
       body: content.body,
       data: {
-        alertType: alert.alert_type,
+        alertType: normalizedAlertType,
         routeTarget,
         ...(callId ? { callId } : {}),
       },

@@ -180,6 +180,5 @@ const styles = StyleSheet.create({
   },
   footerIcon: {
     marginLeft: 6,
-    opacity: 0.3,
   },
 });

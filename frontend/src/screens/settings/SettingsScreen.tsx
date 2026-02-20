@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     marginTop: 0,
   },
   footerText: {
-    marginTop: 32,
+    marginTop: 14,
     textAlign: 'center',
     letterSpacing: 0.3,
     fontSize: 12,
