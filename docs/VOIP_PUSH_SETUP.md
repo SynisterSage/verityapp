@@ -36,9 +36,9 @@ Incoming Call Flow:
 - VoIP push certificates are different from regular push certificates
 
 ### 2. APNs Auth Key (.p8 file)
-You already have the auth key file: `/AuthKey_FVZBR5687U.p8`
+You already have the auth key file: `/AuthKey_<YOUR_APNS_KEY_ID>.p8`
 
-**Key ID:** `FVZBR5687U` (already known)
+**Key ID:** `YOUR_APNS_KEY_ID` (already known)
 
 **Find your Team ID:**
 1. Go to [Apple Developer - Membership](https://developer.apple.com/account/#/membership/)
@@ -61,8 +61,8 @@ Add these to `/Users/lex/Desktop/safecall/backend/config/.env`:
 
 ```bash
 # APNs VoIP Push Configuration
-APNS_AUTH_KEY_PATH=/Users/lex/Desktop/safecall/AuthKey_FVZBR5687U.p8
-APNS_AUTH_KEY_ID=FVZBR5687U
+APNS_AUTH_KEY_PATH=/absolute/path/to/AuthKey_<YOUR_APNS_KEY_ID>.p8
+APNS_AUTH_KEY_ID=YOUR_APNS_KEY_ID
 APNS_TEAM_ID=YOUR_TEAM_ID_HERE
 IOS_BUNDLE_IDENTIFIER=com.lexferguson.verityprotect.com
 APNS_PRODUCTION=false  # Set to 'true' for production builds

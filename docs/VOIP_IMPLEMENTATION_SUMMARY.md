@@ -94,7 +94,7 @@ I've implemented a complete PushKit VoIP push notification system to ensure inco
 
 ### 1. Get Apple Credentials (5 minutes)
 
-You already have the Key ID: **FVZBR5687U**
+You already have the Key ID: **YOUR_APNS_KEY_ID**
 
 Just get your Team ID:
 - **Team ID**: Go to https://developer.apple.com/account/#/membership/
@@ -106,8 +106,8 @@ Edit `/Users/lex/Desktop/safecall/backend/config/.env` and add:
 
 ```bash
 # APNs VoIP Push Configuration
-APNS_AUTH_KEY_PATH=/Users/lex/Desktop/safecall/AuthKey_FVZBR5687U.p8
-APNS_AUTH_KEY_ID=FVZBR5687U
+APNS_AUTH_KEY_PATH=/absolute/path/to/AuthKey_<YOUR_APNS_KEY_ID>.p8
+APNS_AUTH_KEY_ID=YOUR_APNS_KEY_ID
 APNS_TEAM_ID=YOUR_TEAM_ID_HERE
 IOS_BUNDLE_IDENTIFIER=com.lexferguson.verityprotect.com
 APNS_PRODUCTION=false

@@ -7,7 +7,7 @@ Follow these steps to complete the setup. Total time: ~15 minutes.
 1. Open https://developer.apple.com/account/#/membership/
 2. Copy your **Team ID** (10 characters)
 
-Your Key ID is: `FVZBR5687U` (from your existing auth key)
+Your Key ID is: `YOUR_APNS_KEY_ID` (from your existing auth key)
 
 ## ✅ Step 2: Configure Backend
 
@@ -15,8 +15,8 @@ Edit `/Users/lex/Desktop/safecall/backend/config/.env`:
 
 ```bash
 # Add these lines:
-APNS_AUTH_KEY_PATH=/Users/lex/Desktop/safecall/AuthKey_FVZBR5687U.p8
-APNS_AUTH_KEY_ID=FVZBR5687U
+APNS_AUTH_KEY_PATH=/absolute/path/to/AuthKey_<YOUR_APNS_KEY_ID>.p8
+APNS_AUTH_KEY_ID=YOUR_APNS_KEY_ID
 APNS_TEAM_ID=PASTE_YOUR_TEAM_ID_HERE
 IOS_BUNDLE_IDENTIFIER=com.lexferguson.verityprotect.com
 APNS_PRODUCTION=false
