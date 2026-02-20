@@ -21,7 +21,7 @@ import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
 
 import SettingsHeader from '../../components/common/SettingsHeader';
-import { deleteProfile, verifyPasscode } from '../../services/profile';
+import { deleteProfile } from '../../services/profile';
 import { authorizedFetch } from '../../services/backend';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
@@ -224,11 +224,11 @@ export default function AccountScreen() {
     }
   };
 
-  const runDeleteAccount = async () => {
+  const runDeleteAccount = async (pin: string) => {
     if (!activeProfile) return;
     setIsPinVerifying(true);
     try {
-      await deleteProfile(activeProfile.id);
+      await deleteProfile(activeProfile.id, pin);
       await refreshProfiles();
       await signOut();
     } catch (err: any) {
@@ -238,7 +238,7 @@ export default function AccountScreen() {
     }
   };
 
-  const promptDeleteAccount = () => {
+  const promptDeleteAccount = (pin: string) => {
     Alert.alert(
       'Delete profile?',
       'This will delete all calls, alerts, and settings for this profile.',
@@ -256,7 +256,7 @@ export default function AccountScreen() {
                 {
                   text: 'Delete profile',
                   style: 'destructive',
-                  onPress: runDeleteAccount,
+                  onPress: () => runDeleteAccount(pin),
                 },
               ]
             );
@@ -272,21 +272,9 @@ export default function AccountScreen() {
       setPinError('Enter your six-digit passcode.');
       return;
     }
-    setIsPinVerifying(true);
-    try {
-      await verifyPasscode(activeProfile.id, pinValue);
-      closePinModal();
-      promptDeleteAccount();
-    } catch (err: any) {
-      const raw = err?.message ?? 'Passcode not recognized';
-      const normalized =
-        /invalid/i.test(raw) || /incorrect/i.test(raw)
-          ? 'Passcode not recognized.'
-          : raw;
-      setPinError(normalized);
-    } finally {
-      setIsPinVerifying(false);
-    }
+    const pinToUse = pinValue;
+    closePinModal();
+    promptDeleteAccount(pinToUse);
   };
 
   const closePinModal = () => {

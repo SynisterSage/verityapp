@@ -99,7 +99,7 @@ export const SYSTEM_BASICS_CONTENT: ResourceSection[] = [
       'You control your data. Export your timeline or delete your account with a few taps inside Settings.',
     bullets: [
       'Export call logs, tickets, and automation history from Settings → Privacy.',
-      'Delete a profile from Settings → Account; we keep it for 30 days in case you change your mind.',
+      'Delete a profile from Settings → Account to remove active profile data and call history from the app.',
       'Need help? Ask through the portal so we can verify you before processing exports or deletions.',
     ],
   },
@@ -139,7 +139,7 @@ export const PRIVACY_CONTENT: ResourceSection[] = [
     id: 'privacy-retention',
     title: 'Data retention',
     body:
-      'Call logs, recordings, and alerts are deleted after 90 days unless you export them. Exported copies live only on your devices.',
+      'Call logs, recordings, and alerts remain available while your profile is active. You can clear history anytime from Settings.',
   },
   {
     id: 'privacy-rights',
@@ -148,7 +148,7 @@ export const PRIVACY_CONTENT: ResourceSection[] = [
       'Control exports, deletions, and privacy questions through Settings or support; everything is yours to manage.',
     bullets: [
       'Export your entire timeline from Settings → Privacy and keep a copy.',
-      'Delete your profile from Settings → Account; we hold it for 30 days to recover if needed.',
+      'Delete your profile from Settings → Account to remove active profile data from the app.',
       'Contact support for privacy questions, data portability requests, or legal notices.',
     ],
   },
@@ -220,7 +220,7 @@ export const FAQ_CONTENT: ResourceSection[] = [
     id: 'faq-account',
     title: 'Can I export or delete my data?',
     body:
-      'Yes. Export your timeline from Settings → Privacy, and delete your profile from Settings → Account. We keep deleted profiles for 30 days in case you change your mind.',
+      'Yes. Export your timeline from Settings → Privacy, and delete your profile from Settings → Account to remove active profile data and history.',
   },
   {
     id: 'faq-app-store',

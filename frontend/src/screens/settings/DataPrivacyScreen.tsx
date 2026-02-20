@@ -12,6 +12,7 @@ import {
   View,
   Pressable,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -29,7 +30,7 @@ import {
   clearProfileRecords,
   deleteProfile,
   exportProfileData,
-  verifyPasscode,
+  updateContactsPermission,
 } from '../../services/profile';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../../context/ThemeContext';
@@ -74,7 +75,7 @@ const POLICY_SECTIONS = [
   {
     title: 'Data retention',
     body:
-      'Call logs, recordings, and alerts are kept for 90 days, then deleted automatically. You can export your data or clear records anytime, and account deletion purges remaining data.',
+      'Call logs, recordings, and alerts stay available while your profile is active. You can clear records anytime, and deleting a profile removes remaining active data.',
   },
   {
     title: 'Third-party partners',
@@ -204,14 +205,34 @@ export default function DataPrivacyScreen() {
     };
   }, []);
 
-  const togglePermission = (name: string) => {
-    setPermissions((prev) => {
-      const nextValue = !prev[name];
-      if (name === 'Contacts') {
-        setContactsPermissionEnabled(nextValue);
-      }
-      return { ...prev, [name]: nextValue };
-    });
+  const togglePermission = async (name: string) => {
+    const nextValue = !permissions[name];
+    setPermissions((prev) => ({ ...prev, [name]: nextValue }));
+
+    if (name !== 'Contacts') {
+      return;
+    }
+
+    await setContactsPermissionEnabled(nextValue);
+    if (nextValue || !activeProfile?.id) {
+      return;
+    }
+
+    try {
+      await AsyncStorage.removeItem(`trusted_contacts_map:${activeProfile.id}`);
+    } catch (error) {
+      console.warn('Failed to clear local contact map', error);
+    }
+
+    if (!canManageProfile) {
+      return;
+    }
+
+    try {
+      await updateContactsPermission(activeProfile.id, false);
+    } catch (err: any) {
+      setManageError(err?.message || 'Failed to remove stored contact names.');
+    }
   };
 
   const { activeProfile, canManageProfile, canDeleteProfile, refreshProfiles } = useProfile();
@@ -228,9 +249,8 @@ export default function DataPrivacyScreen() {
   const [pinModalAction, setPinModalAction] = useState<ManageActionKey | null>(null);
   const [pinValue, setPinValue] = useState('');
   const [pinError, setPinError] = useState('');
-  const [isPinVerifying, setIsPinVerifying] = useState(false);
 
-  const handleExportData = async () => {
+  const handleExportData = async (pin: string) => {
     if (!activeProfile) return;
     if (!FileSystem.documentDirectory) {
       setManageError('Unable to access file storage on this device.');
@@ -239,7 +259,7 @@ export default function DataPrivacyScreen() {
     setManageAction('export');
     setManageError('');
     try {
-      const payload = await exportProfileData(activeProfile.id);
+      const payload = await exportProfileData(activeProfile.id, pin);
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const filename = `verity-data-export-${timestamp}.json`;
       const uri = `${FileSystem.documentDirectory}${filename}`;
@@ -268,12 +288,12 @@ export default function DataPrivacyScreen() {
     }
   };
 
-  const handleClearRecords = async () => {
+  const handleClearRecords = async (pin: string) => {
     if (!activeProfile) return;
     setManageAction('clear');
     setManageError('');
     try {
-      await clearProfileRecords(activeProfile.id);
+      await clearProfileRecords(activeProfile.id, pin);
       Alert.alert('Records cleared', 'Call and alert history has been removed.');
     } catch (err: any) {
       setManageError(err?.message || 'Failed to clear records.');
@@ -282,12 +302,12 @@ export default function DataPrivacyScreen() {
     }
   };
 
-  const runDeleteAccount = async () => {
+  const runDeleteAccount = async (pin: string) => {
     if (!activeProfile) return;
     setManageAction('delete');
     setManageError('');
     try {
-      await deleteProfile(activeProfile.id);
+      await deleteProfile(activeProfile.id, pin);
       await refreshProfiles();
       await signOut();
     } catch (err: any) {
@@ -297,18 +317,18 @@ export default function DataPrivacyScreen() {
     }
   };
 
-  const promptClearRecords = () => {
+  const promptClearRecords = (pin: string) => {
     Alert.alert(
       'Clear records?',
       'This removes call & alert history but keeps your profile intact.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Clear records', style: 'destructive', onPress: handleClearRecords },
+        { text: 'Clear records', style: 'destructive', onPress: () => handleClearRecords(pin) },
       ]
     );
   };
 
-  const promptDeleteAccount = () => {
+  const promptDeleteAccount = (pin: string) => {
     Alert.alert(
       'Delete profile?',
       'This will delete all calls, alerts, and settings for this profile.',
@@ -326,7 +346,7 @@ export default function DataPrivacyScreen() {
                 {
                   text: 'Delete profile',
                   style: 'destructive',
-                  onPress: runDeleteAccount,
+                  onPress: () => runDeleteAccount(pin),
                 },
               ]
             );
@@ -342,16 +362,16 @@ export default function DataPrivacyScreen() {
     setPinError('');
   };
 
-  const runActionAfterPin = (key: ManageActionKey) => {
+  const runActionAfterPin = (key: ManageActionKey, pin: string) => {
     switch (key) {
       case 'export':
-        handleExportData();
+        handleExportData(pin);
         break;
       case 'clear':
-        promptClearRecords();
+        promptClearRecords(pin);
         break;
       case 'delete':
-        promptDeleteAccount();
+        promptDeleteAccount(pin);
         break;
     }
   };
@@ -364,22 +384,10 @@ export default function DataPrivacyScreen() {
       setPinError('Enter your 6-digit passcode.');
       return;
     }
-    setIsPinVerifying(true);
-    try {
-      await verifyPasscode(activeProfile.id, pinValue);
-      const actionToRun = pinModalAction;
-      closePinModal();
-      runActionAfterPin(actionToRun);
-    } catch (err: any) {
-      const raw = err?.message ?? 'Passcode not recognized';
-      const normalized =
-        /invalid/i.test(raw) || /incorrect/i.test(raw)
-          ? 'Passcode not recognized.'
-          : raw;
-      setPinError(normalized);
-    } finally {
-      setIsPinVerifying(false);
-    }
+    const actionToRun = pinModalAction;
+    const pinToUse = pinValue;
+    closePinModal();
+    runActionAfterPin(actionToRun, pinToUse);
   };
 
   const handleManageAction = (key: ManageActionKey) => {
@@ -559,7 +567,7 @@ export default function DataPrivacyScreen() {
             </View>
             {linkError ? <Text style={[styles.manageMessage]}>{linkError}</Text> : null}
           </View>
-          <Text style={styles.footnote}>By using Verity Protect, you acknowledge our privacy and data processing terms. {"\n"} {"\n"}  Last Updated Feb 6th, 2026</Text>
+          <Text style={styles.footnote}>By using Verity Protect, you acknowledge our privacy and data processing terms. {"\n"} {"\n"}  Last Updated Feb 20th, 2026</Text>
         </ScrollView>
         {pinModalAction ? (
           <Modal
@@ -600,18 +608,12 @@ export default function DataPrivacyScreen() {
                     style={[
                       styles.modalButton,
                       styles.modalButtonPrimary,
-                      isPinVerifying && styles.modalButtonDisabled,
                     ]}
                     onPress={handlePinSubmit}
-                    disabled={isPinVerifying}
                   >
-                    {isPinVerifying ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text style={[styles.modalButtonLabel, styles.modalButtonLabelPrimary]}>
-                        Confirm
-                      </Text>
-                    )}
+                    <Text style={[styles.modalButtonLabel, styles.modalButtonLabelPrimary]}>
+                      Confirm
+                    </Text>
                   </Pressable>
                 </View>
               </View>

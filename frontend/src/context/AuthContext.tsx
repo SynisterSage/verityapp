@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { Linking } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { Session } from '@supabase/supabase-js';
 
@@ -12,11 +13,25 @@ export type SignUpResult = {
   needsConfirmation?: boolean;
 };
 
+export type LegalAcceptancePayload = {
+  termsVersion: string;
+  privacyVersion: string;
+  acceptedAt: string;
+  source?: string;
+  metadata?: Record<string, unknown>;
+};
+
+const PENDING_LEGAL_ACCEPTANCE_KEY = 'auth:pending-legal-acceptance';
+
 type AuthContextValue = {
   session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
-  signUp: (email: string, password: string) => Promise<SignUpResult>;
+  signUp: (
+    email: string,
+    password: string,
+    legalAcceptance?: LegalAcceptancePayload
+  ) => Promise<SignUpResult>;
   sendPasswordReset: (email: string) => Promise<string | null>;
   signInWithGoogle: () => Promise<string | null>;
   signInWithApple: () => Promise<string | null>;
@@ -31,6 +46,89 @@ WebBrowser.maybeCompleteAuthSession();
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const recordLegalAcceptance = async (
+    accessToken: string,
+    payload: LegalAcceptancePayload
+  ) => {
+    const baseUrl =
+      process.env.EXPO_PUBLIC_API_URL ?? process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+    if (!baseUrl) {
+      return;
+    }
+
+    const response = await fetch(`${baseUrl}/auth/legal-acceptance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        terms_version: payload.termsVersion,
+        privacy_version: payload.privacyVersion,
+        accepted_at: payload.acceptedAt,
+        source: payload.source ?? 'mobile_signup',
+        metadata: payload.metadata ?? {},
+      }),
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      const message =
+        (typeof body?.error === 'string' && body.error) ||
+        `legal acceptance request failed (${response.status})`;
+      throw new Error(message);
+    }
+  };
+
+  const cachePendingLegalAcceptance = async (
+    userId: string,
+    payload: LegalAcceptancePayload
+  ) => {
+    try {
+      await AsyncStorage.setItem(
+        PENDING_LEGAL_ACCEPTANCE_KEY,
+        JSON.stringify({
+          userId,
+          ...payload,
+        })
+      );
+    } catch (error) {
+      console.warn('Failed to cache pending legal acceptance', error);
+    }
+  };
+
+  const flushPendingLegalAcceptance = async (activeSession: Session) => {
+    try {
+      const raw = await AsyncStorage.getItem(PENDING_LEGAL_ACCEPTANCE_KEY);
+      if (!raw) {
+        return;
+      }
+
+      const pending = JSON.parse(raw) as
+        | (LegalAcceptancePayload & { userId?: string })
+        | null;
+      if (!pending) {
+        return;
+      }
+
+      const pendingUserId = pending.userId;
+      if (pendingUserId && pendingUserId !== activeSession.user.id) {
+        return;
+      }
+
+      await recordLegalAcceptance(activeSession.access_token, {
+        termsVersion: pending.termsVersion,
+        privacyVersion: pending.privacyVersion,
+        acceptedAt: pending.acceptedAt,
+        source: pending.source,
+        metadata: pending.metadata,
+      });
+      await AsyncStorage.removeItem(PENDING_LEGAL_ACCEPTANCE_KEY);
+    } catch (error) {
+      console.warn('Failed to flush legal acceptance', error);
+    }
+  };
 
   const handleOAuthRedirect = async (url: string) => {
     if (!url) return;
@@ -105,6 +203,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.remove();
   }, []);
 
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    flushPendingLegalAcceptance(session);
+  }, [session]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
@@ -113,7 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         return error ? error.message : null;
       },
-      signUp: async (email, password) => {
+      signUp: async (email, password, legalAcceptance) => {
         const { data, error } = await supabase.auth.signUp({ email, password });
         
         // Check if user already exists (Supabase returns success but no session/user when email is taken)
@@ -122,6 +227,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             error: 'An account with this email already exists. Please sign in instead.',
             needsConfirmation: false,
           };
+        }
+
+        if (!error && legalAcceptance && data?.user?.id) {
+          try {
+            if (data.session?.access_token) {
+              await recordLegalAcceptance(data.session.access_token, legalAcceptance);
+            } else {
+              await cachePendingLegalAcceptance(data.user.id, legalAcceptance);
+            }
+          } catch (acceptanceError) {
+            console.warn('Failed to persist legal acceptance', acceptanceError);
+            if (!data.session?.access_token) {
+              await cachePendingLegalAcceptance(data.user.id, legalAcceptance);
+            }
+          }
         }
         
         return {

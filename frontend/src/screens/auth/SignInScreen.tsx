@@ -121,7 +121,7 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
               { color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily },
             ]}
           >
-            Sign in to your secure account.
+            Sign into your secure account.
           </Text>
         </View>
 

@@ -1,18 +1,46 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 
 import PATHS from '@src/common/constants/PATHS';
-import { resetPassword, checkEmailExists, refreshToken, login } from '@src/controllers/AuthController';
+import {
+  resetPassword,
+  checkEmailExists,
+  refreshToken,
+  login,
+  recordLegalAcceptance,
+} from '@src/controllers/AuthController';
 import { validateRequest } from '@src/middleware/validateRequest';
-import { resetPasswordSchema, checkEmailSchema } from '@src/middleware/validationSchemas';
+import {
+  resetPasswordSchema,
+  checkEmailSchema,
+  legalAcceptanceSchema,
+} from '@src/middleware/validationSchemas';
 
 const router = Router();
 
-// Health check for auth routes
-router.get('/health', (req, res) => {
-  res.json({ status: 'ok', routes: ['POST /login', 'POST /refresh-token', 'POST /reset-password', 'GET /check-email'] });
+const checkEmailLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
-router.get('/check-email', validateRequest(checkEmailSchema), checkEmailExists);
+// Health check for auth routes
+router.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    routes: [
+      'POST /login',
+      'POST /refresh-token',
+      'POST /reset-password',
+      'GET /check-email',
+      'POST /legal-acceptance',
+    ],
+  });
+});
+
+router.get('/check-email', checkEmailLimiter, validateRequest(checkEmailSchema), checkEmailExists);
+router.post('/legal-acceptance', validateRequest(legalAcceptanceSchema), recordLegalAcceptance);
 router.post('/login', login);
 router.post(PATHS.Auth.ResetPassword, validateRequest(resetPasswordSchema), resetPassword);
 router.post('/refresh-token', refreshToken);

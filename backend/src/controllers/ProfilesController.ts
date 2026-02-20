@@ -17,6 +17,7 @@ import {
 import { recordCircleAlert } from '@src/services/circleAlerts';
 import { sanitizeProfile, sanitizeProfiles, sanitizeErrorResponse } from '@src/middleware/dataSanitizer';
 import { releaseNumberFromProfile } from '@src/services/twilioNumberPool';
+import { deleteProfileRecordingPaths } from '@src/services/callRecordingStorage';
 
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];
@@ -401,13 +402,48 @@ async function verifyPasscode(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
-  const clientIp = req.ip;
-  const currentLockState = await getPinLockState(profileId, clientIp);
+  const passcodeResult = await validateProfilePasscode(profileId, pin, req.ip);
+  if (!passcodeResult.valid) {
+    return res.status(passcodeResult.status).json({
+      error: passcodeResult.error,
+      ...(passcodeResult.lockedUntil ? { lockedUntil: passcodeResult.lockedUntil } : {}),
+    });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ valid: true });
+}
+
+type PasscodeValidationResult =
+  | { valid: true }
+  | {
+      valid: false;
+      status: number;
+      error: string;
+      lockedUntil?: string | null;
+    };
+
+async function validateProfilePasscode(
+  profileId: string,
+  pin: string,
+  clientIp: string | undefined
+): Promise<PasscodeValidationResult> {
+  const clientAddress = clientIp ?? 'unknown';
+  if (!/^\d{6}$/.test(pin)) {
+    return {
+      valid: false,
+      status: HTTP_STATUS_CODES.BadRequest,
+      error: 'PIN must be 6 digits',
+    };
+  }
+
+  const currentLockState = await getPinLockState(profileId, clientAddress);
   if (currentLockState.locked) {
-    return res.status(HTTP_STATUS_CODES.TooManyRequests).json({
+    return {
+      valid: false,
+      status: HTTP_STATUS_CODES.TooManyRequests,
       error: 'Too many passcode attempts. Try again later.',
       lockedUntil: currentLockState.lockedUntil?.toISOString() ?? null,
-    });
+    };
   }
 
   const { data: profileRow, error } = await supabaseAdmin
@@ -416,7 +452,11 @@ async function verifyPasscode(req: Request, res: Response) {
     .eq('id', profileId)
     .maybeSingle();
   if (error || !profileRow) {
-    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to load profile' });
+    return {
+      valid: false,
+      status: HTTP_STATUS_CODES.BadRequest,
+      error: 'Failed to load profile',
+    };
   }
 
   const pepperVersion = profileRow.pin_pepper_version ?? CURRENT_PEPPER_VERSION;
@@ -425,20 +465,26 @@ async function verifyPasscode(req: Request, res: Response) {
       (await verifyCurrentPasscode(pin, profileRow.pin_hash, pepperVersion))) ||
     verifyLegacyPasscode(pin, profileRow.passcode_hash ?? null);
 
-  await recordPinAttempt(profileId, clientIp, isValidPin);
+  await recordPinAttempt(profileId, clientAddress, isValidPin);
 
   if (!isValidPin) {
-    const updatedLockState = await getPinLockState(profileId, clientIp);
+    const updatedLockState = await getPinLockState(profileId, clientAddress);
     if (updatedLockState.locked) {
-      return res.status(HTTP_STATUS_CODES.TooManyRequests).json({
+      return {
+        valid: false,
+        status: HTTP_STATUS_CODES.TooManyRequests,
         error: 'Too many passcode attempts. Try again later.',
         lockedUntil: updatedLockState.lockedUntil?.toISOString() ?? null,
-      });
+      };
     }
-    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Invalid passcode' });
+    return {
+      valid: false,
+      status: HTTP_STATUS_CODES.Unauthorized,
+      error: 'Invalid passcode',
+    };
   }
 
-  return res.status(HTTP_STATUS_CODES.Ok).json({ valid: true });
+  return { valid: true };
 }
 
 async function recordActivity(req: Request, res: Response) {
@@ -733,6 +779,52 @@ async function updateAlertPrefs(req: Request, res: Response) {
   });
 }
 
+async function updateContactsPermission(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { profileId } = req.params as { profileId: string };
+  if (!profileId) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId' });
+  }
+
+  const isCaretaker = await userIsCaretaker(userId, profileId);
+  const isAdmin = await userHasRole(userId, profileId, 'admin');
+  if (!isCaretaker && !isAdmin) {
+    return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
+  }
+
+  const { enabled } = req.body as { enabled?: boolean };
+  if (typeof enabled !== 'boolean') {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid permission payload' });
+  }
+
+  if (enabled) {
+    return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true, cleared_contact_names: 0 });
+  }
+
+  const { data: rows, error } = await supabaseAdmin
+    .from('trusted_contacts')
+    .update({ contact_name: null })
+    .eq('profile_id', profileId)
+    .eq('source', 'contacts')
+    .select('id');
+
+  if (error) {
+    logger.err(error);
+    return res
+      .status(HTTP_STATUS_CODES.InternalServerError)
+      .json({ error: 'Failed to clear contact names' });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({
+    ok: true,
+    cleared_contact_names: rows?.length ?? 0,
+  });
+}
+
 async function updateProfile(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
@@ -859,6 +951,15 @@ async function exportProfileData(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
+  const { pin } = ((req as any).validatedBody ?? req.body ?? {}) as { pin?: string };
+  const passcodeResult = await validateProfilePasscode(profileId, pin ?? '', req.ip);
+  if (!passcodeResult.valid) {
+    return res.status(passcodeResult.status).json({
+      error: passcodeResult.error,
+      ...(passcodeResult.lockedUntil ? { lockedUntil: passcodeResult.lockedUntil } : {}),
+    });
+  }
+
   const [
     { data: profileRow, error: profileError },
     { data: calls, error: callsError },
@@ -945,6 +1046,24 @@ async function clearProfileRecords(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
+  const { pin } = ((req as any).validatedBody ?? req.body ?? {}) as { pin?: string };
+  const passcodeResult = await validateProfilePasscode(profileId, pin ?? '', req.ip);
+  if (!passcodeResult.valid) {
+    return res.status(passcodeResult.status).json({
+      error: passcodeResult.error,
+      ...(passcodeResult.lockedUntil ? { lockedUntil: passcodeResult.lockedUntil } : {}),
+    });
+  }
+
+  const { data: callRows, error: callRowsError } = await supabaseAdmin
+    .from('calls')
+    .select('storage_path')
+    .eq('profile_id', profileId);
+  if (callRowsError) {
+    logger.err(callRowsError);
+  }
+  const recordingPaths = (callRows ?? []).map((row) => row.storage_path);
+
   const [{ error: callsError }, { error: alertsError }] = await Promise.all([
     supabaseAdmin.from('calls').delete().eq('profile_id', profileId),
     supabaseAdmin.from('alerts').delete().eq('profile_id', profileId),
@@ -972,6 +1091,8 @@ async function clearProfileRecords(req: Request, res: Response) {
     logger.err(alertError);
   }
 
+  await deleteProfileRecordingPaths(profileId, recordingPaths);
+
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
 }
 
@@ -992,6 +1113,24 @@ async function deleteProfile(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
+  const { pin } = ((req as any).validatedBody ?? req.body ?? {}) as { pin?: string };
+  const passcodeResult = await validateProfilePasscode(profileId, pin ?? '', req.ip);
+  if (!passcodeResult.valid) {
+    return res.status(passcodeResult.status).json({
+      error: passcodeResult.error,
+      ...(passcodeResult.lockedUntil ? { lockedUntil: passcodeResult.lockedUntil } : {}),
+    });
+  }
+
+  const { data: callRows, error: callRowsError } = await supabaseAdmin
+    .from('calls')
+    .select('storage_path')
+    .eq('profile_id', profileId);
+  if (callRowsError) {
+    logger.err(callRowsError);
+  }
+  const recordingPaths = (callRows ?? []).map((row) => row.storage_path);
+
   // Ensure assigned Twilio number is returned to pool with correct availability metadata.
   const released = await releaseNumberFromProfile(profileId);
   if (!released) {
@@ -1007,6 +1146,8 @@ async function deleteProfile(req: Request, res: Response) {
     logger.err(error);
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to delete profile' });
   }
+
+  await deleteProfileRecordingPaths(profileId, recordingPaths);
 
   // If user no longer owns or belongs to any profile, remove auth account as well.
   const [{ count: ownedCount }, { count: memberCount }] = await Promise.all([
@@ -1272,6 +1413,7 @@ export default {
   verifyPasscode,
   recordActivity,
   updateAlertPrefs,
+  updateContactsPermission,
   updateProfile,
   getProfile,
   exportProfileData,

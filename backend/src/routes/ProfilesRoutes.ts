@@ -14,6 +14,7 @@ import {
   verifyPasscodeSchema,
   recordActivitySchema,
   updateAlertPrefsSchema,
+  updateContactsPermissionSchema,
   inviteMemberSchema,
   acceptInviteSchema,
   changeMemberRoleSchema,
@@ -22,6 +23,7 @@ import {
   recordClientHeartbeatSchema,
   recordClientCallLifecycleSchema,
   updateVoIPTokenSchema,
+  sensitiveActionPasscodeSchema,
 } from '@src/middleware/validationSchemas';
 
 const router = Router();
@@ -30,13 +32,30 @@ router.get(PATHS.Profiles.Get, ProfilesController.listProfiles);
 router.get(PATHS.Profiles.Update, ProfilesController.getProfile);
 router.post(PATHS.Profiles.Create, validateRequest(createProfileSchema), ProfilesController.createProfile);
 router.patch(PATHS.Profiles.Update, validateRequest(updateProfileSchema), ProfilesController.updateProfile);
-router.post(PATHS.Profiles.Export, ProfilesController.exportProfileData);
-router.delete(PATHS.Profiles.Records, ProfilesController.clearProfileRecords);
-router.delete(PATHS.Profiles.Delete, ProfilesController.deleteProfile);
+router.post(
+  PATHS.Profiles.Export,
+  validateRequest(sensitiveActionPasscodeSchema),
+  ProfilesController.exportProfileData
+);
+router.delete(
+  PATHS.Profiles.Records,
+  validateRequest(sensitiveActionPasscodeSchema),
+  ProfilesController.clearProfileRecords
+);
+router.delete(
+  PATHS.Profiles.Delete,
+  validateRequest(sensitiveActionPasscodeSchema),
+  ProfilesController.deleteProfile
+);
 router.post(PATHS.Profiles.PasscodeVerify, validateRequest(verifyPasscodeSchema), ProfilesController.verifyPasscode);
 router.post(PATHS.Profiles.Passcode, validateRequest(setPasscodeSchema), ProfilesController.setPasscode);
 router.post(PATHS.Profiles.Activity, validateRequest(recordActivitySchema), ProfilesController.recordActivity);
 router.patch(PATHS.Profiles.Alerts, validateRequest(updateAlertPrefsSchema), ProfilesController.updateAlertPrefs);
+router.patch(
+  PATHS.Profiles.ContactsPermission,
+  validateRequest(updateContactsPermissionSchema),
+  ProfilesController.updateContactsPermission
+);
 router.post(PATHS.Profiles.Invites, validateRequest(inviteMemberSchema), ProfilesController.inviteMember);
 router.get(PATHS.Profiles.Invites, ProfilesController.listInvites);
 router.delete(PATHS.Profiles.Invite, ProfilesController.revokeInvite);

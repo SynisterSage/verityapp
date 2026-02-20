@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **Effective Date:** February 6, 2026  
-**Last Updated:** February 6, 2026
+**Last Updated:** February 20, 2026
 
 ## Introduction
 
@@ -193,9 +193,9 @@ We may share information for other purposes with your explicit consent, which yo
 - We will notify you before deletion if your email is still valid
 
 **Deleted Profiles:**
-- Profile data deleted within 30 days of account deletion request
-- Backups purged within 90 days
-- Some anonymized analytics data may be retained longer
+- Active profile data is deleted from production systems after account deletion is confirmed
+- Backup copies are purged on a rolling schedule (up to 90 days)
+- Some de-identified analytics data may be retained longer
 
 **Legal Holds:**
 - Data subject to legal proceedings may be retained beyond normal periods
@@ -225,8 +225,8 @@ We may share information for other purposes with your explicit consent, which yo
 
 **Account Deletion Process:**
 1. Requires passcode verification
-2. All profile data deleted within 30 days
-3. Backups purged within 90 days
+2. Active profile data is removed from production systems after deletion is confirmed
+3. Backup copies are purged within 90 days
 4. Process is irreversible
 
 ### 5.3 Communication Preferences
@@ -368,6 +368,7 @@ We may update this Privacy Policy from time to time. Changes are effective when 
 - Continued use after changes constitutes acceptance
 
 **Version History:**
+- v1.1 - February 20, 2026: Clarified retention and deletion behavior
 - v1.0 - February 6, 2026: Initial policy
 
 ## 13. Do Not Track Signals

@@ -1,18 +1,32 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import {
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
 
 import { useTheme } from '../../context/ThemeContext';
-import { SignUpResult, useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { logEvent } from '../../services/sentry';
+import { withOpacity } from '../../utils/color';
 
 type AlertState = {
   message: string;
   type: 'warning' | 'danger';
 };
+
+const TERMS_VERSION = '2026-02-20';
+const PRIVACY_VERSION = '2026-02-20';
 
 export default function SignUpScreen({ navigation }: { navigation: any }) {
   const { signUp, signInWithGoogle, signInWithApple } = useAuth();
@@ -28,53 +42,8 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [acceptedLegal, setAcceptedLegal] = useState(false);
-  const [emailCheckLoading, setEmailCheckLoading] = useState(false);
-  const [emailExists, setEmailExists] = useState(false);
-  const emailCheckTimeout = useRef<NodeJS.Timeout | null>(null);
-
-  // Check if email exists in real-time
-  useEffect(() => {
-    if (!email || email.length < 5) {
-      setEmailExists(false);
-      return;
-    }
-
-    // Clear previous timeout
-    if (emailCheckTimeout.current) {
-      clearTimeout(emailCheckTimeout.current);
-    }
-
-    // Set new timeout for debounced check
-    setEmailCheckLoading(true);
-    emailCheckTimeout.current = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `${process.env.EXPO_PUBLIC_API_BASE_URL}/auth/check-email?email=${encodeURIComponent(email)}`,
-          {
-            method: 'GET',
-          }
-        );
-        const data = await response.json();
-        if (data.exists) {
-          setEmailExists(true);
-          logEvent('email_exists_detected', { screen: 'SignUp', extra: { email } });
-        } else {
-          setEmailExists(false);
-        }
-      } catch (err) {
-        console.warn('Email check failed', err);
-        setEmailExists(false);
-      } finally {
-        setEmailCheckLoading(false);
-      }
-    }, 800); // Wait 800ms after user stops typing
-
-    return () => {
-      if (emailCheckTimeout.current) {
-        clearTimeout(emailCheckTimeout.current);
-      }
-    };
-  }, [email]);
+  const [legalModalVisible, setLegalModalVisible] = useState(false);
+  const [legalScrolledToEnd, setLegalScrolledToEnd] = useState(false);
 
   const inputBorderColor = (field: 'email' | 'password' | 'confirm') =>
     focusField === field ? theme.colors.accent : theme.colors.border;
@@ -92,19 +61,6 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
 
   const handleSubmit = async () => {
     setAlert(null);
-
-    if (emailExists) {
-      setAlert({
-        message: 'An account with this email already exists. Please sign in instead.',
-        type: 'danger',
-      });
-      logEvent('signup_validation_failed', {
-        level: 'warning',
-        screen: 'SignUp',
-        extra: { reason: 'email_exists' },
-      });
-      return;
-    }
 
     if (!acceptedLegal) {
       setAlert({
@@ -148,7 +104,12 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
 
     setIsSubmitting(true);
     logEvent('signup_attempt', { screen: 'SignUp' });
-    const result = await signUp(email.trim(), password);
+    const result = await signUp(email.trim(), password, {
+      termsVersion: TERMS_VERSION,
+      privacyVersion: PRIVACY_VERSION,
+      acceptedAt: new Date().toISOString(),
+      source: 'mobile_signup',
+    });
     setIsSubmitting(false);
 
     if (result.error) {
@@ -215,6 +176,13 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const alertSpacing = alert ? 40 : 24;
   const scrollPaddingBottom = Math.max(insets.bottom, 32) + 80 + alertSpacing;
   const bottomBuffer = scrollPaddingBottom + 64;
+  const requiresLegalAcceptance = !acceptedLegal;
+  const canConfirmLegal = !requiresLegalAcceptance || legalScrolledToEnd;
+
+  const openLegalModal = () => {
+    setLegalScrolledToEnd(false);
+    setLegalModalVisible(true);
+  };
 
   return (
     <SafeAreaView
@@ -281,6 +249,15 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
                 placeholder="••••••••"
                 placeholderTextColor={theme.colors.textDim}
                 secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType="newPassword"
+                autoComplete="new-password"
+                passwordRules={
+                  Platform.OS === 'ios'
+                    ? 'minlength: 8; required: lower; required: upper; required: digit; required: special;'
+                    : undefined
+                }
                 style={[
                   styles.input,
                   {
@@ -312,6 +289,10 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
                 placeholder="••••••••"
                 placeholderTextColor={theme.colors.textDim}
                 secureTextEntry={!showConfirm}
+                autoCapitalize="none"
+                autoCorrect={false}
+                textContentType={Platform.OS === 'ios' ? 'password' : 'none'}
+                autoComplete={Platform.OS === 'ios' ? 'password' : 'off'}
                 style={[
                   styles.input,
                   {
@@ -357,55 +338,36 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         <View style={styles.checkboxRow}>
           <Pressable
             style={styles.checkbox}
-            onPress={() => setAcceptedLegal((prev) => !prev)}
+            onPress={openLegalModal}
           >
             <Ionicons
               name={acceptedLegal ? 'checkmark-circle' : 'ellipse-outline'}
               size={20}
               color={acceptedLegal ? theme.colors.accent : theme.colors.textDim}
             />
-            <Text style={[styles.checkboxText, { color: theme.colors.text }]}>
-              I agree to the{' '}
-              <Text
-                style={[styles.linkText, { color: theme.colors.accent }]}
-                onPress={() => Linking.openURL('https://verityprotect.com/terms')}
-              >
-                Terms of Service
-              </Text>{' '}
-              and{' '}
-              <Text
-                style={[styles.linkText, { color: theme.colors.accent }]}
-                onPress={() => Linking.openURL('https://verityprotect.com/privacy')}
-              >
-                Privacy Policy
-              </Text>
-            </Text>
+            <View style={styles.checkboxCopy}>
+              <View style={styles.checkboxInlineRow}>
+                <Text
+                  numberOfLines={1}
+                  style={[styles.checkboxInlineLabel, { color: theme.colors.text }]}
+                >
+                  {acceptedLegal ? 'Terms & Privacy accepted' : 'Terms & Privacy required'}
+                </Text>
+                <View
+                  style={[
+                    styles.checkboxInlineCta,
+                    { backgroundColor: withOpacity(theme.colors.accent, 0.14) },
+                  ]}
+                >
+                  <Text style={[styles.checkboxInlineCtaLabel, { color: theme.colors.accent }]}>
+                    {acceptedLegal ? 'Review' : 'Review & Accept'}
+                  </Text>
+                </View>
+              </View>
+            </View>
           </Pressable>
         </View>
         </View>
-
-          {emailExists && !alert ? (
-            <View
-              style={[
-                styles.loginError,
-                {
-                  borderColor: theme.colors.danger,
-                  backgroundColor: 'rgba(225, 29, 72, 0.08)',
-                  marginTop: 14,
-                },
-              ]}
-            >
-              <Text style={[styles.loginErrorText, { color: theme.colors.danger }]}>
-                An account with this email already exists.{' '}
-                <Text
-                  style={[styles.linkText, { color: theme.colors.danger, fontWeight: '700' }]}
-                  onPress={() => navigation.navigate('SignIn')}
-                >
-                  Sign in instead
-                </Text>
-              </Text>
-            </View>
-          ) : null}
 
           {alert ? (
             <View
@@ -436,6 +398,110 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
           ) : null}
         </View>
       </ScrollView>
+
+      <Modal
+        visible={legalModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLegalModalVisible(false)}
+      >
+        <View style={styles.legalModalOverlay}>
+          <Pressable style={styles.legalModalBackdrop} onPress={() => setLegalModalVisible(false)} />
+          <View
+            style={[
+              styles.legalModalCard,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+          >
+            <Text style={[styles.legalModalTitle, { color: theme.colors.text }]}>
+              Terms & Privacy
+            </Text>
+            <Text style={[styles.legalModalSubtitle, { color: theme.colors.textMuted }]}>
+              Scroll through this summary, then accept to continue.
+            </Text>
+            <ScrollView
+              style={[
+                styles.legalScroll,
+                { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt },
+              ]}
+              contentContainerStyle={styles.legalScrollContent}
+              showsVerticalScrollIndicator
+              onContentSizeChange={(_, contentHeight) => {
+                if (contentHeight <= 250) {
+                  setLegalScrolledToEnd(true);
+                }
+              }}
+              onScroll={({ nativeEvent }) => {
+                const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+                const nearBottom =
+                  layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
+                if (nearBottom && !legalScrolledToEnd) {
+                  setLegalScrolledToEnd(true);
+                }
+              }}
+              scrollEventThrottle={16}
+            >
+              <Text style={[styles.legalParagraph, { color: theme.colors.text }]}>
+                By creating an account, you agree to the Verity Protect Terms of Service and Privacy
+                Policy. These documents explain arbitration, acceptable use, billing, data handling,
+                retention, and your privacy rights.
+              </Text>
+              <Text style={[styles.legalParagraph, { color: theme.colors.text }]}>
+                Key points: your circle data is protected with role-based access, call records are
+                available while your profile is active unless you clear them, and deletion removes
+                active profile data from production systems.
+              </Text>
+              <Text style={[styles.legalParagraph, { color: theme.colors.text }]}>
+                You can open the full legal documents below before accepting.
+              </Text>
+              <View style={styles.legalLinksGroup}>
+                <Pressable onPress={() => Linking.openURL('https://verityprotect.com/terms')}>
+                  <Text style={[styles.linkText, styles.legalLinkText, { color: theme.colors.accent }]}>
+                    Open Terms of Service
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => Linking.openURL('https://verityprotect.com/privacy')}>
+                  <Text style={[styles.linkText, styles.legalLinkText, { color: theme.colors.accent }]}>
+                    Open Privacy Policy
+                  </Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+            <View style={styles.legalModalActions}>
+              <Pressable
+                style={[styles.legalActionButton, { borderColor: theme.colors.border }]}
+                onPress={() => setLegalModalVisible(false)}
+              >
+                <Text style={[styles.legalActionLabel, { color: theme.colors.textMuted }]}>
+                  Cancel
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.legalActionButton,
+                  styles.legalActionPrimary,
+                  {
+                    backgroundColor: canConfirmLegal
+                      ? theme.colors.accent
+                      : withOpacity(theme.colors.textMuted, 0.4),
+                  },
+                ]}
+                disabled={!canConfirmLegal}
+                onPress={() => {
+                  if (requiresLegalAcceptance) {
+                    setAcceptedLegal(true);
+                  }
+                  setLegalModalVisible(false);
+                }}
+              >
+                <Text style={styles.legalActionPrimaryLabel}>
+                  {requiresLegalAcceptance ? 'Accept' : 'Done'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <ActionFooter
         primaryLabel={isSubmitting ? 'Creating…' : 'Create Account'}
@@ -523,6 +589,7 @@ const styles = StyleSheet.create({
     height: 60,
     borderWidth: 1,
     borderRadius: 24,
+    overflow: 'hidden',
     paddingHorizontal: 20,
     fontSize: 16,
   },
@@ -580,15 +647,107 @@ const styles = StyleSheet.create({
   },
   checkbox: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 10,
   },
-  checkboxText: {
-    fontSize: 12,
+  checkboxCopy: {
+    flex: 1,
+  },
+  checkboxInlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  checkboxInlineLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
     letterSpacing: 0.2,
+    lineHeight: 18,
+  },
+  checkboxInlineCta: {
+    minHeight: 28,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxInlineCtaLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  legalModalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
+  legalModalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+  },
+  legalModalCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 16,
+    gap: 10,
+  },
+  legalModalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  legalModalSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  legalScroll: {
+    maxHeight: 260,
+    borderWidth: 1,
+    borderRadius: 14,
+  },
+  legalScrollContent: {
+    padding: 12,
+  },
+  legalParagraph: {
+    fontSize: 13,
     lineHeight: 20,
-    right: 1,
+    marginBottom: 10,
+  },
+  legalLinksGroup: {
+    gap: 12,
+    paddingTop: 2,
+    paddingBottom: 14,
+  },
+  legalLinkText: {
+    lineHeight: 20,
+  },
+  legalModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 8,
+  },
+  legalActionButton: {
+    minWidth: 92,
+    height: 40,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+  },
+  legalActionPrimary: {
+    borderWidth: 0,
+  },
+  legalActionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  legalActionPrimaryLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
   },
   linkText: {
     textDecorationLine: 'underline',

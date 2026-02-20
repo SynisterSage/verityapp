@@ -11,10 +11,8 @@ import logger from 'jet-logger';
 export function validateRequest(schema: ZodSchema) {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      // For GET/DELETE requests, validate query params; for POST/PUT/PATCH, validate body
-      const dataToValidate = req.method === 'GET' || req.method === 'DELETE'
-        ? req.query
-        : req.body ?? {};
+      // Validate query params for GET; validate body for all mutating methods.
+      const dataToValidate = req.method === 'GET' ? req.query : req.body ?? {};
       
       const validated = schema.parse(dataToValidate);
       

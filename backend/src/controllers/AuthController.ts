@@ -6,6 +6,7 @@ import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import supabaseAdmin from '@src/services/supabase';
 import { createRefreshToken, validateAndRotateRefreshToken } from '@src/services/refreshTokens';
 import { clearLoginAttempts, checkAccountLock, recordFailedLoginAttempt } from '@src/services/loginLockout';
+import { getAuthenticatedUserId } from '@src/common/util/auth';
 
 const SUPABASE_URL = process.env.SUPABASE_URL?.replace(/\/$/, '') ?? '';
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY ?? '';
@@ -23,30 +24,12 @@ export async function checkEmailExists(req: Request, res: Response) {
     });
   }
 
-  try {
-    // Query Supabase auth users to check if email exists
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers();
-    
-    if (error !== null && error !== undefined) {
-      logger.err(`checkEmailExists error: ${error.message}`);
-      return res.status(HTTP_STATUS_CODES.InternalServerError).json({
-        error: 'Unable to check email availability',
-      });
-    }
-
-    const emailLower = email.toLowerCase();
-    const exists = data.users.some((user) => user.email?.toLowerCase() === emailLower);
-    
-    return res.status(HTTP_STATUS_CODES.Ok).json({
-      email,
-      exists,
-    });
-  } catch (error) {
-    logger.err(`checkEmailExists error: ${error instanceof Error ? error.message : 'unknown error'}`);
-    return res.status(HTTP_STATUS_CODES.InternalServerError).json({
-      error: 'Unable to check email availability',
-    });
-  }
+  // Always return a generic response to avoid account enumeration.
+  return res.status(HTTP_STATUS_CODES.Ok).json({
+    email,
+    exists: false,
+    message: 'Continue signup to complete verification.',
+  });
 }
 
 export async function resetPassword(req: Request, res: Response) {
@@ -149,6 +132,58 @@ export async function refreshToken(req: Request, res: Response) {
   }
 }
 
+export async function recordLegalAcceptance(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({
+      error: 'Unauthorized',
+    });
+  }
+
+  const {
+    terms_version,
+    privacy_version,
+    accepted_at,
+    source,
+    metadata,
+  } = req.body ?? {};
+
+  const parsedAcceptedAt = accepted_at ? new Date(accepted_at) : new Date();
+  if (Number.isNaN(parsedAcceptedAt.getTime())) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({
+      error: 'accepted_at must be a valid ISO date',
+    });
+  }
+
+  const userAgent = req.header('user-agent') ?? null;
+  const ipAddress = req.ip ?? null;
+
+  const { error } = await supabaseAdmin.from('legal_acceptances').upsert(
+    {
+      user_id: userId,
+      terms_version,
+      privacy_version,
+      accepted_at: parsedAcceptedAt.toISOString(),
+      source: source ?? 'mobile_signup',
+      metadata: metadata ?? {},
+      user_agent: userAgent ? userAgent.slice(0, 512) : null,
+      ip_address: ipAddress,
+    },
+    {
+      onConflict: 'user_id,terms_version,privacy_version',
+    }
+  );
+
+  if (error) {
+    logger.err(`recordLegalAcceptance error: ${error.message}`);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({
+      error: 'Unable to record legal acceptance',
+    });
+  }
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
+}
+
 export async function login(req: Request, res: Response) {
   const { email, password } = req.body ?? {};
 
@@ -224,4 +259,4 @@ export async function login(req: Request, res: Response) {
   }
 }
 
-export default { resetPassword, checkEmailExists, refreshToken, login };
+export default { resetPassword, checkEmailExists, refreshToken, login, recordLegalAcceptance };

@@ -15,6 +15,16 @@ export const checkEmailSchema = z.object({
   email: z.string().email('Invalid email format'),
 });
 
+export const legalAcceptanceSchema = z
+  .object({
+    terms_version: z.string().min(1).max(64),
+    privacy_version: z.string().min(1).max(64),
+    accepted_at: z.string().datetime().optional(),
+    source: z.string().min(1).max(64).optional(),
+    metadata: z.record(z.string(), z.any()).optional(),
+  })
+  .strict();
+
 // Profile Schemas
 export const createProfileSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100, 'First name too long'),
@@ -49,8 +59,14 @@ export const setPasscodeSchema = z.object({
 });
 
 export const verifyPasscodeSchema = z.object({
-  pin: z.string().min(1, 'PIN is required'),
+  pin: z.string().regex(/^\d{6}$/, 'PIN must be 6 digits'),
 });
+
+export const sensitiveActionPasscodeSchema = z
+  .object({
+    pin: z.string().regex(/^\d{6}$/, 'PIN must be 6 digits'),
+  })
+  .strict();
 
 export const recordActivitySchema = z.object({
   alertType: z.enum([
@@ -86,6 +102,12 @@ export const updateAlertPrefsSchema = z.object({
   auto_trust_on_safe: z.boolean().optional(),
   auto_block_on_fraud: z.boolean().optional(),
 }).strict();
+
+export const updateContactsPermissionSchema = z
+  .object({
+    enabled: z.boolean(),
+  })
+  .strict();
 
 export const inviteMemberSchema = z.object({
   email: z.string().email('Invalid email format').optional(),
@@ -176,12 +198,15 @@ export const createSupportBugReportSchema = z
 
 // Type exports for use in controllers
 export type ResetPasswordRequest = z.infer<typeof resetPasswordSchema>;
+export type LegalAcceptanceRequest = z.infer<typeof legalAcceptanceSchema>;
 export type CreateProfileRequest = z.infer<typeof createProfileSchema>;
 export type UpdateProfileRequest = z.infer<typeof updateProfileSchema>;
 export type SetPasscodeRequest = z.infer<typeof setPasscodeSchema>;
 export type VerifyPasscodeRequest = z.infer<typeof verifyPasscodeSchema>;
+export type SensitiveActionPasscodeRequest = z.infer<typeof sensitiveActionPasscodeSchema>;
 export type RecordActivityRequest = z.infer<typeof recordActivitySchema>;
 export type UpdateAlertPrefsRequest = z.infer<typeof updateAlertPrefsSchema>;
+export type UpdateContactsPermissionRequest = z.infer<typeof updateContactsPermissionSchema>;
 export type InviteMemberRequest = z.infer<typeof inviteMemberSchema>;
 export type AcceptInviteRequest = z.infer<typeof acceptInviteSchema>;
 export type ChangeMemberRoleRequest = z.infer<typeof changeMemberRoleSchema>;

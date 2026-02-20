@@ -4,6 +4,7 @@ import logger from 'jet-logger';
 import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
+import { deleteRecordingPaths } from '@src/services/callRecordingStorage';
 
 async function getAuthenticatedUserId(req: Request) {
   const authHeader = req.header('authorization') ?? '';
@@ -316,6 +317,15 @@ async function deleteCall(req: Request, res: Response) {
     return res.status(access.status).json({ error: access.message });
   }
 
+  const { data: callData, error: callLookupError } = await supabaseAdmin
+    .from('calls')
+    .select('storage_path')
+    .eq('id', callId)
+    .maybeSingle();
+  if (callLookupError) {
+    logger.err(callLookupError);
+  }
+
   const { error: deleteError } = await supabaseAdmin
     .from('calls')
     .delete()
@@ -325,6 +335,8 @@ async function deleteCall(req: Request, res: Response) {
     logger.err(deleteError);
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to delete call' });
   }
+
+  await deleteRecordingPaths([callData?.storage_path]);
 
   return res.status(HTTP_STATUS_CODES.Ok).json({ ok: true });
 }
