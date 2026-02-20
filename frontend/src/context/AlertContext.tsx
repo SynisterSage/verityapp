@@ -47,7 +47,9 @@ export function AlertProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     try {
-      const data = await authorizedFetch('/alerts?limit=50');
+      const data = await authorizedFetch(
+        `/alerts?limit=50&profileId=${encodeURIComponent(activeProfile.id)}`
+      );
       const alerts = (data?.alerts ?? []) as AlertRow[];
       // Only count unhandled CRITICAL alerts in the badge
       const count = alerts.filter((alert) => !isHandledAlert(alert) && isCriticalAlert(alert)).length;

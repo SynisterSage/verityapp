@@ -53,9 +53,23 @@ export const verifyPasscodeSchema = z.object({
 });
 
 export const recordActivitySchema = z.object({
-  activity_type: z.enum(['call_answered', 'call_missed', 'message_sent', 'login']),
-  details: z.record(z.string(), z.any()).optional(),
-});
+  alertType: z.enum([
+    'circle_invite',
+    'pin_change',
+    'safe_phrase_added',
+    'trusted_contact_added',
+    'blocked_caller_added',
+    'security_password',
+    'member_joined',
+    'member_role_changed',
+    'member_removed',
+    'automation_settings_updated',
+    'data_exported',
+    'data_cleared',
+  ]),
+  payload: z.record(z.string(), z.any()).optional(),
+  status: z.enum(['pending', 'acknowledged', 'resolved']).optional(),
+}).strict();
 
 export const updateAlertPrefsSchema = z.object({
   enable_email_alerts: z.boolean().optional(),

@@ -173,13 +173,11 @@ async function updateAlertStatus(req: Request, res: Response) {
     .eq('id', alertId)
     .single();
 
-  console.log('deleteAlert: id=', alertId, 'alertRow=', alertRow, 'error=', alertError);
   if (alertError || !alertRow) {
     return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Alert not found' });
   }
 
   const allowed = await userCanAccessProfile(userId, alertRow.profile_id);
-  console.log('deleteAlert access', { userId, profileId: alertRow.profile_id, allowed });
   if (!allowed) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }

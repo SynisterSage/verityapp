@@ -27,7 +27,6 @@ export type CallFilterKey = (typeof CALL_FILTER_OPTIONS)[number]['key'];
 
 type ActiveStyle = {
   gradient: [string, string];
-  shadowColor: string;
 };
 
 type CallFilterProps = {
@@ -43,27 +42,21 @@ export default function CallFilter({ value, onChange, style }: CallFilterProps) 
       ({
         all: {
           gradient: [theme.colors.accent, withOpacity(theme.colors.accent, 0.75)],
-          shadowColor: theme.colors.accent,
         },
         verified: {
           gradient: [theme.colors.success, withOpacity(theme.colors.success, 0.75)],
-          shadowColor: theme.colors.success,
         },
         risk: {
           gradient: [theme.colors.danger, withOpacity(theme.colors.danger, 0.75)],
-          shadowColor: theme.colors.danger,
         },
         trusted: {
           gradient: [theme.colors.accent, withOpacity(theme.colors.accent, 0.75)],
-          shadowColor: theme.colors.accent,
         },
         handled: {
           gradient: [theme.colors.warning, withOpacity(theme.colors.warning, 0.75)],
-          shadowColor: theme.colors.warning,
         },
         archived: {
           gradient: [theme.colors.textDim, withOpacity(theme.colors.textDim, 0.82)],
-          shadowColor: theme.colors.textDim,
         },
       }) as Record<CallFilterKey, ActiveStyle>,
     [theme.colors.accent, theme.colors.success, theme.colors.danger, theme.colors.warning, theme.colors.textDim]
@@ -92,21 +85,14 @@ export default function CallFilter({ value, onChange, style }: CallFilterProps) 
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
                 onPress={() => handlePress(option.key)}
-                style={({ pressed }) => [
-                  styles.segment,
-                  !isLast && styles.segmentSpacing,
-                  { backgroundColor: theme.colors.surfaceAlt },
-                  active && styles.segmentActive,
-                  active && {
-                    shadowColor: activeStyle.shadowColor,
-                    shadowOpacity: 0.35,
-                    shadowRadius: 14,
-                    shadowOffset: { width: 0, height: 8 },
-                    elevation: 6,
-                  },
-                  pressed && styles.segmentPressed,
-                ]}
-              >
+              style={({ pressed }) => [
+                styles.segment,
+                !isLast && styles.segmentSpacing,
+                { backgroundColor: theme.colors.surfaceAlt },
+                active && styles.segmentActive,
+                pressed && styles.segmentPressed,
+              ]}
+            >
                 {active && (
                   <LinearGradient
                     colors={activeStyle.gradient}
@@ -147,10 +133,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.08)',
     padding: 6,
     width: '100%',
-    shadowColor: '#000',
-    shadowOpacity: 0.12,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 10 },
   },
   scrollViewport: {
     borderRadius: 16,

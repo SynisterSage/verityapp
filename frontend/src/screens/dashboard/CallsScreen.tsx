@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  ActivityIndicator,
   Animated,
   Easing,
   Modal,
@@ -18,6 +19,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RouteProp, useFocusEffect } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -271,6 +273,15 @@ export default function CallsScreen({
       progressBackgroundColor: theme.colors.bg,
     }),
     [theme.colors.accent, theme.colors.bg]
+  );
+  const topScrimColors = useMemo(
+    () =>
+      [
+        withOpacity(theme.colors.bg, 0.92),
+        withOpacity(theme.colors.bg, 0.18),
+        withOpacity(theme.colors.bg, 0),
+      ] as const,
+    [theme.colors.bg]
   );
   const [calls, setCalls] = useState<CallRow[]>([]);
   const [trustedActivity, setTrustedActivity] = useState<TrustedActivityRow[]>([]);
@@ -537,7 +548,8 @@ export default function CallsScreen({
     setActiveTrayAction('delete');
     try {
       await authorizedFetch(`/calls/${trayCall.id}`, { method: 'DELETE' });
-      await loadCalls();
+      setCalls((prev) => prev.filter((row) => row.id !== trayCall.id));
+      void loadCalls(true);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       hideTray();
     } catch (err) {
@@ -920,12 +932,28 @@ export default function CallsScreen({
     };
   }, [activeProfile, filter, isDeletableFilter]);
 
+  const applyOptimisticFilterDelete = useCallback(
+    (ids: string[], deleteType: 'calls' | 'alerts') => {
+      if (ids.length === 0) {
+        return;
+      }
+      const idSet = new Set(ids);
+      if (deleteType === 'alerts') {
+        setTrustedActivity((prev) => prev.filter((row) => !idSet.has(row.id)));
+        return;
+      }
+      setCalls((prev) => prev.filter((row) => !idSet.has(row.id)));
+    },
+    []
+  );
+
   const deleteResolvedTargets = useCallback(
     async (ids: string[], deleteType: 'calls' | 'alerts') => {
       if (ids.length === 0) {
         return;
       }
       setFilterDeleteProcessing(true);
+      applyOptimisticFilterDelete(ids, deleteType);
       try {
         const batchSize = 12;
         for (let i = 0; i < ids.length; i += batchSize) {
@@ -938,15 +966,16 @@ export default function CallsScreen({
             )
           );
         }
-        await loadCalls(true);
+        void loadCalls(true);
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch (err) {
         Alert.alert('Delete failed', 'Could not delete all items for this filter right now.');
+        await loadCalls(true);
       } finally {
         setFilterDeleteProcessing(false);
       }
     },
-    [loadCalls]
+    [applyOptimisticFilterDelete, loadCalls]
   );
 
   const confirmDeleteCurrentFilter = useCallback(async () => {
@@ -1060,7 +1089,15 @@ export default function CallsScreen({
               accessibilityRole="button"
               accessibilityLabel={`Delete all ${filterLabel.toLowerCase()} items`}
             >
-              <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
+              {filterDeleteProcessing ? (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.colors.danger}
+                  style={styles.headerDeleteSpinner}
+                />
+              ) : (
+                <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
+              )}
             </Pressable>
           ) : undefined
         }
@@ -1073,6 +1110,7 @@ export default function CallsScreen({
         <CallFilter value={filter} onChange={setFilter} />
       </View>
       <View style={styles.listWrapper}>
+        <LinearGradient colors={topScrimColors} style={styles.topScrim} pointerEvents="none" />
         {showTrustedOnly ? (
           <FlatList<TrustedActivityRow>
             data={trustedActivity}
@@ -1447,6 +1485,14 @@ const createCallStyles = (theme: AppTheme) =>
       position: 'relative',
       zIndex: 1,
     },
+    topScrim: {
+      position: 'absolute',
+      left: -24,
+      right: -24,
+      top: 0,
+      height: 56,
+      zIndex: 2,
+    },
     list: {
       flex: 1,
     },
@@ -1468,6 +1514,11 @@ const createCallStyles = (theme: AppTheme) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.surfaceAlt,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.danger, 0.32),
+    },
+    headerDeleteSpinner: {
+      transform: [{ scale: 0.95 }],
     },
     headerDeleteButtonPressed: {
       transform: [{ scale: 0.98 }],

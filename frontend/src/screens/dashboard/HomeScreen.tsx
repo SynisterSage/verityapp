@@ -166,7 +166,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
       let alertRows: AlertRow[] = [];
       try {
-        const alertData = await authorizedFetch('/alerts?status=pending&limit=3');
+        const alertData = await authorizedFetch(
+          `/alerts?status=pending&limit=3&profileId=${encodeURIComponent(activeProfile.id)}`
+        );
         alertRows = alertData?.alerts ?? [];
       } catch {
         alertRows = [];

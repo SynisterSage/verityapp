@@ -95,20 +95,6 @@ function buildPushContent(alert: AlertLike) {
   };
 }
 
-async function pushEnabledForProfile(profileId: string) {
-  const { data, error } = await supabaseAdmin
-    .from('profiles')
-    .select('enable_push_alerts')
-    .eq('id', profileId)
-    .maybeSingle();
-
-  if (error) {
-    logger.err(error);
-    return false;
-  }
-  return data?.enable_push_alerts !== false;
-}
-
 async function isRateLimited(profileId: string, currentAlertId: string) {
   const cutoffIso = new Date(Date.now() - PUSH_RATE_LIMIT_MS).toISOString();
   const { data, error } = await supabaseAdmin
@@ -129,14 +115,6 @@ async function isRateLimited(profileId: string, currentAlertId: string) {
 
 export async function dispatchAlertPush(alert: AlertLike) {
   if (!alert?.id || !alert?.profile_id || !alert?.alert_type) {
-    return;
-  }
-
-  const pushEnabled = await pushEnabledForProfile(alert.profile_id);
-  if (!pushEnabled) {
-    logger.info(
-      `[push-dispatch] skipped disabled profile=${alert.profile_id} alert=${alert.id} type=${alert.alert_type}`
-    );
     return;
   }
 

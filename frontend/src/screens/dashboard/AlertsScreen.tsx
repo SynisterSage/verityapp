@@ -39,11 +39,12 @@ import type { StackNavigationProp } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../navigation/types';
 import { AlertRow } from './alertTypes';
 import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
-import { formatAlertDateLabel, formatAlertTime } from './alertTimeUtils';
+import { formatAlertDateLabel, formatAlertTime, parseAlertTimestamp } from './alertTimeUtils';
 import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
 import { logError, logEvent } from '../../services/sentry';
 import { useSupportContext } from '../../context/SupportContext';
 import { navigateToSupportPortal } from '../../navigation/rootNavigator';
+import AlertsModeFilter, { type AlertsModeKey } from '../../components/alerts/AlertsModeFilter';
 const capitalizeLabel = (value?: string | null) => {
   if (!value) return '';
   return value
@@ -122,6 +123,7 @@ export default function AlertsScreen() {
     [theme.colors.bg]
   );
   const [activeTrayAction, setActiveTrayAction] = useState<'delete' | null>(null);
+  const [activeMode, setActiveMode] = useState<AlertsModeKey>('needs');
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
 
   const handleSupportPress = useCallback(() => {
@@ -144,8 +146,8 @@ const ONE_DAY_MS = 1000 * 60 * 60 * 24;
 
 const formatRecencyLabel = (value?: string | null) => {
   if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
+  const date = parseAlertTimestamp(value);
+  if (!date) return '';
   const delta = Date.now() - date.getTime();
   if (delta >= ONE_DAY_MS) {
     const days = Math.floor(delta / ONE_DAY_MS);
@@ -266,7 +268,9 @@ const loadMemberNames = useCallback(async () => {
     try {
       await loadContactNames();
       await loadMemberNames();
-      const data = await authorizedFetch('/alerts?limit=100');
+      const data = await authorizedFetch(
+        `/alerts?limit=100&profileId=${encodeURIComponent(activeProfile.id)}`
+      );
       const alerts = (data?.alerts ?? []) as AlertRow[];
       const callIds = alerts
         .map((alert) => alert.call_id)
@@ -443,13 +447,14 @@ const loadMemberNames = useCallback(async () => {
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
   const showSkeleton = loading && alerts.length === 0;
   const contentOpacity = showSkeleton ? 0 : 1;
-  const accent = theme.colors.accent;
   const sortedAlerts = useMemo(() => {
     const weight = (row: AlertRow) => (row.processed ? 1 : 0);
     return [...alerts].sort((a, b) => {
       const wDiff = weight(a) - weight(b);
       if (wDiff !== 0) return wDiff;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      const bTime = parseAlertTimestamp(b.created_at)?.getTime() ?? 0;
+      const aTime = parseAlertTimestamp(a.created_at)?.getTime() ?? 0;
+      return bTime - aTime;
     });
   }, [alerts]);
   const priorityAlerts = useMemo(() => {
@@ -457,12 +462,13 @@ const loadMemberNames = useCallback(async () => {
       const riskLevel = (alert.risk_level ?? '').toLowerCase();
       return (
         !isCircleActivityAlert(alert) &&
-        !alert.processed &&
+        !isHandledAlert(alert) &&
+        (alert.alert_type ?? '').toLowerCase() !== 'trusted' &&
         (highRiskLevels.has(riskLevel) ||
           (typeof alert.payload?.score === 'number' && alert.payload.score >= 80))
       );
     });
-  }, [alerts]);
+  }, [alerts, isCircleActivityAlert]);
   const shieldAlerts = useMemo(() => {
     return alerts.filter(
       (alert) =>
@@ -486,55 +492,8 @@ const loadMemberNames = useCallback(async () => {
     [sortedAlerts, priorityIds, shieldIds, isCircleActivityAlert]
   );
   const circleActivity = useMemo<CircleActivityItem[]>(() => {
-    const now = Date.now();
-    const window = 1000 * 60 * 60 * 24; // last 24h
-    const cutoff = now - window;
-
-    const processedActivities = alerts
-      .filter(
-        (alert) =>
-          alert.processed && new Date(alert.created_at).getTime() >= cutoff
-      )
-      .map((alert) => {
-        const callerNumber =
-          (alert.payload?.callerNumber as string | undefined) ||
-          (alert.payload?.caller_number as string | undefined) ||
-          (alert.call_id ? callNumberMap[alert.call_id] : undefined);
-        const normalizedCaller = normalizeDigits(callerNumber);
-        const handlerFallback =
-          (normalizedCaller && contactNames[normalizedCaller]) ||
-          (callerNumber ? contactNames[callerNumber] : undefined) ||
-          formatPhoneNumber(callerNumber) ||
-          'Circle member';
-        const handlerName =
-          memberNames[alert.feedback_by_user_id ?? ''] ??
-          alert.handled_by_name ??
-          handlerFallback;
-        const suspiciousCaller = formatPhoneNumber(
-          (alert.payload?.callerNumber as string | undefined) ||
-            (alert.payload?.caller_number as string | undefined) ||
-            callerNumber
-        );
-        const actionLabel =
-          alert.feedback_status === 'marked_safe' ? 'Marked safe' : 'Flagged as fraud';
-        const description = `${actionLabel.toLowerCase()} ${suspiciousCaller ?? 'this caller'}.`;
-        const timestamp = formatAlertTime(alert.created_at);
-        return {
-          id: alert.id,
-          label: handlerName,
-          description,
-          timestamp,
-          order: new Date(alert.created_at).getTime(),
-          alertRow: alert,
-        };
-      });
-
     const circleActivities = alerts
-      .filter(
-        (alert) =>
-          CIRCLE_ALERT_TYPES.has(alert.alert_type ?? '') &&
-          new Date(alert.created_at).getTime() >= cutoff
-      )
+      .filter((alert) => CIRCLE_ALERT_TYPES.has(alert.alert_type ?? ''))
       .map((alert) => {
         const actorId = alert.payload?.actor_user_id as string | undefined;
         const label =
@@ -588,16 +547,14 @@ const loadMemberNames = useCallback(async () => {
           label,
           description,
           timestamp,
-          order: new Date(alert.created_at).getTime(),
+          order: parseAlertTimestamp(alert.created_at)?.getTime() ?? 0,
           alertRow: alert,
         };
       });
-
-    const combined = [...circleActivities, ...processedActivities].sort(
-      (a, b) => b.order - a.order
-    );
-    return combined.map(({ order, ...rest }) => rest);
-  }, [alerts, callNumberMap, contactNames, memberNames]);
+    return circleActivities
+      .sort((a, b) => b.order - a.order)
+      .map(({ order, ...rest }) => rest);
+  }, [alerts, memberNames]);
   // Count unhandled non-circle, non-trusted alerts (fraud, system health, etc.)
   // Exclude trusted alerts since they're shown on home/calls screens
   const pendingAlertCount = useMemo(
@@ -608,16 +565,6 @@ const loadMemberNames = useCallback(async () => {
     ).length,
     [alerts, isCircleActivityAlert]
   );
-
-  // Count unhandled circle activities separately
-  // Processed activities (handled by circle members) shouldn't count
-  const unhandledCircleCount = useMemo(
-    () => circleActivity.filter((item) => !isHandledAlert(item.alertRow)).length,
-    [circleActivity]
-  );
-
-  // Total = non-circle alerts + circle alerts (no double counting)
-  const newAlertsCount = pendingAlertCount + unhandledCircleCount;
 
   const handleDelete = useCallback(async (alertId: string) => {
     try {
@@ -640,54 +587,47 @@ const loadMemberNames = useCallback(async () => {
     }
   }, [refreshAlertCount]);
 
-  const confirmDelete = useCallback(
-    (alertId: string) => {
-      Alert.alert(
-        'Delete alert',
-        'This permanently removes the alert. This cannot be undone. Continue?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Delete',
-            style: 'destructive',
-            onPress: () => handleDelete(alertId),
-          },
-        ],
-        { cancelable: true }
-      );
-    },
-    [handleDelete]
-  );
-
   const systemHealthAlerts = useMemo(() => {
     return alerts
       .filter(
         (alert) =>
+          !isHandledAlert(alert) &&
           !isCircleActivityAlert(alert) &&
           !priorityIds.has(alert.id) &&
           !shieldIds.has(alert.id) &&
+          (alert.alert_type ?? '').toLowerCase() !== 'trusted' &&
           (alert.payload?.auto === true ||
             alert.payload?.automation === true ||
             alert.payload?.system_event === true ||
             alert.status === 'blocked')
       )
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [alerts, priorityIds, shieldIds]);
+      .sort(
+        (a, b) =>
+          (parseAlertTimestamp(b.created_at)?.getTime() ?? 0) -
+          (parseAlertTimestamp(a.created_at)?.getTime() ?? 0)
+      );
+  }, [alerts, priorityIds, shieldIds, isCircleActivityAlert]);
 
   const handledAlerts = useMemo(() => {
-    const systemHealthIds = new Set(systemHealthAlerts.map((alert) => alert.id));
-    // Show fraud/risk alerts that aren't priority/system/circle/trusted
-    // Exclude trusted alerts - they're shown on home/calls screens
+    // Show all handled fraud/risk alerts excluding circle/trusted.
     return alerts
       .filter(
         (alert) =>
           !isCircleActivityAlert(alert) &&
-          !priorityIds.has(alert.id) &&
-          !systemHealthIds.has(alert.id) &&
+          isHandledAlert(alert) &&
           (alert.alert_type ?? '').toLowerCase() !== 'trusted' // Exclude trusted alerts
       )
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [alerts, priorityIds, systemHealthAlerts, isCircleActivityAlert]);
+      .sort(
+        (a, b) =>
+          (parseAlertTimestamp(b.created_at)?.getTime() ?? 0) -
+          (parseAlertTimestamp(a.created_at)?.getTime() ?? 0)
+      );
+  }, [alerts, isCircleActivityAlert]);
+
+  const systemHealthIds = useMemo(
+    () => new Set(systemHealthAlerts.map((alert) => alert.id)),
+    [systemHealthAlerts]
+  );
 
   const handledIds = useMemo(
     () => new Set(handledAlerts.map((alert) => alert.id)),
@@ -699,20 +639,15 @@ const loadMemberNames = useCallback(async () => {
     [filteredAlerts, handledIds]
   );
 
-  const trustedAlerts = useMemo(
-    () =>
-      remainingAlerts.filter(
-        (alert) => (alert.alert_type ?? '').toLowerCase() === 'trusted'
-      ),
-    [remainingAlerts]
-  );
-
   const recentAlerts = useMemo(
     () =>
       remainingAlerts.filter(
-        (alert) => (alert.alert_type ?? '').toLowerCase() !== 'trusted'
+        (alert) =>
+          (alert.alert_type ?? '').toLowerCase() !== 'trusted' &&
+          !systemHealthIds.has(alert.id) &&
+          !isHandledAlert(alert)
       ),
-    [remainingAlerts]
+    [remainingAlerts, systemHealthIds]
   );
 
   const renderSectionHeader = (label: string, right?: ReactNode) => (
@@ -821,62 +756,6 @@ const loadMemberNames = useCallback(async () => {
     );
   };
 
-  const renderTrustedSection = () => {
-    if (!trustedAlerts.length) return null;
-    const successColor = getRiskStyles('low').accent;
-    const successBackground = getRiskStyles('low').background;
-    return (
-      <View
-        style={[
-          styles.section,
-          styles.trustedSection,
-          { backgroundColor: withOpacity(theme.colors.success, 0.01) },
-        ]}
-      >
-        <Text style={styles.sectionLabel}>Trusted contacts</Text>
-        <View style={styles.sectionCards}>
-          {trustedAlerts.map((alert) => {
-            const callerNumber =
-              (alert.payload?.callerNumber as string | undefined) ||
-              (alert.payload?.caller_number as string | undefined) ||
-              (alert.call_id ? callNumberMap[alert.call_id] : undefined);
-            const callerName = callerNumber ? contactNames[callerNumber] : '';
-            const resolvedName = callerName || formatPhoneNumber(callerNumber, 'Trusted contact');
-            const scoreLabel =
-              typeof alert.payload?.score === 'number' ? `${Math.round(alert.payload.score)}%` : undefined;
-            const statusLabel = alert.status ?? 'Trusted call';
-            const handlePress = () => {
-              if (!alert.call_id) return;
-              logEvent('fraud_alert_opened', {
-                screen: 'Alerts',
-                extra: {
-                  alertId: alert.id,
-                  callId: alert.call_id,
-                  riskLevel: alert.risk_level ?? alert.payload?.riskLevel,
-                },
-              });
-              navigateToCallDetail(alert.call_id);
-            };
-            return (
-              <AlertCard
-                key={`trusted-${alert.id}`}
-                categoryLabel="Trusted circle"
-                title={resolvedName}
-                timestamp={formatRecencyLabel(alert.created_at)}
-                scoreLabel={scoreLabel}
-                scoreColor={successColor}
-                scoreBackgroundColor={successBackground}
-                iconName="person-circle-outline"
-                iconColor={successColor}
-                onPress={alert.call_id ? handlePress : undefined}
-              />
-            );
-          })}
-        </View>
-      </View>
-    );
-  };
-
   const renderCircleSection = () => {
     if (!circleActivity.length) return null;
     const preview = circleActivity.slice(0, 2);
@@ -916,8 +795,8 @@ const loadMemberNames = useCallback(async () => {
   };
 
   const openCircleFeed = useCallback(() => {
-    navigation.navigate('CircleActivityModal', { activities: circleActivity });
-  }, [circleActivity, navigation]);
+    navigation.navigate('CircleActivityModal', { activities: [] });
+  }, [navigation]);
 
   const showTray = useCallback(
     (alert: AlertRow) => {
@@ -969,7 +848,7 @@ const loadMemberNames = useCallback(async () => {
     if (!handledAlerts.length) return null;
     return (
       <View style={[styles.section, styles.handledSection]}>
-        <Text style={styles.sectionLabel}>Handled alerts</Text>
+        <Text style={styles.sectionLabel}>History</Text>
         <View style={styles.sectionCards}>
           {handledAlerts.map((alert) => {
             const reason = formatReason(alert) ?? alert.payload?.reason ?? 'Suspicious call detected.';
@@ -1020,27 +899,21 @@ const loadMemberNames = useCallback(async () => {
     );
   };
 
-  const hasTopSections =
-    priorityAlerts.length > 0 ||
-    systemHealthAlerts.length > 0 ||
-    handledAlerts.length > 0 ||
-    circleActivity.length > 0;
-
   // For empty state: only show when there are literally NO alerts on screen
-  // Including handled alerts - if they're visible, don't show empty state
-  const hasAnyAlertsToShow =
+  const hasNeedsAttentionAlerts =
     priorityAlerts.length > 0 ||
     systemHealthAlerts.length > 0 ||
-    circleActivity.length > 0 ||
-    handledAlerts.length > 0 ||
     recentAlerts.length > 0;
+  const hasHistoryAlerts = circleActivity.length > 0 || handledAlerts.length > 0;
+  const hasAnyAlertsToShow =
+    activeMode === 'needs' ? hasNeedsAttentionAlerts : hasHistoryAlerts;
 
   const renderOtherAlerts = () => {
     if (!recentAlerts.length) return null;
     return (
       <View style={[styles.section, styles.otherSection]}>
         <View style={styles.sectionInner}>
-          <Text style={styles.sectionLabel}>Recent alerts</Text>
+          <Text style={styles.sectionLabel}>Calls to review</Text>
           <View style={styles.sectionCards}>
             {recentAlerts.map((item) => {
               const reason = formatReason(item) ?? item.payload?.reason ?? 'Suspicious call detected.';
@@ -1134,6 +1007,12 @@ const loadMemberNames = useCallback(async () => {
     return getCircleTrayCopy(trayAlert, detail);
   }, [trayAlert, trayHandledDisplay]);
   const isTrayVisible = isTrayMounted && Boolean(trayAlert);
+  const headerSubtitle =
+    pendingAlertCount === 0
+      ? 'No calls need review'
+      : pendingAlertCount === 1
+      ? '1 call needs review'
+      : `${pendingAlertCount} calls need review`;
 
   return (
     <SafeAreaView
@@ -1143,12 +1022,15 @@ const loadMemberNames = useCallback(async () => {
       <View style={styles.headerWrapper}>
         <DashboardHeader
           title="Alerts"
-          subtitle={`You have ${newAlertsCount} new alert${newAlertsCount === 1 ? '' : 's'}`}
+          subtitle={headerSubtitle}
           supportAction={{
             onPress: handleSupportPress,
             unreadCount: unreadAgentCount,
           }}
         />
+      </View>
+      <View style={styles.modeFilterWrap}>
+        <AlertsModeFilter value={activeMode} onChange={setActiveMode} />
       </View>
       <View style={styles.listWrapper}>
         <LinearGradient colors={topScrimColors} style={styles.topScrim} pointerEvents="none" />
@@ -1180,17 +1062,28 @@ const loadMemberNames = useCallback(async () => {
               ))}
             </Animated.View>
           ) : null}
-          {renderPrioritySection()}
-          {renderSystemSection()}
-          {renderCircleSection()}
-          {renderHandledSection()}
-          {renderOtherAlerts()}
+          {activeMode === 'needs' ? (
+            <>
+              {renderPrioritySection()}
+              {renderSystemSection()}
+              {renderOtherAlerts()}
+            </>
+          ) : (
+            <>
+              {renderCircleSection()}
+              {renderHandledSection()}
+            </>
+          )}
           {!hasAnyAlertsToShow && !showSkeleton ? (
             <View style={styles.emptyStateWrap}>
               <EmptyState
                 icon="alert-circle-outline"
-                title="No alerts"
-                body="We will surface anything suspicious here as soon as it happens."
+                title={activeMode === 'needs' ? 'All clear' : 'No history yet'}
+                body={
+                  activeMode === 'needs'
+                    ? 'There are no calls waiting for review.'
+                    : 'Handled calls and circle updates will appear here.'
+                }
               />
             </View>
           ) : null}
@@ -1266,6 +1159,14 @@ const createAlertStyles = (theme: AppTheme) =>
     },
     headerWrapper: {
       marginBottom: 0,
+    },
+    modeFilterWrap: {
+      position: 'relative',
+      zIndex: 4,
+      overflow: 'visible',
+      marginTop: 20,
+      marginBottom: 12,
+      width: '100%',
     },
     bottomMask: {
       position: 'absolute',

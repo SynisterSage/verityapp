@@ -10,12 +10,14 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		1C95708C7460F60661DEEEB4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		9FA17C325A11B4DBA03E11A0 /* activity-notification.wav in Resources */ = {isa = PBXBuildFile; fileRef = 9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */; };
 		A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2C0D1E4F5A6B7C8D9E0F12 /* ContactPickerModule.swift */; };
 		B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B3D1E2F4A5B6C7D8E9F0012 /* ContactPickerModuleBridge.m */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E42D475140FD759215B196 /* ExpoModulesProvider.swift */; };
 		D7DE6E122F40EA8A003E8AC0 /* VoIPPushModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */; };
 		D7DE6E132F40EA8A003E8AC0 /* VoIPPushModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */; };
+		E59EC8EC6F913453E714D5A2 /* support-notification.wav in Resources */ = {isa = PBXBuildFile; fileRef = E59EC8EB6F913453E714D5A2 /* support-notification.wav */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
 		FA64FEB802DA64B19DC4BEDD /* libPods-VerityProtect.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E22F18D7E3530F0B8CEAA00C /* libPods-VerityProtect.a */; };
 /* End PBXBuildFile section */
@@ -47,10 +49,12 @@
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoIPPushModule.swift; sourceTree = "<group>"; };
 		D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VoIPPushModuleBridge.m; sourceTree = "<group>"; };
+		E59EC8EB6F913453E714D5A2 /* support-notification.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "VerityProtect/support-notification.wav"; sourceTree = "<group>"; };
 		E22F18D7E3530F0B8CEAA00C /* libPods-VerityProtect.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-VerityProtect.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = VerityProtect/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "VerityProtect-Bridging-Header.h"; path = "VerityProtect/VerityProtect-Bridging-Header.h"; sourceTree = "<group>"; };
+		9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "VerityProtect/activity-notification.wav"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -89,6 +93,8 @@
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 				5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */,
+				9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */,
+				E59EC8EB6F913453E714D5A2 /* support-notification.wav */,
 			);
 			name = VerityProtect;
 			sourceTree = "<group>";
@@ -249,6 +255,8 @@
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				1C95708C7460F60661DEEEB4 /* PrivacyInfo.xcprivacy in Resources */,
+				9FA17C325A11B4DBA03E11A0 /* activity-notification.wav in Resources */,
+				E59EC8EC6F913453E714D5A2 /* support-notification.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -25,7 +25,7 @@ import type { CircleActivityItem } from './circleActivityTypes';
 import { AlertRow } from './alertTypes';
 import { getCircleTrayCopy, getCircleTrayDisplay } from './circleTrayUtils';
 import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
-import { formatAlertTime } from './alertTimeUtils';
+import { formatAlertTime, parseAlertTimestamp } from './alertTimeUtils';
 import * as Haptics from 'expo-haptics';
 import EmptyState from '../../components/common/EmptyState';
 import AlertCard from '../../components/alerts/AlertCard';
@@ -109,13 +109,16 @@ export default function CircleActivityScreen() {
     const loadCircleActivity = async () => {
       setIsLoadingActivities(true);
       try {
-        const data = await authorizedFetch('/alerts?limit=50');
+        const data = await authorizedFetch(
+          `/alerts?limit=50&profileId=${encodeURIComponent(activeProfile.id)}`
+        );
         const alerts = (data?.alerts ?? []) as AlertRow[];
         const mapped = alerts
           .filter((alert) => CIRCLE_ALERT_TYPES.has(alert.alert_type ?? ''))
           .sort(
             (a, b) =>
-              new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              (parseAlertTimestamp(b.created_at)?.getTime() ?? 0) -
+              (parseAlertTimestamp(a.created_at)?.getTime() ?? 0)
           )
           .map(toCircleActivityItem);
         if (!cancelled) {

@@ -119,6 +119,64 @@ function sanitizeProfileRow(row: Record<string, any>): Record<string, any> {
   return sanitized;
 }
 
+function applyNotificationPreferences(
+  profile: Record<string, any>,
+  notificationPreferences?: Record<string, any> | null
+) {
+  if (!notificationPreferences || typeof notificationPreferences !== 'object') {
+    return profile;
+  }
+
+  const merged = { ...profile };
+  const mapping: Array<{
+    key:
+      | 'alert_threshold_score'
+      | 'enable_email_alerts'
+      | 'enable_sms_alerts'
+      | 'enable_push_alerts'
+      | 'auto_mark_enabled'
+      | 'auto_mark_fraud_threshold'
+      | 'auto_mark_safe_threshold'
+      | 'auto_trust_on_safe'
+      | 'auto_block_on_fraud';
+    type: 'number' | 'boolean';
+  }> = [
+    { key: 'alert_threshold_score', type: 'number' },
+    { key: 'enable_email_alerts', type: 'boolean' },
+    { key: 'enable_sms_alerts', type: 'boolean' },
+    { key: 'enable_push_alerts', type: 'boolean' },
+    { key: 'auto_mark_enabled', type: 'boolean' },
+    { key: 'auto_mark_fraud_threshold', type: 'number' },
+    { key: 'auto_mark_safe_threshold', type: 'number' },
+    { key: 'auto_trust_on_safe', type: 'boolean' },
+    { key: 'auto_block_on_fraud', type: 'boolean' },
+  ];
+
+  for (const { key, type } of mapping) {
+    const value = notificationPreferences[key];
+    if (typeof value === type) {
+      merged[key] = value;
+    }
+  }
+
+  return merged;
+}
+
+const ALLOWED_ACTIVITY_ALERT_TYPES = new Set([
+  'circle_invite',
+  'pin_change',
+  'safe_phrase_added',
+  'trusted_contact_added',
+  'blocked_caller_added',
+  'security_password',
+  'member_joined',
+  'member_role_changed',
+  'member_removed',
+  'automation_settings_updated',
+  'data_exported',
+  'data_cleared',
+]);
+
 async function listProfiles(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
@@ -152,7 +210,29 @@ async function listProfiles(req: Request, res: Response) {
   const profiles = [...(caretakerProfiles ?? []), ...(memberRows ?? [])]
     .map((row) => sanitizeProfileRow(row))
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  return res.status(HTTP_STATUS_CODES.Ok).json({ profiles });
+
+  const profileIds = profiles.map((profile) => profile.id).filter(Boolean);
+  if (profileIds.length === 0) {
+    return res.status(HTTP_STATUS_CODES.Ok).json({ profiles });
+  }
+
+  const { data: memberPrefs } = await supabaseAdmin
+    .from('profile_members')
+    .select('profile_id, notification_preferences')
+    .eq('user_id', userId)
+    .in('profile_id', profileIds);
+
+  const prefMap = new Map<string, Record<string, any>>();
+  (memberPrefs ?? []).forEach((row) => {
+    if (row.profile_id && row.notification_preferences) {
+      prefMap.set(row.profile_id, row.notification_preferences as Record<string, any>);
+    }
+  });
+
+  const mergedProfiles = profiles.map((profile) =>
+    applyNotificationPreferences(profile, prefMap.get(profile.id))
+  );
+  return res.status(HTTP_STATUS_CODES.Ok).json({ profiles: mergedProfiles });
 }
 
 async function createProfile(req: Request, res: Response) {
@@ -372,6 +452,9 @@ async function recordActivity(req: Request, res: Response) {
 
   if (!alertType) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing alertType' });
+  }
+  if (!ALLOWED_ACTIVITY_ALERT_TYPES.has(alertType)) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid alertType' });
   }
 
   const isCaretaker = await userIsCaretaker(userId, profileId);
@@ -709,8 +792,20 @@ async function getProfile(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Failed to fetch profile' });
   }
 
+  const { data: memberRow } = await supabaseAdmin
+    .from('profile_members')
+    .select('notification_preferences')
+    .eq('profile_id', profileId)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  const profileWithPrefs = applyNotificationPreferences(
+    data,
+    (memberRow?.notification_preferences as Record<string, any> | undefined) ?? null
+  );
+
   return res.status(HTTP_STATUS_CODES.Ok).json({
-    profile: sanitizeProfileRow(data),
+    profile: sanitizeProfileRow(profileWithPrefs),
   });
 }
 
