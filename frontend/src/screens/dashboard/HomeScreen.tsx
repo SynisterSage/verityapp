@@ -619,7 +619,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                           isTrustedActivity ? withOpacity(theme.colors.accent, 0.16) : undefined
                         }
                         muted={item.muted}
-                        disabled={Boolean(item.viewOnly)}
+                        disabled={Boolean(item.viewOnly) && !isTrustedActivity}
                         badgeLevel={
                           item.badge === 'FRAUD'
                             ? 'critical'
@@ -628,6 +628,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                             : item.badgeLevel
                         }
                         onPress={() => {
+                          if (isTrustedActivity) {
+                            navigation.navigate('CallsTab', {
+                              screen: 'Calls',
+                              params: { initialFilter: 'trusted' },
+                            });
+                            return;
+                          }
                           if (item.viewOnly) {
                             return;
                           }

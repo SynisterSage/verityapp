@@ -27,7 +27,7 @@ import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { Ionicons } from '@expo/vector-icons';
 import { withOpacity } from '../../utils/color';
-import type { AppTheme } from '../../theme/tokens';
+import type { AppTheme, ThemeMode } from '../../theme/tokens';
 type MemberRole = 'admin' | 'editor';
 
 type Member = {
@@ -76,8 +76,8 @@ type Props = {
 export default function InviteFamilyScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
-  const { theme } = useTheme();
-  const styles = useMemo(() => createInviteFamilyStyles(theme), [theme]);
+  const { theme, mode } = useTheme();
+  const styles = useMemo(() => createInviteFamilyStyles(theme, mode), [mode, theme]);
   const { session } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
@@ -767,8 +767,10 @@ export default function InviteFamilyScreen({ navigation }: Props) {
   );
 }
 
-const createInviteFamilyStyles = (theme: AppTheme) =>
-  StyleSheet.create({
+const createInviteFamilyStyles = (theme: AppTheme, mode: ThemeMode) => {
+  const trayBackdropColor = mode === 'dark' ? 'rgba(0, 0, 0, 0.72)' : 'rgba(15, 23, 42, 0.36)';
+
+  return StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: theme.colors.bg,
@@ -1044,7 +1046,7 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
     },
     actionBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: theme.colors.overlay,
+      backgroundColor: trayBackdropColor,
     },
     tray: {
       backgroundColor: theme.colors.surface,
@@ -1108,7 +1110,7 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
     },
     memberTrayBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: theme.colors.overlay,
+      backgroundColor: trayBackdropColor,
     },
     memberTray: {
       backgroundColor: theme.colors.surface,
@@ -1189,3 +1191,4 @@ const createInviteFamilyStyles = (theme: AppTheme) =>
       backgroundColor: withOpacity(theme.colors.text, 0.08),
     },
   });
+};

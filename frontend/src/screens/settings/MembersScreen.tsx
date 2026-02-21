@@ -30,7 +30,7 @@ import SettingsHeader from '../../components/common/SettingsHeader';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
-import type { AppTheme } from '../../theme/tokens';
+import type { AppTheme, ThemeMode } from '../../theme/tokens';
 
 import * as Clipboard from 'expo-clipboard';
 
@@ -98,7 +98,7 @@ export default function MembersScreen() {
   const insets = useSafeAreaInsets();
   const { activeProfile } = useProfile();
   const { session } = useAuth();
-  const { theme } = useTheme();
+  const { theme, mode } = useTheme();
   const sessionUserId = session?.user?.id ?? null;
 
   const [members, setMembers] = useState<Member[]>([]);
@@ -135,7 +135,7 @@ export default function MembersScreen() {
   }, [currentUserIsAdmin]);
 
   const highlightInviteEntry = route.params?.highlightInviteEntry ?? false;
-  const styles = useMemo(() => createMembersStyles(theme), [theme]);
+  const styles = useMemo(() => createMembersStyles(theme, mode), [mode, theme]);
   const roleHelperItems = useMemo(() => createRoleHelperItems(theme), [theme]);
 
   const canManageMember = (member: Member) =>
@@ -885,8 +885,10 @@ export default function MembersScreen() {
   );
 }
 
-const createMembersStyles = (theme: AppTheme) =>
-  StyleSheet.create({
+const createMembersStyles = (theme: AppTheme, mode: ThemeMode) => {
+  const trayBackdropColor = mode === 'dark' ? 'rgba(0, 0, 0, 0.72)' : 'rgba(15, 23, 42, 0.36)';
+
+  return StyleSheet.create({
     outer: {
       flex: 1,
       backgroundColor: theme.colors.bg,
@@ -1029,7 +1031,7 @@ const createMembersStyles = (theme: AppTheme) =>
     },
     memberTrayBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: theme.colors.overlay,
+      backgroundColor: trayBackdropColor,
     },
     memberTray: {
       backgroundColor: theme.colors.surface,
@@ -1301,7 +1303,7 @@ const createMembersStyles = (theme: AppTheme) =>
     },
     actionBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: withOpacity(theme.colors.text, 0.65),
+      backgroundColor: trayBackdropColor,
     },
     tray: {
       borderTopLeftRadius: 24,
@@ -1364,3 +1366,4 @@ const createMembersStyles = (theme: AppTheme) =>
       fontWeight: '600',
     },
   });
+};
