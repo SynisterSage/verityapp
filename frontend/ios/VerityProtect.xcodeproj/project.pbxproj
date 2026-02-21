@@ -11,6 +11,10 @@
 		1C95708C7460F60661DEEEB4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		9FA17C325A11B4DBA03E11A0 /* activity-notification.wav in Resources */ = {isa = PBXBuildFile; fileRef = 9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */; };
+		A1B2C3D4E5F60718293A4B01 /* WidgetSnapshotModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */; };
+		A1B2C3D4E5F60718293A4B02 /* WidgetSnapshotModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */; };
+		A1B2C3D4E5F60718293A4B03 /* VerityProtectWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C04 /* VerityProtectWidget.swift */; };
+		A1B2C3D4E5F60718293A4B04 /* VerityProtectWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C07 /* VerityProtectWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2C0D1E4F5A6B7C8D9E0F12 /* ContactPickerModule.swift */; };
 		B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B3D1E2F4A5B6C7D8E9F0012 /* ContactPickerModuleBridge.m */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
@@ -29,6 +33,7 @@
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
+				A1B2C3D4E5F60718293A4B04 /* VerityProtectWidgetExtension.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -55,6 +60,12 @@
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = VerityProtect/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "VerityProtect-Bridging-Header.h"; path = "VerityProtect/VerityProtect-Bridging-Header.h"; sourceTree = "<group>"; };
 		9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "VerityProtect/activity-notification.wav"; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WidgetSnapshotModule.swift; path = VerityProtect/WidgetSnapshotModule.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = WidgetSnapshotModuleBridge.m; path = VerityProtect/WidgetSnapshotModuleBridge.m; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4C04 /* VerityProtectWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityProtectWidget.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4C05 /* VerityProtectWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VerityProtectWidget.entitlements; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4C06 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4C07 /* VerityProtectWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VerityProtectWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -80,6 +91,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A1B2C3D4E5F60718293A4E02 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -87,6 +105,8 @@
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
+				A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */,
+				A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */,
 				F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -129,6 +149,7 @@
 				D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */,
 				D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */,
 				13B07FAE1A68108700A75B9A /* VerityProtect */,
+				A1B2C3D4E5F60718293A4D01 /* VerityProtectWidget */,
 				832341AE1AAA6A7D00B99B32 /* Libraries */,
 				D7DE6DD62F3D555B003E8AC0 /* location */,
 				83CBBA001A601CBA00E9B192 /* Products */,
@@ -146,8 +167,19 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* VerityProtect.app */,
+				A1B2C3D4E5F60718293A4C07 /* VerityProtectWidgetExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A1B2C3D4E5F60718293A4D01 /* VerityProtectWidget */ = {
+			isa = PBXGroup;
+			children = (
+				A1B2C3D4E5F60718293A4C04 /* VerityProtectWidget.swift */,
+				A1B2C3D4E5F60718293A4C06 /* Info.plist */,
+				A1B2C3D4E5F60718293A4C05 /* VerityProtectWidget.entitlements */,
+			);
+			path = VerityProtectWidget;
 			sourceTree = "<group>";
 		};
 		BB2F792B24A3F905000567C9 /* Supporting */ = {
@@ -212,6 +244,23 @@
 			productReference = 13B07F961A680F5B00A75B9A /* VerityProtect.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A1B2C3D4E5F60718293A4F01 /* VerityProtectWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1B2C3D4E5F60718293A4F02 /* Build configuration list for PBXNativeTarget "VerityProtectWidgetExtension" */;
+			buildPhases = (
+				A1B2C3D4E5F60718293A4E01 /* Sources */,
+				A1B2C3D4E5F60718293A4E02 /* Frameworks */,
+				A1B2C3D4E5F60718293A4E03 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VerityProtectWidgetExtension;
+			productName = VerityProtectWidgetExtension;
+			productReference = A1B2C3D4E5F60718293A4C07 /* VerityProtectWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -224,6 +273,10 @@
 					13B07F861A680F5B00A75B9A = {
 						DevelopmentTeam = CAY3N8J725;
 						LastSwiftMigration = 1250;
+						ProvisioningStyle = Automatic;
+					};
+					A1B2C3D4E5F60718293A4F01 = {
+						DevelopmentTeam = CAY3N8J725;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -242,6 +295,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* VerityProtect */,
+				A1B2C3D4E5F60718293A4F01 /* VerityProtectWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -257,6 +311,13 @@
 				1C95708C7460F60661DEEEB4 /* PrivacyInfo.xcprivacy in Resources */,
 				9FA17C325A11B4DBA03E11A0 /* activity-notification.wav in Resources */,
 				E59EC8EC6F913453E714D5A2 /* support-notification.wav in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1B2C3D4E5F60718293A4E03 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -410,9 +471,19 @@
 				D7DE6E122F40EA8A003E8AC0 /* VoIPPushModuleBridge.m in Sources */,
 				D7DE6E132F40EA8A003E8AC0 /* VoIPPushModule.swift in Sources */,
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				A1B2C3D4E5F60718293A4B01 /* WidgetSnapshotModule.swift in Sources */,
+				A1B2C3D4E5F60718293A4B02 /* WidgetSnapshotModuleBridge.m in Sources */,
 				D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */,
 				A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */,
 				B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A1B2C3D4E5F60718293A4E01 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A1B2C3D4E5F60718293A4B03 /* VerityProtectWidget.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -443,7 +514,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -482,7 +553,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -498,6 +569,56 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		A1B2C3D4E5F60718293A4F03 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VerityProtectWidget/VerityProtectWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CAY3N8J725;
+				INFOPLIST_FILE = VerityProtectWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lexferguson.verityprotect.com.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1B2C3D4E5F60718293A4F04 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VerityProtectWidget/VerityProtectWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CAY3N8J725;
+				INFOPLIST_FILE = VerityProtectWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.lexferguson.verityprotect.com.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -627,6 +748,15 @@
 			buildConfigurations = (
 				13B07F941A680F5B00A75B9A /* Debug */,
 				13B07F951A680F5B00A75B9A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1B2C3D4E5F60718293A4F02 /* Build configuration list for PBXNativeTarget "VerityProtectWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1B2C3D4E5F60718293A4F03 /* Debug */,
+				A1B2C3D4E5F60718293A4F04 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

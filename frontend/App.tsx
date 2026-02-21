@@ -234,6 +234,43 @@ function parseNotificationPayload(data: Record<string, unknown>): PendingNotific
   return { callId, alertId, alertType, routeTarget };
 }
 
+function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
+  const parsed = Linking.parse(url);
+  const combinedPath = [parsed.hostname, parsed.path].filter(Boolean).join('/');
+  const path = combinedPath.trim().toLowerCase();
+  if (!path) {
+    return null;
+  }
+  const [firstSegment] = path.split('/').filter(Boolean);
+  if (!firstSegment) {
+    return null;
+  }
+
+  if (firstSegment === 'alerts') {
+    return { routeTarget: 'alerts' };
+  }
+  if (
+    firstSegment === 'support' ||
+    firstSegment === 'supportportal' ||
+    firstSegment === 'support-portal'
+  ) {
+    return { routeTarget: 'support_portal' };
+  }
+  if (firstSegment === 'calls') {
+    const filterParam = parsed.queryParams?.filter;
+    const filterValue =
+      typeof filterParam === 'string'
+        ? filterParam
+        : Array.isArray(filterParam)
+        ? filterParam[0]
+        : '';
+    if (filterValue.trim().toLowerCase() === 'trusted') {
+      return { routeTarget: 'calls_trusted' };
+    }
+  }
+  return null;
+}
+
 const RootStack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<TabParamList>();
 const CallsStack = createStackNavigator<CallsStackParamList>();
@@ -725,6 +762,31 @@ function NavigationHost() {
       );
     }
   }, [session]);
+
+  useEffect(() => {
+    const handleRouteUrl = (url?: string | null) => {
+      if (!url) {
+        return;
+      }
+      const payload = parseWidgetRoutePayload(url);
+      if (!payload) {
+        return;
+      }
+      pendingNotificationRef.current = payload;
+      resolvePendingNotification();
+    };
+
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleRouteUrl(event.url);
+    });
+    Linking.getInitialURL()
+      .then((url) => {
+        handleRouteUrl(url);
+      })
+      .catch(() => null);
+
+    return () => subscription.remove();
+  }, [resolvePendingNotification]);
 
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync()
