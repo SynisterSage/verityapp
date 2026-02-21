@@ -1,5 +1,5 @@
 import React, { ReactNode } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../context/ThemeContext';
@@ -17,6 +17,7 @@ type ActionFooterProps = {
   secondaryIcon?: ReactNode;
   secondaryBackgroundColor?: string;
   secondaryTextColor?: string;
+  secondaryTextStyle?: TextStyle;
   secondaryDisabled?: boolean;
   secondaryLoading?: boolean;
   tertiaryLabel?: string;
@@ -45,6 +46,7 @@ export default function ActionFooter({
   secondaryIcon,
   secondaryBackgroundColor,
   secondaryTextColor,
+  secondaryTextStyle,
   secondaryDisabled,
   secondaryLoading,
   tertiaryLabel,
@@ -127,6 +129,7 @@ export default function ActionFooter({
                 numberOfLines={1}
                 style={[
                   styles.secondaryButtonText,
+                  secondaryTextStyle,
                   {
                     fontFamily: theme.typography.fontFamily,
                     color: secondaryTextColor ?? theme.colors.text,
@@ -184,6 +187,7 @@ export default function ActionFooter({
               numberOfLines={1}
               style={[
                 styles.secondaryButtonText,
+                secondaryTextStyle,
                 {
                   fontFamily: theme.typography.fontFamily,
                   color: secondaryTextColor ?? theme.colors.text,

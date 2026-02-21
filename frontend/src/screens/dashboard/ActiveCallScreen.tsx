@@ -3,6 +3,7 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-nativ
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
+import * as Haptics from 'expo-haptics';
 import TwilioVoice from 'react-native-twilio-programmable-voice';
 
 import type { RootStackParamList } from '../../navigation/types';
@@ -29,6 +30,31 @@ function normalizePhone(input?: string | null) {
   return digits;
 }
 
+function formatPhoneDisplay(input?: string | null) {
+  if (!input) return '';
+  const digits = input.replace(/\D/g, '');
+  const usDigits = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+  if (usDigits.length === 10) {
+    const area = usDigits.slice(0, 3);
+    const exchange = usDigits.slice(3, 6);
+    const line = usDigits.slice(6);
+    return `+1 (${area}) ${exchange}-${line}`;
+  }
+  return input;
+}
+
+function formatStatusLabel(input?: string | null) {
+  const value = (input ?? '').trim();
+  if (!value) {
+    return 'Ringing';
+  }
+  return value
+    .split(/[\s_-]+/)
+    .filter(Boolean)
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1).toLowerCase())
+    .join(' ');
+}
+
 type TrustedContact = {
   caller_number?: string | null;
   contact_name?: string | null;
@@ -45,11 +71,16 @@ export default function ActiveCallScreen() {
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [elapsedLabel, setElapsedLabel] = useState('0:00');
   const [trustedDisplayName, setTrustedDisplayName] = useState<string | null>(null);
+  const [showIdentityFallback, setShowIdentityFallback] = useState(false);
   const ringPulse = useRef(new Animated.Value(0)).current;
   const statusPulse = useRef(new Animated.Value(0)).current;
+  const identitySkeletonPulse = useRef(new Animated.Value(0)).current;
 
+  const callSid = route.params?.callSid ?? '';
   const fromNumber = route.params?.fromNumber ?? '';
   const status = route.params?.status || 'Ringing';
+  const displayNumber = useMemo(() => formatPhoneDisplay(fromNumber), [fromNumber]);
+  const statusLabel = useMemo(() => formatStatusLabel(status), [status]);
 
   console.log('[ActiveCallScreen] Render with params:', {
     fromNumber,
@@ -66,13 +97,24 @@ export default function ActiveCallScreen() {
       setConnectedAt(Date.now());
     }
   }, [status, connectedAt]);
-  const callerTitle = trustedDisplayName || fromNumber || 'Active Call';
-  const callerSubtitle = trustedDisplayName && fromNumber ? fromNumber : 'Protected line';
+  const hasCallerIdentity = Boolean(trustedDisplayName || displayNumber);
+  const showIdentitySkeleton = !hasCallerIdentity && !showIdentityFallback;
+  const callerTitle = trustedDisplayName || displayNumber || (showIdentityFallback ? 'Active Call' : '');
+  const callerSubtitle =
+    trustedDisplayName && displayNumber ? displayNumber : showIdentityFallback ? 'Protected line' : '';
   const initials = useMemo(() => {
     const source = callerTitle.trim() || 'TC';
     const parts = source.split(/\s+/).slice(0, 2);
     return parts.map((item) => item.charAt(0).toUpperCase()).join('');
   }, [callerTitle]);
+
+  useEffect(() => {
+    setShowIdentityFallback(false);
+    const timer = setTimeout(() => {
+      setShowIdentityFallback(true);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [callSid]);
 
   useEffect(() => {
     if (!connectedAt) {
@@ -143,19 +185,50 @@ export default function ActiveCallScreen() {
     };
   }, [ringPulse, statusPulse]);
 
+  useEffect(() => {
+    if (!showIdentitySkeleton) {
+      identitySkeletonPulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(identitySkeletonPulse, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(identitySkeletonPulse, {
+          toValue: 0,
+          duration: 700,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => {
+      loop.stop();
+      identitySkeletonPulse.setValue(0);
+    };
+  }, [identitySkeletonPulse, showIdentitySkeleton]);
+
   const toggleMute = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     const next = !muted;
     TwilioVoice.setMuted(next);
     setMuted(next);
   };
 
   const toggleSpeaker = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     const next = !speakerOn;
     TwilioVoice.setSpeakerPhone(next);
     setSpeakerOn(next);
   };
 
   const endCall = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => null);
     TwilioVoice.disconnect();
   };
 
@@ -175,6 +248,10 @@ export default function ActiveCallScreen() {
   const statusOpacity = statusPulse.interpolate({
     inputRange: [0, 1],
     outputRange: [0.3, 0],
+  });
+  const skeletonOpacity = identitySkeletonPulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.35, 0.7],
   });
 
   const renderControl = (
@@ -222,14 +299,23 @@ export default function ActiveCallScreen() {
           </View>
           <Text style={styles.statusPillText}>TRUSTED LINE</Text>
         </View>
-        <Text style={styles.callerName} numberOfLines={1}>
-          {callerTitle}
-        </Text>
-        <Text style={styles.callerNumber} numberOfLines={1}>
-          {callerSubtitle}
-        </Text>
+        {showIdentitySkeleton ? (
+          <Animated.View style={[styles.identitySkeleton, { opacity: skeletonOpacity }]}>
+            <View style={styles.identitySkeletonName} />
+            <View style={styles.identitySkeletonNumber} />
+          </Animated.View>
+        ) : (
+          <>
+            <Text style={styles.callerName} numberOfLines={1}>
+              {callerTitle}
+            </Text>
+            <Text style={styles.callerNumber} numberOfLines={1}>
+              {callerSubtitle}
+            </Text>
+          </>
+        )}
         <Text style={styles.timer}>
-          {status} • {elapsedLabel}
+          {statusLabel} • {elapsedLabel}
         </Text>
       </View>
 
@@ -283,8 +369,8 @@ const createStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
     },
     topBlock: {
       alignItems: 'center',
-      paddingTop: 18,
-      gap: 8,
+      paddingTop: 14,
+      gap: 0,
     },
     statusPill: {
       minHeight: 32,
@@ -328,20 +414,42 @@ const createStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
       fontWeight: '700',
       textAlign: 'center',
       lineHeight: 44,
+      marginTop: 10,
+      marginBottom: 2,
     },
     callerNumber: {
       color: theme.colors.textMuted,
       fontSize: 19,
       fontWeight: '500',
       textAlign: 'center',
+      marginBottom: 8,
+    },
+    identitySkeleton: {
+      alignItems: 'center',
+      marginTop: 10,
+      marginBottom: 10,
+      gap: 10,
+    },
+    identitySkeletonName: {
+      width: 148,
+      height: 42,
+      borderRadius: 12,
+      backgroundColor: withOpacity(theme.colors.text, mode === 'dark' ? 0.16 : 0.11),
+    },
+    identitySkeletonNumber: {
+      width: 190,
+      height: 24,
+      borderRadius: 10,
+      backgroundColor: withOpacity(theme.colors.text, mode === 'dark' ? 0.13 : 0.09),
     },
     timer: {
-      color: withOpacity(theme.colors.textMuted, 0.86),
+      color: withOpacity(theme.colors.accent, mode === 'dark' ? 0.8 : 0.74),
       fontSize: 14,
       fontWeight: '600',
     },
     middleBlock: {
       alignItems: 'center',
+      marginTop: -10,
     },
     avatarZone: {
       width: 224,
@@ -405,16 +513,23 @@ const createStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
       borderColor: withOpacity(theme.colors.text, mode === 'dark' ? 0.12 : 0.14),
     },
     controlCircleActive: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: withOpacity(theme.colors.accent, mode === 'dark' ? 0.2 : 0.16),
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, mode === 'dark' ? 0.55 : 0.36),
+      shadowColor: theme.colors.accent,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: mode === 'dark' ? 0.18 : 0.1,
+      shadowRadius: 14,
     },
     controlCirclePressed: {
       transform: [{ scale: 0.95 }],
+      opacity: 0.9,
     },
     controlIconIdle: {
       color: theme.colors.text,
     },
     controlIconActive: {
-      color: '#0B1320',
+      color: theme.colors.accent,
     },
     controlLabel: {
       color: withOpacity(theme.colors.textMuted, 0.95),
@@ -439,6 +554,7 @@ const createStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
     },
     endButtonPressed: {
       transform: [{ scale: 0.95 }],
+      opacity: 0.92,
     },
     endIcon: {
       transform: [{ rotate: '135deg' }],

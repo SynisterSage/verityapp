@@ -406,14 +406,8 @@ function AppTabs() {
 }
 
 function RootNavigator() {
-  const { session, isLoading } = useAuth();
-  const { onboardingComplete, isLoading: profileLoading, authInvalid } = useProfile();
-
-  const isBusy = isLoading || (session && profileLoading);
-
-  if (isBusy) {
-    return <SplashScreen />;
-  }
+  const { session } = useAuth();
+  const { onboardingComplete, authInvalid } = useProfile();
 
   return (
     <RootStack.Navigator>
@@ -796,8 +790,16 @@ function NavigationHost() {
     session,
     profileLoading,
   ]);
+  const sessionKey = session?.user?.id ?? '__anon__';
+  const [readySessionKey, setReadySessionKey] = useState<string | null>(null);
   const [splashVisible, setSplashVisible] = useState(true);
   const [navigationReady, setNavigationReady] = useState(false);
+
+  useEffect(() => {
+    if (!isBusy) {
+      setReadySessionKey((prev) => (prev === sessionKey ? prev : sessionKey));
+    }
+  }, [isBusy, sessionKey]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -806,7 +808,9 @@ function NavigationHost() {
     return () => clearTimeout(timer);
   }, []);
 
-  if (isBusy || splashVisible) {
+  const waitingForSessionBootstrap = readySessionKey !== sessionKey;
+
+  if (waitingForSessionBootstrap || splashVisible) {
     return <SplashScreen />;
   }
 

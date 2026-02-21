@@ -1092,6 +1092,7 @@ export default function CallDetailScreen({
           }
           secondaryBackgroundColor={secondaryBackgroundColor}
           secondaryTextColor={secondaryTextColor}
+          secondaryTextStyle={styles.footerSecondaryMatchPrimaryText}
           secondaryDisabled={footerDisabledSafe}
           secondaryLoading={isMarkingSafe}
         />
@@ -1240,7 +1241,7 @@ const createCallDetailStyles = (theme: AppTheme) =>
       borderColor: withOpacity(theme.colors.text, 0.1),
     },
     popupBackIcon: {
-      transform: [{ rotate: '90deg' }],
+      transform: [{ rotate: '-90deg' }],
     },
     headerTitle: {
       color: theme.colors.text,
@@ -1267,9 +1268,12 @@ const createCallDetailStyles = (theme: AppTheme) =>
       fontSize: 12,
     },
     content: {
-    paddingHorizontal: 24,
-    paddingTop: 8,
-  },
+      paddingHorizontal: 24,
+      paddingTop: 8,
+    },
+    footerSecondaryMatchPrimaryText: {
+      fontSize: 18,
+    },
     heroBlock: {
       paddingTop: 12,
       paddingBottom: 18,

@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
     height: 40,
   },
   popupBackIcon: {
-    transform: [{ rotate: '90deg' }],
+    transform: [{ rotate: '-90deg' }],
   },
   textStack: {
     flex: 1,

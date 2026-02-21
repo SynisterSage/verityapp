@@ -642,7 +642,7 @@ export default function TrustedContactsScreen() {
         });
       });
 
-      const updates: Array<{ number: string; name: string }> = [];
+      const updates: Array<{ number: string; name: string; relationshipTag: string }> = [];
       trustedList.forEach((entry) => {
         if (entry.source !== 'contacts') return;
         const normalized = normalizePhoneNumber(entry.caller_number ?? '');
@@ -654,7 +654,14 @@ export default function TrustedContactsScreen() {
           mappedName !== contactMap[normalized]?.name &&
           mappedName !== entry.contact_name
         ) {
-          updates.push({ number: normalized, name: mappedName });
+          updates.push({
+            number: normalized,
+            name: mappedName,
+            relationshipTag:
+              entry.relationship_tag ??
+              contactMap[normalized]?.relationship ??
+              'Friend',
+          });
         }
       });
 
@@ -666,6 +673,7 @@ export default function TrustedContactsScreen() {
               body: JSON.stringify({
                 profileId: activeProfile.id,
                 callerNumber: update.number,
+                relationshipTag: update.relationshipTag,
                 contactName: update.name,
               }),
             })
@@ -816,7 +824,7 @@ export default function TrustedContactsScreen() {
                     <Ionicons name="sync-outline" size={18} color="#fff" />
                   )}
                   <Text style={styles.syncButtonText}>
-                    {syncing ? 'Syncing contacts…' : 'Sync contacts'}
+                    {syncing ? 'Syncing Contacts…' : 'Sync Contacts'}
                   </Text>
                 </Pressable>
               </View>

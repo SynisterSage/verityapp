@@ -400,7 +400,7 @@ const createCircleStyles = (theme: AppTheme) =>
       backgroundColor: withOpacity(theme.colors.text, 0.04),
     },
     popupBackIcon: {
-      transform: [{ rotate: '90deg' }],
+      transform: [{ rotate: '-90deg' }],
     },
     headerContent: {
       flex: 1,

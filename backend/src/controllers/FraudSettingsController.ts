@@ -506,8 +506,10 @@ async function updateTrustedContact(req: Request, res: Response) {
     contactName?: string;
   };
 
-  if (!profileId || !callerNumber?.trim() || !relationshipTag?.trim()) {
-    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId, callerNumber, or relationshipTag' });
+  if (!profileId || !callerNumber?.trim()) {
+    return res
+      .status(HTTP_STATUS_CODES.BadRequest)
+      .json({ error: 'Missing profileId or callerNumber' });
   }
 
   const allowed =
@@ -551,11 +553,17 @@ async function updateTrustedContact(req: Request, res: Response) {
 
   const callerHash = existing.caller_hash;
 
-  const updates: Record<string, string> = {
-    relationship_tag: relationshipTag.trim(),
-  };
+  const updates: Record<string, string> = {};
+  if (relationshipTag?.trim()) {
+    updates.relationship_tag = relationshipTag.trim();
+  }
   if (contactName?.trim()) {
     updates.contact_name = contactName.trim();
+  }
+  if (Object.keys(updates).length === 0) {
+    return res
+      .status(HTTP_STATUS_CODES.BadRequest)
+      .json({ error: 'No updatable trusted contact fields provided' });
   }
 
   const { error } = await supabaseAdmin
