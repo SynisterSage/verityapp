@@ -7,29 +7,29 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-			13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-			1C95708C7460F60661DEEEB4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */; };
-			3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-			F1A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift */; };
-			F1A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m */; };
-			F1A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */; };
-			F1A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */; };
-			F1A2B3C4D5E6F708192A3B50 /* VerityCallLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityWidget.swift */; };
-				9FA17C325A11B4DBA03E11A0 /* activity-notification.wav in Resources */ = {isa = PBXBuildFile; fileRef = 9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */; };
-				C1E2D3F4A5B6C7D8E9F00111 /* VeritySiriShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */; };
-				A1B2C3D4E5F60718293A4B01 /* WidgetSnapshotModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */; };
-			A1B2C3D4E5F60718293A4B02 /* WidgetSnapshotModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */; };
+		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		1C95708C7460F60661DEEEB4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */; };
+		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		9FA17C325A11B4DBA03E11A0 /* activity-notification.wav in Resources */ = {isa = PBXBuildFile; fileRef = 9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */; };
+		A1B2C3D4E5F60718293A4B01 /* WidgetSnapshotModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */; };
+		A1B2C3D4E5F60718293A4B02 /* WidgetSnapshotModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */; };
 		A1B2C3D4E5F60718293A4B03 /* VerityProtectWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C04 /* VerityProtectWidget.swift */; };
 		A1B2C3D4E5F60718293A4B04 /* VerityProtectWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C07 /* VerityProtectWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A2C0D1E4F5A6B7C8D9E0F12 /* ContactPickerModule.swift */; };
 		B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = 2B3D1E2F4A5B6C7D8E9F0012 /* ContactPickerModuleBridge.m */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		C1E2D3F4A5B6C7D8E9F00111 /* VeritySiriShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */; };
 		D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E42D475140FD759215B196 /* ExpoModulesProvider.swift */; };
 		D7DE6E122F40EA8A003E8AC0 /* VoIPPushModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */; };
 		D7DE6E132F40EA8A003E8AC0 /* VoIPPushModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */; };
+		E3F3F15537164A6032B7BD05 /* libPods-VerityProtect.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 46018E7CB6BEEFE2AAD8913C /* libPods-VerityProtect.a */; };
 		E59EC8EC6F913453E714D5A2 /* support-notification.wav in Resources */ = {isa = PBXBuildFile; fileRef = E59EC8EB6F913453E714D5A2 /* support-notification.wav */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
-		FA64FEB802DA64B19DC4BEDD /* libPods-VerityProtect.a in Frameworks */ = {isa = PBXBuildFile; fileRef = E22F18D7E3530F0B8CEAA00C /* libPods-VerityProtect.a */; };
+		F1A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift */; };
+		F1A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m */; };
+		F1A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */; };
+		F1A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */; };
+		F1A2B3C4D5E6F708192A3B50 /* VerityCallLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityWidget.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -53,23 +53,9 @@
 		1A2C0D1E4F5A6B7C8D9E0F12 /* ContactPickerModule.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ContactPickerModule.swift; path = VerityProtect/ContactPickerModule.swift; sourceTree = "<group>"; };
 		2B3D1E2F4A5B6C7D8E9F0012 /* ContactPickerModuleBridge.m */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.c.objcpp; name = ContactPickerModuleBridge.m; path = VerityProtect/ContactPickerModuleBridge.m; sourceTree = "<group>"; };
 		44E42D475140FD759215B196 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-VerityProtect/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		46018E7CB6BEEFE2AAD8913C /* libPods-VerityProtect.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-VerityProtect.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = VerityProtect/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		6DF66467AA921BF3D602E420 /* Pods-VerityProtect.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VerityProtect.debug.xcconfig"; path = "Target Support Files/Pods-VerityProtect/Pods-VerityProtect.debug.xcconfig"; sourceTree = "<group>"; };
-			AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = VerityProtect/SplashScreen.storyboard; sourceTree = "<group>"; };
-			B8C8D21F475E575D07ED45A3 /* Pods-VerityProtect.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VerityProtect.release.xcconfig"; path = "Target Support Files/Pods-VerityProtect/Pods-VerityProtect.release.xcconfig"; sourceTree = "<group>"; };
-			BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
-			C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityProtect/VeritySiriShortcuts.swift; sourceTree = "<group>"; };
-			D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoIPPushModule.swift; sourceTree = "<group>"; };
-			D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VoIPPushModuleBridge.m; sourceTree = "<group>"; };
-		E59EC8EB6F913453E714D5A2 /* support-notification.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "VerityProtect/support-notification.wav"; sourceTree = "<group>"; };
-		E22F18D7E3530F0B8CEAA00C /* libPods-VerityProtect.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-VerityProtect.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-			ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-			F2A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityProtect/VerityLiveActivityModule.swift; sourceTree = "<group>"; };
-			F2A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VerityProtect/VerityLiveActivityModuleBridge.m; sourceTree = "<group>"; };
-			F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityCallLiveActivityAttributes.swift; sourceTree = "<group>"; };
-			F2A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityCallLiveActivityWidget.swift; sourceTree = "<group>"; };
-			F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = VerityProtect/AppDelegate.swift; sourceTree = "<group>"; };
-		F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "VerityProtect-Bridging-Header.h"; path = "VerityProtect/VerityProtect-Bridging-Header.h"; sourceTree = "<group>"; };
+		884F74BA46371832DA6D32BD /* Pods-VerityProtect.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VerityProtect.release.xcconfig"; path = "Target Support Files/Pods-VerityProtect/Pods-VerityProtect.release.xcconfig"; sourceTree = "<group>"; };
 		9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "VerityProtect/activity-notification.wav"; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WidgetSnapshotModule.swift; path = VerityProtect/WidgetSnapshotModule.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = WidgetSnapshotModuleBridge.m; path = VerityProtect/WidgetSnapshotModuleBridge.m; sourceTree = "<group>"; };
@@ -77,6 +63,20 @@
 		A1B2C3D4E5F60718293A4C05 /* VerityProtectWidget.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VerityProtectWidget.entitlements; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4C06 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4C07 /* VerityProtectWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VerityProtectWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = VerityProtect/SplashScreen.storyboard; sourceTree = "<group>"; };
+		B766A7B792C42EF7485E19A3 /* Pods-VerityProtect.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VerityProtect.debug.xcconfig"; path = "Target Support Files/Pods-VerityProtect/Pods-VerityProtect.debug.xcconfig"; sourceTree = "<group>"; };
+		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityProtect/VeritySiriShortcuts.swift; sourceTree = "<group>"; };
+		D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoIPPushModule.swift; sourceTree = "<group>"; };
+		D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VoIPPushModuleBridge.m; sourceTree = "<group>"; };
+		E59EC8EB6F913453E714D5A2 /* support-notification.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "VerityProtect/support-notification.wav"; sourceTree = "<group>"; };
+		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = VerityProtect/AppDelegate.swift; sourceTree = "<group>"; };
+		F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "VerityProtect-Bridging-Header.h"; path = "VerityProtect/VerityProtect-Bridging-Header.h"; sourceTree = "<group>"; };
+		F2A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityProtect/VerityLiveActivityModule.swift; sourceTree = "<group>"; };
+		F2A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VerityProtect/VerityLiveActivityModuleBridge.m; sourceTree = "<group>"; };
+		F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityCallLiveActivityAttributes.swift; sourceTree = "<group>"; };
+		F2A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityCallLiveActivityWidget.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -98,7 +98,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				FA64FEB802DA64B19DC4BEDD /* libPods-VerityProtect.a in Frameworks */,
+				E3F3F15537164A6032B7BD05 /* libPods-VerityProtect.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -115,15 +115,15 @@
 		13B07FAE1A68108700A75B9A /* VerityProtect */ = {
 			isa = PBXGroup;
 			children = (
-					F11748412D0307B40044C1D9 /* AppDelegate.swift */,
-						A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */,
-						A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */,
-						C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */,
-						F2A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift */,
-						F2A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m */,
-						F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */,
-						BB2F792B24A3F905000567C9 /* Supporting */,
-					13B07FB51A68108700A75B9A /* Images.xcassets */,
+				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
+				A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */,
+				A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */,
+				C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */,
+				F2A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift */,
+				F2A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m */,
+				F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */,
+				BB2F792B24A3F905000567C9 /* Supporting */,
+				13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 				5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */,
@@ -137,7 +137,7 @@
 			isa = PBXGroup;
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
-				E22F18D7E3530F0B8CEAA00C /* libPods-VerityProtect.a */,
+				46018E7CB6BEEFE2AAD8913C /* libPods-VerityProtect.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -188,13 +188,13 @@
 		};
 		A1B2C3D4E5F60718293A4D01 /* VerityProtectWidget */ = {
 			isa = PBXGroup;
-				children = (
-					A1B2C3D4E5F60718293A4C04 /* VerityProtectWidget.swift */,
-					F2A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityWidget.swift */,
-					F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */,
-					A1B2C3D4E5F60718293A4C06 /* Info.plist */,
-					A1B2C3D4E5F60718293A4C05 /* VerityProtectWidget.entitlements */,
-				);
+			children = (
+				A1B2C3D4E5F60718293A4C04 /* VerityProtectWidget.swift */,
+				F2A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityWidget.swift */,
+				F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */,
+				A1B2C3D4E5F60718293A4C06 /* Info.plist */,
+				A1B2C3D4E5F60718293A4C05 /* VerityProtectWidget.entitlements */,
+			);
 			path = VerityProtectWidget;
 			sourceTree = "<group>";
 		};
@@ -227,8 +227,8 @@
 		E8B184CA49890DD5BA6265F5 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
-				6DF66467AA921BF3D602E420 /* Pods-VerityProtect.debug.xcconfig */,
-				B8C8D21F475E575D07ED45A3 /* Pods-VerityProtect.release.xcconfig */,
+				B766A7B792C42EF7485E19A3 /* Pods-VerityProtect.debug.xcconfig */,
+				884F74BA46371832DA6D32BD /* Pods-VerityProtect.release.xcconfig */,
 			);
 			path = Pods;
 			sourceTree = "<group>";
@@ -240,16 +240,16 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "VerityProtect" */;
 			buildPhases = (
-				08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */,
+				5DD0178B8AF802571E86542D /* [CP] Check Pods Manifest.lock */,
 				ACC38B5BD04B2334618264CA /* [Expo] Configure project */,
 				13B07F871A680F5B00A75B9A /* Sources */,
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
-				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
 				946A84C54A3A49C8895E46AB /* Upload Debug Symbols to Sentry */,
-				3E0FFCD08558D56BF85BBF0E /* [CP] Embed Pods Frameworks */,
 				D7DE6DDD2F3D555B003E8AC0 /* Embed Foundation Extensions */,
+				1D7C46915A7BD39C904BA004 /* [CP] Embed Pods Frameworks */,
+				FE6AA3BA779E41968DED7584 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
 			);
@@ -357,29 +357,7 @@
 			shellPath = /bin/sh;
 			shellScript = "if [[ -f \"$PODS_ROOT/../.xcode.env\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env\"\nfi\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n# The project root by default is one level up from the ios directory\nexport PROJECT_ROOT=\"$PROJECT_DIR\"/..\n\nif [[ \"$CONFIGURATION\" = *Debug* ]]; then\n  export SKIP_BUNDLING=1\nfi\nif [[ -z \"$ENTRY_FILE\" ]]; then\n  # Set the entry JS file using the bundler's entry resolution.\n  export ENTRY_FILE=\"$(\"$NODE_BINARY\" -e \"require('expo/scripts/resolveAppEntry')\" \"$PROJECT_ROOT\" ios absolute | tail -n 1)\"\nfi\n\nif [[ -z \"$CLI_PATH\" ]]; then\n  # Use Expo CLI\n  export CLI_PATH=\"$(\"$NODE_BINARY\" --print \"require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })\")\"\nfi\nif [[ -z \"$BUNDLE_COMMAND\" ]]; then\n  # Default Expo CLI command for bundling\n  export BUNDLE_COMMAND=\"export:embed\"\nfi\n\n# Source .xcode.env.updates if it exists to allow\n# SKIP_BUNDLING to be unset if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.updates\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.updates\"\nfi\n# Source local changes to allow overrides\n# if needed\nif [[ -f \"$PODS_ROOT/../.xcode.env.local\" ]]; then\n  source \"$PODS_ROOT/../.xcode.env.local\"\nfi\n\n/bin/sh `\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('@sentry/react-native/package.json')) + '/scripts/sentry-xcode.sh'\"` `\"$NODE_BINARY\" --print \"require('path').dirname(require.resolve('react-native/package.json')) + '/scripts/react-native-xcode.sh'\"`\n\n";
 		};
-		08A4A3CD28434E44B6B9DE2E /* [CP] Check Pods Manifest.lock */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
-				"${PODS_ROOT}/Manifest.lock",
-			);
-			name = "[CP] Check Pods Manifest.lock";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-				"$(DERIVED_FILE_DIR)/Pods-VerityProtect-checkManifestLockResult.txt",
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
-			showEnvVarsInLog = 0;
-		};
-		3E0FFCD08558D56BF85BBF0E /* [CP] Embed Pods Frameworks */ = {
+		1D7C46915A7BD39C904BA004 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -399,44 +377,26 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-VerityProtect/Pods-VerityProtect-frameworks.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
-		800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */ = {
+		5DD0178B8AF802571E86542D /* [CP] Check Pods Manifest.lock */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
-			inputPaths = (
-				"${PODS_ROOT}/Target Support Files/Pods-VerityProtect/Pods-VerityProtect-resources.sh",
-				"${PODS_CONFIGURATION_BUILD_DIR}/EXApplication/ExpoApplication_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/RCT-Folly/RCT-Folly_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/RNCAsyncStorage/RNCAsyncStorage_resources.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/RNSVG/RNSVGFilters.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/Sentry/Sentry.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/boost/boost_privacy.bundle",
-				"${PODS_CONFIGURATION_BUILD_DIR}/glog/glog_privacy.bundle",
+			inputFileListPaths = (
 			);
-			name = "[CP] Copy Pods Resources";
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
 			outputPaths = (
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoApplication_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXConstants.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoConstants_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RCT-Folly_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNCAsyncStorage_resources.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNSVGFilters.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Sentry.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/boost_privacy.bundle",
-				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/glog_privacy.bundle",
+				"$(DERIVED_FILE_DIR)/Pods-VerityProtect-checkManifestLockResult.txt",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-VerityProtect/Pods-VerityProtect-resources.sh\"\n";
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
 			showEnvVarsInLog = 0;
 		};
 		946A84C54A3A49C8895E46AB /* Upload Debug Symbols to Sentry */ = {
@@ -477,36 +437,76 @@
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-VerityProtect/expo-configure-project.sh\"\n";
 		};
+		FE6AA3BA779E41968DED7584 /* [CP] Copy Pods Resources */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"${PODS_ROOT}/Target Support Files/Pods-VerityProtect/Pods-VerityProtect-resources.sh",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXApplication/ExpoApplication_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/EXConstants.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/EXConstants/ExpoConstants_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/ExpoFileSystem/ExpoFileSystem_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RCT-Folly/RCT-Folly_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNCAsyncStorage/RNCAsyncStorage_resources.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/RNSVG/RNSVGFilters.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/React-Core/React-Core_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/React-cxxreact/React-cxxreact_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/Sentry/Sentry.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/boost/boost_privacy.bundle",
+				"${PODS_CONFIGURATION_BUILD_DIR}/glog/glog_privacy.bundle",
+			);
+			name = "[CP] Copy Pods Resources";
+			outputPaths = (
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoApplication_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/EXConstants.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoConstants_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/ExpoFileSystem_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RCT-Folly_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNCAsyncStorage_resources.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/RNSVGFilters.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-Core_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/React-cxxreact_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Sentry.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/boost_privacy.bundle",
+				"${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/glog_privacy.bundle",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-VerityProtect/Pods-VerityProtect-resources.sh\"\n";
+			showEnvVarsInLog = 0;
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		13B07F871A680F5B00A75B9A /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-				files = (
-					D7DE6E122F40EA8A003E8AC0 /* VoIPPushModuleBridge.m in Sources */,
-					D7DE6E132F40EA8A003E8AC0 /* VoIPPushModule.swift in Sources */,
-					F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
-					A1B2C3D4E5F60718293A4B01 /* WidgetSnapshotModule.swift in Sources */,
-					A1B2C3D4E5F60718293A4B02 /* WidgetSnapshotModuleBridge.m in Sources */,
-					C1E2D3F4A5B6C7D8E9F00111 /* VeritySiriShortcuts.swift in Sources */,
-					F1A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift in Sources */,
-					F1A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m in Sources */,
-					F1A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift in Sources */,
-					D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */,
-					A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */,
-					B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */,
-				);
+			files = (
+				D7DE6E122F40EA8A003E8AC0 /* VoIPPushModuleBridge.m in Sources */,
+				D7DE6E132F40EA8A003E8AC0 /* VoIPPushModule.swift in Sources */,
+				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				A1B2C3D4E5F60718293A4B01 /* WidgetSnapshotModule.swift in Sources */,
+				A1B2C3D4E5F60718293A4B02 /* WidgetSnapshotModuleBridge.m in Sources */,
+				C1E2D3F4A5B6C7D8E9F00111 /* VeritySiriShortcuts.swift in Sources */,
+				F1A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift in Sources */,
+				F1A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m in Sources */,
+				F1A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift in Sources */,
+				D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */,
+				A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */,
+				B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A1B2C3D4E5F60718293A4E01 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-				files = (
-					A1B2C3D4E5F60718293A4B03 /* VerityProtectWidget.swift in Sources */,
-					F1A2B3C4D5E6F708192A3B50 /* VerityCallLiveActivityWidget.swift in Sources */,
-					F1A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityAttributes.swift in Sources */,
-				);
+			files = (
+				A1B2C3D4E5F60718293A4B03 /* VerityProtectWidget.swift in Sources */,
+				F1A2B3C4D5E6F708192A3B50 /* VerityCallLiveActivityWidget.swift in Sources */,
+				F1A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityAttributes.swift in Sources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
@@ -514,7 +514,7 @@
 /* Begin XCBuildConfiguration section */
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 6DF66467AA921BF3D602E420 /* Pods-VerityProtect.debug.xcconfig */;
+			baseConfigurationReference = B766A7B792C42EF7485E19A3 /* Pods-VerityProtect.debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -556,7 +556,7 @@
 		};
 		13B07F951A680F5B00A75B9A /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = B8C8D21F475E575D07ED45A3 /* Pods-VerityProtect.release.xcconfig */;
+			baseConfigurationReference = 884F74BA46371832DA6D32BD /* Pods-VerityProtect.release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
@@ -587,56 +587,6 @@
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VERSIONING_SYSTEM = "apple-generic";
-			};
-			name = Release;
-		};
-		A1B2C3D4E5F60718293A4F03 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = VerityProtectWidget/VerityProtectWidget.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = CAY3N8J725;
-				INFOPLIST_FILE = VerityProtectWidget/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.lexferguson.verityprotect.com.widget;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		A1B2C3D4E5F60718293A4F04 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				APPLICATION_EXTENSION_API_ONLY = YES;
-				CLANG_ENABLE_MODULES = YES;
-				CODE_SIGN_ENTITLEMENTS = VerityProtectWidget/VerityProtectWidget.entitlements;
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = CAY3N8J725;
-				INFOPLIST_FILE = VerityProtectWidget/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.0.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.lexferguson.verityprotect.com.widget;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -756,6 +706,58 @@
 			};
 			name = Release;
 		};
+		A1B2C3D4E5F60718293A4F03 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VerityProtectWidget/VerityProtectWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CAY3N8J725;
+				INFOPLIST_FILE = VerityProtectWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = com.lexferguson.verityprotect.com.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1B2C3D4E5F60718293A4F04 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CODE_SIGN_ENTITLEMENTS = VerityProtectWidget/VerityProtectWidget.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = CAY3N8J725;
+				INFOPLIST_FILE = VerityProtectWidget/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0.0;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = com.lexferguson.verityprotect.com.widget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -768,20 +770,20 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A1B2C3D4E5F60718293A4F02 /* Build configuration list for PBXNativeTarget "VerityProtectWidgetExtension" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				A1B2C3D4E5F60718293A4F03 /* Debug */,
-				A1B2C3D4E5F60718293A4F04 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
 		83CBB9FA1A601CBA00E9B192 /* Build configuration list for PBXProject "VerityProtect" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1B2C3D4E5F60718293A4F02 /* Build configuration list for PBXNativeTarget "VerityProtectWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1B2C3D4E5F60718293A4F03 /* Debug */,
+				A1B2C3D4E5F60718293A4F04 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

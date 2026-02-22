@@ -57,6 +57,8 @@
 	<string>Location lets us find care professionals nearby to add to your trusted list.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to access your microphone</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>NSVoIPUsageDescription</key>
 	<string>Allow $(PRODUCT_NAME) to run in the background, to wake for calls</string>
 	<key>RCTNewArchEnabled</key>
@@ -66,8 +68,6 @@
 		<string>voip</string>
 		<string>remote-notification</string>
 	</array>
-	<key>NSSupportsLiveActivities</key>
-	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>SplashScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
