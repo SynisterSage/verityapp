@@ -50,15 +50,32 @@ echo "NODE_ENV=${NODE_ENV:-<unset>}"
 
 echo "Installing JavaScript dependencies..."
 if [ -f package-lock.json ]; then
-  npm ci --include=dev --no-audit --no-fund || npm ci --no-audit --no-fund || npm install --include=dev --no-audit --no-fund || npm install --no-audit --no-fund
+  npm ci --include=dev --ignore-scripts --no-audit --no-fund || npm ci --ignore-scripts --no-audit --no-fund || npm install --include=dev --ignore-scripts --no-audit --no-fund || npm install --ignore-scripts --no-audit --no-fund
 else
-  npm install --include=dev --no-audit --no-fund || npm install --no-audit --no-fund
+  npm install --include=dev --ignore-scripts --no-audit --no-fund || npm install --ignore-scripts --no-audit --no-fund
+fi
+
+if [ -d patches ] && [ -n "$(ls -A patches 2>/dev/null)" ]; then
+  echo "Applying patch-package patches..."
+  if [ -x "./node_modules/.bin/patch-package" ]; then
+    ./node_modules/.bin/patch-package
+  else
+    npx --yes patch-package
+  fi
 fi
 
 echo "Installing CocoaPods dependencies..."
 cd ios
 if ! command -v pod >/dev/null 2>&1; then
-  echo "CocoaPods not found. Attempting gem user install..."
+  echo "CocoaPods not found. Attempting brew install..."
+  if command -v brew >/dev/null 2>&1; then
+    HOMEBREW_NO_AUTO_UPDATE=1 brew install cocoapods || true
+    export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+  fi
+fi
+
+if ! command -v pod >/dev/null 2>&1; then
+  echo "CocoaPods still not found. Attempting gem user install..."
   if command -v gem >/dev/null 2>&1; then
     gem install --user-install cocoapods --no-document || true
     GEM_USER_BIN="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin"
