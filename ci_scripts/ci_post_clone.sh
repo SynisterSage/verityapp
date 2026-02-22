@@ -25,7 +25,7 @@ cd "$FRONTEND_DIR"
 export NPM_CONFIG_PRODUCTION=false
 export NODE_ENV=development
 
-if ! command -v node >/dev/null 2>&1; then
+if ! node -v >/dev/null 2>&1; then
   echo "Node not found. Attempting install via Homebrew..."
   if command -v brew >/dev/null 2>&1; then
     HOMEBREW_NO_AUTO_UPDATE=1 brew install node@20 || HOMEBREW_NO_AUTO_UPDATE=1 brew install node || true
@@ -33,12 +33,12 @@ if ! command -v node >/dev/null 2>&1; then
   fi
 fi
 
-if ! command -v node >/dev/null 2>&1; then
+if ! node -v >/dev/null 2>&1; then
   echo "error: node command not found after install attempt"
   exit 127
 fi
 
-if ! command -v npm >/dev/null 2>&1; then
+if ! npm -v >/dev/null 2>&1; then
   echo "error: npm command not found"
   exit 127
 fi
@@ -59,14 +59,18 @@ if [ -d patches ] && [ -n "$(ls -A patches 2>/dev/null)" ]; then
   echo "Applying patch-package patches..."
   if [ -x "./node_modules/.bin/patch-package" ]; then
     ./node_modules/.bin/patch-package
+  elif [ -f "./node_modules/patch-package/index.js" ]; then
+    node ./node_modules/patch-package/index.js
+  elif [ -f "./node_modules/patch-package/dist/index.js" ]; then
+    node ./node_modules/patch-package/dist/index.js
   else
-    npx --yes patch-package
+    echo "warning: patch-package binary not found; skipping patch application"
   fi
 fi
 
 echo "Installing CocoaPods dependencies..."
 cd ios
-if ! command -v pod >/dev/null 2>&1; then
+if ! pod --version >/dev/null 2>&1; then
   echo "CocoaPods not found. Attempting brew install..."
   if command -v brew >/dev/null 2>&1; then
     HOMEBREW_NO_AUTO_UPDATE=1 brew install cocoapods || true
@@ -74,7 +78,7 @@ if ! command -v pod >/dev/null 2>&1; then
   fi
 fi
 
-if ! command -v pod >/dev/null 2>&1; then
+if ! pod --version >/dev/null 2>&1; then
   echo "CocoaPods still not found. Attempting gem user install..."
   if command -v gem >/dev/null 2>&1; then
     gem install --user-install cocoapods --no-document || true
@@ -83,7 +87,7 @@ if ! command -v pod >/dev/null 2>&1; then
   fi
 fi
 
-if ! command -v pod >/dev/null 2>&1; then
+if ! pod --version >/dev/null 2>&1; then
   echo "error: pod command not found after install attempt"
   exit 127
 fi
