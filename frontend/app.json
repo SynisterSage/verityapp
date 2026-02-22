@@ -62,7 +62,24 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "3c07d22a-d47c-4729-b40b-f28fc78a5ecc"
+        "projectId": "3c07d22a-d47c-4729-b40b-f28fc78a5ecc",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "VerityProtectWidgetExtension",
+                  "bundleIdentifier": "com.lexferguson.verityprotect.com.widget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.lexferguson.verityprotect.com"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     },
     "owner": "synastrr"
