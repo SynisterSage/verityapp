@@ -23,7 +23,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { authorizedFetch } from '../../services/backend';
 import AlertCard from '../../components/alerts/AlertCard';
 import EmptyState from '../../components/common/EmptyState';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native';
 import { supabase } from '../../services/supabase';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -35,9 +35,8 @@ import { getRiskStyles } from '../../utils/risk';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import type { AppTheme } from '../../theme/tokens';
 import type { CircleActivityItem } from './circleActivityTypes';
-import { useNavigation } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
-import type { RootStackParamList } from '../../navigation/types';
+import type { RootStackParamList, TabParamList } from '../../navigation/types';
 import { AlertRow } from './alertTypes';
 import { CIRCLE_ALERT_TYPES } from './circleActivityConstants';
 import { formatAlertDateLabel, formatAlertTime, parseAlertTimestamp } from './alertTimeUtils';
@@ -126,7 +125,16 @@ export default function AlertsScreen() {
   );
   const [activeTrayAction, setActiveTrayAction] = useState<'delete' | null>(null);
   const [activeMode, setActiveMode] = useState<AlertsModeKey>('needs');
+  const route = useRoute<RouteProp<TabParamList, 'AlertsTab'>>();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
+
+  useEffect(() => {
+    const requestedMode = route.params?.initialMode;
+    if (!requestedMode) {
+      return;
+    }
+    setActiveMode(requestedMode);
+  }, [route.params?.initialMode]);
 
   const handleSupportPress = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);

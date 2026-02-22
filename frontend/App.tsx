@@ -13,7 +13,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Alert, Platform, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Platform, StyleSheet, View } from 'react-native';
 import {
   SafeAreaProvider,
   initialWindowMetrics,
@@ -76,6 +76,7 @@ import {
   SettingsStackParamList,
 } from './src/navigation/types';
 import { rootNavigationRef } from './src/navigation/rootNavigator';
+import { consumePendingSiriRoute as consumePendingSiriRouteNative } from './src/native/WidgetSnapshot';
 import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientManager';
 import * as Sentry from '@sentry/react-native';
 import { logEvent } from './src/services/sentry';
@@ -106,8 +107,10 @@ enableScreens(true);
 type PendingNotificationData = {
   callId?: string;
   alertId?: string;
+  alertsMode?: 'needs' | 'history';
   routeTarget?:
     | 'call_detail'
+    | 'calls_all'
     | 'calls_trusted'
     | 'circle_activity'
     | 'alerts'
@@ -133,6 +136,15 @@ function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'
     return 'call_detail';
   }
   if (
+    normalized === 'calls_all' ||
+    normalized === 'callsall' ||
+    normalized === 'calls-all' ||
+    normalized === 'calls' ||
+    normalized === 'call'
+  ) {
+    return 'calls_all';
+  }
+  if (
     normalized === 'calls_trusted' ||
     normalized === 'callstrusted' ||
     normalized === 'calls-trusted'
@@ -155,6 +167,30 @@ function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'
     normalized === 'support-portal'
   ) {
     return 'support_portal';
+  }
+  return undefined;
+}
+
+function parseAlertsMode(value: unknown): PendingNotificationData['alertsMode'] {
+  const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  if (!normalized) {
+    return undefined;
+  }
+  if (
+    normalized === 'needs' ||
+    normalized === 'needs_attention' ||
+    normalized === 'needs-attention' ||
+    normalized === 'attention'
+  ) {
+    return 'needs';
+  }
+  if (
+    normalized === 'history' ||
+    normalized === 'handled' ||
+    normalized === 'archive' ||
+    normalized === 'archived'
+  ) {
+    return 'history';
   }
   return undefined;
 }
@@ -218,6 +254,7 @@ function parseNotificationPayload(data: Record<string, unknown>): PendingNotific
   const callId = readDataString(data, 'callId', 'call_id');
   const alertId = readDataString(data, 'alertId', 'alert_id');
   const alertType = readDataString(data, 'alertType', 'alert_type');
+  const alertsMode = parseAlertsMode(readDataString(data, 'alertsMode', 'alerts_mode'));
   const supportTicketId = readDataString(data, 'supportTicketId', 'support_ticket_id');
   const supportMessageId = readDataString(data, 'supportMessageId', 'support_message_id');
   const parsedRoute = parseRouteTarget(readDataString(data, 'routeTarget', 'route_target', 'route'));
@@ -231,7 +268,7 @@ function parseNotificationPayload(data: Record<string, unknown>): PendingNotific
       hasSupportTicketData: Boolean(supportTicketId || supportMessageId),
     });
 
-  return { callId, alertId, alertType, routeTarget };
+  return { callId, alertId, alertType, alertsMode, routeTarget };
 }
 
 function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
@@ -241,13 +278,22 @@ function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
   if (!path) {
     return null;
   }
-  const [firstSegment] = path.split('/').filter(Boolean);
+  const segments = path.split('/').filter(Boolean);
+  const [firstSegment, secondSegment] = segments;
   if (!firstSegment) {
     return null;
   }
 
   if (firstSegment === 'alerts') {
-    return { routeTarget: 'alerts' };
+    const modeParam = parsed.queryParams?.mode;
+    const modeValue =
+      typeof modeParam === 'string'
+        ? modeParam
+        : Array.isArray(modeParam)
+        ? modeParam[0]
+        : '';
+    const parsedMode = parseAlertsMode(modeValue) ?? parseAlertsMode(secondSegment);
+    return { routeTarget: 'alerts', alertsMode: parsedMode };
   }
   if (
     firstSegment === 'support' ||
@@ -267,6 +313,10 @@ function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
     if (filterValue.trim().toLowerCase() === 'trusted') {
       return { routeTarget: 'calls_trusted' };
     }
+    if (secondSegment?.trim().toLowerCase() === 'trusted') {
+      return { routeTarget: 'calls_trusted' };
+    }
+    return { routeTarget: 'calls_all' };
   }
   return null;
 }
@@ -745,6 +795,21 @@ function NavigationHost() {
       );
       return;
     }
+    if (payload.routeTarget === 'calls_all') {
+      rootNavigationRef.current.dispatch(
+        CommonActions.navigate({
+          name: 'AppTabs',
+          params: {
+            screen: 'CallsTab',
+            params: {
+              screen: 'Calls',
+              params: { initialFilter: 'all' },
+            },
+          },
+        })
+      );
+      return;
+    }
     if (payload.routeTarget === 'circle_activity') {
       rootNavigationRef.current.navigate('CircleActivityModal', { activities: [] });
       return;
@@ -757,11 +822,31 @@ function NavigationHost() {
       rootNavigationRef.current.dispatch(
         CommonActions.navigate({
           name: 'AppTabs',
-          params: { screen: 'AlertsTab' },
+          params: {
+            screen: 'AlertsTab',
+            params: payload.alertsMode ? { initialMode: payload.alertsMode } : undefined,
+          },
         })
       );
     }
   }, [session]);
+
+  const consumePendingSiriRoute = useCallback(async () => {
+    try {
+      const route = await consumePendingSiriRouteNative();
+      if (!route) {
+        return;
+      }
+      const payload = parseWidgetRoutePayload(route);
+      if (!payload) {
+        return;
+      }
+      pendingNotificationRef.current = payload;
+      resolvePendingNotification();
+    } catch {
+      // No-op: Siri route handoff is best-effort.
+    }
+  }, [resolvePendingNotification]);
 
   useEffect(() => {
     const handleRouteUrl = (url?: string | null) => {
@@ -787,6 +872,16 @@ function NavigationHost() {
 
     return () => subscription.remove();
   }, [resolvePendingNotification]);
+
+  useEffect(() => {
+    void consumePendingSiriRoute();
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void consumePendingSiriRoute();
+      }
+    });
+    return () => subscription.remove();
+  }, [consumePendingSiriRoute]);
 
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync()

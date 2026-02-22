@@ -9,6 +9,7 @@ class WidgetSnapshotModule: NSObject {
   private let historyCountKey = "alertsWidget.historyCount"
   private let lastUpdatedKey = "alertsWidget.lastUpdatedEpochSeconds"
   private let profileIdKey = "alertsWidget.profileId"
+  private let pendingSiriRouteKey = "alertsWidget.pendingSiriRoute"
   private let widgetKinds = [
     "VerityProtectAlertsWidget",
     "VerityProtectHistoryWidget",
@@ -81,5 +82,23 @@ class WidgetSnapshotModule: NSObject {
     }
 
     resolver(["ok": true])
+  }
+
+  @objc
+  func consumePendingSiriRoute(
+    _ resolver: @escaping RCTPromiseResolveBlock,
+    rejecter: @escaping RCTPromiseRejectBlock
+  ) {
+    guard let defaults = UserDefaults(suiteName: appGroupIdentifier) else {
+      rejecter("WIDGET_STORE_ERROR", "Unable to access shared widget storage", nil)
+      return
+    }
+
+    let route = defaults.string(forKey: pendingSiriRouteKey)
+    defaults.removeObject(forKey: pendingSiriRouteKey)
+    resolver([
+      "ok": true,
+      "route": route as Any,
+    ])
   }
 }

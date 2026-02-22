@@ -34,7 +34,7 @@ export type RootStackParamList = {
 export type TabParamList = {
   HomeTab: undefined;
   CallsTab: NavigatorScreenParams<CallsStackParamList> | undefined;
-  AlertsTab: undefined;
+  AlertsTab: { initialMode?: 'needs' | 'history' } | undefined;
   SettingsTab: NavigatorScreenParams<SettingsStackParamList> | undefined;
 };
 

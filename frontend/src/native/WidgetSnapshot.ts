@@ -9,6 +9,7 @@ const WidgetSnapshotModule = NativeModules.WidgetSnapshotModule as
         lastUpdatedEpochSeconds?: number;
       }) => Promise<unknown>;
       clearSnapshot: () => Promise<unknown>;
+      consumePendingSiriRoute: () => Promise<{ route?: string | null } | unknown>;
     }
   | undefined;
 
@@ -34,4 +35,14 @@ export async function updateWidgetSnapshot(payload: WidgetSnapshotPayload) {
 export async function clearWidgetSnapshot() {
   if (Platform.OS !== 'ios') return;
   await ensureModule().clearSnapshot();
+}
+
+export async function consumePendingSiriRoute(): Promise<string | null> {
+  if (Platform.OS !== 'ios') return null;
+  const result = (await ensureModule().consumePendingSiriRoute()) as
+    | { route?: string | null }
+    | undefined
+    | null;
+  const route = result?.route;
+  return typeof route === 'string' && route.trim().length > 0 ? route.trim() : null;
 }
