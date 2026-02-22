@@ -10,7 +10,7 @@ npm ci
 
 echo "Installing CocoaPods dependencies..."
 cd ios
-pod install --repo-update
+pod install
 
 echo "Validating generated CocoaPods xcconfig..."
 test -f "Pods/Target Support Files/Pods-VerityProtect/Pods-VerityProtect.release.xcconfig"

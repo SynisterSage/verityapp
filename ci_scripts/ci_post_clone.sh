@@ -10,6 +10,6 @@ npm ci
 
 echo "Installing CocoaPods dependencies..."
 cd ios
-pod install --repo-update
+pod install
 
 echo "Post-clone setup complete."
