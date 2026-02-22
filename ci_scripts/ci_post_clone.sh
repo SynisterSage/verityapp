@@ -47,32 +47,23 @@ fi
 cd ios
 echo "Using iOS directory: $(pwd)"
 
-if ! command -v bundle >/dev/null 2>&1; then
-  if command -v gem >/dev/null 2>&1; then
-    run gem install --user-install bundler --no-document
+if ! command -v pod >/dev/null 2>&1; then
+  if command -v brew >/dev/null 2>&1; then
+    run brew install cocoapods
+    export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
+  elif command -v gem >/dev/null 2>&1; then
+    run gem install --user-install cocoapods --no-document
     if command -v ruby >/dev/null 2>&1; then
       GEM_USER_BIN="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin"
       export PATH="$GEM_USER_BIN:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
     fi
+  else
+    echo "error: pod is not available and cannot be installed"
+    exit 1
   fi
 fi
 
-if command -v bundle >/dev/null 2>&1; then
-  run bundle config set path vendor/bundle
-  run bundle install --jobs 4 --retry 3
-  run bundle exec pod install --verbose
-else
-  if ! command -v pod >/dev/null 2>&1; then
-    if command -v brew >/dev/null 2>&1; then
-      run brew install cocoapods
-      export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
-    else
-      echo "error: neither bundle nor pod is available"
-      exit 1
-    fi
-  fi
-  run pod --version
-  run pod install --verbose
-fi
+run pod --version
+run pod install --verbose
 
 echo "Post-clone setup complete."
