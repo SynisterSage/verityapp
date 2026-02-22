@@ -908,9 +908,11 @@ export default function CallDetailScreen({
                 <Ionicons name="radio-outline" size={18} color={theme.colors.accent} />
               </View>
               <View style={styles.liveNudgeCopy}>
-                <Text style={styles.liveNudgeTitle}>Track calls on your Lock Screen</Text>
+                <Text numberOfLines={1} style={styles.liveNudgeTitle}>
+                  Track calls on your Lock Screen
+                </Text>
                 <Text style={styles.liveNudgeSubtitle}>
-                  Turn on Live Activities for Verity Protect in iPhone settings.
+                  Turn on Live Activities for Verity Protect in iPhone Settings.
                 </Text>
               </View>
               <Pressable onPress={dismissLiveNudge} style={styles.liveNudgeClose}>
@@ -1362,6 +1364,8 @@ const createCallDetailStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 10,
+      position: 'relative',
+      paddingRight: 34,
     },
     liveNudgeIcon: {
       width: 34,
@@ -1378,15 +1382,18 @@ const createCallDetailStyles = (theme: AppTheme) =>
       color: theme.colors.text,
       fontSize: 15,
       fontWeight: '700',
-      marginBottom: 2,
+      marginBottom: 4,
     },
     liveNudgeSubtitle: {
       color: theme.colors.textMuted,
       fontSize: 12,
       fontWeight: '600',
-      lineHeight: 18,
+      lineHeight: 16,
     },
     liveNudgeClose: {
+      position: 'absolute',
+      top: 0,
+      right: 0,
       width: 28,
       height: 28,
       borderRadius: 14,
