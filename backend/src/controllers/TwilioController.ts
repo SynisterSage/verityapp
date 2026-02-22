@@ -16,6 +16,7 @@ import {
 import { removeBlockedEntry, removeTrustedContact } from '@src/services/callerLists';
 import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
 import { dispatchAlertPush } from '@src/services/alertPushDispatcher';
+import { notifyProfileForAlert } from '@src/services/pushNotifications';
 import { sendVoIPPushToProfile } from '@src/services/voipPush';
 
 const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call is being recorded for safety purposes.';
@@ -119,6 +120,69 @@ async function logTrustedBridgeActivity(args: {
   }
 
   await dispatchAlertPush(alertRow);
+}
+
+function buildCallInReviewBody(fromNumber?: string | null) {
+  const caller = typeof fromNumber === 'string' ? fromNumber.trim() : '';
+  if (caller) {
+    return `New call from ${caller} is ready to review.`;
+  }
+  return 'A new call is ready to review.';
+}
+
+async function dispatchCallInReviewPush(args: {
+  profileId: string;
+  callId: string;
+  fromNumber?: string | null;
+}) {
+  const { profileId, callId, fromNumber } = args;
+  const claimedAt = new Date().toISOString();
+
+  const { data: claimedCall, error: claimError } = await supabaseAdmin
+    .from('calls')
+    .update({ review_push_sent_at: claimedAt })
+    .eq('id', callId)
+    .is('review_push_sent_at', null)
+    .select('id')
+    .maybeSingle();
+
+  if (claimError) {
+    logger.err(
+      `[call-in-review-push] claim failed profile=${profileId} call=${callId} message=${claimError.message}`
+    );
+    return;
+  }
+
+  if (!claimedCall) {
+    return;
+  }
+
+  try {
+    await notifyProfileForAlert(profileId, {
+      alertId: `call-review-${callId}`,
+      callId,
+      title: 'Call In Review',
+      body: buildCallInReviewBody(fromNumber),
+      data: {
+        alertType: 'call_review',
+        alert_type: 'call_review',
+        routeTarget: 'call_detail',
+        route_target: 'call_detail',
+        callId,
+        call_id: callId,
+      },
+    });
+  } catch (error) {
+    logger.err(error as Error);
+    logger.warn(
+      `[call-in-review-push] send failed profile=${profileId} call=${callId}; resetting review_push_sent_at`
+    );
+    await supabaseAdmin
+      .from('calls')
+      .update({ review_push_sent_at: null })
+      .eq('id', callId)
+      .eq('review_push_sent_at', claimedAt);
+  }
 }
 
 function appendVoicemail(
@@ -1149,6 +1213,12 @@ async function recordingReady(req: Request, res: Response) {
           },
         });
       }
+    } else {
+      await dispatchCallInReviewPush({
+        profileId: profile.id,
+        callId: callRow.id,
+        fromNumber: resolvedFrom || null,
+      });
     }
 
     // Auto-trust low-risk callers if enabled

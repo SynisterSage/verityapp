@@ -7,12 +7,17 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
-		1C95708C7460F60661DEEEB4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */; };
-		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
-			9FA17C325A11B4DBA03E11A0 /* activity-notification.wav in Resources */ = {isa = PBXBuildFile; fileRef = 9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */; };
-			C1E2D3F4A5B6C7D8E9F00111 /* VeritySiriShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */; };
-			A1B2C3D4E5F60718293A4B01 /* WidgetSnapshotModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */; };
+			13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+			1C95708C7460F60661DEEEB4 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */; };
+			3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+			F1A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift */; };
+			F1A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m */; };
+			F1A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */; };
+			F1A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */; };
+			F1A2B3C4D5E6F708192A3B50 /* VerityCallLiveActivityWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityWidget.swift */; };
+				9FA17C325A11B4DBA03E11A0 /* activity-notification.wav in Resources */ = {isa = PBXBuildFile; fileRef = 9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */; };
+				C1E2D3F4A5B6C7D8E9F00111 /* VeritySiriShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */; };
+				A1B2C3D4E5F60718293A4B01 /* WidgetSnapshotModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */; };
 			A1B2C3D4E5F60718293A4B02 /* WidgetSnapshotModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */; };
 		A1B2C3D4E5F60718293A4B03 /* VerityProtectWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C04 /* VerityProtectWidget.swift */; };
 		A1B2C3D4E5F60718293A4B04 /* VerityProtectWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4C07 /* VerityProtectWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -58,8 +63,12 @@
 			D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VoIPPushModuleBridge.m; sourceTree = "<group>"; };
 		E59EC8EB6F913453E714D5A2 /* support-notification.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "VerityProtect/support-notification.wav"; sourceTree = "<group>"; };
 		E22F18D7E3530F0B8CEAA00C /* libPods-VerityProtect.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-VerityProtect.a"; sourceTree = BUILT_PRODUCTS_DIR; };
-		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
-		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = VerityProtect/AppDelegate.swift; sourceTree = "<group>"; };
+			ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+			F2A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityProtect/VerityLiveActivityModule.swift; sourceTree = "<group>"; };
+			F2A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VerityProtect/VerityLiveActivityModuleBridge.m; sourceTree = "<group>"; };
+			F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityCallLiveActivityAttributes.swift; sourceTree = "<group>"; };
+			F2A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityCallLiveActivityWidget.swift; sourceTree = "<group>"; };
+			F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = VerityProtect/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "VerityProtect-Bridging-Header.h"; path = "VerityProtect/VerityProtect-Bridging-Header.h"; sourceTree = "<group>"; };
 		9FA17C315A11B4DBA03E11A0 /* activity-notification.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "VerityProtect/activity-notification.wav"; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = WidgetSnapshotModule.swift; path = VerityProtect/WidgetSnapshotModule.swift; sourceTree = "<group>"; };
@@ -107,12 +116,14 @@
 			isa = PBXGroup;
 			children = (
 					F11748412D0307B40044C1D9 /* AppDelegate.swift */,
-					A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */,
-					A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */,
-					C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */,
-					F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */,
-					BB2F792B24A3F905000567C9 /* Supporting */,
-				13B07FB51A68108700A75B9A /* Images.xcassets */,
+						A1B2C3D4E5F60718293A4C01 /* WidgetSnapshotModule.swift */,
+						A1B2C3D4E5F60718293A4C02 /* WidgetSnapshotModuleBridge.m */,
+						C1E2D3F4A5B6C7D8E9F00222 /* VeritySiriShortcuts.swift */,
+						F2A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift */,
+						F2A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m */,
+						F11748442D0722820044C1D9 /* VerityProtect-Bridging-Header.h */,
+						BB2F792B24A3F905000567C9 /* Supporting */,
+					13B07FB51A68108700A75B9A /* Images.xcassets */,
 				13B07FB61A68108700A75B9A /* Info.plist */,
 				AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */,
 				5AA355F8F90654DC4EED6067 /* PrivacyInfo.xcprivacy */,
@@ -177,11 +188,13 @@
 		};
 		A1B2C3D4E5F60718293A4D01 /* VerityProtectWidget */ = {
 			isa = PBXGroup;
-			children = (
-				A1B2C3D4E5F60718293A4C04 /* VerityProtectWidget.swift */,
-				A1B2C3D4E5F60718293A4C06 /* Info.plist */,
-				A1B2C3D4E5F60718293A4C05 /* VerityProtectWidget.entitlements */,
-			);
+				children = (
+					A1B2C3D4E5F60718293A4C04 /* VerityProtectWidget.swift */,
+					F2A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityWidget.swift */,
+					F2A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift */,
+					A1B2C3D4E5F60718293A4C06 /* Info.plist */,
+					A1B2C3D4E5F60718293A4C05 /* VerityProtectWidget.entitlements */,
+				);
 			path = VerityProtectWidget;
 			sourceTree = "<group>";
 		};
@@ -477,6 +490,9 @@
 					A1B2C3D4E5F60718293A4B01 /* WidgetSnapshotModule.swift in Sources */,
 					A1B2C3D4E5F60718293A4B02 /* WidgetSnapshotModuleBridge.m in Sources */,
 					C1E2D3F4A5B6C7D8E9F00111 /* VeritySiriShortcuts.swift in Sources */,
+					F1A2B3C4D5E6F708192A3B4C /* VerityLiveActivityModule.swift in Sources */,
+					F1A2B3C4D5E6F708192A3B4D /* VerityLiveActivityModuleBridge.m in Sources */,
+					F1A2B3C4D5E6F708192A3B4E /* VerityCallLiveActivityAttributes.swift in Sources */,
 					D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */,
 					A2C0D1E4F5A6B7C8D9E0F123 /* ContactPickerModule.swift in Sources */,
 					B3D1E2F4A5B6C7D8E9F00123 /* ContactPickerModuleBridge.m in Sources */,
@@ -486,9 +502,11 @@
 		A1B2C3D4E5F60718293A4E01 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (
-				A1B2C3D4E5F60718293A4B03 /* VerityProtectWidget.swift in Sources */,
-			);
+				files = (
+					A1B2C3D4E5F60718293A4B03 /* VerityProtectWidget.swift in Sources */,
+					F1A2B3C4D5E6F708192A3B50 /* VerityCallLiveActivityWidget.swift in Sources */,
+					F1A2B3C4D5E6F708192A3B4F /* VerityCallLiveActivityAttributes.swift in Sources */,
+				);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */

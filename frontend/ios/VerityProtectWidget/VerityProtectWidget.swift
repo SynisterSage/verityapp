@@ -422,5 +422,10 @@ struct VerityProtectWidgetBundle: WidgetBundle {
   var body: some Widget {
     VerityProtectAlertsWidget()
     VerityProtectHistoryWidget()
+#if canImport(ActivityKit)
+    if #available(iOSApplicationExtension 16.1, *) {
+      VerityCallLiveActivityWidget()
+    }
+#endif
   }
 }

@@ -23,6 +23,7 @@ import { registerProfileDeviceToken } from '../services/notifications';
 import { logError, logEvent } from '../services/sentry';
 import { initializeVoIPPush, updateVoIPPushToken } from '../services/voipPush';
 import { setPlaceholderCallUUID, markPlaceholderCallAnswered } from '../services/voipPlaceholderCall';
+import { rememberIncomingCallMetadata } from '../services/incomingCallMetadata';
 import type { VoIPPushPayload } from '../types/voip-push';
 import { navigateToActiveCall } from '../navigation/rootNavigator';
 
@@ -445,6 +446,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
 
     const handleIncomingCall = async (payload: VoIPPushPayload) => {
       console.info('[VoIPPush] Incoming call from push:', payload);
+      rememberIncomingCallMetadata({
+        callSid: payload.callSid,
+        callerName: payload.callerName ?? null,
+        fromNumber: payload.fromNumber ?? null,
+      });
 
       // VoIP push module has already created the CallKit call (required by iOS)
       // Store the UUID so we can end it when Twilio's real call arrives

@@ -66,6 +66,8 @@
 		<string>voip</string>
 		<string>remote-notification</string>
 	</array>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>SplashScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
