@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   Animated,
+  Linking,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Switch,
@@ -39,6 +41,10 @@ import {
   setAutoTrustManual,
 } from '../../utils/blockTrustPrompt';
 import { logError, logEvent } from '../../services/sentry';
+import {
+  dismissCallDetailLiveNudge,
+  hasDismissedCallDetailLiveNudge,
+} from '../../utils/liveFeatureHints';
 
 type CallRow = {
   id: string;
@@ -185,6 +191,7 @@ export default function CallDetailScreen({
   const riskBarAnim = useRef(new Animated.Value(0)).current;
   const transcriptAnim = useRef(new Animated.Value(0)).current;
   const [audioModeConfigured, setAudioModeConfigured] = useState(false);
+  const [showLiveNudge, setShowLiveNudge] = useState(false);
   const styles = useMemo(() => createCallDetailStyles(theme), [theme]);
   useEffect(() => {
     const loadPromptPref = async () => {
@@ -195,6 +202,38 @@ export default function CallDetailScreen({
     };
     void loadPromptPref();
   }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+    let isMounted = true;
+    hasDismissedCallDetailLiveNudge()
+      .then((dismissed) => {
+        if (isMounted && !dismissed) {
+          setShowLiveNudge(true);
+        }
+      })
+      .catch(() => null);
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const dismissLiveNudge = useCallback(() => {
+    setShowLiveNudge(false);
+    dismissCallDetailLiveNudge().catch(() => null);
+  }, []);
+
+  const handleOpenLiveSettings = useCallback(async () => {
+    try {
+      await Linking.openSettings();
+    } catch {
+      Alert.alert('Settings', 'Could not open settings right now.');
+    } finally {
+      dismissLiveNudge();
+    }
+  }, [dismissLiveNudge]);
 
   const fetchRecordingLink = useCallback(async () => {
     const urlData = await authorizedFetch(`/calls/${callId}/recording-url`);
@@ -862,6 +901,38 @@ export default function CallDetailScreen({
             </View>
           ) : null}
         </View>
+        {showLiveNudge ? (
+          <View style={styles.liveNudgeCard}>
+            <View style={styles.liveNudgeHeader}>
+              <View style={styles.liveNudgeIcon}>
+                <Ionicons name="radio-outline" size={18} color={theme.colors.accent} />
+              </View>
+              <View style={styles.liveNudgeCopy}>
+                <Text style={styles.liveNudgeTitle}>Track calls on your Lock Screen</Text>
+                <Text style={styles.liveNudgeSubtitle}>
+                  Turn on Live Activities for Verity Protect in iPhone settings.
+                </Text>
+              </View>
+              <Pressable onPress={dismissLiveNudge} style={styles.liveNudgeClose}>
+                <Ionicons name="close" size={16} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
+            <View style={styles.liveNudgeActions}>
+              <TouchableOpacity
+                style={styles.liveNudgePrimaryButton}
+                onPress={handleOpenLiveSettings}
+              >
+                <Text style={styles.liveNudgePrimaryText}>Open settings</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.liveNudgeSecondaryButton}
+                onPress={dismissLiveNudge}
+              >
+                <Text style={styles.liveNudgeSecondaryText}>Not now</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Transcript</Text>
           <View style={styles.card}>
@@ -1277,6 +1348,86 @@ const createCallDetailStyles = (theme: AppTheme) =>
     heroBlock: {
       paddingTop: 12,
       paddingBottom: 18,
+    },
+    liveNudgeCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, 0.28),
+      backgroundColor: withOpacity(theme.colors.accent, 0.08),
+      padding: 14,
+      marginBottom: 20,
+      gap: 12,
+    },
+    liveNudgeHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+    },
+    liveNudgeIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.2),
+    },
+    liveNudgeCopy: {
+      flex: 1,
+    },
+    liveNudgeTitle: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: '700',
+      marginBottom: 2,
+    },
+    liveNudgeSubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      fontWeight: '600',
+      lineHeight: 18,
+    },
+    liveNudgeClose: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+    },
+    liveNudgeActions: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    liveNudgePrimaryButton: {
+      flex: 1,
+      minHeight: 40,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.accent,
+      paddingHorizontal: 12,
+    },
+    liveNudgePrimaryText: {
+      color: theme.colors.surface,
+      fontSize: 13,
+      fontWeight: '700',
+      textTransform: 'capitalize',
+    },
+    liveNudgeSecondaryButton: {
+      minHeight: 40,
+      borderRadius: 999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.text, 0.16),
+      backgroundColor: withOpacity(theme.colors.text, 0.02),
+      paddingHorizontal: 14,
+    },
+    liveNudgeSecondaryText: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      fontWeight: '700',
+      textTransform: 'capitalize',
     },
     section: {
       marginBottom: 24,

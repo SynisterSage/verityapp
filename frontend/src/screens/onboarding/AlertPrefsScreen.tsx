@@ -20,6 +20,7 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
+import LiveFeaturesSection from '../../components/notifications/LiveFeaturesSection';
 
 type NotificationPreset = 'simple' | 'detailed';
 
@@ -313,6 +314,8 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
             </TouchableOpacity>
           </View>
         </View>
+
+        <LiveFeaturesSection />
 
         <View style={styles.notificationsSection}>
           <Text style={styles.sectionTitle}>Email summary</Text>

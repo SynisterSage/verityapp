@@ -21,6 +21,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
 import { logError, logEvent } from '../../services/sentry';
+import LiveFeaturesSection from '../../components/notifications/LiveFeaturesSection';
 
 const LEVELS = [
   { label: 'Standard', breakpoint: 39 },
@@ -352,6 +353,8 @@ export default function NotificationsScreen() {
             ))}
           </View>
         ) : null}
+
+        <LiveFeaturesSection />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
