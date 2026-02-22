@@ -107,6 +107,9 @@ enableScreens(true);
 type PendingNotificationData = {
   callId?: string;
   alertId?: string;
+  profileId?: string;
+  supportTicketId?: string;
+  supportMessageId?: string;
   alertsMode?: 'needs' | 'history';
   routeTarget?:
     | 'call_detail'
@@ -122,6 +125,56 @@ const ACTIVITY_PUSH_CHANNEL_ID = 'activity-alerts';
 const ACTIVITY_PUSH_SOUND = 'activity-notification.wav';
 const SUPPORT_PUSH_CHANNEL_ID = 'support-updates';
 const SUPPORT_PUSH_SOUND = 'support-notification.wav';
+const CALL_DETAIL_ALERT_TYPES = new Set<string>(['fraud', 'safe', 'call_review']);
+
+function parseJsonRecord(value: unknown): Record<string, unknown> | null {
+  if (!value) {
+    return null;
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(trimmed);
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function normalizeNotificationData(data: Record<string, unknown>) {
+  const normalized: Record<string, unknown> = { ...data };
+  const queue: Record<string, unknown>[] = [data];
+  let depth = 0;
+
+  while (queue.length > 0 && depth < 2) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+    for (const key of ['data', 'payload', 'meta', 'metadata', 'notificationData']) {
+      const nested = parseJsonRecord(current[key]);
+      if (!nested) {
+        continue;
+      }
+      Object.assign(normalized, nested);
+      queue.push(nested);
+    }
+    depth += 1;
+  }
+
+  return normalized;
+}
 
 function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'] {
   const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -131,7 +184,13 @@ function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'
   if (
     normalized === 'call_detail' ||
     normalized === 'calldetail' ||
-    normalized === 'call-detail'
+    normalized === 'call-detail' ||
+    normalized === 'call_details' ||
+    normalized === 'calldetails' ||
+    normalized === 'call-details' ||
+    normalized === 'calldetailmodal' ||
+    normalized === 'call_detail_modal' ||
+    normalized === 'call-detail-modal'
   ) {
     return 'call_detail';
   }
@@ -147,14 +206,17 @@ function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'
   if (
     normalized === 'calls_trusted' ||
     normalized === 'callstrusted' ||
-    normalized === 'calls-trusted'
+    normalized === 'calls-trusted' ||
+    normalized === 'trusted_calls' ||
+    normalized === 'trusted-calls'
   ) {
     return 'calls_trusted';
   }
   if (
     normalized === 'circle_activity' ||
     normalized === 'circleactivity' ||
-    normalized === 'circle-activity'
+    normalized === 'circle-activity' ||
+    normalized === 'circle'
   ) {
     return 'circle_activity';
   }
@@ -251,13 +313,78 @@ function inferRouteTargetFromPayload(args: {
 }
 
 function parseNotificationPayload(data: Record<string, unknown>): PendingNotificationData {
-  const callId = readDataString(data, 'callId', 'call_id');
-  const alertId = readDataString(data, 'alertId', 'alert_id');
-  const alertType = readDataString(data, 'alertType', 'alert_type');
-  const alertsMode = parseAlertsMode(readDataString(data, 'alertsMode', 'alerts_mode'));
-  const supportTicketId = readDataString(data, 'supportTicketId', 'support_ticket_id');
-  const supportMessageId = readDataString(data, 'supportMessageId', 'support_message_id');
-  const parsedRoute = parseRouteTarget(readDataString(data, 'routeTarget', 'route_target', 'route'));
+  const normalizedData = normalizeNotificationData(data);
+  const parsedRoutePayload = parseWidgetRoutePayload(
+    readDataString(
+      normalizedData,
+      'deepLink',
+      'deep_link',
+      'deeplink',
+      'url',
+      'link',
+      'routeTarget',
+      'route_target',
+      'route',
+      'screen',
+      'target'
+    ) ?? ''
+  );
+  const callId =
+    readDataString(
+      normalizedData,
+      'callId',
+      'call_id',
+      'callID',
+      'call-id',
+      'callUuid',
+      'call_uuid'
+    ) ?? parsedRoutePayload?.callId;
+  const alertId = readDataString(normalizedData, 'alertId', 'alert_id', 'alertID', 'alert-id');
+  const alertType = readDataString(
+    normalizedData,
+    'alertType',
+    'alert_type',
+    'type',
+    'notificationType',
+    'notification_type',
+    'category'
+  );
+  const alertsMode =
+    parseAlertsMode(
+      readDataString(
+        normalizedData,
+        'alertsMode',
+        'alerts_mode',
+        'initialMode',
+        'initial_mode'
+      )
+    ) ?? parsedRoutePayload?.alertsMode;
+  const supportTicketId = readDataString(
+    normalizedData,
+    'supportTicketId',
+    'support_ticket_id',
+    'ticketId',
+    'ticket_id'
+  );
+  const supportMessageId = readDataString(
+    normalizedData,
+    'supportMessageId',
+    'support_message_id',
+    'messageId',
+    'message_id'
+  );
+  const profileId = readDataString(normalizedData, 'profileId', 'profile_id');
+  const parsedRoute =
+    parseRouteTarget(
+      readDataString(
+        normalizedData,
+        'routeTarget',
+        'route_target',
+        'route',
+        'screen',
+        'target'
+      )
+    ) ?? parsedRoutePayload?.routeTarget;
 
   const routeTarget =
     parsedRoute ??
@@ -268,18 +395,32 @@ function parseNotificationPayload(data: Record<string, unknown>): PendingNotific
       hasSupportTicketData: Boolean(supportTicketId || supportMessageId),
     });
 
-  return { callId, alertId, alertType, alertsMode, routeTarget };
+  return {
+    callId,
+    alertId,
+    alertType,
+    alertsMode,
+    routeTarget,
+    supportTicketId,
+    supportMessageId,
+    profileId,
+  };
 }
 
 function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
+  if (!url.trim()) {
+    return null;
+  }
   const parsed = Linking.parse(url);
   const combinedPath = [parsed.hostname, parsed.path].filter(Boolean).join('/');
-  const path = combinedPath.trim().toLowerCase();
+  const path = combinedPath.trim().replace(/^\/+|\/+$/g, '');
   if (!path) {
     return null;
   }
   const segments = path.split('/').filter(Boolean);
-  const [firstSegment, secondSegment] = segments;
+  const normalizedSegments = segments.map((segment) => segment.trim().toLowerCase());
+  const [firstSegment, secondSegment] = normalizedSegments;
+  const secondSegmentRaw = segments[1]?.trim();
   if (!firstSegment) {
     return null;
   }
@@ -298,9 +439,31 @@ function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
   if (
     firstSegment === 'support' ||
     firstSegment === 'supportportal' ||
-    firstSegment === 'support-portal'
+    firstSegment === 'support-portal' ||
+    firstSegment === 'supportchat' ||
+    firstSegment === 'support-chat'
   ) {
     return { routeTarget: 'support_portal' };
+  }
+  if (
+    firstSegment === 'call' ||
+    firstSegment === 'calldetail' ||
+    firstSegment === 'call-detail' ||
+    firstSegment === 'call_detail' ||
+    firstSegment === 'call-details' ||
+    firstSegment === 'call_details'
+  ) {
+    const callParam = parsed.queryParams?.callId ?? parsed.queryParams?.call_id;
+    const callId =
+      typeof callParam === 'string'
+        ? callParam.trim()
+        : Array.isArray(callParam)
+        ? callParam[0]?.trim()
+        : secondSegmentRaw;
+    if (callId) {
+      return { routeTarget: 'call_detail', callId };
+    }
+    return { routeTarget: 'calls_all' };
   }
   if (firstSegment === 'calls') {
     const filterParam = parsed.queryParams?.filter;
@@ -315,6 +478,14 @@ function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
     }
     if (secondSegment?.trim().toLowerCase() === 'trusted') {
       return { routeTarget: 'calls_trusted' };
+    }
+    if (
+      secondSegmentRaw &&
+      secondSegment !== 'all' &&
+      secondSegment !== 'list' &&
+      secondSegment !== 'history'
+    ) {
+      return { routeTarget: 'call_detail', callId: secondSegmentRaw };
     }
     return { routeTarget: 'calls_all' };
   }
@@ -754,8 +925,38 @@ function NavigationHost() {
   const { onboardingComplete, isLoading: profileLoading, authInvalid } = useProfile();
   const pendingNotificationRef = useRef<PendingNotificationData | null>(null);
   const notificationListenerRef = useRef<Notifications.Subscription | null>(null);
+  const isResolvingNotificationRef = useRef(false);
 
-  const resolvePendingNotification = useCallback(() => {
+  const resolveCallIdFromAlertId = useCallback(async (alertId: string) => {
+    const normalizedAlertId = alertId.trim();
+    if (!normalizedAlertId) {
+      return null;
+    }
+    const { data, error } = await supabase
+      .from('alerts')
+      .select('call_id')
+      .eq('id', normalizedAlertId)
+      .maybeSingle();
+
+    if (error) {
+      logEvent('notification_route_lookup_failed', {
+        screen: 'App',
+        extra: {
+          alertId: normalizedAlertId,
+          reason: 'alert_lookup_failed',
+        },
+      });
+      return null;
+    }
+
+    const callId = data?.call_id;
+    return typeof callId === 'string' && callId.trim().length > 0 ? callId.trim() : null;
+  }, []);
+
+  const resolvePendingNotification = useCallback(async () => {
+    if (isResolvingNotificationRef.current) {
+      return;
+    }
     const payload = pendingNotificationRef.current;
     if (!payload) {
       return;
@@ -766,70 +967,102 @@ function NavigationHost() {
     if (!rootNavigationRef.current?.isReady()) {
       return;
     }
-    pendingNotificationRef.current = null;
-    if (payload.routeTarget === 'call_detail') {
-      if (payload.callId) {
-        rootNavigationRef.current.navigate('CallDetailModal', { callId: payload.callId });
-      } else {
+    isResolvingNotificationRef.current = true;
+    try {
+      const normalizedAlertType = (payload.alertType ?? '').trim().toLowerCase();
+      let resolvedCallId = payload.callId;
+
+      const shouldLookupCallId =
+        !resolvedCallId &&
+        Boolean(payload.alertId) &&
+        (payload.routeTarget === 'call_detail' ||
+          CALL_DETAIL_ALERT_TYPES.has(normalizedAlertType));
+
+      if (shouldLookupCallId && payload.alertId) {
+        const fetchedCallId = await resolveCallIdFromAlertId(payload.alertId);
+        if (fetchedCallId) {
+          resolvedCallId = fetchedCallId;
+        }
+      }
+
+      pendingNotificationRef.current = null;
+
+      if (!onboardingComplete && payload.routeTarget !== 'support_portal') {
+        return;
+      }
+
+      const shouldOpenCallDetail =
+        Boolean(resolvedCallId) &&
+        (payload.routeTarget === 'call_detail' ||
+          CALL_DETAIL_ALERT_TYPES.has(normalizedAlertType));
+
+      if (shouldOpenCallDetail && resolvedCallId) {
+        rootNavigationRef.current.navigate('CallDetailModal', { callId: resolvedCallId });
+        return;
+      }
+
+      if (payload.routeTarget === 'call_detail') {
         rootNavigationRef.current.dispatch(
           CommonActions.navigate({
             name: 'AppTabs',
             params: { screen: 'AlertsTab' },
           })
         );
+        return;
       }
-      return;
-    }
-    if (payload.routeTarget === 'calls_trusted') {
-      rootNavigationRef.current.dispatch(
-        CommonActions.navigate({
-          name: 'AppTabs',
-          params: {
-            screen: 'CallsTab',
+      if (payload.routeTarget === 'calls_trusted') {
+        rootNavigationRef.current.dispatch(
+          CommonActions.navigate({
+            name: 'AppTabs',
             params: {
-              screen: 'Calls',
-              params: { initialFilter: 'trusted' },
+              screen: 'CallsTab',
+              params: {
+                screen: 'Calls',
+                params: { initialFilter: 'trusted' },
+              },
             },
-          },
-        })
-      );
-      return;
-    }
-    if (payload.routeTarget === 'calls_all') {
-      rootNavigationRef.current.dispatch(
-        CommonActions.navigate({
-          name: 'AppTabs',
-          params: {
-            screen: 'CallsTab',
+          })
+        );
+        return;
+      }
+      if (payload.routeTarget === 'calls_all') {
+        rootNavigationRef.current.dispatch(
+          CommonActions.navigate({
+            name: 'AppTabs',
             params: {
-              screen: 'Calls',
-              params: { initialFilter: 'all' },
+              screen: 'CallsTab',
+              params: {
+                screen: 'Calls',
+                params: { initialFilter: 'all' },
+              },
             },
-          },
-        })
-      );
-      return;
+          })
+        );
+        return;
+      }
+      if (payload.routeTarget === 'circle_activity') {
+        rootNavigationRef.current.navigate('CircleActivityModal', { activities: [] });
+        return;
+      }
+      if (payload.routeTarget === 'support_portal') {
+        rootNavigationRef.current.navigate('SupportPortal');
+        return;
+      }
+      if (payload.alertId || payload.routeTarget === 'alerts' || payload.alertType) {
+        rootNavigationRef.current.dispatch(
+          CommonActions.navigate({
+            name: 'AppTabs',
+            params: {
+              screen: 'AlertsTab',
+              params: payload.alertsMode ? { initialMode: payload.alertsMode } : undefined,
+            },
+          })
+        );
+      }
+    } finally {
+      isResolvingNotificationRef.current = false;
     }
-    if (payload.routeTarget === 'circle_activity') {
-      rootNavigationRef.current.navigate('CircleActivityModal', { activities: [] });
-      return;
-    }
-    if (payload.routeTarget === 'support_portal') {
-      rootNavigationRef.current.navigate('SupportPortal');
-      return;
-    }
-    if (payload.alertId || payload.routeTarget === 'alerts' || payload.alertType) {
-      rootNavigationRef.current.dispatch(
-        CommonActions.navigate({
-          name: 'AppTabs',
-          params: {
-            screen: 'AlertsTab',
-            params: payload.alertsMode ? { initialMode: payload.alertsMode } : undefined,
-          },
-        })
-      );
-    }
-  }, [session]);
+  }, [onboardingComplete, resolveCallIdFromAlertId, session]);
 
   const consumePendingSiriRoute = useCallback(async () => {
     try {
@@ -842,7 +1075,7 @@ function NavigationHost() {
         return;
       }
       pendingNotificationRef.current = payload;
-      resolvePendingNotification();
+      void resolvePendingNotification();
     } catch {
       // No-op: Siri route handoff is best-effort.
     }
@@ -858,7 +1091,7 @@ function NavigationHost() {
         return;
       }
       pendingNotificationRef.current = payload;
-      resolvePendingNotification();
+      void resolvePendingNotification();
     };
 
     const subscription = Linking.addEventListener('url', (event) => {
@@ -891,7 +1124,7 @@ function NavigationHost() {
         }
         const data = response.notification.request.content.data as Record<string, unknown>;
         pendingNotificationRef.current = parseNotificationPayload(data);
-        resolvePendingNotification();
+        void resolvePendingNotification();
       })
       .catch(() => null);
   }, [resolvePendingNotification]);
@@ -911,10 +1144,12 @@ function NavigationHost() {
             alertId: payload.alertId,
             routeTarget: payload.routeTarget,
             alertType: payload.alertType,
+            supportTicketId: payload.supportTicketId,
+            supportMessageId: payload.supportMessageId,
           },
         });
         pendingNotificationRef.current = payload;
-        resolvePendingNotification();
+        void resolvePendingNotification();
       }
     );
     return () => {
@@ -923,7 +1158,7 @@ function NavigationHost() {
   }, [resolvePendingNotification]);
 
   useEffect(() => {
-    resolvePendingNotification();
+    void resolvePendingNotification();
   }, [session, resolvePendingNotification]);
 
   const navTheme = useMemo(() => {
@@ -978,7 +1213,7 @@ function NavigationHost() {
       onReady={() => {
         setNavigationReady(true);
         if (pendingNotificationRef.current) {
-          resolvePendingNotification();
+          void resolvePendingNotification();
         }
       }}
     >
