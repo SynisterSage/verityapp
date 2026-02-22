@@ -23,6 +23,10 @@ fi
 echo "Using frontend directory: $FRONTEND_DIR"
 cd "$FRONTEND_DIR"
 
+# Ensure devDependencies are installed in CI. We rely on patch-package in postinstall.
+export NPM_CONFIG_PRODUCTION=false
+export NODE_ENV=development
+
 if ! command -v node >/dev/null 2>&1; then
   echo "Node not found. Attempting install via Homebrew..."
   if command -v brew >/dev/null 2>&1; then
@@ -43,12 +47,14 @@ fi
 
 echo "Node: $(node -v)"
 echo "npm: $(npm -v)"
+echo "NPM_CONFIG_PRODUCTION=${NPM_CONFIG_PRODUCTION:-<unset>}"
+echo "NODE_ENV=${NODE_ENV:-<unset>}"
 
 echo "Installing JavaScript dependencies..."
 if [ -f package-lock.json ]; then
-  npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+  npm ci --include=dev --no-audit --no-fund || npm ci --no-audit --no-fund || npm install --include=dev --no-audit --no-fund || npm install --no-audit --no-fund
 else
-  npm install --no-audit --no-fund
+  npm install --include=dev --no-audit --no-fund || npm install --no-audit --no-fund
 fi
 
 echo "Installing CocoaPods dependencies..."
