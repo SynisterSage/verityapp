@@ -859,9 +859,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   legalLinksGroup: {
-    gap: 12,
+    gap: 6,
     paddingTop: 2,
-    paddingBottom: 14,
+    paddingBottom: 8,
   },
   legalLinkText: {
     lineHeight: 20,
