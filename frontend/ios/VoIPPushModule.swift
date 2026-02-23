@@ -357,7 +357,8 @@ extension VoIPPushModule: PKPushRegistryDelegate {
     guard type == .voIP else { return }
     latestVoIPToken = nil
     print("[VoIPPush] Token invalidated")
-    sendEvent(withName: "voipTokenUpdated", body: ["token": nil])
+    // Never pass Swift nil through the event payload dictionary; bridge NSNull explicitly.
+    sendEvent(withName: "voipTokenUpdated", body: ["token": NSNull()])
   }
 }
 
