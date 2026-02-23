@@ -1,5 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Animated,
+  Easing,
+  NativeEventEmitter,
+  NativeModules,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { RouteProp, useRoute } from '@react-navigation/native';
@@ -14,6 +24,12 @@ import { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 
 type ActiveCallRoute = RouteProp<RootStackParamList, 'ActiveCallModal'>;
+
+type AudioRoutePayload = {
+  route?: string;
+  displayName?: string;
+  portType?: string;
+};
 
 function formatElapsed(ms: number) {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -72,6 +88,7 @@ export default function ActiveCallScreen() {
   const [elapsedLabel, setElapsedLabel] = useState('0:00');
   const [trustedDisplayName, setTrustedDisplayName] = useState<string | null>(null);
   const [showIdentityFallback, setShowIdentityFallback] = useState(false);
+  const [audioRouteLabel, setAudioRouteLabel] = useState('iPhone');
   const ringPulse = useRef(new Animated.Value(0)).current;
   const statusPulse = useRef(new Animated.Value(0)).current;
   const identitySkeletonPulse = useRef(new Animated.Value(0)).current;
@@ -213,6 +230,51 @@ export default function ActiveCallScreen() {
     };
   }, [identitySkeletonPulse, showIdentitySkeleton]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    const module = NativeModules.VoIPPushModule as
+      | {
+          getCurrentAudioRoute?: () => Promise<AudioRoutePayload>;
+        }
+      | undefined;
+
+    if (!module) {
+      return;
+    }
+
+    let cancelled = false;
+    const applyRoute = (payload?: AudioRoutePayload) => {
+      if (cancelled) return;
+      const nextLabel =
+        typeof payload?.displayName === 'string' && payload.displayName.trim().length > 0
+          ? payload.displayName.trim()
+          : 'iPhone';
+      setAudioRouteLabel(nextLabel);
+    };
+
+    module.getCurrentAudioRoute?.().then(applyRoute).catch(() => null);
+
+    const emitter = new NativeEventEmitter(NativeModules.VoIPPushModule);
+    const subscription = emitter.addListener('audioRouteChanged', (payload: AudioRoutePayload) => {
+      applyRoute(payload);
+    });
+
+    return () => {
+      cancelled = true;
+      subscription.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      return;
+    }
+    setAudioRouteLabel(speakerOn ? 'Speaker' : 'Device');
+  }, [speakerOn]);
+
   const toggleMute = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     const next = !muted;
@@ -317,6 +379,7 @@ export default function ActiveCallScreen() {
         <Text style={styles.timer}>
           {statusLabel} • {elapsedLabel}
         </Text>
+        <Text style={styles.audioRouteText}>Audio: {audioRouteLabel}</Text>
       </View>
 
       <View style={styles.middleBlock}>
@@ -446,6 +509,12 @@ const createStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
       color: withOpacity(theme.colors.accent, mode === 'dark' ? 0.8 : 0.74),
       fontSize: 14,
       fontWeight: '600',
+    },
+    audioRouteText: {
+      color: withOpacity(theme.colors.textMuted, 0.92),
+      fontSize: 13,
+      fontWeight: '500',
+      marginTop: 8,
     },
     middleBlock: {
       alignItems: 'center',

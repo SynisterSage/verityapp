@@ -1,6 +1,7 @@
 import Foundation
 import PushKit
 import CallKit
+import AVFoundation
 import React
 
 @objc(VoIPPushModule)
@@ -18,6 +19,7 @@ class VoIPPushModule: RCTEventEmitter {
   private var nativeAutoAnswerExcludedCallUUID: UUID?
   private var nativeAutoAnswerWorkItem: DispatchWorkItem?
   private var latestPlaceholderCallUUID: UUID?
+  private var audioRouteObserver: NSObjectProtocol?
 
   override init() {
     // Use deprecated initializer for now - iOS 14+ alternative is complex
@@ -34,6 +36,19 @@ class VoIPPushModule: RCTEventEmitter {
     super.init()
 
     self.callKitProvider.setDelegate(self, queue: nil)
+    self.audioRouteObserver = NotificationCenter.default.addObserver(
+      forName: AVAudioSession.routeChangeNotification,
+      object: nil,
+      queue: .main
+    ) { [weak self] _ in
+      self?.emitAudioRouteChangedIfNeeded()
+    }
+  }
+
+  deinit {
+    if let audioRouteObserver {
+      NotificationCenter.default.removeObserver(audioRouteObserver)
+    }
   }
 
   private func findPendingIncomingCall(excluding excludedUUID: UUID? = nil) -> CXCall? {
@@ -142,7 +157,7 @@ class VoIPPushModule: RCTEventEmitter {
   }
 
   override func supportedEvents() -> [String]! {
-    return ["voipPushReceived", "voipTokenUpdated", "callAnswered", "callEnded"]
+    return ["voipPushReceived", "voipTokenUpdated", "callAnswered", "callEnded", "audioRouteChanged"]
   }
 
   override static func requiresMainQueueSetup() -> Bool {
@@ -151,6 +166,7 @@ class VoIPPushModule: RCTEventEmitter {
 
   override func startObserving() {
     hasJsListeners = true
+    emitAudioRouteChangedIfNeeded()
   }
 
   override func stopObserving() {
@@ -168,6 +184,54 @@ class VoIPPushModule: RCTEventEmitter {
         self.pushRegistry?.desiredPushTypes = [.voIP]
       }
     }
+  }
+
+  private func currentAudioRoutePayload() -> [String: Any] {
+    let session = AVAudioSession.sharedInstance()
+    let outputPort = session.currentRoute.outputs.first?.portType
+
+    guard let outputPort else {
+      return [
+        "route": "unknown",
+        "displayName": "Unknown",
+        "portType": "unknown"
+      ]
+    }
+
+    let routeMeta: (route: String, displayName: String)
+    switch outputPort {
+    case .builtInSpeaker:
+      routeMeta = ("speaker", "Speaker")
+    case .builtInReceiver:
+      routeMeta = ("receiver", "iPhone")
+    case .headphones, .headsetMic, .lineOut:
+      routeMeta = ("headphones", "Headphones")
+    case .bluetoothHFP, .bluetoothA2DP, .bluetoothLE:
+      routeMeta = ("bluetooth", "Bluetooth")
+    case .airPlay:
+      routeMeta = ("airplay", "AirPlay")
+    case .carAudio:
+      routeMeta = ("car", "Car Audio")
+    default:
+      routeMeta = ("other", "Other")
+    }
+
+    return [
+      "route": routeMeta.route,
+      "displayName": routeMeta.displayName,
+      "portType": outputPort.rawValue
+    ]
+  }
+
+  private func emitAudioRouteChangedIfNeeded() {
+    guard hasJsListeners else { return }
+    sendEvent(withName: "audioRouteChanged", body: currentAudioRoutePayload())
+  }
+
+  @objc
+  func getCurrentAudioRoute(_ resolver: @escaping RCTPromiseResolveBlock,
+                            rejecter: @escaping RCTPromiseRejectBlock) {
+    resolver(currentAudioRoutePayload())
   }
 
   @objc
