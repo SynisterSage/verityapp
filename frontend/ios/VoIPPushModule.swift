@@ -17,6 +17,7 @@ class VoIPPushModule: RCTEventEmitter {
   private var nativeAutoAnswerDeadline: Date?
   private var nativeAutoAnswerExcludedCallUUID: UUID?
   private var nativeAutoAnswerWorkItem: DispatchWorkItem?
+  private var latestPlaceholderCallUUID: UUID?
 
   override init() {
     // Use deprecated initializer for now - iOS 14+ alternative is complex
@@ -123,12 +124,16 @@ class VoIPPushModule: RCTEventEmitter {
     }
   }
 
-  private func startNativeAutoAnswer(excluding excludedUUID: UUID) {
+  private func startNativeAutoAnswer(excluding excludedUUID: UUID?) {
     nativeAutoAnswerExcludedCallUUID = excludedUUID
     nativeAutoAnswerDeadline = Date().addingTimeInterval(25)
     nativeAutoAnswerWorkItem?.cancel()
     nativeAutoAnswerWorkItem = nil
-    print("[VoIPPush] Native auto-answer armed, waiting for Twilio call")
+    if let excludedUUID {
+      print("[VoIPPush] Native auto-answer armed, excluding call \(excludedUUID.uuidString)")
+    } else {
+      print("[VoIPPush] Native auto-answer armed (no exclusions), waiting for Twilio call")
+    }
     attemptNativeAutoAnswer()
   }
 
@@ -338,6 +343,7 @@ extension VoIPPushModule: PKPushRegistryDelegate {
         return
       }
 
+      self.latestPlaceholderCallUUID = uuid
       print("[VoIPPush] Successfully reported placeholder call to CallKit")
 
       // Notify React Native - Twilio's real call will arrive in ~500ms
@@ -390,7 +396,16 @@ extension VoIPPushModule: CXProviderDelegate {
       ])
     }
 
-    startNativeAutoAnswer(excluding: action.callUUID)
+    let isPlaceholderCall = (action.callUUID == latestPlaceholderCallUUID)
+    if isPlaceholderCall {
+      print("[VoIPPush] Answered placeholder call; ending placeholder to avoid busy client leg")
+      requestEndCall(action.callUUID)
+      // Keep watching for the real Twilio invite and answer it as soon as it appears.
+      startNativeAutoAnswer(excluding: action.callUUID)
+    } else {
+      // Defensive: if this was not our placeholder call, don't keep auto-answer armed.
+      stopNativeAutoAnswer()
+    }
     action.fulfill()
   }
 
@@ -398,6 +413,9 @@ extension VoIPPushModule: CXProviderDelegate {
     print("[VoIPPush] User ended call")
     if action.callUUID == nativeAutoAnswerExcludedCallUUID {
       stopNativeAutoAnswer()
+    }
+    if action.callUUID == latestPlaceholderCallUUID {
+      latestPlaceholderCallUUID = nil
     }
 
     let payload = [
