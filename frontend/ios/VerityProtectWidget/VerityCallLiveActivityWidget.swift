@@ -28,6 +28,35 @@ private struct VerityCallLockScreenView: View {
     return Date(timeIntervalSince1970: epoch)
   }
 
+  private var formattedCallerNumber: String? {
+    guard let raw = context.state.callerNumber, !raw.isEmpty else {
+      return nil
+    }
+    return formatPhoneNumber(raw)
+  }
+
+  private func formatPhoneNumber(_ raw: String) -> String {
+    let digits = raw.filter(\.isNumber)
+    if digits.isEmpty {
+      return raw
+    }
+    let normalizedDigits: String
+    if digits.count == 10 {
+      normalizedDigits = "1" + digits
+    } else {
+      normalizedDigits = digits
+    }
+    guard normalizedDigits.count >= 11 else {
+      return raw
+    }
+    let country = normalizedDigits.dropLast(10)
+    let national = normalizedDigits.suffix(10)
+    let area = national.prefix(3)
+    let prefix = national.dropFirst(3).prefix(3)
+    let line = national.suffix(4)
+    return "+\(country) (\(area)) \(prefix)-\(line)"
+  }
+
   var body: some View {
     HStack(spacing: 12) {
       ZStack {
@@ -47,7 +76,7 @@ private struct VerityCallLockScreenView: View {
         Text(context.state.callerName)
           .font(.system(size: 17, weight: .bold))
           .lineLimit(1)
-        if let callerNumber = context.state.callerNumber, !callerNumber.isEmpty {
+        if let callerNumber = formattedCallerNumber {
           Text(callerNumber)
             .font(.system(size: 13, weight: .medium))
             .foregroundStyle(.secondary)
@@ -64,8 +93,10 @@ private struct VerityCallLockScreenView: View {
           Text(timerInterval: connectedAt...Date(), countsDown: false)
             .font(.system(size: 16, weight: .bold, design: .rounded))
             .monospacedDigit()
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
       }
+      .frame(minWidth: 72, alignment: .trailing)
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 12)

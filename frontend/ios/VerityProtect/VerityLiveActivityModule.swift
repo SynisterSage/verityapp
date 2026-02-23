@@ -41,6 +41,15 @@ class VerityLiveActivityModule: NSObject {
         return
       }
 
+      // Keep only one active call card visible. If a stale call activity is still present
+      // (e.g. previous ringing state), end it before starting the new one.
+      let staleActivities = Activity<VerityCallLiveActivityAttributes>.activities.filter { activity in
+        activity.attributes.callSid != callSid
+      }
+      for activity in staleActivities {
+        await activity.end(using: activity.contentState, dismissalPolicy: .immediate)
+      }
+
       do {
         _ = try Activity<VerityCallLiveActivityAttributes>.request(
           attributes: attributes,

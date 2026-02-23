@@ -1,6 +1,7 @@
 import { AppState, Platform, NativeModules, NativeEventEmitter } from 'react-native';
 import { useEffect, useRef } from 'react';
 import TwilioVoice from 'react-native-twilio-programmable-voice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useProfile } from '../../context/ProfileContext';
 import {
@@ -9,6 +10,7 @@ import {
   TwilioClientCallLifecyclePayload,
   TwilioClientCallLifecycleState,
 } from '../../services/twilioClient';
+import { authorizedFetch } from '../../services/backend';
 import { dismissActiveCall, navigateToActiveCall } from '../../navigation/rootNavigator';
 import {
   getPlaceholderCallUUID,
@@ -25,6 +27,7 @@ import {
   clearIncomingCallMetadata,
   getIncomingCallMetadata,
 } from '../../services/incomingCallMetadata';
+import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 
 const { VoIPPushModule } = NativeModules;
 
@@ -57,6 +60,40 @@ function parseTwilioEventData(data: unknown) {
   };
 }
 
+function normalizePhoneDigits(value?: string | null) {
+  if (!value) return '';
+  const digits = value.replace(/\D/g, '');
+  if (!digits) return '';
+  return digits.length === 10 ? `1${digits}` : digits;
+}
+
+function trimToNull(value?: string | null) {
+  if (!value) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizeDisplayName(name?: string | null, rawNumber?: string | null) {
+  const trimmedName = trimToNull(name);
+  if (!trimmedName) return null;
+  const normalizedNameDigits = normalizePhoneDigits(trimmedName);
+  const normalizedRawDigits = normalizePhoneDigits(rawNumber);
+  if (normalizedNameDigits && normalizedRawDigits && normalizedNameDigits === normalizedRawDigits) {
+    return null;
+  }
+  return trimmedName;
+}
+
+function parseTrustedMapEntryName(value: unknown) {
+  if (typeof value === 'string') {
+    return trimToNull(value);
+  }
+  if (value && typeof value === 'object' && 'name' in value) {
+    return trimToNull((value as { name?: string | null }).name ?? null);
+  }
+  return null;
+}
+
 export default function TwilioVoiceClientManager() {
   const {
     activeProfile,
@@ -73,6 +110,19 @@ export default function TwilioVoiceClientManager() {
   const lastRefreshAtRef = useRef(0);
   const activeCallSidRef = useRef<string | null>(null);
   const connectedAtByCallSidRef = useRef<Map<string, number>>(new Map());
+  const trustedNameByNumberRef = useRef<Map<string, string>>(new Map());
+  const livePayloadArgsByCallSidRef = useRef<
+    Map<
+      string,
+      {
+        callSid: string;
+        status: string;
+        fromNumber?: string | null;
+        callerName?: string | null;
+        connectedAtEpochSeconds?: number | null;
+      }
+    >
+  >(new Map());
   const isInitialMountRef = useRef(true);
   const REFRESH_MIN_INTERVAL_MS = 120_000;
   const INIT_MIN_INTERVAL_MS = 15_000;
@@ -84,11 +134,18 @@ export default function TwilioVoiceClientManager() {
     callerName?: string | null;
     connectedAtEpochSeconds?: number | null;
   }) => {
+    livePayloadArgsByCallSidRef.current.set(args.callSid, { ...args });
     const cached = getIncomingCallMetadata(args.callSid);
-    const callerName =
-      args.callerName?.trim() || cached?.callerName?.trim() || args.fromNumber?.trim() || 'Incoming Call';
-    const callerNumber = (args.fromNumber ?? cached?.fromNumber ?? null)?.trim() || null;
-    const isTrusted = Boolean(cached?.callerName?.trim() || args.callerName?.trim());
+    const rawNumber = trimToNull(args.fromNumber ?? cached?.fromNumber ?? null);
+    const normalizedNumber = normalizePhoneDigits(rawNumber);
+    const trustedName = normalizedNumber
+      ? trustedNameByNumberRef.current.get(normalizedNumber) ?? null
+      : null;
+    const fallbackCallerName = normalizeDisplayName(args.callerName ?? cached?.callerName ?? null, rawNumber);
+    const formattedNumber = rawNumber ? formatPhoneNumber(rawNumber, rawNumber) : null;
+    const callerName = trustedName ?? fallbackCallerName ?? formattedNumber ?? 'Incoming Call';
+    const callerNumber = trustedName || fallbackCallerName ? formattedNumber : null;
+    const isTrusted = Boolean(trustedName);
 
     return {
       callSid: args.callSid,
@@ -102,24 +159,104 @@ export default function TwilioVoiceClientManager() {
     };
   };
 
+  useEffect(() => {
+    const profileId = activeProfile?.id;
+    if (!profileId) {
+      trustedNameByNumberRef.current.clear();
+      return;
+    }
+
+    let cancelled = false;
+    const nextMap = new Map<string, string>();
+    const trustedMapKey = `trusted_contacts_map:${profileId}`;
+
+    const setIfValid = (phone: string | null | undefined, name: string | null | undefined) => {
+      const normalizedPhone = normalizePhoneDigits(phone);
+      const normalizedName = trimToNull(name);
+      if (!normalizedPhone || !normalizedName) {
+        return;
+      }
+      nextMap.set(normalizedPhone, normalizedName);
+    };
+
+    const loadTrustedNames = async () => {
+      try {
+        const cached = await AsyncStorage.getItem(trustedMapKey);
+        if (cached) {
+          const parsed = JSON.parse(cached) as Record<string, unknown>;
+          Object.entries(parsed).forEach(([key, value]) => {
+            setIfValid(key, parseTrustedMapEntryName(value));
+          });
+        }
+      } catch (error) {
+        console.warn('[twilio-voice] failed reading trusted contact cache', {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
+        const data = await authorizedFetch(`/fraud/trusted-contacts?profileId=${profileId}`);
+        const trustedContacts = Array.isArray(data?.trusted_contacts) ? data.trusted_contacts : [];
+        trustedContacts.forEach((entry: unknown) => {
+          const row =
+            entry && typeof entry === 'object'
+              ? (entry as { caller_number?: string | null; contact_name?: string | null })
+              : {};
+          setIfValid(row.caller_number ?? null, trimToNull(row.contact_name ?? null));
+        });
+      } catch (error) {
+        console.warn('[twilio-voice] failed loading trusted contacts for live activity', {
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      if (!cancelled) {
+        trustedNameByNumberRef.current = nextMap;
+        const activeCallSid = activeCallSidRef.current;
+        if (activeCallSid) {
+          const args = livePayloadArgsByCallSidRef.current.get(activeCallSid);
+          if (args) {
+            updateLiveCallActivity(buildLiveActivityPayload(args)).catch((err) => {
+              console.warn('[twilio-voice] failed refreshing live activity after trusted lookup', {
+                callSid: activeCallSid,
+                message: err instanceof Error ? err.message : String(err),
+              });
+            });
+          }
+        }
+      }
+    };
+
+    void loadTrustedNames();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile?.id]);
+
   const clearActiveCall = (callSid?: string | null) => {
     const targetCallSid = callSid ?? activeCallSidRef.current;
     if (targetCallSid) {
       connectedAtByCallSidRef.current.delete(targetCallSid);
       clearIncomingCallMetadata(targetCallSid);
-      endLiveCallActivity({
+      const endPayload = {
         ...buildLiveActivityPayload({
           callSid: targetCallSid,
           status: 'Ended',
           connectedAtEpochSeconds: null,
         }),
         callSid: targetCallSid,
-      }).catch((err) => {
-        console.warn('[twilio-voice] failed ending live activity', {
-          callSid: targetCallSid,
-          message: err instanceof Error ? err.message : String(err),
+      };
+      endLiveCallActivity(endPayload)
+        .catch((err) => {
+          console.warn('[twilio-voice] failed ending live activity', {
+            callSid: targetCallSid,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        })
+        .finally(() => {
+          livePayloadArgsByCallSidRef.current.delete(targetCallSid);
         });
-      });
     }
     activeCallSidRef.current = null;
     dismissActiveCall();
