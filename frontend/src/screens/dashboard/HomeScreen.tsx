@@ -109,6 +109,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [alertsThisWeek, setAlertsThisWeek] = useState<number | null>(null);
   const [blockedCount, setBlockedCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasInitialLoadCompleted, setHasInitialLoadCompleted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const shimmer = useRef(new Animated.Value(0.6)).current;
@@ -160,9 +161,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       ]);
 
       const callRows = callsRes.data ?? [];
-      setRecentCall(callRows[0] ?? null);
-      setAlertsThisWeek(alertsRes.count ?? 0);
-      setBlockedCount(blockedRes.count ?? 0);
+      const nextRecentCall = callRows[0] ?? null;
+      const nextAlertsThisWeek = alertsRes.count ?? 0;
+      const nextBlockedCount = blockedRes.count ?? 0;
 
       let alertRows: AlertRow[] = [];
       try {
@@ -302,10 +303,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 3);
 
+      // Apply the full snapshot together to avoid partial first-paint states.
+      setRecentCall(nextRecentCall);
+      setAlertsThisWeek(nextAlertsThisWeek);
+      setBlockedCount(nextBlockedCount);
       setRecentActivity(activityItems);
     } catch (error) {
       console.warn('[home] loadStats failed', error);
     } finally {
+      if (!silent) {
+        setHasInitialLoadCompleted(true);
+      }
       if (!silent) {
         setLoading(false);
         setRefreshing(false);
@@ -314,8 +322,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   };
 
   useEffect(() => {
+    setRecentCall(null);
+    setRecentActivity([]);
+    setAlertsThisWeek(null);
+    setBlockedCount(null);
+    setHasInitialLoadCompleted(false);
     loadStats();
-  }, [activeProfile]);
+  }, [activeProfile?.id]);
 
   useEffect(() => {
     const interval = isAppActive
@@ -358,7 +371,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   );
 
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
-  const showSkeleton = loading && !recentCall && recentActivity.length === 0;
+  const showSkeleton = !hasInitialLoadCompleted && loading;
   const contentOpacity = showSkeleton ? 0 : 1;
   const statTiles: StatTile[] = [
     {
