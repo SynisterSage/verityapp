@@ -7,6 +7,7 @@ import {
   Linking,
   PanResponder,
   Pressable,
+  Platform,
   ScrollView,
   Share,
   StyleSheet,
@@ -55,6 +56,7 @@ type Invite = {
 };
 
 const avatarColors = ['#4c7dff', '#6e60f8', '#00c2ff', '#47d6a5'];
+const APP_STORE_FALLBACK_URL = 'https://apps.apple.com/app/id6759526773';
 const ROLE_DISPLAY_NAMES: Record<MemberRole, string> = {
   editor: 'Family',
   admin: 'Caretaker',
@@ -90,6 +92,18 @@ function resolveDisplayName(member: Member) {
 function formatStatus(status: string) {
   if (!status) return '';
   return `${status.charAt(0).toUpperCase()}${status.slice(1)}`;
+}
+
+function formatInviteCode(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return '';
+  }
+  const cleaned = trimmed.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+  if (cleaned.length !== 8) {
+    return trimmed;
+  }
+  return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
 }
 
 export default function MembersScreen() {
@@ -310,10 +324,26 @@ export default function MembersScreen() {
     }, [activeProfile, fetchMembers, fetchInvites])
   );
 
+  const resolveInviteToken = (invite: Invite) => (invite.short_code ?? invite.id ?? '').trim();
+  const resolveInviteCode = (invite: Invite) => formatInviteCode(invite.short_code ?? invite.id ?? '');
+  const buildInviteLink = (invite: Invite) => {
+    const token = invite.short_code ? resolveInviteCode(invite) : resolveInviteToken(invite);
+    return `verityprotect://invite/${token}`;
+  };
+  const buildInviteMessage = (invite: Invite) => {
+    const code = resolveInviteCode(invite);
+    return `You're invited to join my Verity Protect Circle.\n\nOpen this on your phone:\n${buildInviteLink(
+      invite
+    )}\n\nIf you do not have the app yet, install it here:\n${APP_STORE_FALLBACK_URL}\n\nIf it does not open automatically, enter this code in the app:\n${code}`;
+  };
+  const buildSmsUrl = (message: string) => {
+    const encoded = encodeURIComponent(message);
+    const separator = Platform.OS === 'ios' ? '&' : '?';
+    return `sms:${separator}body=${encoded}`;
+  };
+
   const shareInvite = async (invite: Invite) => {
-    const message = `Join my Verity Protect Circle.\nTap verityprotect://invite/${invite.id} or use code ${
-      invite.short_code ?? invite.id
-    } to join.`;
+    const message = buildInviteMessage(invite);
     try {
       await Share.share({ title: 'Verity Protect invite', message });
     } catch (err) {
@@ -391,18 +421,17 @@ export default function MembersScreen() {
   );
 
   const shareViaSMS = async (invite: Invite) => {
-    const code = invite.short_code ?? invite.id ?? '';
-    const message = `Join my Verity Protect Circle.\nTap verityprotect://invite/${invite.id} or use code ${code} to join.`;
-    const encoded = encodeURIComponent(message);
+    const message = buildInviteMessage(invite);
     try {
-      await Linking.openURL(`sms:?body=${encoded}`);
+      await Linking.openURL(buildSmsUrl(message));
     } catch (err) {
       Alert.alert('Unable to open SMS', 'Please share the invite manually.');
     }
+    closeInviteActions();
   };
 
   const copyInviteCode = async (invite: Invite) => {
-    const code = invite.short_code ?? invite.id ?? '';
+    const code = resolveInviteCode(invite);
     if (!code) return;
     await Clipboard.setStringAsync(code);
     Alert.alert('Code copied', 'Paste it into the Enter invite code screen.');
@@ -720,7 +749,7 @@ export default function MembersScreen() {
               ) : (
                 <View style={loadingInvites ? styles.faded : undefined}>
                   {invites.map((invite) => {
-                    const shortCode = invite.short_code ?? invite.id ?? '';
+                    const shortCode = resolveInviteCode(invite);
                     const roleLabel =
                       ROLE_DISPLAY_NAMES[invite.role] ??
                       invite.role.charAt(0).toUpperCase() + invite.role.slice(1);
@@ -757,10 +786,10 @@ export default function MembersScreen() {
           <View style={{ height: Math.max(insets.bottom, 32) }} />
         </ScrollView>
       </SafeAreaView>
-	      {selectedInvite && (
+      {selectedInvite && (
         <View style={styles.actionOverlay} pointerEvents="box-none">
           <TouchableWithoutFeedback onPress={closeInviteActions}>
-            <View style={styles.actionBackdrop} />
+            <Animated.View style={[styles.actionBackdrop, { opacity: actionAnim }]} />
           </TouchableWithoutFeedback>
 	          <Animated.View
 	            style={[
@@ -788,7 +817,7 @@ export default function MembersScreen() {
               <View>
                 <Text style={styles.actionTitle}>Invite Link</Text>
                 <Text style={styles.actionCode}>
-                  Code: {selectedInvite.short_code ?? selectedInvite.id}
+                  Code: {resolveInviteCode(selectedInvite)}
                 </Text>
               </View>
             </View>
@@ -821,7 +850,7 @@ export default function MembersScreen() {
       {isMemberTrayMounted && memberTrayMember && (
         <View style={styles.memberTrayOverlay} pointerEvents="box-none">
           <TouchableWithoutFeedback onPress={closeMemberTray}>
-            <View style={styles.memberTrayBackdrop} />
+            <Animated.View style={[styles.memberTrayBackdrop, { opacity: trayAnim }]} />
           </TouchableWithoutFeedback>
 	          <Animated.View
 	            style={[
