@@ -168,6 +168,8 @@ async function dispatchCallInReviewPush(args: {
         alert_type: 'call_review',
         routeTarget: 'call_detail',
         route_target: 'call_detail',
+        profileId,
+        profile_id: profileId,
         callId,
         call_id: callId,
       },

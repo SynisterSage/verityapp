@@ -365,7 +365,13 @@ function parseNotificationPayload(data: Record<string, unknown>): PendingNotific
     'messageId',
     'message_id'
   );
-  const profileId = readDataString(normalizedData, 'profileId', 'profile_id');
+  const profileId = readDataString(
+    normalizedData,
+    'profileId',
+    'profile_id',
+    'profileID',
+    'profile-id'
+  );
   const parsedRoute =
     parseRouteTarget(
       readDataString(
@@ -995,19 +1001,27 @@ function AuthCallbackHandler() {
 function NavigationHost() {
   const { mode, theme } = useTheme();
   const { session, isLoading } = useAuth();
-  const { onboardingComplete, isLoading: profileLoading, authInvalid } = useProfile();
+  const {
+    onboardingComplete,
+    isLoading: profileLoading,
+    authInvalid,
+    profiles,
+    activeProfile,
+    setActiveProfile,
+  } = useProfile();
   const pendingNotificationRef = useRef<PendingNotificationData | null>(null);
   const notificationListenerRef = useRef<Notifications.Subscription | null>(null);
   const isResolvingNotificationRef = useRef(false);
+  const notificationRetryCountRef = useRef<Record<string, number>>({});
 
-  const resolveCallIdFromAlertId = useCallback(async (alertId: string) => {
+  const resolveAlertRoutingContext = useCallback(async (alertId: string) => {
     const normalizedAlertId = alertId.trim();
     if (!normalizedAlertId) {
       return null;
     }
     const { data, error } = await supabase
       .from('alerts')
-      .select('call_id')
+      .select('call_id, profile_id')
       .eq('id', normalizedAlertId)
       .maybeSingle();
 
@@ -1022,9 +1036,38 @@ function NavigationHost() {
       return null;
     }
 
-    const callId = data?.call_id;
-    return typeof callId === 'string' && callId.trim().length > 0 ? callId.trim() : null;
+    const callId =
+      typeof data?.call_id === 'string' && data.call_id.trim().length > 0
+        ? data.call_id.trim()
+        : undefined;
+    const profileId =
+      typeof data?.profile_id === 'string' && data.profile_id.trim().length > 0
+        ? data.profile_id.trim()
+        : undefined;
+    if (!callId && !profileId) {
+      return null;
+    }
+    return { callId, profileId };
   }, []);
+
+  const activateProfileForNotification = useCallback(
+    async (profileId?: string) => {
+      const normalizedProfileId = profileId?.trim();
+      if (!normalizedProfileId || !profiles?.length) {
+        return;
+      }
+      if (activeProfile?.id === normalizedProfileId) {
+        return;
+      }
+      const matchedProfile = profiles.find((profile) => profile.id === normalizedProfileId);
+      if (!matchedProfile) {
+        return;
+      }
+      setActiveProfile(matchedProfile);
+      await Promise.resolve();
+    },
+    [activeProfile?.id, profiles, setActiveProfile]
+  );
 
   const resolvePendingNotification = useCallback(async () => {
     if (isResolvingNotificationRef.current) {
@@ -1043,26 +1086,49 @@ function NavigationHost() {
     isResolvingNotificationRef.current = true;
     try {
       const normalizedAlertType = (payload.alertType ?? '').trim().toLowerCase();
-      let resolvedCallId = payload.callId;
+      let resolvedCallId = payload.callId?.trim();
+      let resolvedProfileId = payload.profileId?.trim();
+      const retryKey =
+        payload.alertId?.trim() ??
+        payload.callId?.trim() ??
+        `${payload.routeTarget ?? 'unknown'}:${normalizedAlertType || 'unknown'}`;
+      const retryCount = notificationRetryCountRef.current[retryKey] ?? 0;
 
-      const shouldLookupCallId =
-        !resolvedCallId &&
+      const shouldLookupAlertContext =
         Boolean(payload.alertId) &&
-        (payload.routeTarget === 'call_detail' ||
-          CALL_DETAIL_ALERT_TYPES.has(normalizedAlertType));
+        (!resolvedCallId ||
+          !resolvedProfileId ||
+          payload.routeTarget === 'call_detail' ||
+          CALL_DETAIL_ALERT_TYPES.has(normalizedAlertType) ||
+          payload.routeTarget === 'alerts');
 
-      if (shouldLookupCallId && payload.alertId) {
-        const fetchedCallId = await resolveCallIdFromAlertId(payload.alertId);
-        if (fetchedCallId) {
-          resolvedCallId = fetchedCallId;
+      if (shouldLookupAlertContext && payload.alertId) {
+        const needsCallDetailResolution =
+          payload.routeTarget === 'call_detail' ||
+          CALL_DETAIL_ALERT_TYPES.has(normalizedAlertType);
+
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          const context = await resolveAlertRoutingContext(payload.alertId);
+          if (context?.callId && !resolvedCallId) {
+            resolvedCallId = context.callId;
+          }
+          if (context?.profileId && !resolvedProfileId) {
+            resolvedProfileId = context.profileId;
+          }
+          if (!needsCallDetailResolution || resolvedCallId) {
+            break;
+          }
+          if (attempt < 2) {
+            await new Promise((resolve) => setTimeout(resolve, 220 * (attempt + 1)));
+          }
         }
       }
-
-      pendingNotificationRef.current = null;
 
       if (!onboardingComplete && payload.routeTarget !== 'support_portal') {
         return;
       }
+
+      await activateProfileForNotification(resolvedProfileId);
 
       const shouldOpenCallDetail =
         Boolean(resolvedCallId) &&
@@ -1070,47 +1136,55 @@ function NavigationHost() {
           CALL_DETAIL_ALERT_TYPES.has(normalizedAlertType));
 
       if (shouldOpenCallDetail && resolvedCallId) {
+        pendingNotificationRef.current = null;
+        delete notificationRetryCountRef.current[retryKey];
         rootNavigationRef.current.navigate('CallDetailModal', { callId: resolvedCallId });
         return;
       }
 
       if (payload.routeTarget === 'call_detail') {
-        rootNavigationRef.current.dispatch(
-          CommonActions.navigate({
-            name: 'AppTabs',
-            params: { screen: 'AlertsTab' },
-          })
-        );
+        if (payload.alertId && retryCount < 2) {
+          notificationRetryCountRef.current[retryKey] = retryCount + 1;
+          pendingNotificationRef.current = {
+            ...payload,
+            callId: resolvedCallId,
+            profileId: resolvedProfileId,
+          };
+          setTimeout(() => {
+            void resolvePendingNotification();
+          }, 500);
+          return;
+        }
+        pendingNotificationRef.current = null;
+        delete notificationRetryCountRef.current[retryKey];
+        rootNavigationRef.current.navigate('AppTabs', {
+          screen: 'AlertsTab',
+          params: { initialMode: 'needs' },
+        });
         return;
       }
+
+      pendingNotificationRef.current = null;
+      delete notificationRetryCountRef.current[retryKey];
+
       if (payload.routeTarget === 'calls_trusted') {
-        rootNavigationRef.current.dispatch(
-          CommonActions.navigate({
-            name: 'AppTabs',
-            params: {
-              screen: 'CallsTab',
-              params: {
-                screen: 'Calls',
-                params: { initialFilter: 'trusted' },
-              },
-            },
-          })
-        );
+        rootNavigationRef.current.navigate('AppTabs', {
+          screen: 'CallsTab',
+          params: {
+            screen: 'Calls',
+            params: { initialFilter: 'trusted' },
+          },
+        });
         return;
       }
       if (payload.routeTarget === 'calls_all') {
-        rootNavigationRef.current.dispatch(
-          CommonActions.navigate({
-            name: 'AppTabs',
-            params: {
-              screen: 'CallsTab',
-              params: {
-                screen: 'Calls',
-                params: { initialFilter: 'all' },
-              },
-            },
-          })
-        );
+        rootNavigationRef.current.navigate('AppTabs', {
+          screen: 'CallsTab',
+          params: {
+            screen: 'Calls',
+            params: { initialFilter: 'all' },
+          },
+        });
         return;
       }
       if (payload.routeTarget === 'circle_activity') {
@@ -1122,20 +1196,20 @@ function NavigationHost() {
         return;
       }
       if (payload.alertId || payload.routeTarget === 'alerts' || payload.alertType) {
-        rootNavigationRef.current.dispatch(
-          CommonActions.navigate({
-            name: 'AppTabs',
-            params: {
-              screen: 'AlertsTab',
-              params: payload.alertsMode ? { initialMode: payload.alertsMode } : undefined,
-            },
-          })
-        );
+        rootNavigationRef.current.navigate('AppTabs', {
+          screen: 'AlertsTab',
+          params: payload.alertsMode ? { initialMode: payload.alertsMode } : undefined,
+        });
       }
     } finally {
       isResolvingNotificationRef.current = false;
     }
-  }, [onboardingComplete, resolveCallIdFromAlertId, session]);
+  }, [
+    activateProfileForNotification,
+    onboardingComplete,
+    resolveAlertRoutingContext,
+    session,
+  ]);
 
   const consumePendingSiriRoute = useCallback(async () => {
     try {

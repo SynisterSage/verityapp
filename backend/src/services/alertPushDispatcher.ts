@@ -180,6 +180,8 @@ export async function dispatchAlertPush(alert: AlertLike) {
         alert_type: normalizedAlertType,
         routeTarget,
         route_target: routeTarget,
+        profileId: alert.profile_id,
+        profile_id: alert.profile_id,
         ...(callId ? { callId } : {}),
         ...(callId ? { call_id: callId } : {}),
       },
