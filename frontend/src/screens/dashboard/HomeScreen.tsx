@@ -122,8 +122,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       setRecentActivity([]);
       setAlertsThisWeek(null);
       setBlockedCount(null);
-      setLoading(false);
-      setRefreshing(false);
+      if (!session) {
+        setLoading(false);
+      }
+      if (!silent) {
+        setRefreshing(false);
+      }
       return;
     }
     if (isRefresh && !silent) {
@@ -371,7 +375,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   );
 
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
-  const showSkeleton = !hasInitialLoadCompleted && loading;
+  const waitingForProfile = Boolean(session) && !activeProfile;
+  const showSkeleton = waitingForProfile || (!hasInitialLoadCompleted && loading);
   const statTiles: StatTile[] = [
     {
       key: 'alerts',
@@ -413,6 +418,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     ? formatPhoneNumber(recentCall?.caller_number, 'Recent Call')
     : hasTwilioNumber
     ? 'No calls yet'
+    : waitingForProfile
+    ? 'Loading…'
     : 'Missing #';
   const heroTranscript = recentCall?.transcript ?? (loading ? 'Loading…' : null);
   const heroIsHandledFraud = hasHeroCall && recentCall?.feedback_status === 'marked_fraud';

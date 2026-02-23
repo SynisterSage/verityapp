@@ -1004,6 +1004,7 @@ function NavigationHost() {
   const {
     onboardingComplete,
     isLoading: profileLoading,
+    resolvedSessionKey,
     authInvalid,
     profiles,
     activeProfile,
@@ -1347,7 +1348,8 @@ function NavigationHost() {
     return () => clearTimeout(timer);
   }, []);
 
-  const waitingForSessionBootstrap = readySessionKey !== sessionKey;
+  const waitingForSessionBootstrap =
+    readySessionKey !== sessionKey || resolvedSessionKey !== sessionKey;
 
   if (waitingForSessionBootstrap || splashVisible) {
     return <SplashScreen />;

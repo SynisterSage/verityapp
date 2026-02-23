@@ -83,6 +83,7 @@ type ProfileContextValue = {
   canDeleteProfile: boolean;
   onboardingComplete: boolean;
   isLoading: boolean;
+  resolvedSessionKey: string;
   authInvalid: boolean;
   passcodeDraft: string;
   redirectToSettings: boolean;
@@ -108,6 +109,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [activeMembership, setActiveMembership] = useState<ProfileMembership | null>(null);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [resolvedSessionKey, setResolvedSessionKey] = useState('__boot__');
   const [authInvalid, setAuthInvalid] = useState(false);
   const [passcodeDraft, setPasscodeDraft] = useState('');
   const [redirectToSettings, setRedirectToSettings] = useState(false);
@@ -128,6 +130,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const skipTwilioDelayRef = useRef(false);
 
   const refreshProfiles = useCallback(async (options?: { silent?: boolean }) => {
+    const targetSessionKey = session?.user?.id ?? '__anon__';
     if (!options?.silent) {
       setIsLoading(true);
     }
@@ -137,29 +140,38 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setActiveMembership(null);
       setAuthInvalid(false);
       setIsLoading(false);
+      setResolvedSessionKey(targetSessionKey);
       return;
     }
     try {
       const data = await authorizedFetch('/profiles');
       const list = (data?.profiles ?? []) as Profile[];
+      const selectedProfile =
+        (activeProfile ? list.find((profile) => profile.id === activeProfile.id) : null) ??
+        list[0] ??
+        null;
       setProfiles(list);
-      setActiveProfile(list[0] ?? null);
-      setOnboardingComplete(Boolean(list[0]?.has_passcode));
+      setActiveProfile(selectedProfile);
+      setOnboardingComplete(Boolean(selectedProfile?.has_passcode));
       setAuthInvalid(false);
     } catch (err) {
       const message = err instanceof Error ? err.message.toLowerCase() : '';
       if (message.includes('401') || message.includes('unauthorized')) {
         await signOut();
         setAuthInvalid(true);
+        setProfiles([]);
+        setActiveProfile(null);
+        setOnboardingComplete(false);
+        setActiveMembership(null);
+      } else {
+        // Keep the current profile snapshot on transient failures to avoid UI flicker.
+        console.warn('Failed to refresh profiles; keeping previous profile state', err);
       }
-      setProfiles([]);
-      setActiveProfile(null);
-      setOnboardingComplete(false);
-      setActiveMembership(null);
    } finally {
      setIsLoading(false);
+     setResolvedSessionKey(targetSessionKey);
    }
-  }, [session, signOut]);
+  }, [activeProfile, session, signOut]);
 
   useEffect(() => {
     refreshProfiles();
@@ -659,6 +671,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       canDeleteProfile,
       onboardingComplete,
       isLoading,
+      resolvedSessionKey,
       authInvalid,
       passcodeDraft,
       redirectToSettings,
@@ -681,6 +694,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       canManageProfile,
       onboardingComplete,
       isLoading,
+      resolvedSessionKey,
       authInvalid,
       refreshProfiles,
       passcodeDraft,
