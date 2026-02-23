@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet, ScrollView, Pressable, AppState, AppStateStatus } from 'react-native';
 
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { supabase } from '../../services/supabase';
 import { logEvent } from '../../services/sentry';
@@ -21,9 +22,11 @@ type Props = {
 
 const RESEND_LIMIT = 5;
 const RESEND_WINDOW_MS = 30 * 60 * 1000;
+const EMAIL_CONFIRM_REDIRECT_TO = 'verityprotect://auth/callback';
 
 export default function ConfirmEmailScreen({ route, navigation }: Props) {
   const { email: routeEmail, confirmed } = route.params;
+  const { session } = useAuth();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const styles = useMemo(() => createConfirmEmailStyles(theme), [theme]);
@@ -32,6 +35,7 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
   const footerBuffer = bottomInset + theme.spacing.xxl + theme.spacing.xxl + 60;
   const [resendState, setResendState] = useState<null | { type: 'success' | 'error'; message: string }>(null);
   const [isResending, setIsResending] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
   const [resendHistory, setResendHistory] = useState<number[]>([]);
   const email = routeEmail ?? '';
   const [emailConfirmed, setEmailConfirmed] = useState(confirmed ?? false);
@@ -39,57 +43,75 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
 
   const showSuccess = emailConfirmed;
 
-  // Update confirmed state when route params change
-  useEffect(() => {
-    console.log('ConfirmEmailScreen: confirmed param changed to:', confirmed);
-    if (confirmed) {
-      setEmailConfirmed(true);
-    }
-  }, [confirmed]);
-
-  // Check session when app comes to foreground or after a delay
-  useEffect(() => {
-    const checkEmailConfirmation = async () => {
+  const checkEmailConfirmation = useCallback(
+    async (reason: 'mount' | 'foreground' | 'manual' | 'session') => {
+      if (emailConfirmed) {
+        return true;
+      }
+      setIsChecking(true);
       try {
-        console.log('Checking email confirmation status...');
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Session check:', { 
-          hasSession: !!session, 
-          emailConfirmed: !!session?.user?.email_confirmed_at,
-          email: session?.user?.email 
-        });
-        if (session?.user?.email_confirmed_at) {
-          console.log('Email confirmed! Setting state...');
+        const {
+          data: { session: currentSession },
+        } = await supabase.auth.getSession();
+        const sessionToCheck = currentSession ?? session;
+        const confirmedViaSession = Boolean(sessionToCheck?.user?.email_confirmed_at);
+
+        if (confirmedViaSession) {
           setEmailConfirmed(true);
-          logEvent('confirm_email_detected_confirmed', { screen: 'ConfirmEmail' });
+          logEvent('confirm_email_detected_confirmed', {
+            screen: 'ConfirmEmail',
+            extra: { reason },
+          });
+          return true;
         }
+
+        return false;
       } catch (error) {
         console.warn('Failed to check email confirmation:', error);
+        return false;
+      } finally {
+        setIsChecking(false);
       }
-    };
+    },
+    [emailConfirmed, session]
+  );
 
+  // Update confirmed state when route params or session change.
+  useEffect(() => {
+    if (confirmed) {
+      setEmailConfirmed(true);
+      return;
+    }
+    if (session?.user?.email_confirmed_at) {
+      setEmailConfirmed(true);
+    }
+  }, [confirmed, session?.user?.email_confirmed_at]);
+
+  // Check confirmation on mount and when returning to app foreground.
+  useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
-        // App came to foreground, check if email is confirmed after short delay
-        console.log('App came to foreground, checking confirmation...');
         setTimeout(() => {
-          void checkEmailConfirmation();
-        }, 500);
+          void checkEmailConfirmation('foreground');
+        }, 350);
       }
       appState.current = nextAppState;
     });
 
-    // Check immediately on mount if confirmed param is true
-    if (confirmed) {
-      setTimeout(() => {
-        void checkEmailConfirmation();
-      }, 500);
-    }
+    void checkEmailConfirmation('mount');
 
     return () => {
       subscription.remove();
     };
-  }, [confirmed]);
+  }, [checkEmailConfirmation]);
+
+  // If auth session is updated from callback while this screen is open, re-check once.
+  useEffect(() => {
+    if (!session) {
+      return;
+    }
+    void checkEmailConfirmation('session');
+  }, [checkEmailConfirmation, session]);
 
   const cleanHistory = (timestamps: number[], now = Date.now()) =>
     timestamps.filter((ts) => now - ts < RESEND_WINDOW_MS);
@@ -123,7 +145,7 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
       email,
       type: 'signup',
       options: {
-        emailRedirectTo: 'exp://192.168.1.174:8081/--/auth/callback',
+        emailRedirectTo: EMAIL_CONFIRM_REDIRECT_TO,
       },
     });
     if (error) {
@@ -211,6 +233,21 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
                 <Text style={styles.helpText}>
                   Still nothing? Tap “Resend email” and we’ll send a fresh link right away.
                 </Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.resendButton,
+                    pressed && styles.resendButtonPressed,
+                    isChecking && styles.resendButtonLoading,
+                  ]}
+                  onPress={() => {
+                    void checkEmailConfirmation('manual');
+                  }}
+                  disabled={isChecking}
+                >
+                  <Text style={styles.resendButtonText}>
+                    {isChecking ? 'Checking…' : 'I confirmed, check again'}
+                  </Text>
+                </Pressable>
                 <Pressable
                   style={({ pressed }) => [
                     styles.resendButton,
