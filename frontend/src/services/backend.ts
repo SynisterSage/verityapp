@@ -7,6 +7,26 @@ type AuthorizedFetchOptions = RequestInit & {
   skipUnauthorizedSignOut?: boolean;
 };
 
+function stripHtmlTags(input: string) {
+  return input.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function normalizeApiErrorMessage(message: string) {
+  const trimmed = message.trim();
+  if (!trimmed) {
+    return 'Request failed';
+  }
+  const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(trimmed);
+  if (!looksLikeHtml) {
+    return trimmed;
+  }
+  const plainText = stripHtmlTags(trimmed);
+  if (!plainText || plainText.length > 220) {
+    return 'Request failed. Please try again.';
+  }
+  return plainText;
+}
+
 async function getAccessToken() {
   const { data } = await supabase.auth.getSession();
   return data.session?.access_token ?? '';
@@ -59,6 +79,8 @@ export async function authorizedFetch(path: string, options: AuthorizedFetchOpti
         const json = JSON.parse(text);
         if (json?.message) {
           message = json.message;
+        } else if (typeof json?.error === 'string') {
+          message = json.error;
         } else if (Array.isArray(json?.errors) && json.errors[0]?.message) {
           message = json.errors[0].message;
         } else if (json?.error?.message) {
@@ -70,6 +92,7 @@ export async function authorizedFetch(path: string, options: AuthorizedFetchOpti
         message = text;
       }
     }
+    message = normalizeApiErrorMessage(String(message ?? 'Request failed'));
     const durationMs = Date.now() - startTime;
     logEvent('api_error', {
       level: response.status >= 500 ? 'error' : 'warning',

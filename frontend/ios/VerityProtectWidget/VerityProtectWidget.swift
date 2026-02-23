@@ -5,9 +5,10 @@ private let appGroupIdentifier = "group.com.lexferguson.verityprotect.com"
 private let needsAttentionKey = "alertsWidget.needsAttentionCount"
 private let historyCountKey = "alertsWidget.historyCount"
 private let verityBrandPrimary = Color(red: 0.29, green: 0.53, blue: 0.98)
-private let verityBrandSecondary = Color(red: 0.35, green: 0.84, blue: 0.97)
-private let verityWarning = Color(red: 0.96, green: 0.62, blue: 0.22)
+private let verityBrandSecondary = Color(red: 0.29, green: 0.53, blue: 0.98)
+private let verityDanger = Color(red: 0.88, green: 0.11, blue: 0.28)
 private let largeBottomCardHeight: CGFloat = 92
+private let mediumMetricCardHeight: CGFloat = 84
 
 struct AlertsWidgetEntry: TimelineEntry {
   let date: Date
@@ -83,7 +84,9 @@ struct VerityProtectAlertsWidgetEntryView: View {
       widgetHeader(icon: "shield.lefthalf.filled", title: "Alerts", tint: verityBrandPrimary)
       HStack(spacing: 10) {
         metricCard(title: "Needs Attention", value: entry.needsAttentionCount, tint: attentionTint(entry.needsAttentionCount), colorScheme: colorScheme)
+          .frame(maxWidth: .infinity, minHeight: mediumMetricCardHeight, maxHeight: mediumMetricCardHeight, alignment: .topLeading)
         metricCard(title: "History", value: entry.historyCount, tint: verityBrandSecondary, colorScheme: colorScheme)
+          .frame(maxWidth: .infinity, minHeight: mediumMetricCardHeight, maxHeight: mediumMetricCardHeight, alignment: .topLeading)
       }
     }
     .padding(14)
@@ -189,7 +192,7 @@ struct VerityProtectHistoryWidgetEntryView: View {
       }
       Spacer(minLength: 0)
       metricCard(title: "Needs Attention", value: entry.needsAttentionCount, tint: attentionTint(entry.needsAttentionCount), colorScheme: colorScheme)
-        .frame(maxWidth: 132)
+        .frame(maxWidth: 132, minHeight: mediumMetricCardHeight, maxHeight: mediumMetricCardHeight, alignment: .topLeading)
     }
     .padding(14)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -333,10 +336,10 @@ private func statusCard(value: String, isAttention: Bool, colorScheme: ColorSche
       .foregroundStyle(.secondary)
       .lineLimit(1)
     Text(value)
-      .font(.system(size: 16, weight: .bold))
-      .foregroundStyle(isAttention ? verityWarning : verityBrandPrimary)
-      .lineLimit(2)
-      .minimumScaleFactor(0.8)
+      .font(.system(size: 15, weight: .bold))
+      .foregroundStyle(isAttention ? verityDanger : verityBrandPrimary)
+      .lineLimit(1)
+      .minimumScaleFactor(0.72)
   }
   .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
   .padding(.horizontal, 10)
@@ -348,7 +351,7 @@ private func statusCard(value: String, isAttention: Bool, colorScheme: ColorSche
 }
 
 private func attentionTint(_ value: Int) -> Color {
-  value > 0 ? verityWarning : verityBrandPrimary
+  value > 0 ? verityDanger : verityBrandPrimary
 }
 
 private func widgetFooterCTA() -> some View {

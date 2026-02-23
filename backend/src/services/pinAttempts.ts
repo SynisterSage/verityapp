@@ -1,7 +1,8 @@
 import supabaseAdmin from '@src/services/supabase';
 
-const PIN_ATTEMPT_LIMIT = 5;
+const PIN_ATTEMPT_LIMIT = 8;
 const LOCKBACKOFF_SECONDS = [900, 900, 900];
+const ATTEMPT_SESSION_WINDOW_MS = 30 * 60 * 1000;
 
 export interface PinLockState {
   locked: boolean;
@@ -21,11 +22,18 @@ function normalizeIp(ip?: string) {
   return ip?.trim() ? ip.trim() : 'unknown';
 }
 
+function isWithinAttemptWindow(timestamp?: string | null, now = new Date()) {
+  if (!timestamp) return false;
+  const lastAttemptAt = new Date(timestamp);
+  if (Number.isNaN(lastAttemptAt.getTime())) return false;
+  return now.getTime() - lastAttemptAt.getTime() <= ATTEMPT_SESSION_WINDOW_MS;
+}
+
 export async function getPinLockState(profileId: string, ip?: string): Promise<PinLockState> {
   const ipKey = normalizeIp(ip);
   const { data } = await supabaseAdmin
     .from('pin_attempts')
-    .select('attempts, locked_until')
+    .select('attempts, locked_until, last_attempt_at')
     .eq('profile_id', profileId)
     .eq('ip', ipKey)
     .maybeSingle();
@@ -35,10 +43,11 @@ export async function getPinLockState(profileId: string, ip?: string): Promise<P
   }
   const lockedUntil = data.locked_until ? new Date(data.locked_until) : null;
   const locked = lockedUntil ? lockedUntil > now : false;
+  const attempts = isWithinAttemptWindow(data.last_attempt_at, now) ? data.attempts ?? 0 : 0;
   return {
     locked,
     lockedUntil,
-    attempts: data.attempts ?? 0,
+    attempts,
   };
 }
 
@@ -51,11 +60,11 @@ export async function recordPinAttempt(
   const now = new Date();
   const { data } = await supabaseAdmin
     .from('pin_attempts')
-    .select('attempts')
+    .select('attempts, last_attempt_at')
     .eq('profile_id', profileId)
     .eq('ip', ipKey)
     .maybeSingle();
-  const previousAttempts = data?.attempts ?? 0;
+  const previousAttempts = isWithinAttemptWindow(data?.last_attempt_at, now) ? data?.attempts ?? 0 : 0;
   const attempts = success ? 0 : previousAttempts + 1;
   const lockSeconds = success ? 0 : getLockDurationSeconds(attempts);
   const lockedUntil = lockSeconds ? new Date(now.getTime() + lockSeconds * 1000) : null;
