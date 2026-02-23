@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, ScrollView, Pressable } from 'react-native';
-import { useCallback, useLayoutEffect, useMemo } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import { useTheme } from '../../context/ThemeContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
+import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
@@ -19,9 +20,10 @@ import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 export default function TestCallScreen({ navigation }: { navigation: any }) {
   const { activeProfile, passcodeDraft, setActiveProfile, setRedirectToSettings } =
     useProfile();
-  const { theme } = useTheme();
+  const { theme, mode } = useTheme();
   const styles = useMemo(() => createTestCallStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
 
   const twilioNumber = activeProfile?.twilio_virtual_number ?? '';
   const redirectNumber = activeProfile?.fallback_phone_number ?? '';
@@ -149,7 +151,19 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
             <Ionicons name="swap-horizontal-outline" size={20} color={theme.colors.surface} />
           </View>
           <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Redirect Number</Text>
+            <View style={styles.infoLabelRow}>
+              <Text style={styles.infoLabel}>Reliable fallback number</Text>
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation();
+                  setShowFallbackInfoModal(true);
+                }}
+                hitSlop={8}
+                style={({ pressed }) => [styles.infoHelpButton, pressed && styles.infoHelpButtonPressed]}
+              >
+                <Ionicons name="help-circle-outline" size={14} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
             <Text style={styles.infoValue}>
               {redirectNumber ? formatPhoneNumber(redirectNumber, redirectNumber) : 'Not set'}
             </Text>
@@ -188,6 +202,12 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
         onPrimaryPress={finishOnboarding}
         secondaryLabel="Skip for now"
         onSecondaryPress={finishOnboarding}
+      />
+      <ReliableFallbackInfoModal
+        visible={showFallbackInfoModal}
+        onClose={() => setShowFallbackInfoModal(false)}
+        theme={theme}
+        mode={mode}
       />
     </SafeAreaView>
   );
@@ -258,6 +278,25 @@ const createTestCallStyles = (theme: AppTheme) =>
       letterSpacing: 0.6,
       color: theme.colors.textMuted,
       textTransform: 'uppercase',
+    },
+    infoLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    infoHelpButton: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.border, 0.9),
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.surface, 0.8),
+    },
+    infoHelpButtonPressed: {
+      opacity: 0.72,
     },
     infoValue: {
       fontSize: 18,

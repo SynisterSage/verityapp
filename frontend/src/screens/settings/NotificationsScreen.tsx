@@ -271,22 +271,27 @@ export default function NotificationsScreen() {
       {
         icon: 'notifications-outline',
         color: theme.colors.danger,
-        text: 'Turn on only the alert types you want to receive.',
+        text: 'Notifications are recommended for real-time fraud alerts and support replies.',
       },
       {
         icon: 'settings',
         color: theme.colors.accent,
         text: 'Use the toggles to reduce non-critical activity updates.',
       },
+      {
+        icon: 'settings-outline',
+        color: theme.colors.textMuted,
+        text: 'If notifications are off in system settings, Verity still works but updates may arrive later.',
+      },
     ],
-    [theme.colors.accent, theme.colors.danger]
+    [theme.colors.accent, theme.colors.danger, theme.colors.textMuted]
   );
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <SettingsHeader
         title="Notifications"
-        subtitle="Choose how much activity you want to receive"
+        subtitle="Recommended for fastest alerts and support updates"
       />
       <ScrollView
         contentContainerStyle={[
@@ -301,6 +306,7 @@ export default function NotificationsScreen() {
           <Text style={styles.title}>Alert Delivery</Text>
           <Text style={styles.subtitle}>
             Control which alerts reach you and how strict call screening should be.
+            {'\n'}Verity works without notifications, but updates may be delayed.
           </Text>
         </View>
 

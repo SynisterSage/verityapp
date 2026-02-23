@@ -228,6 +228,11 @@ function numbersLikelyMatch(a?: string | null, b?: string | null) {
   return Boolean(normalizedA && normalizedB && normalizedA === normalizedB);
 }
 
+function getExplicitFallbackNumber(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
 function appendNumberBridge(
   twimlResponse: twilio.twiml.VoiceResponse,
   dialStatusUrl: string,
@@ -388,7 +393,7 @@ async function bridgeToProfile(
     twilio_client_last_seen_at?: string | null;
   }
 ) {
-  const fallbackNumber = profile.fallback_phone_number || profile.phone_number || null;
+  const fallbackNumber = getExplicitFallbackNumber(profile.fallback_phone_number);
   const loopTarget = numbersLikelyMatch(profile.phone_number, toNumber);
 
   // If the profile number points back to the routed Twilio number, do not dial it again.
@@ -776,7 +781,7 @@ async function verifyPin(req: Request, res: Response) {
       );
       return res.type('text/xml').send(twimlResponse.toString());
     }
-    const fallbackNumber = profile.fallback_phone_number || profile.phone_number || null;
+    const fallbackNumber = getExplicitFallbackNumber(profile.fallback_phone_number);
     if (fallbackNumber) {
       logger.info(
         `Dialing fallback_number=${fallbackNumber} callerId=${outboundCallerId}`
@@ -784,6 +789,12 @@ async function verifyPin(req: Request, res: Response) {
       appendNumberBridge(twimlResponse, dialStatusUrl, outboundCallerId, fallbackNumber);
       return res.type('text/xml').send(twimlResponse.toString());
     }
+    appendVoicemail(
+      twimlResponse,
+      callbackUrl,
+      'Passcode accepted, but we could not connect your secure line. Please leave a message.'
+    );
+    return res.type('text/xml').send(twimlResponse.toString());
   }
 
   if (isValid && !bridgeEnabled) {
@@ -838,7 +849,7 @@ async function bridgeFallback(req: Request, res: Response) {
     return res.type('text/xml').send(twimlResponse.toString());
   }
 
-  const destination = profile.fallback_phone_number || profile.phone_number || null;
+  const destination = getExplicitFallbackNumber(profile.fallback_phone_number);
   if (!destination) {
     appendHangupMessage(
       twimlResponse,

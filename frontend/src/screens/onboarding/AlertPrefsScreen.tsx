@@ -177,15 +177,20 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
       {
         icon: 'notifications-outline',
         color: theme.colors.danger,
-        text: 'Pick the alert categories you want to receive right now.',
+        text: 'Verity works without notifications, but alerts can be delayed when they are off.',
       },
       {
         icon: 'options-outline',
         color: theme.colors.accent,
         text: 'Choose Simple or Detailed now. You can always adjust in Settings later.',
       },
+      {
+        icon: 'settings-outline',
+        color: theme.colors.textMuted,
+        text: 'If alerts feel quiet, open iPhone Settings and re-enable notifications for Verity Protect.',
+      },
     ],
-    [theme.colors.accent, theme.colors.danger]
+    [theme.colors.accent, theme.colors.danger, theme.colors.textMuted]
   );
 
   return (
@@ -203,7 +208,7 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
         <View style={styles.headerSection}>
           <Text style={styles.title}>Notifications</Text>
           <Text style={styles.subtitle}>
-            Set your safety style now. You can fine-tune this later in Settings.
+            Recommended: keep notifications on for faster fraud alerts and support updates.
           </Text>
         </View>
 

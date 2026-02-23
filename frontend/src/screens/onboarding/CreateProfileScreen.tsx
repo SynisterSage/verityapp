@@ -18,6 +18,7 @@ import { useProfile } from '../../context/ProfileContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
+import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
@@ -75,7 +76,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCallFlowModal, setShowCallFlowModal] = useState(false);
-  const { theme } = useTheme();
+  const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
+  const { theme, mode } = useTheme();
   const styles = useMemo(() => createProfileStyles(theme), [theme]);
   const placeholderColor = withOpacity(theme.colors.textMuted, 0.7);
 
@@ -275,7 +277,16 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           />
         </View>
 
-        <Text style={styles.inputLabel}>Reliable fallback number</Text>
+        <View style={styles.inputLabelRow}>
+          <Text style={styles.inputLabel}>Reliable fallback number</Text>
+          <Pressable
+            style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
+            onPress={() => setShowFallbackInfoModal(true)}
+            hitSlop={8}
+          >
+            <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
+          </Pressable>
+        </View>
         <View style={styles.inputContainer}>
           <Ionicons name="call-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
           <Text style={styles.prefix}>+1</Text>
@@ -289,9 +300,6 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
             returnKeyType="done"
           />
         </View>
-        <Text style={styles.inputHint}>
-          Optional. Use a direct number that does not forward to the Verity line.
-        </Text>
 
         <Text style={styles.inputLabel}>Verity number</Text>
         {!assignedNumber ? (
@@ -434,6 +442,12 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
             </View>
           </View>
         </Modal>
+        <ReliableFallbackInfoModal
+          visible={showFallbackInfoModal}
+          onClose={() => setShowFallbackInfoModal(false)}
+          theme={theme}
+          mode={mode}
+        />
       </SafeAreaView>
     </View>
   );
@@ -481,12 +495,24 @@ const createProfileStyles = (theme: AppTheme) =>
       color: theme.colors.textMuted,
       marginBottom: 4,
     },
-    inputHint: {
-      fontSize: 12,
-      color: theme.colors.textDim,
-      marginTop: -8,
+    inputLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       marginBottom: 4,
-      lineHeight: 16,
+    },
+    labelHelpButton: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.border, 0.9),
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.surface, 0.8),
+    },
+    labelHelpButtonPressed: {
+      opacity: 0.72,
     },
     inputContainer: {
       flexDirection: 'row',

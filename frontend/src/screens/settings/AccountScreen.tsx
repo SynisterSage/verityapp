@@ -21,6 +21,7 @@ import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
 
 import SettingsHeader from '../../components/common/SettingsHeader';
+import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
 import { deleteProfile } from '../../services/profile';
 import { authorizedFetch } from '../../services/backend';
 import { useAuth } from '../../context/AuthContext';
@@ -106,6 +107,7 @@ export default function AccountScreen() {
   const [isPinVerifying, setIsPinVerifying] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [safetyMessage, setSafetyMessage] = useState('');
+  const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
   const lastFallbackPhoneKey = useRef<string | null>(null);
 
@@ -368,7 +370,16 @@ export default function AccountScreen() {
                 editable={!isReadOnly}
               />
             </View>
-            <Text style={styles.inputLabel}>Reliable fallback number</Text>
+            <View style={styles.inputLabelRow}>
+              <Text style={styles.inputLabel}>Reliable fallback number</Text>
+              <Pressable
+                style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
+                onPress={() => setShowFallbackInfoModal(true)}
+                hitSlop={8}
+              >
+                <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
             <View style={[styles.inputWithPrefix, isReadOnly && styles.inputDisabled]}>
               <Text style={styles.prefixText}>+1</Text>
               <TextInput
@@ -382,9 +393,6 @@ export default function AccountScreen() {
                 editable={!isReadOnly}
               />
             </View>
-            <Text style={styles.helpText}>
-              Used if the in-app call cannot connect. Use a direct number, not one forwarded to Verity.
-            </Text>
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput
               style={[styles.input, styles.inputDisabled]}
@@ -556,6 +564,12 @@ export default function AccountScreen() {
             </View>
           </Modal>
         ) : null}
+        <ReliableFallbackInfoModal
+          visible={showFallbackInfoModal}
+          onClose={() => setShowFallbackInfoModal(false)}
+          theme={theme}
+          mode={mode}
+        />
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -655,6 +669,24 @@ const createAccountStyles = (theme: AppTheme) =>
       marginBottom: 2,
       letterSpacing: 0.4,
     },
+    inputLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    labelHelpButton: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.border, 0.9),
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.surface, 0.8),
+    },
+    labelHelpButtonPressed: {
+      opacity: 0.72,
+    },
     input: {
       height: 60,
       borderWidth: 1,
@@ -687,13 +719,6 @@ const createAccountStyles = (theme: AppTheme) =>
     },
     inputDisabled: {
       opacity: 0.6,
-    },
-    helpText: {
-      color: theme.colors.textDim,
-      fontSize: 12,
-      lineHeight: 16,
-      marginTop: 2,
-      marginBottom: 2,
     },
     metaRow: {
       flexDirection: 'row',
