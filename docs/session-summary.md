@@ -261,3 +261,47 @@ Backend / automation cleanup
 Verification
 - Frontend type checks passed after each major iteration (`cd frontend && npx tsc --noEmit`).
 - Confirmed no remaining references in backend/workflows to stale Twilio reminder automation.
+
+2026-02-22 to 2026-02-23
+
+Scope
+- Complete iOS production/TestFlight setup and unblock build/upload pipeline.
+- Stabilize trusted-call bridging in production after repeated closed/locked-state failures.
+- Lock production to the known-good single-call flow and verify with live logs.
+
+Build, signing, and distribution setup
+- Completed App Store Connect app setup and TestFlight upload workflow.
+- Resolved provisioning/profile/certificate conflicts across main app + widget target.
+- Fixed iOS archive blockers encountered during release prep:
+  - Twilio bitcode stripping issue,
+  - Sentry upload failure in archive path,
+  - CocoaPods/Xcode Cloud post-clone/install failures.
+- Established working production release path and uploaded new internal builds.
+- Current active validation target: TestFlight build `#32`.
+
+VoIP / call flow stabilization
+- Investigated production-only race conditions (answered call while caller still rings, intermittent no-call on closed app).
+- Added native CallKit placeholder handoff hardening in `frontend/ios/VoIPPushModule.swift` to reduce answer race risk.
+- Hardened backend bridge timing and fallback behavior in `backend/src/controllers/TwilioController.ts`.
+- Final production mode aligned to known-good Twilio-native flow:
+  - `ENABLE_MANUAL_VOIP_PUSH=false`
+  - `EXPO_PUBLIC_ENABLE_CUSTOM_VOIP_PUSH=false`
+- Updated known-good doc to match validated production behavior:
+  - `docs/KNOWN_GOOD_CALL_FLOW.md`
+
+Validation evidence (production logs)
+- Repeated trusted bridge events with final `sip=200`.
+- Twilio client token issuance confirms push credential wiring:
+  - `hasPushCredentialSid=true`
+- Manual/custom pre-dial path disabled in working runs:
+  - `voipPushSent=false`
+
+Open items / tomorrow
+- Smoke test build `#32` end-to-end before declaring release-ready.
+- Continue iteration on live call activity behavior and widget polish.
+- After smoke tests pass, start App Store distribution prep (screenshots, metadata, review setup).
+
+Known follow-up
+- Synthetic voice detector runtime path missing on Render:
+  - `spawn /opt/render/project/src/backend/.venv-voice-detector/bin/python3 ENOENT`
+  - Non-blocking for call bridging, but should be fixed for consistent detection/scoring.

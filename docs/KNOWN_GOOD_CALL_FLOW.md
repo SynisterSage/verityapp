@@ -1,6 +1,6 @@
 # Known Good Call Flow (Single Call UX)
 
-Last verified: February 18, 2026
+Last verified: February 23, 2026 (production/TestFlight path)
 
 ## Goal
 
@@ -10,52 +10,45 @@ One incoming CallKit call only (no placeholder handoff), with reliable answer be
 - app closed + phone unlocked
 - app closed + phone locked
 
+## Canonical Production Mode
+
+Use Twilio-native incoming invite flow only.
+
+- Do not run manual pre-dial backend VoIP push.
+- Do not run custom frontend PushKit placeholder handoff path.
+
+This mode produced stable repeated `sip=200` results in production testing.
+
 ## Required Environment Settings
 
 ### Backend (Render)
 
 - `ENABLE_CALL_BRIDGE=true`
-- `ENABLE_MANUAL_VOIP_PUSH=false` (or unset)
+- `ENABLE_MANUAL_VOIP_PUSH=false`
+- `TWILIO_PUSH_CREDENTIAL_SID_IOS` must be set
 
-### Frontend Build Environment
+### Frontend Build Environment (EAS production)
 
-- `EXPO_PUBLIC_ENABLE_CUSTOM_VOIP_PUSH=false` (or unset)
+- `EXPO_PUBLIC_ENABLE_CUSTOM_VOIP_PUSH=false`
 
-## Required Code State
+Important: `EXPO_PUBLIC_*` values are compile-time. Changing this requires a new iOS build install.
 
-- Twilio is the single incoming-call owner for production flow.
-- Manual pre-dial VoIP push is disabled by default.
-- `react-native-twilio-programmable-voice` iOS behavior is patched via `patch-package`.
-- `postinstall` runs `patch-package` automatically.
-
-## Build Order (iOS Release)
-
-```bash
-cd /Users/lex/Desktop/safecall
-git pull
-
-cd frontend
-npm install
-npx pod-install
-
-# Release device build
-npx expo run:ios --device --configuration Release
-```
-
-If you changed backend code, also redeploy latest `main` on Render.
-
-## Expected Runtime Signals
+## Required Runtime Signals
 
 ### Good backend signals
 
-- Trusted bridge log appears:
+- Token issuance confirms Twilio push credential:
+  - `[twilio-client] token issued ... hasPushCredentialSid=true`
+- Bridge path active:
   - `Trusted caller bridged client=profile-...`
-- Final dial status for answered call:
-  - `sip=200`
+- Answered call completes on client leg:
+  - final `Dial status ... sip=200`
 
-### Bad signal
+### Config drift signals
 
-- `sip=487` after user answered (means the client leg did not connect in time).
+- If you see:
+  - `[VoIP] Sending: callSid=...`
+  then manual backend VoIP push mode is active and this doc's flow is not in effect.
 
 ## Validation Matrix
 
@@ -71,8 +64,25 @@ Pass criteria for each:
 - Answer connects call
 - Active call UI appears
 - Caller identity is shown correctly
+- Backend final status for answered call is `sip=200`
+
+## Build Order (iOS Release/TestFlight)
+
+```bash
+cd /Users/lex/Desktop/safecall
+git pull
+
+cd frontend
+npm install
+npx pod-install
+```
+
+Build and distribute with your standard TestFlight pipeline.
+
+If backend code/config changed, redeploy latest `main` on Render before retesting.
 
 ## Notes
 
 - Release testing is required for true cold-start behavior.
-- JS console logs are limited in this path; use backend logs and device native logs for diagnosis.
+- JS logs are not enough for this path; use backend logs as source of truth.
+- `DialCallSid=undefined` can still appear in status callbacks in this TwiML client-dial path; rely on final SIP outcome (`sip=200` vs failure codes).
