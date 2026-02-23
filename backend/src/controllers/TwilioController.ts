@@ -318,41 +318,25 @@ function parsePositiveSeconds(value: string | undefined, fallback: number) {
 
 function resolveVoipWakePauseSeconds(
   voipPushSent: boolean,
-  lastSeenAt?: string | null
+  _lastSeenAt?: string | null
 ) {
   if (!voipPushSent) {
     return 0;
   }
 
-  const warmPause = clampPauseSeconds(
-    Number(process.env.VOIP_PUSH_WARM_START_PAUSE_SECONDS ?? 3),
-    3
+  // Deterministic wake behavior: always use the configured VoIP wake pause.
+  // "Fresh session" heuristics caused flaky timing when app was terminated/locked.
+  const configuredPause = Number(
+    process.env.VOIP_PUSH_WAKE_PAUSE_SECONDS ??
+      process.env.VOIP_PUSH_COLD_START_PAUSE_SECONDS ??
+      6
   );
-  const coldPause = clampPauseSeconds(
-    Number(process.env.VOIP_PUSH_COLD_START_PAUSE_SECONDS ?? 6),
-    6
-  );
-  const freshSeconds = parsePositiveSeconds(
-    process.env.TWILIO_CLIENT_FRESH_SECONDS,
-    10
-  );
-
-  if (!lastSeenAt) {
-    return coldPause;
-  }
-
-  const parsed = new Date(lastSeenAt);
-  if (Number.isNaN(parsed.getTime())) {
-    return coldPause;
-  }
-
-  const isFresh = Date.now() - parsed.getTime() <= freshSeconds * 1000;
-  return isFresh ? warmPause : coldPause;
+  return clampPauseSeconds(configuredPause, 6);
 }
 
 function resolveClientDialTimeoutSeconds(
   voipPushSent: boolean,
-  lastSeenAt?: string | null
+  _lastSeenAt?: string | null
 ) {
   const baseTimeout = clampDialTimeoutSeconds(
     Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_SECONDS ?? 24),
@@ -362,30 +346,13 @@ function resolveClientDialTimeoutSeconds(
     return baseTimeout;
   }
 
-  const warmTimeout = clampDialTimeoutSeconds(
-    Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_WARM_SECONDS ?? 24),
-    24
+  // Deterministic dial timeout for VoIP push path.
+  const configuredTimeout = Number(
+    process.env.VOIP_PUSH_DIAL_TIMEOUT_SECONDS ??
+      process.env.TWILIO_CLIENT_DIAL_TIMEOUT_COLD_SECONDS ??
+      24
   );
-  const coldTimeout = clampDialTimeoutSeconds(
-    Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_COLD_SECONDS ?? 24),
-    24
-  );
-  const freshSeconds = parsePositiveSeconds(
-    process.env.TWILIO_CLIENT_FRESH_SECONDS,
-    10
-  );
-
-  if (!lastSeenAt) {
-    return coldTimeout;
-  }
-
-  const parsed = new Date(lastSeenAt);
-  if (Number.isNaN(parsed.getTime())) {
-    return coldTimeout;
-  }
-
-  const isFresh = Date.now() - parsed.getTime() <= freshSeconds * 1000;
-  return isFresh ? warmTimeout : coldTimeout;
+  return clampDialTimeoutSeconds(configuredTimeout, 24);
 }
 
 async function sendManualVoIPPushIfEnabled(
@@ -839,9 +806,9 @@ function shouldFallbackDial(status?: string, sipCode?: string | null) {
     return true;
   }
   const sip = Number.parseInt(String(sipCode ?? ''), 10);
-  // 487 (Request Terminated) is common when the client leg is canceled/no-answer
-  // before full connection and should trigger the same fallback path.
-  if (!Number.isNaN(sip) && [480, 486, 487, 600, 603].includes(sip)) {
+  // Do not fallback on 487 (Request Terminated); it often indicates caller-side cancellation
+  // and can cause confusing secondary routing attempts.
+  if (!Number.isNaN(sip) && [480, 486, 600, 603].includes(sip)) {
     return true;
   }
   return false;
