@@ -88,13 +88,17 @@ function buildPushContent(alert: AlertLike) {
   if (alertType === 'trusted') {
     const contactName = coerceString(payload.contactName);
     const callerNumber = coerceString(payload.callerNumber);
+    const callerLabel = contactName || callerNumber;
+    const bridged = payload.bridged === true;
     return {
-      title: 'Trusted Call Connected',
+      title: 'Trusted Call Activity',
       body: normalizePushSentence(
         payload.message,
-        contactName || callerNumber
-          ? `${contactName || callerNumber} was marked trusted`
-          : 'A trusted caller reached this profile'
+        callerLabel
+          ? bridged
+            ? `Incoming trusted call from ${callerLabel}`
+            : `Trusted caller activity from ${callerLabel}`
+          : 'Trusted caller activity detected'
       ),
     };
   }

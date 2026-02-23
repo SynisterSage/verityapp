@@ -94,7 +94,12 @@ class VoIPPushModule: RCTEventEmitter {
     }
     if Date() > deadline {
       print("[VoIPPush] Native auto-answer window expired")
+      let placeholderUUID = nativeAutoAnswerExcludedCallUUID
       stopNativeAutoAnswer()
+      if let placeholderUUID {
+        print("[VoIPPush] Ending stale placeholder call after auto-answer timeout")
+        requestEndCall(placeholderUUID)
+      }
       return
     }
 

@@ -832,7 +832,7 @@ function shouldFallbackDial(status?: string, sipCode?: string | null) {
   const sip = Number.parseInt(String(sipCode ?? ''), 10);
   // 487 (Request Terminated) is common when the client leg is canceled/no-answer
   // before full connection and should trigger the same fallback path.
-  if (!Number.isNaN(sip) && [480, 486, 487, 603].includes(sip)) {
+  if (!Number.isNaN(sip) && [480, 486, 487, 600, 603].includes(sip)) {
     return true;
   }
   return false;
