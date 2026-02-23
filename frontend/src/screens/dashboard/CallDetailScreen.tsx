@@ -905,14 +905,14 @@ export default function CallDetailScreen({
           <View style={styles.liveNudgeCard}>
             <View style={styles.liveNudgeHeader}>
               <View style={styles.liveNudgeIcon}>
-                <Ionicons name="radio-outline" size={18} color={theme.colors.accent} />
+                <Ionicons name="radio-outline" size={16} color={theme.colors.accent} />
               </View>
               <View style={styles.liveNudgeCopy}>
                 <Text numberOfLines={1} style={styles.liveNudgeTitle}>
                   Track calls on your Lock Screen
                 </Text>
-                <Text style={styles.liveNudgeSubtitle}>
-                  Turn on Live Activities for Verity Protect in iPhone Settings.
+                <Text numberOfLines={2} style={styles.liveNudgeSubtitle}>
+                  Enable Live Activities in iPhone Settings.
                 </Text>
               </View>
               <Pressable onPress={dismissLiveNudge} style={styles.liveNudgeClose}>
@@ -924,7 +924,7 @@ export default function CallDetailScreen({
                 style={styles.liveNudgePrimaryButton}
                 onPress={handleOpenLiveSettings}
               >
-                <Text style={styles.liveNudgePrimaryText}>Open settings</Text>
+                <Text style={styles.liveNudgePrimaryText}>Open Settings</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.liveNudgeSecondaryButton}
@@ -1352,25 +1352,26 @@ const createCallDetailStyles = (theme: AppTheme) =>
       paddingBottom: 18,
     },
     liveNudgeCard: {
-      borderRadius: 24,
+      borderRadius: theme.radii.sm,
       borderWidth: 1,
       borderColor: withOpacity(theme.colors.accent, 0.28),
       backgroundColor: withOpacity(theme.colors.accent, 0.08),
-      padding: 14,
-      marginBottom: 20,
-      gap: 12,
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.sm,
+      marginBottom: theme.spacing.lg,
+      gap: theme.spacing.xs,
     },
     liveNudgeHeader: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 10,
+      alignItems: 'center',
+      gap: theme.spacing.xs,
       position: 'relative',
-      paddingRight: 34,
+      paddingRight: 28,
     },
     liveNudgeIcon: {
-      width: 34,
-      height: 34,
-      borderRadius: 10,
+      width: 28,
+      height: 28,
+      borderRadius: 8,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: withOpacity(theme.colors.accent, 0.2),
@@ -1380,61 +1381,59 @@ const createCallDetailStyles = (theme: AppTheme) =>
     },
     liveNudgeTitle: {
       color: theme.colors.text,
-      fontSize: 15,
+      fontSize: 14,
       fontWeight: '700',
-      marginBottom: 4,
+      marginBottom: 1,
     },
     liveNudgeSubtitle: {
       color: theme.colors.textMuted,
-      fontSize: 12,
-      fontWeight: '600',
-      lineHeight: 16,
+      fontSize: 11,
+      fontWeight: '500',
+      lineHeight: 14,
     },
     liveNudgeClose: {
       position: 'absolute',
       top: 0,
       right: 0,
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.text, 0.08),
+      backgroundColor: withOpacity(theme.colors.text, 0.06),
     },
     liveNudgeActions: {
       flexDirection: 'row',
-      gap: 10,
+      gap: theme.spacing.xs,
     },
     liveNudgePrimaryButton: {
       flex: 1,
-      minHeight: 40,
-      borderRadius: 999,
+      minHeight: 34,
+      borderRadius: theme.radii.sm,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.accent,
-      paddingHorizontal: 12,
+      paddingHorizontal: theme.spacing.sm,
     },
     liveNudgePrimaryText: {
       color: theme.colors.surface,
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '700',
-      textTransform: 'capitalize',
     },
     liveNudgeSecondaryButton: {
-      minHeight: 40,
-      borderRadius: 999,
+      minHeight: 34,
+      borderRadius: theme.radii.sm,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: withOpacity(theme.colors.text, 0.16),
       backgroundColor: withOpacity(theme.colors.text, 0.02),
-      paddingHorizontal: 14,
+      paddingHorizontal: theme.spacing.sm,
     },
     liveNudgeSecondaryText: {
       color: theme.colors.textMuted,
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '700',
-      textTransform: 'capitalize',
     },
     section: {
       marginBottom: 24,
