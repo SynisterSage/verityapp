@@ -372,7 +372,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
   const showSkeleton = !hasInitialLoadCompleted && loading;
-  const contentOpacity = showSkeleton ? 0 : 1;
   const statTiles: StatTile[] = [
     {
       key: 'alerts',
@@ -488,190 +487,253 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           }
         >
         {showSkeleton ? (
-          <Animated.View style={[styles.skeletonOverlay, { opacity: shimmer }]}>
-            {skeletonRows.map((key) => (
-              <View key={key} style={styles.skeletonCard}>
-                <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
-                <View style={styles.skeletonLine} />
-                <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
-              </View>
-            ))}
-          </Animated.View>
-        ) : null}
-        <View style={{ opacity: contentOpacity }}>
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Featured Event</Text>
-            <RecentCallCard
-              title={heroTitle}
-              transcript={heroTranscript}
-              createdAt={recentCall?.created_at}
-              fraudLevel={heroFraudLevel}
-              badgeLabel={heroBadgeLabel}
-              badgeBackgroundColor={heroBadgeBackgroundColor}
-              badgeTextColor={heroBadgeTextColor}
-              hideBadge={!hasHeroCall}
-              subtitleLabel={heroSubtitleLabel}
-              emptyText={
-                hasTwilioNumber
-                  ? 'No calls recorded yet.'
-                  : 'Add a Verity Protect number to start recording calls.'
-              }
-              onPress={() =>
-                navigation.navigate('CallsTab', {
-                  screen: 'Calls',
-                  params: { initialCallId: recentCall?.id },
-                })
-              }
-            />
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionLabel}>Quick Stats</Text>
-            <View style={styles.statsGrid}>
-              {statTiles.map((tile, index) => (
-                <View
-                  key={tile.key}
-                  style={[styles.statColumn, index % 2 === 0 ? styles.rightMargin : null]}
-                >
-                  <StatTile
-                    label={tile.label}
-                    value={tile.value}
-                    caption={tile.caption}
-                    icon={tile.icon}
-                    iconColor={tile.iconColor}
-                    iconBackgroundColor={tile.iconBackgroundColor}
-                    onPress={tile.onPress}
-                  />
+          <View>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Featured Event</Text>
+              <Animated.View style={[styles.skeletonFeaturedCard, { opacity: shimmer }]}>
+                <View style={styles.skeletonFeaturedHeader}>
+                  <View style={styles.skeletonIconCircle} />
+                  <View style={styles.skeletonHeaderTextWrap}>
+                    <View style={[styles.skeletonLine, styles.skeletonHeaderLine]} />
+                    <View style={[styles.skeletonLine, styles.skeletonMetaLine]} />
+                  </View>
+                  <View style={styles.skeletonBadge} />
                 </View>
-              ))}
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <View style={styles.activityHeader}>
-              <Text style={styles.sectionTitle}>Recent Activity</Text>
-              <TouchableOpacity
-                style={styles.viewAllButton}
-                onPress={handleViewAllPress}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.viewAllText}>View All</Text>
-                <Ionicons name="chevron-forward" size={16} color="#2d6df6" style={styles.viewAllIcon} />
-              </TouchableOpacity>
+                <View style={styles.skeletonFeaturedBody}>
+                  <View style={[styles.skeletonLine, styles.skeletonBodyLineLong]} />
+                  <View style={[styles.skeletonLine, styles.skeletonBodyLineShort]} />
+                </View>
+                <View style={styles.skeletonFooterRow}>
+                  <View style={[styles.skeletonLine, styles.skeletonFooterLine]} />
+                  <View style={styles.skeletonFooterDot} />
+                </View>
+              </Animated.View>
             </View>
 
-            {loading && recentActivity.length === 0 ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Quick Stats</Text>
+              <View style={styles.statsGrid}>
+                {[0, 1].map((index) => (
+                  <Animated.View
+                    key={`stats-skeleton-${index}`}
+                    style={[
+                      styles.statColumn,
+                      index % 2 === 0 ? styles.rightMargin : null,
+                      styles.skeletonStatCard,
+                      { opacity: shimmer },
+                    ]}
+                  >
+                    <View style={styles.skeletonStatTop}>
+                      <View style={styles.skeletonStatValue} />
+                      <View style={styles.skeletonStatIcon} />
+                    </View>
+                    <View style={[styles.skeletonLine, styles.skeletonStatLabel]} />
+                    <View style={[styles.skeletonLine, styles.skeletonStatCaption]} />
+                  </Animated.View>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.activityHeader}>
+                <Text style={styles.sectionTitle}>Recent Activity</Text>
+                <View style={styles.skeletonViewAll} />
+              </View>
               <View>
                 {skeletonRows.map((key) => (
-                  <Animated.View
-                    key={`activity-${key}`}
-                    style={[styles.skeletonCard, { opacity: shimmer }]}
-                  >
-                    <View>
-                      <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
-                      <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                  <Animated.View key={`activity-skeleton-${key}`} style={[styles.skeletonCard, { opacity: shimmer }]}>
+                    <View style={styles.skeletonActivityLeft}>
+                      <View style={styles.skeletonActivityIcon} />
+                      <View style={styles.skeletonActivityText}>
+                        <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                        <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                      </View>
                     </View>
                     <View style={styles.skeletonPill} />
                   </Animated.View>
                 ))}
               </View>
-            ) : recentActivity.length === 0 ? (
-              <View style={styles.emptyStateWrap}>
-                <View style={styles.homeEmptyCard}>
-                  <View style={styles.homeEmptyIcon}>
-                    <Ionicons
-                      name={hasTwilioNumber ? 'pulse-outline' : 'call-outline'}
-                      size={24}
-                      color={theme.colors.accent}
+            </View>
+          </View>
+        ) : (
+          <View>
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Featured Event</Text>
+              <RecentCallCard
+                title={heroTitle}
+                transcript={heroTranscript}
+                createdAt={recentCall?.created_at}
+                fraudLevel={heroFraudLevel}
+                badgeLabel={heroBadgeLabel}
+                badgeBackgroundColor={heroBadgeBackgroundColor}
+                badgeTextColor={heroBadgeTextColor}
+                hideBadge={!hasHeroCall}
+                subtitleLabel={heroSubtitleLabel}
+                emptyText={
+                  hasTwilioNumber
+                    ? 'No calls recorded yet.'
+                    : 'Add a Verity Protect number to start recording calls.'
+                }
+                onPress={() =>
+                  navigation.navigate('CallsTab', {
+                    screen: 'Calls',
+                    params: { initialCallId: recentCall?.id },
+                  })
+                }
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Quick Stats</Text>
+              <View style={styles.statsGrid}>
+                {statTiles.map((tile, index) => (
+                  <View
+                    key={tile.key}
+                    style={[styles.statColumn, index % 2 === 0 ? styles.rightMargin : null]}
+                  >
+                    <StatTile
+                      label={tile.label}
+                      value={tile.value}
+                      caption={tile.caption}
+                      icon={tile.icon}
+                      iconColor={tile.iconColor}
+                      iconBackgroundColor={tile.iconBackgroundColor}
+                      onPress={tile.onPress}
                     />
                   </View>
-                  <Text style={styles.homeEmptyTitle}>
-                    {hasTwilioNumber ? 'No activity yet' : 'Connect a SafeCall number'}
-                  </Text>
-                  <Text style={styles.homeEmptyBody}>
-                    {hasTwilioNumber
-                      ? 'Calls and alerts will show up here once they start.'
-                      : 'Add your virtual number to start receiving and reviewing calls.'}
-                  </Text>
-                  {!hasTwilioNumber && (
-                    <Pressable
-                      style={({ pressed }) => [
-                        styles.homeEmptyCta,
-                        {
-                          backgroundColor: pressed
-                            ? withOpacity(theme.colors.accent, 0.15)
-                            : 'transparent',
-                        },
-                      ]}
-                      onPress={() => {
-                        triggerLightHaptic();
-                        navigation.navigate('SettingsTab');
-                      }}
-                    >
-                    <Text style={styles.homeEmptyCtaText}>
-                      Set up number
-                    </Text>
-                    </Pressable>
-                  )}
-                </View>
+                ))}
               </View>
-            ) : (
-              <View style={styles.activityList}>
-                {recentActivity.map((item) => {
-                  const isTrustedActivity = item.badge === 'TRUSTED';
-                  return (
-                    <View key={item.id} style={styles.activityItem}>
-                      <ActivityRow
-                        type={item.type}
-                        label={item.label}
-                        createdAt={item.created_at}
-                        badge={item.badge}
-                        iconName={isTrustedActivity ? 'shield-checkmark' : undefined}
-                        iconColor={isTrustedActivity ? theme.colors.accent : undefined}
-                        iconBackgroundColor={
-                          isTrustedActivity ? withOpacity(theme.colors.accent, 0.16) : undefined
-                        }
-                        muted={item.muted}
-                        disabled={Boolean(item.viewOnly) && !isTrustedActivity}
-                        badgeLevel={
-                          item.badge === 'FRAUD'
-                            ? 'critical'
-                            : item.badge === 'SAFE'
-                            ? 'low'
-                            : item.badgeLevel
-                        }
-                        onPress={() => {
-                          if (isTrustedActivity) {
-                            navigation.navigate('CallsTab', {
-                              screen: 'Calls',
-                              params: { initialFilter: 'trusted' },
-                            });
-                            return;
-                          }
-                          if (item.viewOnly) {
-                            return;
-                          }
-                          if (item.type === 'call') {
-                            navigation.navigate('CallsTab', {
-                              screen: 'Calls',
-                              params: { initialCallId: item.callId },
-                            });
-                            return;
-                          }
-                          navigation.navigate('AlertsTab');
-                        }}
+            </View>
+
+            <View style={styles.section}>
+              <View style={styles.activityHeader}>
+                <Text style={styles.sectionTitle}>Recent Activity</Text>
+                <TouchableOpacity
+                  style={styles.viewAllButton}
+                  onPress={handleViewAllPress}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.viewAllText}>View All</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#2d6df6" style={styles.viewAllIcon} />
+                </TouchableOpacity>
+              </View>
+
+              {loading && recentActivity.length === 0 ? (
+                <View>
+                  {skeletonRows.map((key) => (
+                    <Animated.View
+                      key={`activity-${key}`}
+                      style={[styles.skeletonCard, { opacity: shimmer }]}
+                    >
+                      <View style={styles.skeletonActivityLeft}>
+                        <View style={styles.skeletonActivityIcon} />
+                        <View style={styles.skeletonActivityText}>
+                          <View style={[styles.skeletonLine, styles.skeletonLineShort]} />
+                          <View style={[styles.skeletonLine, styles.skeletonLineTiny]} />
+                        </View>
+                      </View>
+                      <View style={styles.skeletonPill} />
+                    </Animated.View>
+                  ))}
+                </View>
+              ) : recentActivity.length === 0 ? (
+                <View style={styles.emptyStateWrap}>
+                  <View style={styles.homeEmptyCard}>
+                    <View style={styles.homeEmptyIcon}>
+                      <Ionicons
+                        name={hasTwilioNumber ? 'pulse-outline' : 'call-outline'}
+                        size={24}
+                        color={theme.colors.accent}
                       />
                     </View>
-                  );
-                })}
-              </View>
-            )}
-          </View>
+                    <Text style={styles.homeEmptyTitle}>
+                      {hasTwilioNumber ? 'No activity yet' : 'Connect a SafeCall number'}
+                    </Text>
+                    <Text style={styles.homeEmptyBody}>
+                      {hasTwilioNumber
+                        ? 'Calls and alerts will show up here once they start.'
+                        : 'Add your virtual number to start receiving and reviewing calls.'}
+                    </Text>
+                    {!hasTwilioNumber && (
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.homeEmptyCta,
+                          {
+                            backgroundColor: pressed
+                              ? withOpacity(theme.colors.accent, 0.15)
+                              : 'transparent',
+                          },
+                        ]}
+                        onPress={() => {
+                          triggerLightHaptic();
+                          navigation.navigate('SettingsTab');
+                        }}
+                      >
+                      <Text style={styles.homeEmptyCtaText}>
+                        Set up number
+                      </Text>
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.activityList}>
+                  {recentActivity.map((item) => {
+                    const isTrustedActivity = item.badge === 'TRUSTED';
+                    return (
+                      <View key={item.id} style={styles.activityItem}>
+                        <ActivityRow
+                          type={item.type}
+                          label={item.label}
+                          createdAt={item.created_at}
+                          badge={item.badge}
+                          iconName={isTrustedActivity ? 'shield-checkmark' : undefined}
+                          iconColor={isTrustedActivity ? theme.colors.accent : undefined}
+                          iconBackgroundColor={
+                            isTrustedActivity ? withOpacity(theme.colors.accent, 0.16) : undefined
+                          }
+                          muted={item.muted}
+                          disabled={Boolean(item.viewOnly) && !isTrustedActivity}
+                          badgeLevel={
+                            item.badge === 'FRAUD'
+                              ? 'critical'
+                              : item.badge === 'SAFE'
+                              ? 'low'
+                              : item.badgeLevel
+                          }
+                          onPress={() => {
+                            if (isTrustedActivity) {
+                              navigation.navigate('CallsTab', {
+                                screen: 'Calls',
+                                params: { initialFilter: 'trusted' },
+                              });
+                              return;
+                            }
+                            if (item.viewOnly) {
+                              return;
+                            }
+                            if (item.type === 'call') {
+                              navigation.navigate('CallsTab', {
+                                screen: 'Calls',
+                                params: { initialCallId: item.callId },
+                              });
+                              return;
+                            }
+                            navigation.navigate('AlertsTab');
+                          }}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
 
-          <View style={styles.section}>
-            <NeedAssistanceCard onPress={navigateToSupportPortal} />
+            <View style={styles.section}>
+              <NeedAssistanceCard onPress={navigateToSupportPortal} />
+            </View>
           </View>
-        </View>
+        )}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -807,11 +869,110 @@ const createStyles = (theme: AppTheme) =>
       fontWeight: '600',
       color: theme.colors.accent,
     },
-    skeletonOverlay: {
-      position: 'absolute',
-      top: 20,
-      left: 0,
-      right: 0,
+    skeletonFeaturedCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      padding: 24,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+      marginBottom: 16,
+    },
+    skeletonFeaturedHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    skeletonIconCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+      marginRight: 12,
+    },
+    skeletonHeaderTextWrap: {
+      flex: 1,
+      marginRight: 12,
+    },
+    skeletonHeaderLine: {
+      width: '62%',
+      marginTop: 0,
+    },
+    skeletonMetaLine: {
+      width: '45%',
+      marginTop: 8,
+    },
+    skeletonBadge: {
+      width: 74,
+      height: 24,
+      borderRadius: 999,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+    },
+    skeletonFeaturedBody: {
+      borderRadius: 18,
+      padding: 18,
+      backgroundColor: withOpacity(theme.colors.text, 0.08),
+      marginBottom: 14,
+    },
+    skeletonBodyLineLong: {
+      width: '90%',
+      marginTop: 0,
+    },
+    skeletonBodyLineShort: {
+      width: '66%',
+      marginTop: 8,
+    },
+    skeletonFooterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    skeletonFooterLine: {
+      width: '44%',
+      marginTop: 0,
+    },
+    skeletonFooterDot: {
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+    },
+    skeletonStatCard: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 22,
+      padding: 18,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+    },
+    skeletonStatTop: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    skeletonStatValue: {
+      width: 52,
+      height: 34,
+      borderRadius: 8,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+    },
+    skeletonStatIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 16,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+    },
+    skeletonStatLabel: {
+      width: '72%',
+      marginTop: 12,
+    },
+    skeletonStatCaption: {
+      width: '48%',
+      marginTop: 6,
+    },
+    skeletonViewAll: {
+      width: 62,
+      height: 14,
+      borderRadius: 7,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
     },
     skeletonCard: {
       backgroundColor: theme.colors.surface,
@@ -823,6 +984,22 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
+    },
+    skeletonActivityLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      marginRight: 12,
+    },
+    skeletonActivityIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      marginRight: 14,
+      backgroundColor: withOpacity(theme.colors.text, 0.1),
+    },
+    skeletonActivityText: {
+      flex: 1,
     },
     skeletonLine: {
       height: 10,

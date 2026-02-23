@@ -45,13 +45,13 @@ const PRESET_COPY: Record<
   { title: string; description: string; trusted: boolean; circle: boolean }
 > = {
   simple: {
-    title: 'Simple (Recommended)',
+    title: 'Simple',
     description: 'Fewer updates, focused on what matters most.',
     trusted: false,
     circle: false,
   },
   detailed: {
-    title: 'Detailed',
+    title: 'Detailed (Recommended)',
     description: 'All alert categories, including trusted and circle activity.',
     trusted: true,
     circle: true,
@@ -66,10 +66,10 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
 
   const [threshold, setThreshold] = useState(activeProfile?.alert_threshold_score ?? 90);
   const [pushTrustedActivity, setPushTrustedActivity] = useState(
-    activeProfile?.enable_push_trusted_activity ?? false
+    activeProfile?.enable_push_trusted_activity ?? true
   );
   const [pushCircleActivity, setPushCircleActivity] = useState(
-    activeProfile?.enable_push_circle_activity ?? false
+    activeProfile?.enable_push_circle_activity ?? true
   );
   const [weeklyEmailReports, setWeeklyEmailReports] = useState(
     activeProfile?.enable_email_weekly_reports ?? true
@@ -83,8 +83,8 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
 
   useEffect(() => {
     if (!activeProfile) return;
-    const trusted = activeProfile.enable_push_trusted_activity ?? false;
-    const circle = activeProfile.enable_push_circle_activity ?? false;
+    const trusted = activeProfile.enable_push_trusted_activity ?? true;
+    const circle = activeProfile.enable_push_circle_activity ?? true;
     setThreshold(activeProfile.alert_threshold_score ?? 90);
     setPushTrustedActivity(trusted);
     setPushCircleActivity(circle);
@@ -231,7 +231,7 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
 
         <View style={styles.presetSection}>
           <Text style={styles.sectionTitle}>Notification style</Text>
-          {(['simple', 'detailed'] as NotificationPreset[]).map((option) => {
+          {(['detailed', 'simple'] as NotificationPreset[]).map((option) => {
             const isActive = preset === option;
             const config = PRESET_COPY[option];
             return (
@@ -365,6 +365,9 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
 }
 
 function derivePreset(trusted?: boolean | null, circle?: boolean | null): NotificationPreset {
+  if (trusted == null && circle == null) {
+    return 'detailed';
+  }
   return trusted || circle ? 'detailed' : 'simple';
 }
 

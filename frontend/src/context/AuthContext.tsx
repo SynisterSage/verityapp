@@ -267,20 +267,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.warn('signInWithOAuth error', error.message);
           return error.message;
         }
+        if (!data?.url) {
+          return 'Could not start Google sign in.';
+        }
         if (data?.url) {
           console.log('OAuth url', data.url);
           const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
           if (result.type === 'success' && result.url) {
             try {
               await handleOAuthRedirect(result.url);
+              const {
+                data: { session: latestSession },
+              } = await supabase.auth.getSession();
+              if (!latestSession) {
+                console.warn('[auth][google] callback completed but session is empty');
+                return 'Google sign in finished but no session was created.';
+              }
             } catch (err) {
               console.warn('OAuth session handling failed', err, {
                 redirectTo,
                 returnedUrl: result.url,
               });
+              return 'Google sign in failed while processing callback.';
             }
           } else {
             console.warn('OAuth session result', result);
+            if (result.type === 'cancel') {
+              return 'Google sign in was cancelled.';
+            }
+            return 'Google sign in did not complete.';
           }
         }
         return null;

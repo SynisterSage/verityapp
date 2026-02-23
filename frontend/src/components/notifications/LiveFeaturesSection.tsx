@@ -12,6 +12,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
@@ -96,8 +97,8 @@ export default function LiveFeaturesSection({
   style?: StyleProp<ViewStyle>;
   showTitle?: boolean;
 }) {
-  const { theme } = useTheme();
-  const styles = useMemo(() => createLiveFeaturesStyles(theme), [theme]);
+  const { theme, mode } = useTheme();
+  const styles = useMemo(() => createLiveFeaturesStyles(theme, mode), [theme, mode]);
   const [activeTopic, setActiveTopic] = useState<LiveFeatureTopic | null>(null);
 
   const openSettings = async () => {
@@ -149,7 +150,18 @@ export default function LiveFeaturesSection({
       >
         <View style={styles.modalOverlay}>
           <TouchableWithoutFeedback onPress={() => setActiveTopic(null)}>
-            <View style={styles.modalBackdrop} />
+            <View style={styles.modalBackdrop}>
+              <LinearGradient
+                colors={
+                  mode === 'dark'
+                    ? ['rgba(39, 128, 255, 0.10)', 'rgba(2, 10, 22, 0.84)']
+                    : ['rgba(39, 128, 255, 0.06)', 'rgba(8, 24, 46, 0.34)']
+                }
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
+                style={styles.modalBackdropGradient}
+              />
+            </View>
           </TouchableWithoutFeedback>
           {modalContent ? (
             <View style={styles.modalCard}>
@@ -190,7 +202,7 @@ export default function LiveFeaturesSection({
   );
 }
 
-const createLiveFeaturesStyles = (theme: AppTheme) =>
+const createLiveFeaturesStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
   StyleSheet.create({
     section: {
       gap: 12,
@@ -263,7 +275,10 @@ const createLiveFeaturesStyles = (theme: AppTheme) =>
     },
     modalBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: withOpacity(theme.colors.overlay, 0.95),
+      backgroundColor: mode === 'dark' ? 'rgba(2, 10, 22, 0.7)' : 'rgba(8, 24, 46, 0.2)',
+    },
+    modalBackdropGradient: {
+      ...StyleSheet.absoluteFillObject,
     },
     modalCard: {
       width: '100%',

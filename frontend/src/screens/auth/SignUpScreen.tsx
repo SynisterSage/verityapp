@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Linking,
   Modal,
   Platform,
@@ -49,6 +50,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const [showConfirm, setShowConfirm] = useState(false);
   const [alert, setAlert] = useState<AlertState | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSocialHandoffLoading, setIsSocialHandoffLoading] = useState(false);
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [legalModalVisible, setLegalModalVisible] = useState(false);
   const [legalScrolledToEnd, setLegalScrolledToEnd] = useState(false);
@@ -215,15 +217,50 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   };
 
   const handleGoogleSignUp = async () => {
+    setAlert(null);
+    setIsSocialHandoffLoading(true);
     logEvent('signup_google_attempt', { screen: 'SignUp' });
-    await signInWithGoogle();
+    try {
+      const message = await signInWithGoogle();
+      if (message) {
+        setIsSocialHandoffLoading(false);
+        setAlert({ message, type: 'danger' });
+        logEvent('signup_google_failed', {
+          level: 'warning',
+          screen: 'SignUp',
+          extra: { reason: message },
+        });
+      }
+    } catch (error: any) {
+      setIsSocialHandoffLoading(false);
+      const message = error?.message || 'Google sign in failed.';
+      setAlert({ message, type: 'danger' });
+      logEvent('signup_google_failed', {
+        level: 'warning',
+        screen: 'SignUp',
+        extra: { reason: message },
+      });
+    }
   };
 
   const handleAppleSignUp = async () => {
     setAlert(null);
+    setIsSocialHandoffLoading(true);
     logEvent('signup_apple_attempt', { screen: 'SignUp' });
-    const message = await signInWithApple();
-    if (message) {
+    try {
+      const message = await signInWithApple();
+      if (message) {
+        setIsSocialHandoffLoading(false);
+        setAlert({ message, type: 'danger' });
+        logEvent('signup_apple_failed', {
+          level: 'warning',
+          screen: 'SignUp',
+          extra: { reason: message },
+        });
+      }
+    } catch (error: any) {
+      setIsSocialHandoffLoading(false);
+      const message = error?.message || 'Apple sign in failed.';
       setAlert({ message, type: 'danger' });
       logEvent('signup_apple_failed', {
         level: 'warning',
@@ -598,7 +635,7 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         primaryLabel={isSubmitting ? 'Creating…' : 'Create Account'}
         onPrimaryPress={handleSubmit}
         primaryLoading={isSubmitting}
-        primaryDisabled={!acceptedLegal || emailAvailability === 'taken'}
+        primaryDisabled={!acceptedLegal || emailAvailability === 'taken' || isSocialHandoffLoading}
         secondaryLabel="Apple"
         onSecondaryPress={handleAppleSignUp}
         secondaryIcon={
@@ -617,6 +654,15 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         helperActionLabel="Sign In"
         onHelperPress={() => navigation.navigate('SignIn')}
       />
+      {isSocialHandoffLoading ? (
+        <View style={[styles.handoffOverlay, { backgroundColor: withOpacity(theme.colors.bg, 0.96) }]}>
+          <ActivityIndicator size="large" color={theme.colors.accent} />
+          <Text style={[styles.handoffTitle, { color: theme.colors.text }]}>Finishing sign in…</Text>
+          <Text style={[styles.handoffSubtitle, { color: theme.colors.textMuted }]}>
+            Taking you to onboarding now.
+          </Text>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -849,5 +895,22 @@ const styles = StyleSheet.create({
   },
   linkText: {
     textDecorationLine: 'underline',
+  },
+  handoffOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    gap: 10,
+  },
+  handoffTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  handoffSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });

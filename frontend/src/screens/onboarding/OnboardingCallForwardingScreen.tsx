@@ -127,14 +127,32 @@ home: [
   );
 
   const openSystem = async () => {
-    if (!isIOS) return Linking.openURL('app-settings:');
-    const phoneSettingsUrl = 'App-Prefs:root=Phone';
-    const canOpen = await Linking.canOpenURL(phoneSettingsUrl);
-    if (canOpen) {
-      await Linking.openURL(phoneSettingsUrl);
+    if (!isIOS) {
+      await Linking.openURL('app-settings:');
       return;
     }
-    await Linking.openURL('app-settings:');
+
+    // Best-effort deep links to Phone > Call Forwarding on iOS.
+    // If Apple blocks a path on a specific iOS version/device, we fall back gracefully.
+    const iosTargets = [
+      'App-Prefs:root=Phone&path=Call%20Forwarding',
+      'App-Prefs:Phone&path=Call%20Forwarding',
+      'App-Prefs:root=Phone',
+      'app-settings:',
+    ];
+
+    for (const target of iosTargets) {
+      try {
+        const canOpen = await Linking.canOpenURL(target);
+        if (!canOpen) {
+          continue;
+        }
+        await Linking.openURL(target);
+        return;
+      } catch {
+        // Try next fallback target.
+      }
+    }
   };
 
   useEffect(() => {
@@ -300,7 +318,7 @@ home: [
           <Ionicons name="open-outline" size={16} color={theme.colors.accent} />
         </View>
         <Text style={[styles.secondaryText, { color: theme.colors.accent }]}>
-          Open System Settings
+          Open Call Forwarding Settings
         </Text>
       </Pressable>
 
