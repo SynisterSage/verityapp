@@ -50,14 +50,6 @@
             "./assets/sounds/support-notification.wav"
           ]
         }
-      ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "url": "https://sentry.io/",
-          "project": "react-native",
-          "organization": "verity-protect"
-        }
       ]
     ],
     "extra": {

@@ -2439,42 +2439,11 @@ PODS:
     - ReactCommon/turbomodule/core
     - SocketRocket
     - Yoga
-  - RNSentry (7.11.0):
-    - boost
-    - DoubleConversion
-    - fast_float
-    - fmt
-    - glog
-    - hermes-engine
-    - RCT-Folly
-    - RCT-Folly/Fabric
-    - RCTRequired
-    - RCTTypeSafety
-    - React-Core
-    - React-debug
-    - React-Fabric
-    - React-featureflags
-    - React-graphics
-    - React-hermes
-    - React-ImageManager
-    - React-jsi
-    - React-NativeModulesApple
-    - React-RCTFabric
-    - React-renderercss
-    - React-rendererdebug
-    - React-utils
-    - ReactCodegen
-    - ReactCommon/turbomodule/bridging
-    - ReactCommon/turbomodule/core
-    - Sentry/HybridSDK (= 8.58.0)
-    - SocketRocket
-    - Yoga
   - RNSVG (15.15.1):
     - React-Core
   - RNTwilioVoice (4.4.0):
     - React-Core
     - TwilioVoice (~> 5.2.0)
-  - Sentry/HybridSDK (8.58.0)
   - SocketRocket (0.7.1)
   - TwilioVoice (5.2.1)
   - Yoga (0.0.0)
@@ -2576,7 +2545,6 @@ DEPENDENCIES:
   - "RNCAsyncStorage (from `../node_modules/@react-native-async-storage/async-storage`)"
   - RNGestureHandler (from `../node_modules/react-native-gesture-handler`)
   - RNScreens (from `../node_modules/react-native-screens`)
-  - "RNSentry (from `../node_modules/@sentry/react-native`)"
   - RNSVG (from `../node_modules/react-native-svg`)
   - RNTwilioVoice (from `../node_modules/react-native-twilio-programmable-voice`)
   - SocketRocket (~> 0.7.1)
@@ -2584,7 +2552,6 @@ DEPENDENCIES:
 
 SPEC REPOS:
   trunk:
-    - Sentry
     - SocketRocket
     - TwilioVoice
 
@@ -2780,8 +2747,6 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-gesture-handler"
   RNScreens:
     :path: "../node_modules/react-native-screens"
-  RNSentry:
-    :path: "../node_modules/@sentry/react-native"
   RNSVG:
     :path: "../node_modules/react-native-svg"
   RNTwilioVoice:
@@ -2885,10 +2850,8 @@ SPEC CHECKSUMS:
   RNCAsyncStorage: b44e8a4e798c3e1f56bffccd0f591f674fb9198f
   RNGestureHandler: 12a436b5074378be95468a57b62c165a1e24cfc9
   RNScreens: 35525ebfe219c8709da0d26aebbc9a5e02e1077b
-  RNSentry: f35abd8355c38411775b7279b6c43ed3e5e819ae
   RNSVG: 866f818ba926c5d3f7863705abed51bb09d8ddd3
   RNTwilioVoice: c4ff2fb267f4bc01da1ac75d279d8e46b8ad2b20
-  Sentry: d587a8fe91ca13503ecd69a1905f3e8a0fcf61be
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   TwilioVoice: 99f69686a0962873114534ce561436117ed9ea35
   Yoga: 728df40394d49f3f471688747cf558158b3a3bd1

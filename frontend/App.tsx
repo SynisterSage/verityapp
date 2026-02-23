@@ -78,29 +78,7 @@ import {
 import { rootNavigationRef } from './src/navigation/rootNavigator';
 import { consumePendingSiriRoute as consumePendingSiriRouteNative } from './src/native/WidgetSnapshot';
 import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientManager';
-import * as Sentry from '@sentry/react-native';
 import { logEvent } from './src/services/sentry';
-
-const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
-
-Sentry.init({
-  dsn: sentryDsn,
-
-  // Disabled sendDefaultPii to prevent location permission request on startup
-  // We'll manually attach relevant user context as needed
-  sendDefaultPii: false,
-
-  // Enable Logs
-  enableLogs: true,
-
-  // Configure Session Replay
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
-  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
-
-  // uncomment the line below to enable Spotlight (https://spotlightjs.com)
-  // spotlight: __DEV__,
-});
 
 enableScreens(true);
 
@@ -1267,7 +1245,7 @@ function AppContent() {
   );
 }
 
-export default Sentry.wrap(function App() {
+export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -1275,4 +1253,4 @@ export default Sentry.wrap(function App() {
       </AuthProvider>
     </ThemeProvider>
   );
-});
+}
