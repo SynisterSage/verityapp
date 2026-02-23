@@ -325,8 +325,8 @@ function resolveVoipWakePauseSeconds(
   }
 
   const warmPause = clampPauseSeconds(
-    Number(process.env.VOIP_PUSH_WARM_START_PAUSE_SECONDS ?? 1),
-    1
+    Number(process.env.VOIP_PUSH_WARM_START_PAUSE_SECONDS ?? 3),
+    3
   );
   const coldPause = clampPauseSeconds(
     Number(process.env.VOIP_PUSH_COLD_START_PAUSE_SECONDS ?? 6),
@@ -334,7 +334,7 @@ function resolveVoipWakePauseSeconds(
   );
   const freshSeconds = parsePositiveSeconds(
     process.env.TWILIO_CLIENT_FRESH_SECONDS,
-    60
+    10
   );
 
   if (!lastSeenAt) {
@@ -363,8 +363,8 @@ function resolveClientDialTimeoutSeconds(
   }
 
   const warmTimeout = clampDialTimeoutSeconds(
-    Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_WARM_SECONDS ?? 16),
-    16
+    Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_WARM_SECONDS ?? 24),
+    24
   );
   const coldTimeout = clampDialTimeoutSeconds(
     Number(process.env.TWILIO_CLIENT_DIAL_TIMEOUT_COLD_SECONDS ?? 24),
@@ -372,7 +372,7 @@ function resolveClientDialTimeoutSeconds(
   );
   const freshSeconds = parsePositiveSeconds(
     process.env.TWILIO_CLIENT_FRESH_SECONDS,
-    60
+    10
   );
 
   if (!lastSeenAt) {
@@ -444,6 +444,9 @@ async function bridgeToProfile(
         voipPushSent,
         profile.twilio_client_last_seen_at
       );
+      logger.info(
+        `[bridge] loop-avoidance client dial profile=${profile.id} voipPushSent=${voipPushSent} pauseSeconds=${pauseDuration} timeoutSeconds=${dialTimeoutSeconds} lastSeenAt=${profile.twilio_client_last_seen_at ?? 'n/a'}`
+      );
       appendClientBridge(
         twimlResponse,
         dialStatusUrl,
@@ -478,6 +481,9 @@ async function bridgeToProfile(
     const dialTimeoutSeconds = resolveClientDialTimeoutSeconds(
       voipPushSent,
       profile.twilio_client_last_seen_at
+    );
+    logger.info(
+      `[bridge] client dial profile=${profile.id} voipPushSent=${voipPushSent} pauseSeconds=${pauseDuration} timeoutSeconds=${dialTimeoutSeconds} lastSeenAt=${profile.twilio_client_last_seen_at ?? 'n/a'}`
     );
     appendClientBridge(
       twimlResponse,
@@ -786,6 +792,9 @@ async function verifyPin(req: Request, res: Response) {
       const dialTimeoutSeconds = resolveClientDialTimeoutSeconds(
         voipPushSent,
         profile.twilio_client_last_seen_at
+      );
+      logger.info(
+        `[bridge] verify-pin client dial profile=${profile.id} voipPushSent=${voipPushSent} pauseSeconds=${pauseDuration} timeoutSeconds=${dialTimeoutSeconds} lastSeenAt=${profile.twilio_client_last_seen_at ?? 'n/a'}`
       );
       appendClientBridge(
         twimlResponse,
