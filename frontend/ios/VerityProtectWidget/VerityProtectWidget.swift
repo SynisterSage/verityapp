@@ -4,6 +4,10 @@ import WidgetKit
 private let appGroupIdentifier = "group.com.lexferguson.verityprotect.com"
 private let needsAttentionKey = "alertsWidget.needsAttentionCount"
 private let historyCountKey = "alertsWidget.historyCount"
+private let verityBrandPrimary = Color(red: 0.29, green: 0.53, blue: 0.98)
+private let verityBrandSecondary = Color(red: 0.35, green: 0.84, blue: 0.97)
+private let verityWarning = Color(red: 0.96, green: 0.62, blue: 0.22)
+private let largeBottomCardHeight: CGFloat = 92
 
 struct AlertsWidgetEntry: TimelineEntry {
   let date: Date
@@ -65,48 +69,49 @@ struct VerityProtectAlertsWidgetEntryView: View {
 
   private var alertsSystemSmallView: some View {
     VStack(alignment: .leading, spacing: 12) {
-      widgetHeader(icon: "shield.lefthalf.filled", title: "Alerts", tint: .blue)
-      metricRow(label: "Needs", value: entry.needsAttentionCount, tint: .blue)
-      metricRow(label: "History", value: entry.historyCount, tint: .cyan)
+      widgetHeader(icon: "shield.lefthalf.filled", title: "Alerts", tint: verityBrandPrimary)
+      metricRow(label: "Needs", value: entry.needsAttentionCount, tint: attentionTint(entry.needsAttentionCount))
+      metricRow(label: "History", value: entry.historyCount, tint: verityBrandSecondary)
     }
     .padding(14)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(widgetBackground(accent: .blue, colorScheme: colorScheme))
+    .background(widgetBackground(accent: verityBrandPrimary, colorScheme: colorScheme))
   }
 
   private var alertsSystemMediumView: some View {
     VStack(alignment: .leading, spacing: 12) {
-      widgetHeader(icon: "shield.lefthalf.filled", title: "Alerts", tint: .blue)
+      widgetHeader(icon: "shield.lefthalf.filled", title: "Alerts", tint: verityBrandPrimary)
       HStack(spacing: 10) {
-        metricCard(title: "Needs Attention", value: entry.needsAttentionCount, tint: .blue, colorScheme: colorScheme)
-        metricCard(title: "History", value: entry.historyCount, tint: .cyan, colorScheme: colorScheme)
+        metricCard(title: "Needs Attention", value: entry.needsAttentionCount, tint: attentionTint(entry.needsAttentionCount), colorScheme: colorScheme)
+        metricCard(title: "History", value: entry.historyCount, tint: verityBrandSecondary, colorScheme: colorScheme)
       }
     }
     .padding(14)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(widgetBackground(accent: .blue, colorScheme: colorScheme))
+    .background(widgetBackground(accent: verityBrandPrimary, colorScheme: colorScheme))
   }
 
   private var alertsSystemLargeView: some View {
     VStack(alignment: .leading, spacing: 14) {
-      widgetHeader(icon: "shield.lefthalf.filled", title: "Alerts", tint: .blue)
+      widgetHeader(icon: "shield.lefthalf.filled", title: "Alerts", tint: verityBrandPrimary)
 
       heroMetricCard(
         title: "Needs Attention",
         value: entry.needsAttentionCount,
         suffix: "alerts",
-        tint: .blue,
+        tint: attentionTint(entry.needsAttentionCount),
         colorScheme: colorScheme
       )
 
       HStack(spacing: 12) {
-        metricCard(title: "History", value: entry.historyCount, tint: .cyan, colorScheme: colorScheme)
+        metricCard(title: "History", value: entry.historyCount, tint: verityBrandSecondary, colorScheme: colorScheme)
+          .frame(maxWidth: .infinity, minHeight: largeBottomCardHeight, maxHeight: largeBottomCardHeight, alignment: .topLeading)
         statusCard(
           value: entry.needsAttentionCount > 0 ? "Needs Attention" : "All Clear",
           isAttention: entry.needsAttentionCount > 0,
           colorScheme: colorScheme
         )
-        .frame(maxWidth: 132)
+        .frame(maxWidth: .infinity, minHeight: largeBottomCardHeight, maxHeight: largeBottomCardHeight, alignment: .topLeading)
       }
 
       Spacer(minLength: 6)
@@ -115,13 +120,13 @@ struct VerityProtectAlertsWidgetEntryView: View {
     }
     .padding(16)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(widgetBackground(accent: .blue, colorScheme: colorScheme))
+    .background(widgetBackground(accent: verityBrandPrimary, colorScheme: colorScheme))
   }
 
   private var alertsAccessoryRectangularView: some View {
     HStack(spacing: 16) {
-      compactMetric(label: "Need", value: entry.needsAttentionCount, tint: .blue)
-      compactMetric(label: "Hist", value: entry.historyCount, tint: .cyan)
+      compactMetric(label: "Need", value: entry.needsAttentionCount, tint: attentionTint(entry.needsAttentionCount))
+      compactMetric(label: "Hist", value: entry.historyCount, tint: verityBrandSecondary)
       Spacer(minLength: 0)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -151,31 +156,31 @@ struct VerityProtectHistoryWidgetEntryView: View {
 
   private var historySystemSmallView: some View {
     VStack(alignment: .leading, spacing: 12) {
-      widgetHeader(icon: "clock.arrow.circlepath", title: "History", tint: .teal)
+      widgetHeader(icon: "clock.arrow.circlepath", title: "History", tint: verityBrandPrimary)
       HStack(alignment: .firstTextBaseline, spacing: 6) {
         Text("\(entry.historyCount)")
           .font(.system(size: 34, weight: .bold))
-          .foregroundStyle(entry.historyCount > 0 ? Color.teal : .primary)
+          .foregroundStyle(entry.historyCount > 0 ? verityBrandSecondary : .primary)
           .monospacedDigit()
         Text("events")
           .font(.system(size: 13, weight: .semibold))
           .foregroundStyle(.secondary)
       }
-      metricRow(label: "Needs", value: entry.needsAttentionCount, tint: .orange)
+      metricRow(label: "Needs", value: entry.needsAttentionCount, tint: attentionTint(entry.needsAttentionCount))
     }
     .padding(14)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(widgetBackground(accent: .teal, colorScheme: colorScheme))
+    .background(widgetBackground(accent: verityBrandPrimary, colorScheme: colorScheme))
   }
 
   private var historySystemMediumView: some View {
     HStack(spacing: 12) {
       VStack(alignment: .leading, spacing: 12) {
-        widgetHeader(icon: "clock.arrow.circlepath", title: "History", tint: .teal)
+        widgetHeader(icon: "clock.arrow.circlepath", title: "History", tint: verityBrandPrimary)
         HStack(alignment: .firstTextBaseline, spacing: 6) {
           Text("\(entry.historyCount)")
             .font(.system(size: 38, weight: .bold))
-            .foregroundStyle(entry.historyCount > 0 ? Color.teal : .primary)
+            .foregroundStyle(entry.historyCount > 0 ? verityBrandSecondary : .primary)
             .monospacedDigit()
           Text("events")
             .font(.system(size: 14, weight: .semibold))
@@ -183,34 +188,35 @@ struct VerityProtectHistoryWidgetEntryView: View {
         }
       }
       Spacer(minLength: 0)
-      metricCard(title: "Needs Attention", value: entry.needsAttentionCount, tint: .orange, colorScheme: colorScheme)
+      metricCard(title: "Needs Attention", value: entry.needsAttentionCount, tint: attentionTint(entry.needsAttentionCount), colorScheme: colorScheme)
         .frame(maxWidth: 132)
     }
     .padding(14)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(widgetBackground(accent: .teal, colorScheme: colorScheme))
+    .background(widgetBackground(accent: verityBrandPrimary, colorScheme: colorScheme))
   }
 
   private var historySystemLargeView: some View {
     VStack(alignment: .leading, spacing: 14) {
-      widgetHeader(icon: "clock.arrow.circlepath", title: "History", tint: .teal)
+      widgetHeader(icon: "clock.arrow.circlepath", title: "History", tint: verityBrandPrimary)
 
       heroMetricCard(
         title: "History",
         value: entry.historyCount,
         suffix: "events",
-        tint: .teal,
+        tint: verityBrandSecondary,
         colorScheme: colorScheme
       )
 
       HStack(spacing: 12) {
-        metricCard(title: "Needs Attention", value: entry.needsAttentionCount, tint: .orange, colorScheme: colorScheme)
+        metricCard(title: "Needs Attention", value: entry.needsAttentionCount, tint: attentionTint(entry.needsAttentionCount), colorScheme: colorScheme)
+          .frame(maxWidth: .infinity, minHeight: largeBottomCardHeight, maxHeight: largeBottomCardHeight, alignment: .topLeading)
         statusCard(
           value: entry.needsAttentionCount > 0 ? "Needs Attention" : "All Clear",
           isAttention: entry.needsAttentionCount > 0,
           colorScheme: colorScheme
         )
-        .frame(maxWidth: 132)
+        .frame(maxWidth: .infinity, minHeight: largeBottomCardHeight, maxHeight: largeBottomCardHeight, alignment: .topLeading)
       }
 
       Spacer(minLength: 6)
@@ -219,13 +225,13 @@ struct VerityProtectHistoryWidgetEntryView: View {
     }
     .padding(16)
     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    .background(widgetBackground(accent: .teal, colorScheme: colorScheme))
+    .background(widgetBackground(accent: verityBrandPrimary, colorScheme: colorScheme))
   }
 
   private var historyAccessoryRectangularView: some View {
     HStack(spacing: 16) {
-      compactMetric(label: "Events", value: entry.historyCount, tint: .teal)
-      compactMetric(label: "Need", value: entry.needsAttentionCount, tint: .orange)
+      compactMetric(label: "Events", value: entry.historyCount, tint: verityBrandSecondary)
+      compactMetric(label: "Need", value: entry.needsAttentionCount, tint: attentionTint(entry.needsAttentionCount))
       Spacer(minLength: 0)
     }
     .frame(maxWidth: .infinity, alignment: .leading)
@@ -328,7 +334,7 @@ private func statusCard(value: String, isAttention: Bool, colorScheme: ColorSche
       .lineLimit(1)
     Text(value)
       .font(.system(size: 16, weight: .bold))
-      .foregroundStyle(isAttention ? Color.orange : Color.green)
+      .foregroundStyle(isAttention ? verityWarning : verityBrandPrimary)
       .lineLimit(2)
       .minimumScaleFactor(0.8)
   }
@@ -339,6 +345,10 @@ private func statusCard(value: String, isAttention: Bool, colorScheme: ColorSche
     RoundedRectangle(cornerRadius: 12, style: .continuous)
       .fill(Color.primary.opacity(colorScheme == .dark ? 0.18 : 0.08))
   )
+}
+
+private func attentionTint(_ value: Int) -> Color {
+  value > 0 ? verityWarning : verityBrandPrimary
 }
 
 private func widgetFooterCTA() -> some View {
