@@ -424,7 +424,7 @@ const createStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: mode === 'dark' ? '#020914' : '#F3F8FF',
+      backgroundColor: theme.colors.bg,
       paddingHorizontal: 24,
       justifyContent: 'space-between',
       paddingBottom: 26,

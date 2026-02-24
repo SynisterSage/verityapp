@@ -66,18 +66,19 @@ export default function BottomDock({
         const ySequence = Animated.sequence([
           Animated.timing(bounceAnim, {
             toValue: -6,
-            duration: 350,
-            easing: Easing.inOut(Easing.ease),
+            duration: 420,
+            easing: Easing.out(Easing.quad),
             useNativeDriver: true,
           }),
           Animated.timing(bounceAnim, {
             toValue: 0,
-            duration: 350,
-            easing: Easing.inOut(Easing.ease),
+            duration: 420,
+            easing: Easing.in(Easing.quad),
             useNativeDriver: true,
           }),
+          Animated.delay(250),
         ]);
-        bounceLoopRef.current = Animated.loop(ySequence);
+        bounceLoopRef.current = Animated.loop(ySequence, { resetBeforeIteration: true });
         bounceLoopRef.current.start();
       }
     } else if (bounceLoopRef.current) {

@@ -148,6 +148,8 @@ export default function InviteFamilyScreen({ navigation }: Props) {
   );
   const [selectedInvite, setSelectedInvite] = useState<Invite | null>(null);
   const actionAnim = useRef(new Animated.Value(0)).current;
+  const initialMembersLoadedRef = useRef(false);
+  const initialInvitesLoadedRef = useRef(false);
 
   const resolveInviteToken = (invite: Invite) => (invite.short_code ?? invite.id ?? '').trim();
   const resolveInviteCode = (invite: Invite) => formatInviteCode(invite.short_code ?? invite.id ?? '');
@@ -173,14 +175,20 @@ export default function InviteFamilyScreen({ navigation }: Props) {
       setMembers([]);
       return;
     }
-    setLoadingMembers(true);
+    const isInitialLoad = !initialMembersLoadedRef.current;
+    if (isInitialLoad) {
+      setLoadingMembers(true);
+    }
     try {
       const data = await authorizedFetch(`/profiles/${activeProfile.id}/members`);
       setMembers(data?.members ?? []);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoadingMembers(false);
+      if (isInitialLoad) {
+        setLoadingMembers(false);
+        initialMembersLoadedRef.current = true;
+      }
     }
   }, [activeProfile]);
 
@@ -189,14 +197,20 @@ export default function InviteFamilyScreen({ navigation }: Props) {
       setInvites([]);
       return;
     }
-    setLoadingInvites(true);
+    const isInitialLoad = !initialInvitesLoadedRef.current;
+    if (isInitialLoad) {
+      setLoadingInvites(true);
+    }
     try {
       const data = await authorizedFetch(`/profiles/${activeProfile.id}/invites`);
       setInvites(data?.invites ?? []);
     } catch (err) {
       console.error(err);
     } finally {
-      setLoadingInvites(false);
+      if (isInitialLoad) {
+        setLoadingInvites(false);
+        initialInvitesLoadedRef.current = true;
+      }
     }
   }, [activeProfile]);
 
@@ -211,6 +225,8 @@ export default function InviteFamilyScreen({ navigation }: Props) {
       return;
     }
     const profileId = activeProfile.id;
+    initialMembersLoadedRef.current = false;
+    initialInvitesLoadedRef.current = false;
     const channel = supabase
       .channel(`profile-members-${profileId}`)
       .on(
