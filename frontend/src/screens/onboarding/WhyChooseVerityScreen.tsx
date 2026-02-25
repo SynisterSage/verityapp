@@ -54,6 +54,11 @@ const useCases = [
     title: 'Facility partnerships and care teams',
     copy: 'Support resident safety with trusted-routing and clear call review workflows.',
   },
+  {
+    icon: 'call-outline' as const,
+    title: 'Works across phone types',
+    copy: 'Verity protects a forwarded line, so it can support smartphones, basic phones, and landline-style setups.',
+  },
 ] as const;
 
 const comparisonPoints = [
@@ -72,12 +77,46 @@ const comparisonPoints = [
     title: 'Actionable call context',
     copy: 'Instead of a missed call only, Verity provides transcript snippets and risk markers so people can make safer decisions.',
   },
+  {
+    icon: 'swap-horizontal-outline' as const,
+    title: 'Reliable fallback coverage',
+    copy: 'Because protection sits on the forwarded line, coverage continues as a dependable fallback even when someone changes devices.',
+  },
+  {
+    icon: 'options-outline' as const,
+    title: 'Expanded controls when you need them',
+    copy: 'Use Safe Phrases, Trusted Contacts, blocked contacts, and automation settings to tune how calls are screened for each household.',
+  },
 ] as const;
 
 const caregiverPoints = [
   'Know when a risky call was blocked without asking your parent to explain every detail.',
   'Review suspicious calls quickly and decide together what to do next.',
   'Keep independence in place while adding backup for high-pressure scam moments.',
+] as const;
+
+const scenarioCases = [
+  {
+    title: 'Bank impersonation push',
+    before:
+      'Caller claims a fraud hold and asks for a one-time code “to verify identity” while keeping the person on the line.',
+    after:
+      'Unknown caller is screened first, the request is flagged as high-risk language, and family can review before any code is shared.',
+  },
+  {
+    title: 'Medicare or pharmacy callback trap',
+    before:
+      'A spoofed callback asks for Medicare ID, date of birth, and card details to “fix coverage today.”',
+    after:
+      'Verity captures context, routes trusted numbers normally, and gives caregivers a clear review trail before sensitive info is given.',
+  },
+  {
+    title: 'Utility shutoff urgency',
+    before:
+      'Scammer pressures immediate payment by gift card or wire, threatening service shutoff within minutes.',
+    after:
+      'High-pressure payment language is surfaced quickly so families can pause, verify through trusted contacts, and avoid panic payments.',
+  },
 ] as const;
 
 const socialLinks = [
@@ -94,7 +133,7 @@ const policyLinks = [
 ] as const;
 
 const sourceLinks = [
-  { label: 'FTC 2024 fraud report', url: 'https://www.ftc.gov/news-events/news/press-releases/2025/03/new-ftc-data-show-big-jump-reported-losses-fraud-126-billion-2024' },
+  { label: 'FTC 2024 fraud report', url: 'https://www.ftc.gov/news-events/news/press-releases/2025/03/new-ftc-data-show-big-jump-reported-losses-fraud-125-billion-2024' },
   { label: 'FBI IC3 2024 report', url: 'https://www.ic3.gov/Media/PDF/AnnualReport/2024_IC3Report.pdf' },
 ] as const;
 
@@ -136,7 +175,7 @@ export default function WhyChooseVerityScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={[]}>
-      <View style={styles.headerRow}>
+      <View style={[styles.headerRow, { paddingTop: Math.max(insets.top, 14) }]}>
         <Pressable
           style={styles.backButton}
           onPress={() => {
@@ -153,7 +192,7 @@ export default function WhyChooseVerityScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Math.max(insets.bottom, 24) + 32 },
+          { paddingBottom: Math.max(insets.bottom, 16) + 12 },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -179,18 +218,18 @@ export default function WhyChooseVerityScreen() {
         </View>
 
         <View style={styles.sectionWrap}>
-          <Text style={styles.sectionTitle}>Real-world scenario</Text>
-          <View style={styles.scenarioCard}>
-            <Text style={styles.scenarioHeadline}>Before Verity</Text>
-            <Text style={styles.scenarioCopy}>
-              “I’m calling from your bank. Read me the code we just sent.”
-            </Text>
-            <View style={styles.scenarioDivider} />
-            <Text style={styles.scenarioHeadline}>With Verity</Text>
-            <Text style={styles.scenarioCopy}>
-              Unknown callers are screened first. Family can review risk markers before any action
-              is taken.
-            </Text>
+          <Text style={styles.sectionTitle}>Real-world scenarios</Text>
+          <View style={styles.useCasesWrap}>
+            {scenarioCases.map((scenario) => (
+              <View key={scenario.title} style={styles.scenarioCard}>
+                <Text style={styles.useCaseTitle}>{scenario.title}</Text>
+                <Text style={styles.scenarioHeadline}>Before Verity</Text>
+                <Text style={styles.scenarioCopy}>{scenario.before}</Text>
+                <View style={styles.scenarioDivider} />
+                <Text style={styles.scenarioHeadline}>With Verity</Text>
+                <Text style={styles.scenarioCopy}>{scenario.after}</Text>
+              </View>
+            ))}
           </View>
         </View>
 
@@ -264,6 +303,29 @@ export default function WhyChooseVerityScreen() {
               <Text style={styles.supportSecondaryText}>Email Support</Text>
             </Pressable>
           </View>
+        </View>
+
+        <View style={styles.facilityCard}>
+          <View style={styles.facilityIconWrap}>
+            <Ionicons name="business-outline" size={16} color={theme.colors.accent} />
+          </View>
+          <View style={styles.facilityTextWrap}>
+            <Text style={styles.facilityTitle}>Facility partnerships</Text>
+            <Text style={styles.facilityCopy}>
+              Managing multiple residents or members? We can help you set up Verity for your team.
+            </Text>
+          </View>
+          <Pressable
+            style={styles.facilityButton}
+            onPress={() => {
+              void openExternalLink(
+                'mailto:support@verityprotect.com?subject=Facility%20Partnership%20Inquiry',
+                'Facility Partnership Email'
+              );
+            }}
+          >
+            <Text style={styles.facilityButtonText}>Email us</Text>
+          </Pressable>
         </View>
 
         <View style={styles.linksSection}>
@@ -431,7 +493,7 @@ const createStyles = (theme: AppTheme) =>
       borderRadius: 18,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surfaceAlt,
+      backgroundColor: theme.colors.surface,
       padding: 12,
       gap: 6,
     },
@@ -558,6 +620,51 @@ const createStyles = (theme: AppTheme) =>
       color: theme.colors.accent,
       textAlign: 'center',
     },
+    facilityCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      padding: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    facilityIconWrap: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.14),
+    },
+    facilityTextWrap: {
+      flex: 1,
+      gap: 1,
+    },
+    facilityTitle: {
+      fontSize: 13.5,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    facilityCopy: {
+      fontSize: 12.5,
+      lineHeight: 17,
+      color: theme.colors.textMuted,
+    },
+    facilityButton: {
+      borderRadius: 10,
+      backgroundColor: theme.colors.accent,
+      paddingHorizontal: 11,
+      paddingVertical: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    facilityButtonText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
     linksSection: {
       borderRadius: 18,
       borderWidth: 1,
@@ -580,8 +687,7 @@ const createStyles = (theme: AppTheme) =>
     },
     linkPill: {
       borderRadius: 12,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.border, 0.95),
+      borderWidth: 0,
       backgroundColor: theme.colors.surfaceAlt,
       paddingHorizontal: 10,
       paddingVertical: 7,

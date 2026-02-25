@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,13 +14,16 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../context/ThemeContext';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { useAuth } from '../../context/AuthContext';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { logEvent } from '../../services/sentry';
+import { MEMBERSHIP_SIGNOUT_NOTE_KEY } from '../../utils/membership';
 
 type PlanOption = {
   productId: string;
@@ -169,6 +173,7 @@ export default function MembershipScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const styles = useMemo(() => createMembershipStyles(theme), [theme]);
+  const { signOut } = useAuth();
 
   const {
     status,
@@ -195,8 +200,14 @@ export default function MembershipScreen() {
   const [isBillingExpanded, setIsBillingExpanded] = useState(false);
   const [showPurchaseSuccess, setShowPurchaseSuccess] = useState(false);
   const [footerHeight, setFooterHeight] = useState(156);
+  const [showExitModal, setShowExitModal] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const purchaseSuccessScale = useRef(new Animated.Value(0.84)).current;
   const purchaseSuccessOpacity = useRef(new Animated.Value(0)).current;
+  const exitBackdropOpacity = useRef(new Animated.Value(0)).current;
+  const exitCardOpacity = useRef(new Animated.Value(0)).current;
+  const exitCardTranslateY = useRef(new Animated.Value(10)).current;
+  const exitCardScale = useRef(new Animated.Value(0.985)).current;
   const planScaleByIdRef = useRef<Record<string, Animated.Value>>({});
   const hasLoggedMembershipView = useRef(false);
   const showInviteCodeAction = status?.canJoinWithInviteCode !== false;
@@ -334,6 +345,58 @@ export default function MembershipScreen() {
       screen: 'MembershipScreen',
     });
     await refreshProducts();
+  };
+
+  useEffect(() => {
+    if (!showExitModal) {
+      exitBackdropOpacity.setValue(0);
+      exitCardOpacity.setValue(0);
+      exitCardTranslateY.setValue(10);
+      exitCardScale.setValue(0.985);
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(exitBackdropOpacity, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+      Animated.timing(exitCardOpacity, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(exitCardTranslateY, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(exitCardScale, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [exitBackdropOpacity, exitCardOpacity, exitCardScale, exitCardTranslateY, showExitModal]);
+
+  const closeExitModal = () => {
+    if (isSigningOut) return;
+    void Haptics.selectionAsync().catch(() => null);
+    setShowExitModal(false);
+  };
+
+  const confirmSignOut = async () => {
+    if (isSigningOut) return;
+    setIsSigningOut(true);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    try {
+      await AsyncStorage.setItem(MEMBERSHIP_SIGNOUT_NOTE_KEY, '1');
+      await signOut();
+      logEvent('membership_signout_not_now', { screen: 'MembershipScreen' });
+      setShowExitModal(false);
+    } finally {
+      setIsSigningOut(false);
+    }
   };
 
   return (
@@ -503,7 +566,7 @@ export default function MembershipScreen() {
           <Pressable
             onPress={() => {
               void Haptics.selectionAsync().catch(() => null);
-              navigation.navigate('SupportPortal');
+              navigation.navigate('SupportPortal', { initialResource: 'billing' });
             }}
             hitSlop={8}
             accessibilityRole="button"
@@ -523,6 +586,16 @@ export default function MembershipScreen() {
           <Ionicons name="chatbubble-ellipses-outline" size={15} color={theme.colors.accent} />
           <Text style={styles.supportQuickText}>Need help now? Open support portal.</Text>
           <Ionicons name="chevron-forward" size={14} color={theme.colors.textMuted} />
+        </Pressable>
+
+        <Pressable
+          style={styles.notNowRow}
+          onPress={() => {
+            void Haptics.selectionAsync().catch(() => null);
+            setShowExitModal(true);
+          }}
+        >
+          <Text style={styles.notNowText}>Not now</Text>
         </Pressable>
 
         {(statusError || feedback) ? (
@@ -602,6 +675,61 @@ export default function MembershipScreen() {
           </Animated.View>
         </View>
       ) : null}
+
+      <Modal
+        visible={showExitModal}
+        transparent
+        animationType="none"
+        onRequestClose={closeExitModal}
+      >
+        <View style={styles.exitModalRoot}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeExitModal}>
+            <Animated.View style={[styles.exitModalBackdrop, { opacity: exitBackdropOpacity }]} />
+          </Pressable>
+          <Animated.View
+            style={[
+              styles.exitModalCard,
+              {
+                opacity: exitCardOpacity,
+                transform: [{ translateY: exitCardTranslateY }, { scale: exitCardScale }],
+              },
+            ]}
+          >
+            <Text style={styles.exitModalTitle}>Leave for now?</Text>
+            <Text style={styles.exitModalBody}>
+              You will be signed out and returned to login. Verity membership covers secure call routing,
+              screening, recordings, and fraud monitoring infrastructure.
+            </Text>
+            <View style={styles.exitModalActions}>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.exitModalButtonSecondary,
+                  pressed && styles.exitModalButtonSecondaryPressed,
+                ]}
+                onPress={closeExitModal}
+                disabled={isSigningOut}
+              >
+                <Text style={styles.exitModalButtonSecondaryText}>Stay here</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.exitModalButtonPrimary,
+                  pressed && styles.exitModalButtonPrimaryPressed,
+                  isSigningOut && styles.exitModalButtonPrimaryDisabled,
+                ]}
+                onPress={confirmSignOut}
+                disabled={isSigningOut}
+              >
+                {isSigningOut ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.exitModalButtonPrimaryText}>Sign out</Text>
+                )}
+              </Pressable>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -787,7 +915,7 @@ const createMembershipStyles = (theme: AppTheme) =>
       borderRadius: 24,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surfaceAlt,
+      backgroundColor: theme.colors.surface,
       padding: 16,
       gap: 7,
     },
@@ -839,6 +967,19 @@ const createMembershipStyles = (theme: AppTheme) =>
       fontSize: 13,
       fontWeight: '600',
       color: theme.colors.text,
+    },
+    notNowRow: {
+      alignSelf: 'center',
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      marginTop: -2,
+      marginBottom: 2,
+    },
+    notNowText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.textMuted,
+      textDecorationLine: 'underline',
     },
     feedbackCard: {
       marginTop: 4,
@@ -972,5 +1113,85 @@ const createMembershipStyles = (theme: AppTheme) =>
       lineHeight: 18,
       color: theme.colors.textMuted,
       textAlign: 'center',
+    },
+    exitModalRoot: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 28,
+    },
+    exitModalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: withOpacity(theme.colors.bg, 0.72),
+    },
+    exitModalCard: {
+      width: '100%',
+      maxWidth: 370,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 18,
+      paddingVertical: 18,
+      gap: 10,
+      shadowColor: '#000',
+      shadowOpacity: 0.24,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 10 },
+      elevation: 12,
+    },
+    exitModalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    exitModalBody: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.textMuted,
+    },
+    exitModalActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    exitModalButtonSecondary: {
+      flex: 1,
+      minHeight: 46,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surfaceAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    exitModalButtonSecondaryPressed: {
+      opacity: 0.92,
+      transform: [{ scale: 0.99 }],
+    },
+    exitModalButtonSecondaryText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    exitModalButtonPrimary: {
+      flex: 1,
+      minHeight: 46,
+      borderRadius: 14,
+      backgroundColor: theme.colors.danger,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    exitModalButtonPrimaryPressed: {
+      opacity: 0.9,
+      transform: [{ scale: 0.99 }],
+    },
+    exitModalButtonPrimaryDisabled: {
+      opacity: 0.75,
+    },
+    exitModalButtonPrimaryText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#fff',
     },
   });

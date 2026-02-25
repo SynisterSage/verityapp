@@ -4,6 +4,7 @@ import {
   Alert,
   Animated,
   Easing,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
@@ -14,7 +15,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import type { StackNavigationProp } from '@react-navigation/stack';
 
 import { useProfile } from '../../context/ProfileContext';
@@ -77,8 +79,20 @@ function getTicketState(ticket: SupportTicketSummary) {
   return ticketState === 'closed' ? 'handled' : 'active';
 }
 
+function toErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    const message = error.message.trim();
+    if (/unauthorized|401/i.test(message)) {
+      return 'Live support chat requires a signed-in Verity account. If you do not have one yet, email support@verityprotect.com.';
+    }
+    return message;
+  }
+  return 'Unable to load support history.';
+}
+
 export default function SupportTicketsScreen() {
   const navigation = useNavigation<StackNavigationProp<RootStackParamList, 'SupportPortal'>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'SupportPortal'>>();
   const { mode, theme } = useTheme();
   const { profiles, setActiveProfile } = useProfile();
   const [tickets, setTickets] = useState<SupportTicketSummary[]>([]);
@@ -109,7 +123,7 @@ export default function SupportTicketsScreen() {
         setTickets(data);
       } catch (err) {
         console.warn('Failed to load support tickets', err);
-        setError('Unable to load support history.');
+        setError(toErrorMessage(err));
       } finally {
         if (showLoading) {
           setLoading(false);
@@ -133,6 +147,19 @@ export default function SupportTicketsScreen() {
       void loadTickets({ showLoading: false });
     }, [loadTickets])
   );
+
+  useEffect(() => {
+    const initialResource = route.params?.initialResource;
+    if (!initialResource) {
+      return;
+    }
+    const resourceMeta = SUPPORT_PORTAL_RESOURCES.find((resource) => resource.resource === initialResource);
+    navigateToSupportResource({
+      resource: initialResource,
+      title: resourceMeta?.title,
+    });
+    navigation.setParams({ initialResource: undefined });
+  }, [navigation, route.params?.initialResource]);
 
   const handleOpenChat = useCallback(
     async (ticketProfileId: string, ticketId: string) => {
@@ -264,7 +291,7 @@ export default function SupportTicketsScreen() {
       } catch (err) {
         console.warn('Failed to start setup support conversation', err);
         setCreatingTicket(false);
-        setError('Unable to start a new support conversation. Please try again.');
+        setError(toErrorMessage(err));
       }
       return;
     }
@@ -279,7 +306,7 @@ export default function SupportTicketsScreen() {
     } catch (err) {
       console.warn('Failed to start new ticket', err);
       setCreatingTicket(false);
-      setError('Unable to start a new support conversation. Please try again.');
+      setError(toErrorMessage(err));
     }
   }, [profiles, setActiveProfile]);
 
@@ -353,26 +380,63 @@ export default function SupportTicketsScreen() {
         <Text style={[styles.emptyBody, { color: theme.colors.textMuted }]}> 
           {error ?? 'Start a chat and every message will save to this timeline. Our assistant asks what you need before you reply.'}
         </Text>
-        <Pressable
-          onPress={handleStartNew}
-          disabled={creatingTicket}
-          style={({ pressed }) => [
-            styles.startButton,
-            {
-              backgroundColor: creatingTicket ? withOpacity(theme.colors.accent, 0.6) : theme.colors.accent,
-              opacity: creatingTicket ? 0.8 : 1,
-            },
-          ]}
-        >
-          {creatingTicket ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.startButtonText}>Send a support message</Text>
-          )}
-        </Pressable>
+        {!error ? (
+          <Pressable
+            onPress={handleStartNew}
+            disabled={creatingTicket}
+            style={({ pressed }) => [
+              styles.startButton,
+              {
+                backgroundColor: creatingTicket ? withOpacity(theme.colors.accent, 0.6) : theme.colors.accent,
+                opacity: creatingTicket ? 0.8 : 1,
+              },
+            ]}
+          >
+            {creatingTicket ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.startButtonText}>Send a support message</Text>
+            )}
+          </Pressable>
+        ) : (
+          <View style={styles.errorActionsWrap}>
+            <Pressable
+              onPress={() => {
+                void loadTickets({ showLoading: true });
+              }}
+              style={({ pressed }) => [
+                styles.errorActionButton,
+                {
+                  backgroundColor: pressed
+                    ? withOpacity(theme.colors.accent, 0.2)
+                    : withOpacity(theme.colors.accent, 0.14),
+                  borderColor: withOpacity(theme.colors.accent, 0.38),
+                },
+              ]}
+            >
+              <Text style={[styles.errorActionText, { color: theme.colors.accent }]}>Retry</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => {
+                void Linking.openURL('mailto:support@verityprotect.com?subject=Verity%20Support%20Help');
+              }}
+              style={({ pressed }) => [
+                styles.errorActionButton,
+                {
+                  backgroundColor: pressed
+                    ? withOpacity(theme.colors.textMuted, 0.18)
+                    : withOpacity(theme.colors.textMuted, 0.12),
+                  borderColor: withOpacity(theme.colors.textMuted, 0.32),
+                },
+              ]}
+            >
+              <Text style={[styles.errorActionText, { color: theme.colors.textMuted }]}>Email support</Text>
+            </Pressable>
+          </View>
+        )}
     </View>
   );
-}, [creatingTicket, error, handleStartNew, loading, theme.colors]);
+}, [creatingTicket, error, handleStartNew, loadTickets, loading, theme.colors]);
 
   const ListHeader = useCallback(() => {
     return (
@@ -673,6 +737,23 @@ const createStyles = (theme: AppTheme) =>
       paddingHorizontal: 20,
       paddingVertical: 12,
       borderRadius: 999,
+    },
+    errorActionsWrap: {
+      width: '100%',
+      gap: 10,
+    },
+    errorActionButton: {
+      width: '100%',
+      paddingHorizontal: 16,
+      paddingVertical: 11,
+      borderRadius: 12,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    errorActionText: {
+      fontSize: 14,
+      fontWeight: '700',
     },
     startButtonText: {
       color: '#fff',

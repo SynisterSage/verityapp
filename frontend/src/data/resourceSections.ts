@@ -248,6 +248,17 @@ export const BILLING_CONTENT: ResourceSection[] = [
     ],
   },
   {
+    id: 'billing-why-membership',
+    title: 'Why membership is required',
+    body:
+      'Membership covers the live infrastructure that keeps call protection running in real time, including routing, recording, and monitoring systems.',
+    bullets: [
+      'Phone infrastructure: forwarded-line call routing, carrier connectivity, and uptime monitoring.',
+      'Call recording and storage: secure capture, retention, and access to transcripts/history for review.',
+      'Active fraud monitoring: real-time risk checks, alert delivery, and family visibility across devices.',
+    ],
+  },
+  {
     id: 'billing-support',
     title: 'How support helps',
     body:

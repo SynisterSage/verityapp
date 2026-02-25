@@ -11,6 +11,12 @@ export function navigateToSupportPortal() {
   }
 }
 
+export function navigateToSupportPortalResource(resource: SupportResourceType) {
+  if (rootNavigationRef.isReady()) {
+    rootNavigationRef.navigate('SupportPortal', { initialResource: resource });
+  }
+}
+
 type SupportModalParams = {
   ticketId?: string | null;
   profileId?: string;

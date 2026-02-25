@@ -104,6 +104,8 @@ export default function SupportScreen() {
   const [isSending, setIsSending] = useState(false);
   const [selectedPrompt, setSelectedPrompt] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [conversationError, setConversationError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
   const scrollRef = useRef<FlatList<SupportMessage> | null>(null);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState<'positive' | 'neutral' | 'negative' | null>(null);
@@ -160,6 +162,7 @@ export default function SupportScreen() {
     const ticketIdToUse = opts?.ticketId ?? currentTicketId ?? SETUP_TICKET_ID;
     if (!ticketIdToUse) {
       setMessages([]);
+      setConversationError(null);
       if (showLoading) {
         setLoading(false);
       }
@@ -169,6 +172,7 @@ export default function SupportScreen() {
         setLoading(true);
       }
       try {
+      setConversationError(null);
       const data = hasProfileSupport && activeProfile?.id
         ? await fetchSupportMessages(activeProfile.id, ticketIdToUse)
         : await fetchSetupSupportMessages(ticketIdToUse);
@@ -189,6 +193,8 @@ export default function SupportScreen() {
         await refreshUnread();
       } catch (err) {
       console.warn('Failed to load support conversation', err);
+      const message = err instanceof Error && err.message ? err.message : 'Unable to load support chat right now.';
+      setConversationError(message);
     } finally {
       if (showLoading) {
         setLoading(false);
@@ -222,6 +228,12 @@ export default function SupportScreen() {
       void playNotificationSound();
     }
   }, [messages, playNotificationSound]);
+
+  useEffect(() => {
+    if (sendError && composerText.trim().length > 0) {
+      setSendError(null);
+    }
+  }, [composerText, sendError]);
 
   useEffect(() => {
     const latestMessage = [...messages].slice(-1)[0];
@@ -279,6 +291,8 @@ export default function SupportScreen() {
       Keyboard.dismiss();
     } catch (err) {
       console.warn('Failed to send support message', err);
+      const message = err instanceof Error && err.message ? err.message : 'Could not send your message.';
+      setSendError(message);
     } finally {
       setIsSending(false);
     }
@@ -495,6 +509,33 @@ export default function SupportScreen() {
             )}
             {loading ? (
               <ActivityIndicator color={theme.colors.accent} size="small" />
+            ) : conversationError && messages.length === 0 ? (
+              <View
+                style={[
+                  styles.errorCard,
+                  {
+                    borderColor: withOpacity(theme.colors.danger, 0.35),
+                    backgroundColor: withOpacity(theme.colors.danger, 0.08),
+                  },
+                ]}
+              >
+                <Text style={[styles.errorTitle, { color: theme.colors.text }]}>Could not load support chat</Text>
+                <Text style={[styles.errorCopy, { color: theme.colors.textMuted }]}>{conversationError}</Text>
+                <Pressable
+                  style={[
+                    styles.errorRetryButton,
+                    {
+                      backgroundColor: withOpacity(theme.colors.accent, 0.16),
+                      borderColor: withOpacity(theme.colors.accent, 0.38),
+                    },
+                  ]}
+                  onPress={() => {
+                    void loadMessages({ showLoading: true, ticketId: activeTicketId ?? SETUP_TICKET_ID });
+                  }}
+                >
+                  <Text style={[styles.errorRetryText, { color: theme.colors.accent }]}>Try again</Text>
+                </Pressable>
+              </View>
             ) : statusMessage && messages.length === 0 ? (
               <View style={styles.statusMessage}>
                 <Text style={[styles.statusMessageText, { color: theme.colors.textMuted }]}>
@@ -627,6 +668,22 @@ export default function SupportScreen() {
               </Text>
             ) : (
               <>
+                {sendError ? (
+                  <View
+                    style={[
+                      styles.sendErrorRow,
+                      {
+                        backgroundColor: withOpacity(theme.colors.danger, 0.1),
+                        borderColor: withOpacity(theme.colors.danger, 0.32),
+                      },
+                    ]}
+                  >
+                    <Ionicons name="alert-circle-outline" size={13} color={theme.colors.danger} />
+                    <Text style={[styles.sendErrorText, { color: theme.colors.textMuted }]} numberOfLines={2}>
+                      {sendError}
+                    </Text>
+                  </View>
+                ) : null}
                 <TextInput
                   style={[
                     styles.input,
@@ -958,6 +1015,34 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
       textAlign: 'center',
       maxWidth: 240,
     },
+    errorCard: {
+      borderWidth: 1,
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      gap: 6,
+      marginTop: 14,
+    },
+    errorTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    errorCopy: {
+      fontSize: 12,
+      lineHeight: 18,
+    },
+    errorRetryButton: {
+      alignSelf: 'flex-start',
+      marginTop: 4,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderWidth: 1,
+    },
+    errorRetryText: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
     quickChip: {
       borderRadius: 18,
       paddingVertical: 8,
@@ -980,7 +1065,8 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
     },
     composerOuter: {
       flexDirection: 'row',
-      alignItems: 'center',
+      flexWrap: 'wrap',
+      alignItems: 'flex-end',
       paddingHorizontal: 18,
       paddingVertical: 12,
       borderRadius: 30,
@@ -995,6 +1081,7 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
     },
     input: {
       flex: 1,
+      minWidth: '72%',
       minHeight: 6,
       maxHeight: 180,
       borderRadius: 24,
@@ -1017,6 +1104,22 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
     },
     sendIcon: {
       marginTop: -2,
+    },
+    sendErrorRow: {
+      width: '100%',
+      borderWidth: 1,
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      marginBottom: 6,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 6,
+    },
+    sendErrorText: {
+      flex: 1,
+      fontSize: 12,
+      lineHeight: 17,
     },
     ticketClosedCopy: {
       fontSize: 14,

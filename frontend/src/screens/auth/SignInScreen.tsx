@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -10,11 +11,13 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { logEvent } from '../../services/sentry';
+import { MEMBERSHIP_SIGNOUT_NOTE_KEY } from '../../utils/membership';
 
 export default function SignInScreen({ navigation }: { navigation: any }) {
   const { signIn, signInWithGoogle, signInWithApple, sendPasswordReset } = useAuth();
@@ -27,7 +30,38 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
   const [resetMessage, setResetMessage] = useState<null | { text: string; type: 'error' | 'info' }>(null);
   const [focusField, setFocusField] = useState<'email' | 'password' | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [membershipNoteVisible, setMembershipNoteVisible] = useState(false);
+  const [isDismissingMembershipNote, setIsDismissingMembershipNote] = useState(false);
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    let mounted = true;
+    const loadMembershipNote = async () => {
+      try {
+        const value = await AsyncStorage.getItem(MEMBERSHIP_SIGNOUT_NOTE_KEY);
+        if (mounted && value === '1') {
+          setMembershipNoteVisible(true);
+        }
+      } catch {
+        // no-op
+      }
+    };
+    void loadMembershipNote();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const dismissMembershipNote = async () => {
+    if (isDismissingMembershipNote) return;
+    setIsDismissingMembershipNote(true);
+    try {
+      await AsyncStorage.removeItem(MEMBERSHIP_SIGNOUT_NOTE_KEY);
+    } finally {
+      setMembershipNoteVisible(false);
+      setIsDismissingMembershipNote(false);
+    }
+  };
   const handleSubmit = async () => {
     setLoginError('');
     setIsSubmitting(true);
@@ -124,6 +158,48 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
             Sign into your Verity account.
           </Text>
         </View>
+
+        {membershipNoteVisible ? (
+          <View
+            style={[
+              styles.membershipNote,
+              {
+                borderColor: theme.colors.border,
+                backgroundColor: theme.colors.surface,
+              },
+            ]}
+          >
+            <View style={styles.membershipNoteHeader}>
+              <Text style={[styles.membershipNoteTitle, { color: theme.colors.text }]}>
+                Thanks for checking Verity
+              </Text>
+              <Pressable
+                onPress={() => {
+                  void dismissMembershipNote();
+                }}
+                hitSlop={8}
+                style={styles.membershipNoteClose}
+              >
+                {isDismissingMembershipNote ? (
+                  <ActivityIndicator size="small" color={theme.colors.textMuted} />
+                ) : (
+                  <Ionicons name="close" size={15} color={theme.colors.textMuted} />
+                )}
+              </Pressable>
+            </View>
+            <Text style={[styles.membershipNoteBody, { color: theme.colors.textMuted }]}>
+              Membership funds secure call routing, screening, recordings, and fraud monitoring infrastructure.
+            </Text>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('SupportPortal', { initialResource: 'billing' })}
+              style={styles.membershipNoteLinkWrap}
+            >
+              <Text style={[styles.membershipNoteLink, { color: theme.colors.accent }]}>
+                Contact support about pricing
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         <View style={styles.fields}>
         <View style={styles.fieldWrapper}>
@@ -291,8 +367,46 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   fields: {
-    marginTop: 32,
+    marginTop: 20,
     marginBottom: 36,
+  },
+  membershipNote: {
+    marginTop: 16,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    gap: 6,
+  },
+  membershipNoteHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  membershipNoteTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  membershipNoteClose: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  membershipNoteBody: {
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  membershipNoteLinkWrap: {
+    alignSelf: 'flex-start',
+    paddingVertical: 2,
+  },
+  membershipNoteLink: {
+    fontSize: 13,
+    fontWeight: '700',
   },
   fieldWrapper: {
     marginBottom: 14,

@@ -22,7 +22,7 @@ export type RootStackParamList = {
   OnboardingSuccess: undefined;
   AppTabs: NavigatorScreenParams<TabParamList> | undefined;
   CallDetailModal: { callId: string; compact?: boolean };
-  SupportPortal: undefined;
+  SupportPortal: { initialResource?: SupportResourceType } | undefined;
   SupportModal: { ticketId?: string | null; profileId?: string | null; newTicket?: boolean; autoEnd?: boolean };
   SupportResource: { resource: SupportResourceType; title?: string };
   CircleActivityModal: { activities?: import('../screens/dashboard/circleActivityTypes').CircleActivityItem[] };
