@@ -72,6 +72,7 @@ import OnboardingChoiceScreen from './src/screens/onboarding/OnboardingChoiceScr
 import OnboardingInviteCodeScreen from './src/screens/onboarding/OnboardingInviteCodeScreen';
 import OnboardingSuccessScreen from './src/screens/onboarding/OnboardingSuccessScreen';
 import MembershipScreen from './src/screens/onboarding/MembershipScreen';
+import MembershipExperienceScreen from './src/screens/onboarding/MembershipExperienceScreen';
 import {
   RootStackParamList,
   TabParamList,
@@ -761,6 +762,11 @@ function RootNavigator() {
             <RootStack.Screen
               name="Membership"
               component={MembershipScreen}
+              options={{ headerShown: false }}
+            />
+            <RootStack.Screen
+              name="MembershipExperience"
+              component={MembershipExperienceScreen}
               options={{ headerShown: false }}
             />
             <RootStack.Screen

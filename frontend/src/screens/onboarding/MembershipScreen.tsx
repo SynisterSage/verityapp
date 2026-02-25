@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -9,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
@@ -31,33 +33,15 @@ const fallbackPlans: PlanOption[] = [
   {
     productId: 'verityprotect_monthly',
     title: 'Monthly',
-    price: '$14.99 / month',
+    price: '$9.99 / month',
     detail: 'Flexible monthly billing',
   },
   {
     productId: 'verityprotect_annual',
     title: 'Annual',
-    price: '$119.99 / year',
+    price: '$99.99 / year',
     detail: 'Best value for long-term protection',
     badge: 'Save over monthly',
-  },
-];
-
-const howItWorks = [
-  {
-    icon: 'call-outline' as const,
-    title: 'Calls are screened first',
-    description: 'Unknown callers are reviewed before they reach your loved one.',
-  },
-  {
-    icon: 'shield-checkmark-outline' as const,
-    title: 'Risk is scored clearly',
-    description: 'Potential fraud is flagged fast so families can act quickly.',
-  },
-  {
-    icon: 'people-outline' as const,
-    title: 'Family stays in sync',
-    description: 'Trusted contacts and circle members can monitor activity together.',
   },
 ];
 
@@ -113,6 +97,10 @@ export default function MembershipScreen() {
 
   const [selectedProductId, setSelectedProductId] = useState<string>(selectedDefaultProductId);
   const [message, setMessage] = useState<string>('');
+  const [isBillingExpanded, setIsBillingExpanded] = useState(false);
+  const [showPurchaseSuccess, setShowPurchaseSuccess] = useState(false);
+  const purchaseSuccessScale = useRef(new Animated.Value(0.84)).current;
+  const purchaseSuccessOpacity = useRef(new Animated.Value(0)).current;
   const showInviteCodeAction = status?.canJoinWithInviteCode !== false;
 
   useEffect(() => {
@@ -130,6 +118,7 @@ export default function MembershipScreen() {
     fallbackPlans[0];
 
   const setPlan = (productId: string) => {
+    void Haptics.selectionAsync().catch(() => null);
     setSelectedProductId(productId);
     setMessage('');
     logEvent('membership_plan_selected', {
@@ -138,10 +127,46 @@ export default function MembershipScreen() {
     });
   };
 
+  const runPurchaseSuccessAnimation = async () => {
+    setShowPurchaseSuccess(true);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
+
+    await new Promise<void>((resolve) => {
+      Animated.sequence([
+        Animated.parallel([
+          Animated.spring(purchaseSuccessScale, {
+            toValue: 1,
+            speed: 20,
+            bounciness: 8,
+            useNativeDriver: true,
+          }),
+          Animated.timing(purchaseSuccessOpacity, {
+            toValue: 1,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.delay(420),
+        Animated.timing(purchaseSuccessOpacity, {
+          toValue: 0,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        purchaseSuccessScale.setValue(0.84);
+        purchaseSuccessOpacity.setValue(0);
+        setShowPurchaseSuccess(false);
+        resolve();
+      });
+    });
+  };
+
   const handlePurchase = async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => null);
     setMessage('');
     const result = await purchase(selectedPlan.productId);
     if (result.status === 'purchased') {
+      await runPurchaseSuccessAnimation();
       logEvent('membership_purchase_success', {
         screen: 'MembershipScreen',
         extra: { productId: selectedPlan.productId },
@@ -152,6 +177,7 @@ export default function MembershipScreen() {
   };
 
   const handleRestore = async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     setMessage('');
     const result = await restore();
     if (result.status === 'purchased') {
@@ -161,7 +187,7 @@ export default function MembershipScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -172,24 +198,28 @@ export default function MembershipScreen() {
         <View style={styles.headerBlock}>
           <Text style={styles.title}>Protect your family phone line</Text>
           <Text style={styles.subtitle}>
-            See how Verity works before purchase, then choose a plan to activate call protection.
+            Learn how Verity works, then choose a plan to activate call protection.
           </Text>
         </View>
 
-        <View style={styles.previewCard}>
-          <Text style={styles.previewTitle}>How Verity works</Text>
-          {howItWorks.map((item) => (
-            <View key={item.title} style={styles.previewRow}>
-              <View style={styles.previewIconWrap}>
-                <Ionicons name={item.icon} size={18} color={theme.colors.accent} />
-              </View>
-              <View style={styles.previewTextWrap}>
-                <Text style={styles.previewRowTitle}>{item.title}</Text>
-                <Text style={styles.previewRowDescription}>{item.description}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
+        <Pressable
+          style={styles.experienceCard}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+            navigation.navigate('MembershipExperience');
+          }}
+        >
+          <View style={styles.experienceIconWrap}>
+            <Ionicons name="sparkles-outline" size={18} color={theme.colors.accent} />
+          </View>
+          <View style={styles.experienceTextWrap}>
+            <Text style={styles.experienceTitle}>See how Verity works</Text>
+            <Text style={styles.experienceCopy}>
+              Walk through the full call-screening flow with an interactive demo.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+        </Pressable>
 
         <View style={styles.planSection}>
           <Text style={styles.planSectionTitle}>Choose your plan</Text>
@@ -230,7 +260,10 @@ export default function MembershipScreen() {
           {showInviteCodeAction ? (
             <Pressable
               style={styles.inlineButton}
-              onPress={() => navigation.navigate('OnboardingInviteCode')}
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+                navigation.navigate('OnboardingInviteCode');
+              }}
               disabled={isProcessingPurchase}
             >
               <Text style={styles.inlineButtonText}>I have an invite code</Text>
@@ -239,15 +272,40 @@ export default function MembershipScreen() {
         </View>
 
         <View style={styles.billingCard}>
-          <Text style={styles.billingTitle}>Why membership is required</Text>
-          <Text style={styles.billingCopy}>
-            Membership supports real phone infrastructure, call recording, and continuous fraud monitoring.
-            Billing is handled by Apple, and you can cancel anytime in iPhone subscription settings. If a
-            renewal payment fails, both plans include a 3-day billing grace period for all renewals before
-            service is paused.
-          </Text>
           <Pressable
-            onPress={() => navigation.navigate('SupportPortal')}
+            style={styles.billingHeaderRow}
+            onPress={() => {
+              void Haptics.selectionAsync().catch(() => null);
+              setIsBillingExpanded((prev) => !prev);
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle membership billing details"
+          >
+            <View style={styles.billingHeaderTextWrap}>
+              <Text style={styles.billingTitle}>Why membership is required</Text>
+              <Text style={styles.billingSummary}>
+                Covers phone infrastructure, recording, and active fraud monitoring.
+              </Text>
+            </View>
+            <Ionicons
+              name={isBillingExpanded ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={theme.colors.textMuted}
+            />
+          </Pressable>
+          {isBillingExpanded ? (
+            <Text style={styles.billingCopy}>
+              Billing is handled by Apple, and you can cancel anytime in iPhone subscription settings. If
+              a renewal payment fails, both plans include a 3-day billing grace period for all renewals
+              before service is paused.
+            </Text>
+          ) : null}
+          <Pressable
+            onPress={() => {
+              void Haptics.selectionAsync().catch(() => null);
+              navigation.navigate('SupportPortal');
+            }}
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="Open billing help"
@@ -275,12 +333,32 @@ export default function MembershipScreen() {
           disabled={isProcessingPurchase || isLoadingProducts}
         >
           {isProcessingPurchase || isLoadingProducts ? (
-            <ActivityIndicator color={theme.colors.surface} />
+            <ActivityIndicator color="#FFFFFF" />
           ) : (
             <Text style={styles.primaryButtonText}>Continue with App Store</Text>
           )}
         </Pressable>
       </View>
+
+      {showPurchaseSuccess ? (
+        <View style={styles.purchaseSuccessOverlay} pointerEvents="none">
+          <Animated.View
+            style={[
+              styles.purchaseSuccessCard,
+              {
+                opacity: purchaseSuccessOpacity,
+                transform: [{ scale: purchaseSuccessScale }],
+              },
+            ]}
+          >
+            <View style={styles.purchaseSuccessIcon}>
+              <Ionicons name="checkmark" size={22} color="#FFFFFF" />
+            </View>
+            <Text style={styles.purchaseSuccessTitle}>Membership Activated</Text>
+            <Text style={styles.purchaseSuccessText}>Verity protection is now live.</Text>
+          </Animated.View>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -293,7 +371,7 @@ const createMembershipStyles = (theme: AppTheme) =>
     },
     content: {
       paddingHorizontal: 24,
-      paddingTop: 24,
+      paddingTop: 22,
       gap: 16,
     },
     headerBlock: {
@@ -312,45 +390,34 @@ const createMembershipStyles = (theme: AppTheme) =>
       color: theme.colors.textMuted,
       lineHeight: 22,
     },
-    previewCard: {
-      borderRadius: 28,
-      padding: 18,
-      backgroundColor: theme.colors.surface,
+    experienceCard: {
+      borderRadius: 24,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      gap: 14,
-    },
-    previewTitle: {
-      fontSize: 13,
-      fontWeight: '800',
-      letterSpacing: 0.4,
-      textTransform: 'uppercase',
-      color: theme.colors.textMuted,
-    },
-    previewRow: {
+      borderColor: withOpacity(theme.colors.accent, 0.35),
+      backgroundColor: withOpacity(theme.colors.accent, 0.08),
+      padding: 15,
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       gap: 12,
     },
-    previewIconWrap: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
+    experienceIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.accent, 0.14),
-      marginTop: 1,
+      backgroundColor: withOpacity(theme.colors.accent, 0.16),
     },
-    previewTextWrap: {
+    experienceTextWrap: {
       flex: 1,
       gap: 2,
     },
-    previewRowTitle: {
+    experienceTitle: {
       fontSize: 15,
       fontWeight: '700',
       color: theme.colors.text,
     },
-    previewRowDescription: {
+    experienceCopy: {
       fontSize: 13,
       lineHeight: 18,
       color: theme.colors.textMuted,
@@ -458,12 +525,27 @@ const createMembershipStyles = (theme: AppTheme) =>
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surfaceAlt,
       padding: 16,
-      gap: 6,
+      gap: 7,
+    },
+    billingHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    billingHeaderTextWrap: {
+      flex: 1,
+      gap: 2,
     },
     billingTitle: {
       fontSize: 14,
       fontWeight: '700',
       color: theme.colors.text,
+    },
+    billingSummary: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.colors.textMuted,
     },
     billingCopy: {
       fontSize: 13,
@@ -508,6 +590,49 @@ const createMembershipStyles = (theme: AppTheme) =>
     primaryButtonText: {
       fontSize: 16,
       fontWeight: '700',
-      color: theme.colors.surface,
+      color: '#FFFFFF',
+    },
+    purchaseSuccessOverlay: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+    },
+    purchaseSuccessCard: {
+      width: '100%',
+      maxWidth: 320,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.success, 0.45),
+      backgroundColor: withOpacity(theme.colors.surface, 0.96),
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 22,
+      paddingHorizontal: 18,
+      gap: 6,
+    },
+    purchaseSuccessIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.success,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 2,
+    },
+    purchaseSuccessTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    purchaseSuccessText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.colors.textMuted,
+      textAlign: 'center',
     },
   });

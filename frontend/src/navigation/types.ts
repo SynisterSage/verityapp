@@ -8,6 +8,7 @@ export type RootStackParamList = {
   ResetPassword: undefined;
   OnboardingChoice: undefined;
   Membership: undefined;
+  MembershipExperience: undefined;
   OnboardingProfile: undefined;
   OnboardingPasscode: undefined;
   OnboardingTrustedContacts: undefined;

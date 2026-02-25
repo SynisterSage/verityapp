@@ -490,7 +490,7 @@ export default function SupportScreen() {
                 ]}
               >
                 <Ionicons name="checkmark-circle-outline" size={36} color={theme.colors.success} />
-                <Text style={[styles.successAnimationText, { color: theme.colors.success }]}>Ticket closed</Text>
+                <Text style={[styles.successAnimationText, { color: theme.colors.text }]}>Ticket closed</Text>
               </Animated.View>
             )}
             {loading ? (
@@ -911,23 +911,30 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
     },
     successAnimationOverlay: {
       position: 'absolute',
-      bottom: -4,
+      bottom: 12,
       left: 0,
       right: 0,
       alignItems: 'center',
       justifyContent: 'center',
+      paddingHorizontal: 18,
       paddingVertical: 14,
       marginHorizontal: 12,
-      backgroundColor: withOpacity(theme.colors.surface, 0.0),
+      backgroundColor: withOpacity(theme.colors.surface, mode === 'dark' ? 0.96 : 0.92),
       borderRadius: 28,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.success, mode === 'dark' ? 0.58 : 0.35),
       zIndex: 2,
-      elevation: 4,
+      shadowColor: theme.colors.success,
+      shadowOpacity: mode === 'dark' ? 0.28 : 0.16,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
       pointerEvents: 'none',
     },
     successAnimationText: {
       marginTop: 6,
-      fontSize: 13,
-      fontWeight: '600',
+      fontSize: 14,
+      fontWeight: '700',
       letterSpacing: 0.3,
     },
     endSessionHeader: {
