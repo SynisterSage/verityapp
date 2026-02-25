@@ -1,17 +1,36 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { useTheme } from '../../context/ThemeContext';
 
 const ICON_SIZE = 160;
 
-const SplashScreen: React.FC = () => {
+type SplashScreenProps = {
+  persistent?: boolean;
+};
+
+const SplashScreen: React.FC<SplashScreenProps> = ({ persistent = false }) => {
   const { theme, mode } = useTheme();
   const opacity = useRef(new Animated.Value(0)).current;
   const scale = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
+    if (persistent) {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
     Animated.sequence([
       Animated.delay(100),
       Animated.parallel([
@@ -40,7 +59,7 @@ const SplashScreen: React.FC = () => {
         }),
       ]),
     ]).start();
-  }, [opacity, scale]);
+  }, [opacity, persistent, scale]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.bg }]}>
@@ -81,6 +100,13 @@ const SplashScreen: React.FC = () => {
         <Text style={[styles.secondaryText, { color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily }]}>
           Protect
         </Text>
+        {persistent ? (
+          <ActivityIndicator
+            size="small"
+            color={theme.colors.accent}
+            style={styles.loader}
+          />
+        ) : null}
       </Animated.View>
     </View>
   );
@@ -106,6 +132,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     letterSpacing: 0.2,
     marginTop: 4,
+  },
+  loader: {
+    marginTop: 18,
   },
 });
 

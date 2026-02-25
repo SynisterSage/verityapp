@@ -236,6 +236,7 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
                 <Pressable
                   style={({ pressed }) => [
                     styles.resendButton,
+                    styles.checkButton,
                     pressed && styles.resendButtonPressed,
                     isChecking && styles.resendButtonLoading,
                   ]}
@@ -251,6 +252,7 @@ export default function ConfirmEmailScreen({ route, navigation }: Props) {
                 <Pressable
                   style={({ pressed }) => [
                     styles.resendButton,
+                    styles.resendEmailButton,
                     pressed && styles.resendButtonPressed,
                     isResending && styles.resendButtonLoading,
                   ]}
@@ -370,7 +372,7 @@ const createConfirmEmailStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surface,
       borderRadius: theme.radii.md,
       padding: theme.spacing.md,
-      gap: theme.spacing.sm,
+      gap: theme.spacing.xs,
       borderWidth: 1,
       borderColor: theme.colors.border,
       marginBottom: theme.spacing.xxl,
@@ -386,7 +388,6 @@ const createConfirmEmailStyles = (theme: AppTheme) =>
       lineHeight: 20,
     },
     resendButton: {
-      marginTop: theme.spacing.sm,
       paddingVertical: theme.spacing.sm,
       borderRadius: theme.radii.md,
       borderWidth: 1,
@@ -411,6 +412,12 @@ const createConfirmEmailStyles = (theme: AppTheme) =>
       fontSize: 14,
       fontWeight: '500',
       textAlign: 'center',
+    },
+    checkButton: {
+      marginTop: theme.spacing.xs,
+    },
+    resendEmailButton: {
+      marginTop: theme.spacing.xs,
     },
     feedbackError: {
       color: theme.colors.danger,

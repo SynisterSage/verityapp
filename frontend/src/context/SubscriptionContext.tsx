@@ -103,6 +103,14 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     return err instanceof Error && err.message.trim().length > 0 ? err.message.trim() : fallback;
   }, []);
 
+  const toProductsErrorMessage = useCallback((err: unknown) => {
+    const raw = toErrorMessage(err, 'Could not load App Store plans.');
+    if (/No App Store plans found for bundle/i.test(raw)) {
+      return 'App Store plans are not available for this build yet. Verify this build is attached to the subscription products in App Store Connect, then retry in a few minutes.';
+    }
+    return raw;
+  }, [toErrorMessage]);
+
   const refreshStatus = useCallback(
     async (options?: { silent?: boolean }) => {
       if (!session) {
@@ -164,7 +172,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       });
       return sortedProducts;
     } catch (err) {
-      const message = toErrorMessage(err, 'Could not load App Store plans.');
+      const message = toProductsErrorMessage(err);
       logError(err, {
         screen: 'SubscriptionContext',
         extra: { reason: 'refresh_products_failed', message },
@@ -179,7 +187,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     } finally {
       setIsLoadingProducts(false);
     }
-  }, [session, toErrorMessage]);
+  }, [session, toProductsErrorMessage]);
 
   const verifyReceipt = useCallback(
     async (args: {

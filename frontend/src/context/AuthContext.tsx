@@ -351,7 +351,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null;
       },
       signOut: async () => {
-        await supabase.auth.signOut({ scope: 'local' });
+        try {
+          await supabase.auth.signOut({ scope: 'local' });
+        } finally {
+          // Force immediate local auth state clear so navigation returns to SignIn
+          // even if the auth state listener callback is delayed on device.
+          setSession(null);
+          setIsLoading(false);
+        }
       },
     }),
     [session, isLoading]

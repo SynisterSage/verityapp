@@ -708,8 +708,7 @@ const createStyles = (theme: AppTheme) =>
     },
     sourceRow: {
       borderRadius: 10,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.border, 0.95),
+      borderWidth: 0,
       backgroundColor: theme.colors.surfaceAlt,
       paddingHorizontal: 10,
       paddingVertical: 8,

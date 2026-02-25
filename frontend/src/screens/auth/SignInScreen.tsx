@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -102,7 +103,7 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
       });
     } else {
       setResetMessage({
-        text: `We just sent password reset instructions to ${email.trim()}.`,
+        text: 'If an account exists for this email, password reset instructions were sent.',
         type: 'info',
       });
       logEvent('password_reset_success', { screen: 'SignIn' });
@@ -191,7 +192,9 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
               Membership funds secure call routing, screening, recordings, and fraud monitoring infrastructure.
             </Text>
             <TouchableOpacity
-              onPress={() => navigation.navigate('SupportPortal', { initialResource: 'billing' })}
+              onPress={() => {
+                void Linking.openURL('mailto:support@verityprotect.com').catch(() => null);
+              }}
               style={styles.membershipNoteLinkWrap}
             >
               <Text style={[styles.membershipNoteLink, { color: theme.colors.accent }]}>

@@ -171,7 +171,20 @@ class VeritySubscriptionsModule: NSObject {
 
     Task {
       do {
-        let products = try await Product.products(for: Set(ids))
+        var products = try await Product.products(for: Set(ids))
+        if products.isEmpty {
+          // Retry once after syncing with App Store in case product metadata just propagated.
+          try? await AppStore.sync()
+          products = try await Product.products(for: Set(ids))
+        }
+
+        guard !products.isEmpty else {
+          let bundleId = Bundle.main.bundleIdentifier ?? "unknown-bundle"
+          let message = "No App Store plans found for bundle \(bundleId) and product IDs: \(ids.joined(separator: ", "))"
+          rejecter("STOREKIT_PRODUCTS_EMPTY", message, nil)
+          return
+        }
+
         let indexMap = Dictionary(uniqueKeysWithValues: ids.enumerated().map { ($1, $0) })
         let payload = products
           .map { product in mapProduct(product) }

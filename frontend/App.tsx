@@ -14,6 +14,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Alert, AppState, Platform, StyleSheet, View } from 'react-native';
+import { ActivityIndicator } from 'react-native';
 import {
   SafeAreaProvider,
   initialWindowMetrics,
@@ -967,25 +968,94 @@ function AuthCallbackHandler() {
         if (Array.isArray(val)) return val[0];
         return undefined;
       };
-      const isReset = params.mode === 'reset' || params.source === 'password';
+
+      const urlObject = (() => {
+        try {
+          return new URL(url);
+        } catch {
+          return null;
+        }
+      })();
+      const queryParams = urlObject?.searchParams ?? new URLSearchParams();
+      const hashParams = new URLSearchParams(urlObject?.hash?.replace(/^#/, '') ?? '');
+      const readParam = (...keys: string[]) => {
+        for (const key of keys) {
+          const fromParsed = toStringParam((params as Record<string, string | string[] | undefined>)[key]);
+          if (fromParsed?.trim()) {
+            return fromParsed.trim();
+          }
+          const fromQuery = queryParams.get(key);
+          if (fromQuery?.trim()) {
+            return fromQuery.trim();
+          }
+          const fromHash = hashParams.get(key);
+          if (fromHash?.trim()) {
+            return fromHash.trim();
+          }
+        }
+        return undefined;
+      };
+
+      const mode = readParam('mode');
+      const source = readParam('source');
+      const isReset = mode === 'reset' || source === 'password';
       if (isReset) {
         console.log('Reset password flow detected');
         rootNavigationRef.current?.navigate('ResetPassword');
         return;
       }
-      
-      // Check if we have an auth code to exchange (PKCE flow)
-      const code = toStringParam(params.code);
-      const codeVerifier = toStringParam(params.code_verifier);
+
+      const code = readParam('code');
+      const codeVerifier = readParam('code_verifier');
+      const accessToken = readParam('access_token');
+      const refreshToken = readParam('refresh_token');
+      const tokenHash = readParam('token_hash');
+      const token = readParam('token');
+      const type = readParam('type');
+      const confirmedParam = readParam('confirmed');
+      const emailParam = readParam('email');
       
       console.log('=== PKCE EXTRACTION ===');
       console.log('code:', code ? `${code.substring(0, 20)}...` : 'MISSING');
       console.log('code_verifier:', codeVerifier ? `${codeVerifier.substring(0, 20)}...` : 'MISSING');
       console.log('code length:', code?.length ?? 0);
       console.log('verifier length:', codeVerifier?.length ?? 0);
-      
-      // Only attempt exchange if we have both code AND verifier (proper PKCE flow)
-      if (code && codeVerifier) {
+
+      let callbackSession: Awaited<ReturnType<typeof supabase.auth.getSession>>['data']['session'] | null = null;
+
+      if (accessToken && refreshToken) {
+        try {
+          const { data, error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) {
+            console.warn('setSession error in callback', error.message);
+          } else {
+            callbackSession = data.session ?? null;
+          }
+        } catch (error) {
+          console.warn('setSession exception in callback', error);
+        }
+      } else if (tokenHash && type) {
+        try {
+          const normalizedType = type.toLowerCase();
+          const allowedOtpTypes = new Set(['signup', 'email', 'email_change', 'recovery', 'invite']);
+          if (allowedOtpTypes.has(normalizedType)) {
+            const { data, error } = await supabase.auth.verifyOtp({
+              token_hash: tokenHash,
+              type: normalizedType as 'signup' | 'email' | 'email_change' | 'recovery' | 'invite',
+            });
+            if (error) {
+              console.warn('verifyOtp error in callback', error.message);
+            } else {
+              callbackSession = data.session ?? null;
+            }
+          }
+        } catch (error) {
+          console.warn('verifyOtp exception in callback', error);
+        }
+      } else if (code && codeVerifier) {
         try {
           console.log('=== ATTEMPTING CODE EXCHANGE ===');
           
@@ -1006,6 +1076,7 @@ function AuthCallbackHandler() {
             console.log('Has session:', !!data.session);
             console.log('User email:', data.session?.user?.email);
             console.log('Email confirmed:', !!data.session?.user?.email_confirmed_at);
+            callbackSession = data.session ?? null;
           }
         } catch (error) {
           console.error('=== EXCHANGE EXCEPTION ===');
@@ -1015,11 +1086,32 @@ function AuthCallbackHandler() {
         console.warn('=== SKIPPING EXCHANGE ===');
         console.warn('Missing required params - code:', !!code, 'verifier:', !!codeVerifier);
       }
-      
-      const isConfirmation = params.type === 'signup' || !!params.token || params.source === 'confirmation' || (code && codeVerifier);
+
+      if (!callbackSession) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          callbackSession = data.session ?? null;
+        } catch {
+          callbackSession = null;
+        }
+      }
+
+      const confirmedFlagFromParam =
+        confirmedParam === 'true' ||
+        confirmedParam === '1' ||
+        confirmedParam === 'yes';
+      const isConfirmation =
+        Boolean(callbackSession?.user?.email_confirmed_at) ||
+        type === 'signup' ||
+        type === 'email' ||
+        !!tokenHash ||
+        !!token ||
+        source === 'confirmation' ||
+        confirmedFlagFromParam ||
+        Boolean(code && codeVerifier);
       const payload: { confirmed?: boolean; email?: string } = {
         confirmed: !!isConfirmation,
-        email: toStringParam(params.email),
+        email: emailParam ?? callbackSession?.user?.email ?? undefined,
       };
       console.log('=== NAVIGATING ===');
       console.log('Payload:', payload);
@@ -1405,10 +1497,21 @@ function NavigationHost() {
   }, []);
 
   const waitingForSessionBootstrap =
-    readySessionKey !== sessionKey || resolvedSessionKey !== sessionKey;
+    readySessionKey !== sessionKey || (Boolean(session) && resolvedSessionKey !== sessionKey);
 
   if (waitingForSessionBootstrap) {
-    return <SplashScreen />;
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.colors.bg,
+        }}
+      >
+        <ActivityIndicator size="small" color={theme.colors.accent} />
+      </View>
+    );
   }
 
   const showSplashOverlay = splashVisible || !navigationReady;
@@ -1430,7 +1533,7 @@ function NavigationHost() {
       </NavigationContainer>
       {showSplashOverlay ? (
         <View style={StyleSheet.absoluteFill} pointerEvents="auto">
-          <SplashScreen />
+          <SplashScreen persistent={!navigationReady} />
         </View>
       ) : null}
     </View>
