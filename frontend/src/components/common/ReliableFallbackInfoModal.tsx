@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -19,15 +19,100 @@ export default function ReliableFallbackInfoModal({
   theme,
   mode,
 }: ReliableFallbackInfoModalProps) {
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const styles = useMemo(() => createStyles(theme, mode), [mode, theme]);
+  const [isMounted, setIsMounted] = useState(visible);
+  const backdropOpacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const cardOpacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
+  const cardTranslateY = useRef(new Animated.Value(visible ? 0 : 12)).current;
+  const cardScale = useRef(new Animated.Value(visible ? 1 : 0.98)).current;
+
+  useEffect(() => {
+    if (visible) {
+      setIsMounted(true);
+      Animated.parallel([
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 220,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardOpacity, {
+          toValue: 1,
+          duration: 210,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardTranslateY, {
+          toValue: 0,
+          duration: 210,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(cardScale, {
+          toValue: 1,
+          duration: 210,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 0,
+        duration: 170,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 0,
+        duration: 160,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardTranslateY, {
+        toValue: 10,
+        duration: 160,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardScale, {
+        toValue: 0.985,
+        duration: 160,
+        easing: Easing.in(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) {
+        setIsMounted(false);
+      }
+    });
+  }, [backdropOpacity, cardOpacity, cardScale, cardTranslateY, visible]);
+
+  if (!isMounted) {
+    return null;
+  }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible transparent animationType="none" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose}>
-          <BlurView intensity={65} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.blur} />
+        <Pressable style={styles.backdrop} onPress={onClose} disabled={!visible}>
+          <Animated.View style={[styles.backdropAnimatedLayer, { opacity: backdropOpacity }]}>
+            <BlurView intensity={65} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.blur} />
+            <View style={styles.scrim} />
+          </Animated.View>
         </Pressable>
-        <View style={styles.card}>
+        <Animated.View
+          style={[
+            styles.cardWrap,
+            {
+              opacity: cardOpacity,
+              transform: [{ translateY: cardTranslateY }, { scale: cardScale }],
+            },
+          ]}
+        >
+          <View style={styles.card}>
           <Text style={styles.title}>Reliable fallback number</Text>
           <Text style={styles.body}>
             Verity always tries your in-app call first. This number is only used as a last resort.
@@ -47,37 +132,53 @@ export default function ReliableFallbackInfoModal({
           <Pressable style={styles.button} onPress={onClose}>
             <Text style={styles.buttonText}>Got it</Text>
           </Pressable>
+          </View>
+        </Animated.View>
         </View>
-      </View>
     </Modal>
   );
 }
 
-const createStyles = (theme: AppTheme) =>
+const createStyles = (theme: AppTheme, mode?: 'light' | 'dark' | string) =>
   StyleSheet.create({
     overlay: {
       ...StyleSheet.absoluteFillObject,
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 28,
-      backgroundColor: withOpacity(theme.colors.text, 0.42),
     },
     backdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    backdropAnimatedLayer: {
       ...StyleSheet.absoluteFillObject,
     },
     blur: {
       ...StyleSheet.absoluteFillObject,
     },
-    card: {
+    scrim: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor:
+        mode === 'dark' ? withOpacity(theme.colors.bg, 0.54) : withOpacity(theme.colors.text, 0.22),
+    },
+    cardWrap: {
       width: '100%',
       maxWidth: 380,
+    },
+    card: {
+      width: '100%',
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
+      borderColor: withOpacity(theme.colors.border, 0.9),
+      backgroundColor: withOpacity(theme.colors.surface, 0.98),
       paddingHorizontal: 18,
       paddingVertical: 18,
       gap: 10,
+      shadowColor: '#000',
+      shadowOpacity: mode === 'dark' ? 0.35 : 0.16,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 12,
     },
     title: {
       fontSize: 18,

@@ -18,7 +18,7 @@ import {
   type PurchaseResult,
   type StoreProduct,
 } from '../native/Subscriptions';
-import { logError } from '../services/sentry';
+import { logError, logEvent } from '../services/sentry';
 
 const PRODUCT_IDS = ['verityprotect_monthly', 'verityprotect_annual'];
 
@@ -61,6 +61,7 @@ type SubscriptionContextValue = {
   isProcessingPurchase: boolean;
   hasResolvedStatus: boolean;
   statusError: string | null;
+  productsError: string | null;
   refreshStatus: (options?: { silent?: boolean }) => Promise<SubscriptionStatusSnapshot | null>;
   refreshProducts: () => Promise<StoreProduct[]>;
   purchase: (productId: string) => Promise<PurchaseActionResult>;
@@ -95,7 +96,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [isProcessingPurchase, setIsProcessingPurchase] = useState(false);
   const [hasResolvedStatus, setHasResolvedStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
+  const [productsError, setProductsError] = useState<string | null>(null);
   const lastStatusFetchAtRef = useRef(0);
+
+  const toErrorMessage = useCallback((err: unknown, fallback: string) => {
+    return err instanceof Error && err.message.trim().length > 0 ? err.message.trim() : fallback;
+  }, []);
 
   const refreshStatus = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -138,6 +144,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const refreshProducts = useCallback(async () => {
     if (!session) {
       setProducts([]);
+      setProductsError(null);
       return [];
     }
 
@@ -150,18 +157,29 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         return (aIndex < 0 ? 99 : aIndex) - (bIndex < 0 ? 99 : bIndex);
       });
       setProducts(sortedProducts);
+      setProductsError(null);
+      logEvent('membership_products_loaded', {
+        screen: 'SubscriptionContext',
+        extra: { count: sortedProducts.length },
+      });
       return sortedProducts;
     } catch (err) {
+      const message = toErrorMessage(err, 'Could not load App Store plans.');
       logError(err, {
         screen: 'SubscriptionContext',
-        extra: { reason: 'refresh_products_failed' },
+        extra: { reason: 'refresh_products_failed', message },
       });
+      logEvent('membership_products_load_failed', {
+        screen: 'SubscriptionContext',
+        extra: { message },
+      });
+      setProductsError(message);
       setProducts([]);
       return [];
     } finally {
       setIsLoadingProducts(false);
     }
-  }, [session]);
+  }, [session, toErrorMessage]);
 
   const verifyReceipt = useCallback(
     async (args: {
@@ -251,51 +269,95 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const purchase = useCallback(
     async (productId: string): Promise<PurchaseActionResult> => {
       setIsProcessingPurchase(true);
+      logEvent('membership_purchase_started', {
+        screen: 'SubscriptionContext',
+        extra: { productId },
+      });
       try {
         const nativeResult = await purchaseStoreProduct(productId);
-        return await mapPurchaseOutcome(nativeResult);
+        const mapped = await mapPurchaseOutcome(nativeResult);
+        logEvent('membership_purchase_result', {
+          screen: 'SubscriptionContext',
+          extra: {
+            productId,
+            status: mapped.status,
+            hasActiveSubscription: mapped.hasActiveSubscription,
+          },
+        });
+        return mapped;
       } catch (err) {
+        const message = toErrorMessage(err, 'Purchase failed. Try again.');
         logError(err, {
           screen: 'SubscriptionContext',
-          extra: { reason: 'purchase_failed', productId },
+          extra: { reason: 'purchase_failed', productId, message },
+        });
+        logEvent('membership_purchase_result', {
+          screen: 'SubscriptionContext',
+          extra: {
+            productId,
+            status: 'failed',
+            hasActiveSubscription: Boolean(status?.hasActiveSubscription),
+            message,
+          },
         });
         return {
           status: 'failed',
-          message: err instanceof Error ? err.message : 'Purchase failed. Try again.',
+          message,
           hasActiveSubscription: Boolean(status?.hasActiveSubscription),
         };
       } finally {
         setIsProcessingPurchase(false);
       }
     },
-    [mapPurchaseOutcome, status?.hasActiveSubscription]
+    [mapPurchaseOutcome, status?.hasActiveSubscription, toErrorMessage]
   );
 
   const restore = useCallback(async (): Promise<PurchaseActionResult> => {
     setIsProcessingPurchase(true);
+    logEvent('membership_restore_started', {
+      screen: 'SubscriptionContext',
+    });
     try {
       const nativeResult = await restoreStorePurchases();
-      return await mapPurchaseOutcome(nativeResult);
+      const mapped = await mapPurchaseOutcome(nativeResult);
+      logEvent('membership_restore_result', {
+        screen: 'SubscriptionContext',
+        extra: {
+          status: mapped.status,
+          hasActiveSubscription: mapped.hasActiveSubscription,
+        },
+      });
+      return mapped;
     } catch (err) {
+      const message = toErrorMessage(err, 'Restore failed. Try again.');
       logError(err, {
         screen: 'SubscriptionContext',
-        extra: { reason: 'restore_failed' },
+        extra: { reason: 'restore_failed', message },
+      });
+      logEvent('membership_restore_result', {
+        screen: 'SubscriptionContext',
+        extra: {
+          status: 'failed',
+          hasActiveSubscription: Boolean(status?.hasActiveSubscription),
+          message,
+        },
       });
       return {
         status: 'failed',
-        message: err instanceof Error ? err.message : 'Restore failed. Try again.',
+        message,
         hasActiveSubscription: Boolean(status?.hasActiveSubscription),
       };
     } finally {
       setIsProcessingPurchase(false);
     }
-  }, [mapPurchaseOutcome, status?.hasActiveSubscription]);
+  }, [mapPurchaseOutcome, status?.hasActiveSubscription, toErrorMessage]);
 
   useEffect(() => {
     if (!session) {
       setStatus(null);
       setProducts([]);
       setStatusError(null);
+      setProductsError(null);
       setHasResolvedStatus(true);
       setIsLoadingStatus(false);
       setIsLoadingProducts(false);
@@ -358,6 +420,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       isProcessingPurchase,
       hasResolvedStatus,
       statusError,
+      productsError,
       refreshStatus,
       refreshProducts,
       purchase,
@@ -372,6 +435,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       isProcessingPurchase,
       hasResolvedStatus,
       statusError,
+      productsError,
       refreshStatus,
       refreshProducts,
       purchase,

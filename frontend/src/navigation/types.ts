@@ -9,6 +9,7 @@ export type RootStackParamList = {
   OnboardingChoice: undefined;
   Membership: undefined;
   MembershipExperience: undefined;
+  WhyChooseVerity: undefined;
   OnboardingProfile: undefined;
   OnboardingPasscode: undefined;
   OnboardingTrustedContacts: undefined;
@@ -53,6 +54,7 @@ export type CallsStackParamList = {
 export type SettingsStackParamList = {
   Settings: { initialScreen?: 'Blocklist' } | undefined;
   Account: undefined;
+  MembershipBilling: undefined;
   Notifications: undefined;
   Security: undefined;
   ChangePasscode: undefined;

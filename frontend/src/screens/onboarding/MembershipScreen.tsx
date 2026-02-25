@@ -29,6 +29,14 @@ type PlanOption = {
   badge?: string;
 };
 
+type MembershipFeedback = {
+  kind: 'product_not_found' | 'network' | 'cancelled' | 'pending' | 'failed';
+  title: string;
+  detail: string;
+  tone: 'error' | 'info';
+  retryProducts?: boolean;
+};
+
 const fallbackPlans: PlanOption[] = [
   {
     productId: 'verityprotect_monthly',
@@ -71,6 +79,91 @@ function toPlanOption(product: {
   };
 }
 
+function isNetworkIssue(message: string) {
+  return /network|internet|offline|timed out|could not connect/i.test(message);
+}
+
+function isProductUnavailable(message: string) {
+  return /product not found|not available|not found/i.test(message);
+}
+
+function toPurchaseFeedback(result: { status: string; message?: string }): MembershipFeedback {
+  const normalizedMessage = (result.message ?? '').trim();
+
+  if (result.status === 'cancelled') {
+    return {
+      kind: 'cancelled',
+      title: 'Purchase canceled',
+      detail: 'No charge was made. Choose a plan whenever you are ready.',
+      tone: 'info',
+    };
+  }
+
+  if (result.status === 'pending') {
+    return {
+      kind: 'pending',
+      title: 'Purchase pending',
+      detail: 'Apple is still confirming this purchase. Membership activates automatically once approved.',
+      tone: 'info',
+    };
+  }
+
+  if (isProductUnavailable(normalizedMessage)) {
+    return {
+      kind: 'product_not_found',
+      title: 'Plan unavailable',
+      detail: 'This build could not find that App Store plan yet. Reload plans and try again.',
+      tone: 'error',
+      retryProducts: true,
+    };
+  }
+
+  if (isNetworkIssue(normalizedMessage)) {
+    return {
+      kind: 'network',
+      title: 'Network issue',
+      detail: 'Check your connection and try again.',
+      tone: 'error',
+    };
+  }
+
+  return {
+    kind: 'failed',
+    title: 'Could not complete purchase',
+    detail: normalizedMessage || 'Please try again.',
+    tone: 'error',
+  };
+}
+
+function toRestoreFeedback(result: { message?: string }): MembershipFeedback {
+  const normalizedMessage = (result.message ?? '').trim();
+
+  if (/no active subscription found/i.test(normalizedMessage)) {
+    return {
+      kind: 'pending',
+      title: 'No active membership found',
+      detail: 'No previous purchase is linked to this Apple account.',
+      tone: 'info',
+    };
+  }
+
+  if (isNetworkIssue(normalizedMessage)) {
+    return {
+      kind: 'network',
+      title: 'Network issue',
+      detail: 'Check your connection and try restore again.',
+      tone: 'error',
+    };
+  }
+
+  return {
+    kind: 'failed',
+    title: 'Could not restore purchase',
+    detail: normalizedMessage || 'Please try again.',
+    tone: 'error',
+  };
+}
+
 export default function MembershipScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'Membership'>>();
   const insets = useSafeAreaInsets();
@@ -84,6 +177,8 @@ export default function MembershipScreen() {
     isLoadingProducts,
     isProcessingPurchase,
     statusError,
+    productsError,
+    refreshProducts,
     purchase,
     restore,
   } = useSubscription();
@@ -96,12 +191,14 @@ export default function MembershipScreen() {
   }, [products]);
 
   const [selectedProductId, setSelectedProductId] = useState<string>(selectedDefaultProductId);
-  const [message, setMessage] = useState<string>('');
+  const [feedback, setFeedback] = useState<MembershipFeedback | null>(null);
   const [isBillingExpanded, setIsBillingExpanded] = useState(false);
   const [showPurchaseSuccess, setShowPurchaseSuccess] = useState(false);
   const purchaseSuccessScale = useRef(new Animated.Value(0.84)).current;
   const purchaseSuccessOpacity = useRef(new Animated.Value(0)).current;
+  const hasLoggedMembershipView = useRef(false);
   const showInviteCodeAction = status?.canJoinWithInviteCode !== false;
+  const plansUnavailable = !isLoadingProducts && products.length === 0;
 
   useEffect(() => {
     setSelectedProductId((prev) => {
@@ -112,6 +209,16 @@ export default function MembershipScreen() {
     });
   }, [planOptions, selectedDefaultProductId]);
 
+  useEffect(() => {
+    if (hasLoggedMembershipView.current) {
+      return;
+    }
+    hasLoggedMembershipView.current = true;
+    logEvent('membership_screen_viewed', {
+      screen: 'MembershipScreen',
+    });
+  }, []);
+
   const selectedPlan =
     planOptions.find((plan) => plan.productId === selectedProductId) ??
     planOptions[0] ??
@@ -120,7 +227,7 @@ export default function MembershipScreen() {
   const setPlan = (productId: string) => {
     void Haptics.selectionAsync().catch(() => null);
     setSelectedProductId(productId);
-    setMessage('');
+    setFeedback(null);
     logEvent('membership_plan_selected', {
       screen: 'MembershipScreen',
       extra: { productId },
@@ -163,7 +270,11 @@ export default function MembershipScreen() {
 
   const handlePurchase = async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => null);
-    setMessage('');
+    setFeedback(null);
+    logEvent('membership_continue_pressed', {
+      screen: 'MembershipScreen',
+      extra: { productId: selectedPlan.productId },
+    });
     const result = await purchase(selectedPlan.productId);
     if (result.status === 'purchased') {
       await runPurchaseSuccessAnimation();
@@ -173,17 +284,31 @@ export default function MembershipScreen() {
       });
       return;
     }
-    setMessage(result.message ?? 'Purchase did not complete.');
+    const nextFeedback = toPurchaseFeedback(result);
+    setFeedback(nextFeedback);
+    logEvent('membership_purchase_feedback_shown', {
+      screen: 'MembershipScreen',
+      extra: { kind: nextFeedback.kind, status: result.status },
+    });
   };
 
   const handleRestore = async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-    setMessage('');
+    setFeedback(null);
     const result = await restore();
     if (result.status === 'purchased') {
       return;
     }
-    setMessage(result.message ?? 'No active purchase found to restore.');
+    setFeedback(toRestoreFeedback(result));
+  };
+
+  const retryProducts = async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    setFeedback(null);
+    logEvent('membership_products_retry_tapped', {
+      screen: 'MembershipScreen',
+    });
+    await refreshProducts();
   };
 
   return (
@@ -191,7 +316,7 @@ export default function MembershipScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Math.max(insets.bottom, 20) + 120 },
+          { paddingBottom: Math.max(insets.bottom, 24) + 144 },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -206,6 +331,9 @@ export default function MembershipScreen() {
           style={styles.experienceCard}
           onPress={() => {
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+            logEvent('membership_experience_opened', {
+              screen: 'MembershipScreen',
+            });
             navigation.navigate('MembershipExperience');
           }}
         >
@@ -218,7 +346,33 @@ export default function MembershipScreen() {
               Walk through the full call-screening flow with an interactive demo.
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+          <View style={styles.experienceChevronWrap}>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+          </View>
+        </Pressable>
+
+        <Pressable
+          style={[styles.experienceCard, styles.whyChooseCard]}
+          onPress={() => {
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+            logEvent('membership_why_choose_opened', {
+              screen: 'MembershipScreen',
+            });
+            navigation.navigate('WhyChooseVerity');
+          }}
+        >
+          <View style={styles.experienceIconWrap}>
+            <Ionicons name="trending-up-outline" size={18} color={theme.colors.accent} />
+          </View>
+          <View style={styles.experienceTextWrap}>
+            <Text style={styles.experienceTitle}>Why choose Verity</Text>
+            <Text style={styles.experienceCopy}>
+              See real fraud trends, use cases, and how families and facilities use Verity.
+            </Text>
+          </View>
+          <View style={styles.experienceChevronWrap}>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+          </View>
         </Pressable>
 
         <View style={styles.planSection}>
@@ -262,6 +416,9 @@ export default function MembershipScreen() {
               style={styles.inlineButton}
               onPress={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+                logEvent('membership_invite_code_tapped', {
+                  screen: 'MembershipScreen',
+                });
                 navigation.navigate('OnboardingInviteCode');
               }}
               disabled={isProcessingPurchase}
@@ -314,8 +471,37 @@ export default function MembershipScreen() {
           </Pressable>
         </View>
 
-        {(statusError || message) ? (
-          <Text style={styles.errorText}>{message || statusError}</Text>
+        <Pressable
+          style={styles.supportQuickRow}
+          onPress={() => {
+            void Haptics.selectionAsync().catch(() => null);
+            navigation.navigate('SupportPortal');
+          }}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={15} color={theme.colors.accent} />
+          <Text style={styles.supportQuickText}>Need help now? Open support portal.</Text>
+          <Ionicons name="chevron-forward" size={14} color={theme.colors.textMuted} />
+        </Pressable>
+
+        {(statusError || feedback) ? (
+          <View
+            style={[
+              styles.feedbackCard,
+              feedback?.tone === 'info' ? styles.feedbackCardInfo : styles.feedbackCardError,
+            ]}
+          >
+            <Text style={styles.feedbackTitle}>
+              {feedback?.title ?? 'Could not load membership status'}
+            </Text>
+            <Text style={styles.feedbackText}>
+              {feedback?.detail ?? statusError ?? 'Please try again.'}
+            </Text>
+            {feedback?.retryProducts ? (
+              <Pressable style={styles.feedbackActionButton} onPress={retryProducts}>
+                <Text style={styles.feedbackActionText}>Reload plans</Text>
+              </Pressable>
+            ) : null}
+          </View>
         ) : null}
       </ScrollView>
 
@@ -323,14 +509,26 @@ export default function MembershipScreen() {
         style={[
           styles.footer,
           {
-            paddingBottom: Math.max(insets.bottom, 16),
+            paddingBottom: Math.max(insets.bottom, 20),
           },
         ]}
       >
+        {plansUnavailable ? (
+          <View style={styles.catalogErrorCard}>
+            <Text style={styles.catalogErrorTitle}>Could not load App Store plans</Text>
+            <Text style={styles.catalogErrorText}>
+              {productsError ?? 'Check your connection and load plans again.'}
+            </Text>
+            <Pressable style={styles.catalogErrorButton} onPress={retryProducts}>
+              <Text style={styles.catalogErrorButtonText}>Retry loading plans</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <Pressable
           style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
           onPress={handlePurchase}
-          disabled={isProcessingPurchase || isLoadingProducts}
+          disabled={isProcessingPurchase || isLoadingProducts || plansUnavailable}
         >
           {isProcessingPurchase || isLoadingProducts ? (
             <ActivityIndicator color="#FFFFFF" />
@@ -338,6 +536,9 @@ export default function MembershipScreen() {
             <Text style={styles.primaryButtonText}>Continue with App Store</Text>
           )}
         </Pressable>
+        <Text style={styles.trustStrip}>
+          Secure billing via Apple • Cancel anytime • 3-day grace period
+        </Text>
       </View>
 
       {showPurchaseSuccess ? (
@@ -371,12 +572,12 @@ const createMembershipStyles = (theme: AppTheme) =>
     },
     content: {
       paddingHorizontal: 24,
-      paddingTop: 22,
-      gap: 16,
+      paddingTop: 26,
+      gap: 18,
     },
     headerBlock: {
       gap: 8,
-      marginBottom: 4,
+      marginBottom: 6,
     },
     title: {
       fontSize: 34,
@@ -395,10 +596,15 @@ const createMembershipStyles = (theme: AppTheme) =>
       borderWidth: 1,
       borderColor: withOpacity(theme.colors.accent, 0.35),
       backgroundColor: withOpacity(theme.colors.accent, 0.08),
-      padding: 15,
+      paddingHorizontal: 15,
+      paddingVertical: 17,
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
+    },
+    whyChooseCard: {
+      backgroundColor: withOpacity(theme.colors.surfaceAlt, 0.8),
+      borderColor: theme.colors.border,
     },
     experienceIconWrap: {
       width: 36,
@@ -419,8 +625,19 @@ const createMembershipStyles = (theme: AppTheme) =>
     },
     experienceCopy: {
       fontSize: 13,
-      lineHeight: 18,
+      lineHeight: 19,
       color: theme.colors.textMuted,
+    },
+    experienceChevronWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.border, 0.9),
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginLeft: 2,
     },
     planSection: {
       gap: 10,
@@ -559,11 +776,63 @@ const createMembershipStyles = (theme: AppTheme) =>
       marginTop: 2,
       alignSelf: 'flex-start',
     },
-    errorText: {
-      marginTop: 4,
+    supportQuickRow: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, 0.3),
+      backgroundColor: withOpacity(theme.colors.accent, 0.09),
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    supportQuickText: {
+      flex: 1,
       fontSize: 13,
-      color: theme.colors.danger,
-      textAlign: 'center',
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    feedbackCard: {
+      marginTop: 4,
+      borderRadius: 16,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 11,
+      gap: 4,
+    },
+    feedbackCardError: {
+      borderColor: withOpacity(theme.colors.danger, 0.28),
+      backgroundColor: withOpacity(theme.colors.danger, 0.1),
+    },
+    feedbackCardInfo: {
+      borderColor: withOpacity(theme.colors.accent, 0.3),
+      backgroundColor: withOpacity(theme.colors.accent, 0.1),
+    },
+    feedbackTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    feedbackText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.colors.textMuted,
+    },
+    feedbackActionButton: {
+      marginTop: 3,
+      alignSelf: 'flex-start',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, 0.4),
+      backgroundColor: withOpacity(theme.colors.accent, 0.14),
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    feedbackActionText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.colors.accent,
     },
     footer: {
       position: 'absolute',
@@ -571,10 +840,45 @@ const createMembershipStyles = (theme: AppTheme) =>
       right: 0,
       bottom: 0,
       paddingHorizontal: 24,
-      paddingTop: 12,
+      paddingTop: 16,
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
-      backgroundColor: withOpacity(theme.colors.bg, 0.95),
+      backgroundColor: withOpacity(theme.colors.bg, 0.98),
+    },
+    catalogErrorCard: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.warning, 0.4),
+      backgroundColor: withOpacity(theme.colors.warning, 0.11),
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      gap: 4,
+      marginBottom: 10,
+    },
+    catalogErrorTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    catalogErrorText: {
+      fontSize: 12,
+      color: theme.colors.textMuted,
+      lineHeight: 17,
+    },
+    catalogErrorButton: {
+      marginTop: 3,
+      alignSelf: 'flex-start',
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, 0.4),
+      backgroundColor: withOpacity(theme.colors.accent, 0.15),
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    catalogErrorButtonText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.colors.accent,
     },
     primaryButton: {
       height: 58,
@@ -591,6 +895,13 @@ const createMembershipStyles = (theme: AppTheme) =>
       fontSize: 16,
       fontWeight: '700',
       color: '#FFFFFF',
+    },
+    trustStrip: {
+      marginTop: 9,
+      fontSize: 11.5,
+      lineHeight: 16,
+      textAlign: 'center',
+      color: theme.colors.textMuted,
     },
     purchaseSuccessOverlay: {
       position: 'absolute',

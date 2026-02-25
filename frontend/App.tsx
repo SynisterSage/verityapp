@@ -41,6 +41,7 @@ import ActiveCallScreen from './src/screens/dashboard/ActiveCallScreen';
 import CircleActivityScreen from './src/screens/dashboard/CircleActivityScreen';
 import AlertsScreen from './src/screens/dashboard/AlertsScreen';
 import SettingsScreen from './src/screens/settings/SettingsScreen';
+import MembershipBillingScreen from './src/screens/settings/MembershipBillingScreen';
 import SafePhrasesScreen from './src/screens/settings/SafePhrasesScreen';
 import BlocklistScreen from './src/screens/settings/BlocklistScreen';
 import DataPrivacyScreen from './src/screens/settings/DataPrivacyScreen';
@@ -73,6 +74,7 @@ import OnboardingInviteCodeScreen from './src/screens/onboarding/OnboardingInvit
 import OnboardingSuccessScreen from './src/screens/onboarding/OnboardingSuccessScreen';
 import MembershipScreen from './src/screens/onboarding/MembershipScreen';
 import MembershipExperienceScreen from './src/screens/onboarding/MembershipExperienceScreen';
+import WhyChooseVerityScreen from './src/screens/onboarding/WhyChooseVerityScreen';
 import {
   RootStackParamList,
   TabParamList,
@@ -523,6 +525,7 @@ function SettingsStackNavigator() {
       >
       <SettingsStack.Screen name="Settings" component={SettingsScreen} />
       <SettingsStack.Screen name="Account" component={AccountScreen} />
+      <SettingsStack.Screen name="MembershipBilling" component={MembershipBillingScreen} />
       <SettingsStack.Screen name="Notifications" component={NotificationsScreen} />
       <SettingsStack.Screen name="Security" component={SecurityScreen} />
       <SettingsStack.Screen name="ChangePasscode" component={ChangePasscodeScreen} />
@@ -767,6 +770,11 @@ function RootNavigator() {
             <RootStack.Screen
               name="MembershipExperience"
               component={MembershipExperienceScreen}
+              options={{ headerShown: false }}
+            />
+            <RootStack.Screen
+              name="WhyChooseVerity"
+              component={WhyChooseVerityScreen}
               options={{ headerShown: false }}
             />
             <RootStack.Screen

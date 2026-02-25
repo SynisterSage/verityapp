@@ -57,6 +57,12 @@ export default function SettingsScreen({
       icon: 'notifications-outline',
       onPress: () => navigation.navigate('Notifications'),
     });
+    rows.push({
+      label: 'Membership & Billing',
+      subtitle: 'Plan, restore, and App Store billing',
+      icon: 'card-outline',
+      onPress: () => navigation.navigate('MembershipBilling'),
+    });
     if (canManageProfile) {
       rows.push({
         label: 'Security',
