@@ -22,6 +22,11 @@ const PATHS = {
     _: '/auth',
     ResetPassword: '/reset-password',
   },
+  Subscriptions: {
+    _: '/subscriptions',
+    Status: '/status',
+    Verify: '/verify',
+  },
   Fraud: {
     _: '/fraud',
     SafePhrases: '/safe-phrases',

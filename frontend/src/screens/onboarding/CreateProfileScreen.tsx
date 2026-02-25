@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
+import { useSubscription } from '../../context/SubscriptionContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
@@ -64,6 +65,7 @@ const formatFullPhone = (phoneNumber: string) => {
 export default function CreateProfileScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const { activeProfile, setActiveProfile, setOnboardingComplete } = useProfile();
+  const { refreshStatus } = useSubscription();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -177,6 +179,15 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         setError(
           'Too many assignment attempts. Please wait an hour before trying again.'
         );
+      } else if (
+        errorMessage.includes('Active membership required') ||
+        errorMessage.includes('SUBSCRIPTION_REQUIRED')
+      ) {
+        const snapshot = await refreshStatus();
+        setError('Membership required to continue setup.');
+        if (!snapshot) {
+          setError('Membership status could not be verified. Please try again.');
+        }
       } else if (errorMessage.toLowerCase().includes('no available') || errorMessage.toLowerCase().includes('no numbers')) {
         setError(
           'No phone numbers available in the pool. Please contact Verity Support to add more numbers to your account.'

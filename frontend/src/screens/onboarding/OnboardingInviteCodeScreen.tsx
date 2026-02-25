@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useSubscription } from '../../context/SubscriptionContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
 import { RootStackParamList } from '../../navigation/types';
@@ -30,6 +31,7 @@ export default function OnboardingInviteCodeScreen() {
   const { theme } = useTheme();
   const styles = useMemo(() => createInviteCodeStyles(theme), [theme]);
   const { refreshProfiles, setOnboardingComplete } = useProfile();
+  const { refreshStatus } = useSubscription();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [message, setMessage] = useState('');
@@ -97,6 +99,7 @@ export default function OnboardingInviteCodeScreen() {
           lastName: lastName.trim(),
         }),
       });
+      await refreshStatus({ silent: true });
       await refreshProfiles();
       setOnboardingComplete(true);
       logEvent('invite_code_accepted', { screen: 'OnboardingInviteCode' });

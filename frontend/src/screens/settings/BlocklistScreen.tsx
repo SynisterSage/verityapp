@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
@@ -83,10 +84,12 @@ export default function BlocklistScreen() {
   const [trayContact, setTrayContact] = useState<BlockedCaller | null>(null);
   const [isTrayMounted, setIsTrayMounted] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
+  const profileId = activeProfile?.id ?? null;
 
   const trayAnim = useRef(new Animated.Value(0)).current;
   const trayDragY = useRef(new Animated.Value(0)).current;
   const shimmer = useRef(new Animated.Value(0.65)).current;
+  const fetchInFlightRef = useRef(false);
 
   const { theme } = useTheme();
   const styles = useMemo(() => createBlocklistStyles(theme), [theme]);
@@ -113,23 +116,42 @@ export default function BlocklistScreen() {
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `block-skel-${i}`), []);
 
   const fetchBlocked = useCallback(async () => {
-    if (!activeProfile) return;
+    if (!profileId || fetchInFlightRef.current) {
+      return;
+    }
+    fetchInFlightRef.current = true;
     setLoading(true);
-    setShowSkeleton(true);
     try {
-      const data = await authorizedFetch(`/fraud/blocked-callers?profileId=${activeProfile.id}`);
+      const data = await authorizedFetch(`/fraud/blocked-callers?profileId=${profileId}`);
       setBlockedList(data?.blocked_callers ?? []);
     } catch {
       setBlockedList([]);
     } finally {
+      fetchInFlightRef.current = false;
       setLoading(false);
-      setTimeout(() => setShowSkeleton(false), 200);
+      setShowSkeleton(false);
     }
-  }, [activeProfile]);
+  }, [profileId]);
 
   useEffect(() => {
+    if (!profileId) {
+      setBlockedList([]);
+      setShowSkeleton(false);
+      setLoading(false);
+      return;
+    }
+    setShowSkeleton(true);
     fetchBlocked();
-  }, [fetchBlocked]);
+  }, [profileId, fetchBlocked]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!profileId) {
+        return;
+      }
+      void fetchBlocked();
+    }, [profileId, fetchBlocked])
+  );
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -169,13 +191,13 @@ export default function BlocklistScreen() {
       setInputError('Enter a phone number.');
       return;
     }
-    if (!activeProfile) return;
+    if (!profileId) return;
     setIsAdding(true);
     try {
       await authorizedFetch('/fraud/blocked-callers', {
         method: 'POST',
         body: JSON.stringify({
-          profileId: activeProfile.id,
+          profileId,
           callerNumber: `+1${inputDigits}`,
           reason: 'manual',
         }),

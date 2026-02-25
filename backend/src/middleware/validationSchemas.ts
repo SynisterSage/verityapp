@@ -196,6 +196,16 @@ export const createSupportBugReportSchema = z
   })
   .strict();
 
+export const verifySubscriptionReceiptSchema = z
+  .object({
+    receiptData: z.string().min(20, 'receiptData is required'),
+    platform: z.literal('ios').optional(),
+    productId: z.string().min(1).max(128).optional(),
+    transactionId: z.string().min(1).max(128).optional(),
+    originalTransactionId: z.string().min(1).max(128).optional(),
+  })
+  .strict();
+
 // Type exports for use in controllers
 export type ResetPasswordRequest = z.infer<typeof resetPasswordSchema>;
 export type LegalAcceptanceRequest = z.infer<typeof legalAcceptanceSchema>;
@@ -217,3 +227,4 @@ export type RecordClientCallLifecycleRequest = z.infer<typeof recordClientCallLi
 export type AssignNumberRequest = z.infer<typeof assignNumberSchema>;
 export type CreateSupportMessageRequest = z.infer<typeof createSupportMessageSchema>;
 export type CreateSupportBugReportRequest = z.infer<typeof createSupportBugReportSchema>;
+export type VerifySubscriptionReceiptRequest = z.infer<typeof verifySubscriptionReceiptSchema>;

@@ -18,6 +18,7 @@ import { recordCircleAlert } from '@src/services/circleAlerts';
 import { sanitizeProfile, sanitizeProfiles, sanitizeErrorResponse } from '@src/middleware/dataSanitizer';
 import { releaseNumberFromProfile } from '@src/services/twilioNumberPool';
 import { deleteProfileRecordingPaths } from '@src/services/callRecordingStorage';
+import { hasActiveSubscription } from '@src/services/subscriptionAccess';
 
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];
@@ -248,6 +249,23 @@ async function createProfile(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  let activeSubscription = false;
+  try {
+    activeSubscription = await hasActiveSubscription(userId);
+  } catch (err) {
+    logger.err(err);
+    return res
+      .status(HTTP_STATUS_CODES.InternalServerError)
+      .json({ error: 'Failed to validate membership status' });
+  }
+
+  if (!activeSubscription) {
+    return res.status(HTTP_STATUS_CODES.PaymentRequired).json({
+      error: 'Active membership required to create a profile',
+      code: 'SUBSCRIPTION_REQUIRED',
+    });
   }
 
   const {

@@ -479,11 +479,12 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
             onPress={handleLookup}
             disabled={loading}
           >
-            {loading ? (
-              <Loader />
-            ) : (
-              <Text style={[styles.lookupButtonText, { color: '#fff' }]}>Lookup Providers</Text>
-            )}
+            <View style={styles.lookupButtonContent}>
+              {loading ? <Loader /> : null}
+              <Text style={[styles.lookupButtonText, { color: '#fff' }]}>
+                {loading ? 'Working…' : 'Lookup Providers'}
+              </Text>
+            </View>
           </Pressable>
           <View style={[styles.resultList, { borderColor: withOpacity(theme.colors.textMuted, 0.2) }]}>
             {results.length === 0 && !loading && hasSearched ? (
@@ -685,6 +686,12 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  lookupButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
   lookupButtonText: {
     color: '#fff',

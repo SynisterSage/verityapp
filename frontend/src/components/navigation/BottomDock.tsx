@@ -1,8 +1,16 @@
-import { Animated, View, TouchableOpacity, StyleSheet, Text, ViewStyle, Easing } from 'react-native';
+import {
+  Animated,
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  Text,
+  ViewStyle,
+} from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { TabActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../context/ThemeContext';
 import { useAlertContext } from '../../context/AlertContext';
@@ -54,102 +62,6 @@ export default function BottomDock({
   const labelColor = theme.colors.textMuted;
   const labelActiveColor = theme.colors.text;
   const { unhandledCount } = useAlertContext();
-  const bounceAnim = useRef(new Animated.Value(0)).current;
-  const bounceCycleRef = useRef<Animated.CompositeAnimation | null>(null);
-  const bounceSettleRef = useRef<Animated.CompositeAnimation | null>(null);
-  const isBounceRunningRef = useRef(false);
-
-  const isAlertsTabFocused = state.routes[state.index].name === 'AlertsTab';
-  const shouldAnimateBounce = unhandledCount > 0 && !isAlertsTabFocused;
-
-  const stopBounce = useCallback(
-    (smoothReset: boolean) => {
-      isBounceRunningRef.current = false;
-      if (bounceCycleRef.current) {
-        bounceCycleRef.current.stop();
-        bounceCycleRef.current = null;
-      }
-      if (bounceSettleRef.current) {
-        bounceSettleRef.current.stop();
-        bounceSettleRef.current = null;
-      }
-      if (smoothReset) {
-        bounceAnim.stopAnimation(() => {
-          const settle = Animated.timing(bounceAnim, {
-            toValue: 0,
-            duration: 140,
-            easing: Easing.out(Easing.quad),
-            useNativeDriver: true,
-          });
-          bounceSettleRef.current = settle;
-          settle.start(({ finished }) => {
-            if (finished) {
-              bounceSettleRef.current = null;
-            }
-          });
-        });
-      } else {
-        bounceAnim.setValue(0);
-      }
-    },
-    [bounceAnim]
-  );
-
-  const startBounce = useCallback(() => {
-    if (isBounceRunningRef.current) {
-      return;
-    }
-    isBounceRunningRef.current = true;
-    if (bounceSettleRef.current) {
-      bounceSettleRef.current.stop();
-      bounceSettleRef.current = null;
-    }
-
-    const runCycle = () => {
-      if (!isBounceRunningRef.current) {
-        return;
-      }
-      const cycle = Animated.sequence([
-        Animated.timing(bounceAnim, {
-          toValue: -6,
-          duration: 260,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bounceAnim, {
-          toValue: 0,
-          duration: 260,
-          easing: Easing.in(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.delay(350),
-      ]);
-      bounceCycleRef.current = cycle;
-      cycle.start(({ finished }) => {
-        bounceCycleRef.current = null;
-        if (finished && isBounceRunningRef.current) {
-          runCycle();
-        }
-      });
-    };
-
-    runCycle();
-  }, [bounceAnim]);
-
-  useEffect(() => {
-    if (shouldAnimateBounce) {
-      startBounce();
-      return;
-    }
-    stopBounce(true);
-  }, [shouldAnimateBounce, startBounce, stopBounce]);
-
-  useEffect(
-    () => () => {
-      stopBounce(false);
-    },
-    [stopBounce]
-  );
 
   return (
     <View
@@ -175,7 +87,7 @@ export default function BottomDock({
               canPreventDefault: true,
             });
             if (!focused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+              navigation.dispatch(TabActions.jumpTo(route.name));
             }
             requestAnimationFrame(() => {
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
@@ -188,11 +100,7 @@ export default function BottomDock({
           const iconName = focused ? active : inactive;
           const label = descriptors[route.key].options.title ?? route.name.replace(/Tab$/, '');
 
-          const bounceTransform = isAlertsRoute ? { translateY: bounceAnim } : undefined;
-          const iconTransforms = [
-            { scale: scaleValuesRef.current[index] },
-            ...(bounceTransform ? [bounceTransform] : []),
-          ];
+          const iconTransforms = [{ scale: scaleValuesRef.current[index] }];
           return (
             <TouchableOpacity
               key={route.key}

@@ -376,7 +376,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
   const waitingForProfile = Boolean(session) && !activeProfile;
-  const showSkeleton = waitingForProfile || (!hasInitialLoadCompleted && loading);
+  const showSkeleton = waitingForProfile || !hasInitialLoadCompleted;
   const statTiles: StatTile[] = [
     {
       key: 'alerts',

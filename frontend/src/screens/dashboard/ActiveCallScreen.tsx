@@ -87,6 +87,7 @@ export default function ActiveCallScreen() {
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [elapsedLabel, setElapsedLabel] = useState('0:00');
   const [trustedDisplayName, setTrustedDisplayName] = useState<string | null>(null);
+  const [identityLookupResolved, setIdentityLookupResolved] = useState(false);
   const [showIdentityFallback, setShowIdentityFallback] = useState(false);
   const [audioRouteLabel, setAudioRouteLabel] = useState('iPhone');
   const ringPulse = useRef(new Animated.Value(0)).current;
@@ -114,24 +115,30 @@ export default function ActiveCallScreen() {
       setConnectedAt(Date.now());
     }
   }, [status, connectedAt]);
-  const hasCallerIdentity = Boolean(trustedDisplayName || displayNumber);
+  const hasCallerIdentity = Boolean(trustedDisplayName || (identityLookupResolved && displayNumber));
   const showIdentitySkeleton = !hasCallerIdentity && !showIdentityFallback;
-  const callerTitle = trustedDisplayName || displayNumber || (showIdentityFallback ? 'Active Call' : '');
+  const callerTitle =
+    trustedDisplayName ||
+    (identityLookupResolved ? displayNumber : '') ||
+    (showIdentityFallback ? 'Active Call' : '');
   const callerSubtitle =
     trustedDisplayName && displayNumber ? displayNumber : showIdentityFallback ? 'Protected line' : '';
   const initials = useMemo(() => {
-    const source = callerTitle.trim() || 'TC';
+    const source = identityLookupResolved ? callerTitle.trim() || 'TC' : 'TC';
     const parts = source.split(/\s+/).slice(0, 2);
     return parts.map((item) => item.charAt(0).toUpperCase()).join('');
-  }, [callerTitle]);
+  }, [callerTitle, identityLookupResolved]);
 
   useEffect(() => {
+    setIdentityLookupResolved(false);
     setShowIdentityFallback(false);
     const timer = setTimeout(() => {
-      setShowIdentityFallback(true);
+      if (!fromNumber) {
+        setShowIdentityFallback(true);
+      }
     }, 1200);
     return () => clearTimeout(timer);
-  }, [callSid]);
+  }, [callSid, fromNumber]);
 
   useEffect(() => {
     if (!connectedAt) {
@@ -149,15 +156,23 @@ export default function ActiveCallScreen() {
     if (!profileId || !fromNumber) {
       console.log('[ActiveCallScreen] Skipping trusted lookup:', { profileId, fromNumber });
       setTrustedDisplayName(null);
+      setIdentityLookupResolved(Boolean(fromNumber));
       return;
     }
     let cancelled = false;
+    setIdentityLookupResolved(false);
     const normalizedIncoming = normalizePhone(fromNumber);
     console.log('[ActiveCallScreen] Looking up trusted contact:', { fromNumber, normalizedIncoming });
     if (!normalizedIncoming) {
       setTrustedDisplayName(null);
+      setIdentityLookupResolved(true);
       return;
     }
+    const lookupTimeout = setTimeout(() => {
+      if (!cancelled) {
+        setIdentityLookupResolved(true);
+      }
+    }, 1500);
     authorizedFetch(`/fraud/trusted-contacts?profileId=${profileId}`)
       .then((data) => {
         if (cancelled) return;
@@ -169,14 +184,17 @@ export default function ActiveCallScreen() {
         const name = matched?.contact_name?.trim();
         console.log('[ActiveCallScreen] Matched contact:', { name, matched: !!matched });
         setTrustedDisplayName(name ? name : null);
+        setIdentityLookupResolved(true);
       })
       .catch(() => {
         if (!cancelled) {
           setTrustedDisplayName(null);
+          setIdentityLookupResolved(true);
         }
       });
     return () => {
       cancelled = true;
+      clearTimeout(lookupTimeout);
     };
   }, [activeProfile?.id, fromNumber]);
 

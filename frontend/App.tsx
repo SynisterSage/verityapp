@@ -25,6 +25,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ProfileProvider, useProfile } from './src/context/ProfileContext';
+import { SubscriptionProvider, useSubscription } from './src/context/SubscriptionContext';
 import { AlertProvider } from './src/context/AlertContext';
 import { SupportProvider } from './src/context/SupportContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -70,6 +71,7 @@ import SplashScreen from './src/components/common/SplashScreen';
 import OnboardingChoiceScreen from './src/screens/onboarding/OnboardingChoiceScreen';
 import OnboardingInviteCodeScreen from './src/screens/onboarding/OnboardingInviteCodeScreen';
 import OnboardingSuccessScreen from './src/screens/onboarding/OnboardingSuccessScreen';
+import MembershipScreen from './src/screens/onboarding/MembershipScreen';
 import {
   RootStackParamList,
   TabParamList,
@@ -715,6 +717,7 @@ function AppTabs() {
       screenOptions={{
         headerShown: false,
         tabBarHideOnKeyboard: true,
+        animation: 'none',
       }}
       tabBar={(props) => (
         <BottomDock
@@ -745,11 +748,43 @@ function AppTabs() {
 function RootNavigator() {
   const { session } = useAuth();
   const { onboardingComplete, authInvalid } = useProfile();
+  const { status: subscriptionStatus } = useSubscription();
+  const shouldRequireMembership = Boolean(
+    subscriptionStatus?.requiresPaidMembership && !subscriptionStatus?.hasActiveSubscription
+  );
 
   return (
     <RootStack.Navigator>
       {session && !authInvalid ? (
-        !onboardingComplete ? (
+        shouldRequireMembership ? (
+          <>
+            <RootStack.Screen
+              name="Membership"
+              component={MembershipScreen}
+              options={{ headerShown: false }}
+            />
+            <RootStack.Screen
+              name="OnboardingInviteCode"
+              component={OnboardingInviteCodeScreen}
+              options={{ headerShown: false }}
+            />
+            <RootStack.Screen
+              name="SupportPortal"
+              component={SupportTicketsScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="SupportModal"
+              component={SupportScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="SupportResource"
+              component={SupportResourceScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+          </>
+        ) : !onboardingComplete ? (
           <>
             <RootStack.Screen
               name="OnboardingChoice"
@@ -1001,6 +1036,10 @@ function AuthCallbackHandler() {
 function NavigationHost() {
   const { mode, theme } = useTheme();
   const { session, isLoading } = useAuth();
+  const {
+    isLoadingStatus: subscriptionLoading,
+    hasResolvedStatus: hasResolvedSubscriptionStatus,
+  } = useSubscription();
   const {
     onboardingComplete,
     isLoading: profileLoading,
@@ -1325,11 +1364,14 @@ function NavigationHost() {
   }, [theme, mode]);
 
   const statusBarStyle = mode === 'light' ? 'dark' : 'light';
-  const isBusy = useMemo(() => isLoading || (session ? profileLoading : false), [
-    isLoading,
-    session,
-    profileLoading,
-  ]);
+  const isBusy = useMemo(
+    () =>
+      isLoading ||
+      (session
+        ? profileLoading || subscriptionLoading || !hasResolvedSubscriptionStatus
+        : false),
+    [isLoading, session, profileLoading, subscriptionLoading, hasResolvedSubscriptionStatus]
+  );
   const sessionKey = session?.user?.id ?? '__anon__';
   const [readySessionKey, setReadySessionKey] = useState<string | null>(null);
   const [splashVisible, setSplashVisible] = useState(true);
@@ -1351,24 +1393,33 @@ function NavigationHost() {
   const waitingForSessionBootstrap =
     readySessionKey !== sessionKey || resolvedSessionKey !== sessionKey;
 
-  if (waitingForSessionBootstrap || splashVisible) {
+  if (waitingForSessionBootstrap) {
     return <SplashScreen />;
   }
 
+  const showSplashOverlay = splashVisible || !navigationReady;
+
   return (
-    <NavigationContainer
-      theme={navTheme}
-      ref={rootNavigationRef}
-      onReady={() => {
-        setNavigationReady(true);
-        if (pendingNotificationRef.current) {
-          void resolvePendingNotification();
-        }
-      }}
-    >
-      <RootNavigator />
-      <StatusBar style={statusBarStyle} />
-    </NavigationContainer>
+    <View style={{ flex: 1 }}>
+      <NavigationContainer
+        theme={navTheme}
+        ref={rootNavigationRef}
+        onReady={() => {
+          setNavigationReady(true);
+          if (pendingNotificationRef.current) {
+            void resolvePendingNotification();
+          }
+        }}
+      >
+        <RootNavigator />
+        <StatusBar style={statusBarStyle} />
+      </NavigationContainer>
+      {showSplashOverlay ? (
+        <View style={StyleSheet.absoluteFill} pointerEvents="auto">
+          <SplashScreen />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -1402,16 +1453,18 @@ function AppContent() {
 
   return (
     <ProfileProvider>
-      <SupportProvider>
-        <InviteLinkHandler />
-        <TwilioVoiceClientManager />
-        <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
-          <GestureHandlerRootView style={{ flex: 1 }}>
-            <NavigationHost />
-            <AuthCallbackHandler />
-          </GestureHandlerRootView>
-        </SafeAreaProvider>
-      </SupportProvider>
+      <SubscriptionProvider>
+        <SupportProvider>
+          <InviteLinkHandler />
+          <TwilioVoiceClientManager />
+          <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
+            <GestureHandlerRootView style={{ flex: 1 }}>
+              <NavigationHost />
+              <AuthCallbackHandler />
+            </GestureHandlerRootView>
+          </SafeAreaProvider>
+        </SupportProvider>
+      </SubscriptionProvider>
     </ProfileProvider>
   );
 }

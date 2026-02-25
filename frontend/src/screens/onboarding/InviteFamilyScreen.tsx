@@ -51,6 +51,7 @@ type Invite = {
 
 const avatarColors = ['#4c7dff', '#6e60f8', '#00c2ff', '#47d6a5'];
 const APP_STORE_FALLBACK_URL = 'https://apps.apple.com/app/id6759526773';
+const INVITE_LINK_BASE_URL = 'https://verityprotect.com/invite';
 const ROLE_DISPLAY_NAMES: Record<MemberRole, string> = {
   editor: 'Family',
   admin: 'Caretaker',
@@ -155,13 +156,13 @@ export default function InviteFamilyScreen({ navigation }: Props) {
   const resolveInviteCode = (invite: Invite) => formatInviteCode(invite.short_code ?? invite.id ?? '');
   const buildInviteLink = (invite: Invite) => {
     const token = invite.short_code ? resolveInviteCode(invite) : resolveInviteToken(invite);
-    return `verityprotect://invite/${token}`;
+    return `${INVITE_LINK_BASE_URL}/${encodeURIComponent(token)}`;
   };
   const buildInviteMessage = (invite: Invite) => {
     const code = resolveInviteCode(invite);
-    return `You're invited to join my Verity Protect Circle.\n\nOpen this on your phone:\n${buildInviteLink(
+    return `You're invited to join my Verity Protect Circle.\n\nOpen this invite:\n${buildInviteLink(
       invite
-    )}\n\nIf you do not have the app yet, install it here:\n${APP_STORE_FALLBACK_URL}\n\nIf it does not open automatically, enter this code in the app:\n${code}`;
+    )}\n\nIf the app isn't installed, install it here:\n${APP_STORE_FALLBACK_URL}\n\nIf the invite doesn't open automatically, enter this code in the app:\n${code}`;
   };
 
   const buildSmsUrl = (message: string) => {
