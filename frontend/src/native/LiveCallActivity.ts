@@ -15,7 +15,7 @@ const VerityLiveActivityModule = NativeModules.VerityLiveActivityModule as
   | {
       startCallActivity: (payload: LiveCallPayload) => Promise<unknown>;
       updateCallActivity: (payload: LiveCallPayload) => Promise<unknown>;
-      endCallActivity: (payload: Partial<LiveCallPayload> & { callSid: string }) => Promise<unknown>;
+      endCallActivity: (payload: Partial<LiveCallPayload> & { callSid?: string }) => Promise<unknown>;
     }
   | undefined;
 
@@ -37,7 +37,7 @@ export async function updateLiveCallActivity(payload: LiveCallPayload) {
 }
 
 export async function endLiveCallActivity(
-  payload: Partial<LiveCallPayload> & { callSid: string }
+  payload: Partial<LiveCallPayload> & { callSid?: string }
 ) {
   if (Platform.OS !== 'ios') return;
   await ensureModule().endCallActivity(payload);

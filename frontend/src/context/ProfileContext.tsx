@@ -506,8 +506,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       markPlaceholderCallAnswered(callUUID);
     };
 
-    const handleCallEnded = (callUUID: string) => {
-      console.info('[VoIPPush] Call ended:', callUUID);
+    const handleCallEnded = (payload: { callUUID: string; callSid?: string; source?: string }) => {
+      console.info('[VoIPPush] Call ended:', payload.callUUID, {
+        callSid: payload.callSid ?? null,
+        source: payload.source ?? null,
+      });
       // The call state will be handled by TwilioVoiceManager
     };
 

@@ -2,7 +2,7 @@ import { Animated, View, TouchableOpacity, StyleSheet, Text, ViewStyle, Easing }
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../../context/ThemeContext';
 import { useAlertContext } from '../../context/AlertContext';
@@ -55,44 +55,101 @@ export default function BottomDock({
   const labelActiveColor = theme.colors.text;
   const { unhandledCount } = useAlertContext();
   const bounceAnim = useRef(new Animated.Value(0)).current;
-  const bounceLoopRef = useRef<Animated.CompositeAnimation | null>(null);
+  const bounceCycleRef = useRef<Animated.CompositeAnimation | null>(null);
+  const bounceSettleRef = useRef<Animated.CompositeAnimation | null>(null);
+  const isBounceRunningRef = useRef(false);
 
   const isAlertsTabFocused = state.routes[state.index].name === 'AlertsTab';
   const shouldAnimateBounce = unhandledCount > 0 && !isAlertsTabFocused;
 
-  useEffect(() => {
-    if (shouldAnimateBounce) {
-      if (!bounceLoopRef.current) {
-        const ySequence = Animated.sequence([
-          Animated.timing(bounceAnim, {
-            toValue: -6,
-            duration: 420,
+  const stopBounce = useCallback(
+    (smoothReset: boolean) => {
+      isBounceRunningRef.current = false;
+      if (bounceCycleRef.current) {
+        bounceCycleRef.current.stop();
+        bounceCycleRef.current = null;
+      }
+      if (bounceSettleRef.current) {
+        bounceSettleRef.current.stop();
+        bounceSettleRef.current = null;
+      }
+      if (smoothReset) {
+        bounceAnim.stopAnimation(() => {
+          const settle = Animated.timing(bounceAnim, {
+            toValue: 0,
+            duration: 140,
             easing: Easing.out(Easing.quad),
             useNativeDriver: true,
-          }),
-          Animated.timing(bounceAnim, {
-            toValue: 0,
-            duration: 420,
-            easing: Easing.in(Easing.quad),
-            useNativeDriver: true,
-          }),
-          Animated.delay(250),
-        ]);
-        bounceLoopRef.current = Animated.loop(ySequence, { resetBeforeIteration: true });
-        bounceLoopRef.current.start();
+          });
+          bounceSettleRef.current = settle;
+          settle.start(({ finished }) => {
+            if (finished) {
+              bounceSettleRef.current = null;
+            }
+          });
+        });
+      } else {
+        bounceAnim.setValue(0);
       }
-    } else if (bounceLoopRef.current) {
-      bounceLoopRef.current.stop();
-      bounceLoopRef.current = null;
-      bounceAnim.setValue(0);
+    },
+    [bounceAnim]
+  );
+
+  const startBounce = useCallback(() => {
+    if (isBounceRunningRef.current) {
+      return;
     }
-    return () => {
-      if (bounceLoopRef.current) {
-        bounceLoopRef.current.stop();
-        bounceLoopRef.current = null;
+    isBounceRunningRef.current = true;
+    if (bounceSettleRef.current) {
+      bounceSettleRef.current.stop();
+      bounceSettleRef.current = null;
+    }
+
+    const runCycle = () => {
+      if (!isBounceRunningRef.current) {
+        return;
       }
+      const cycle = Animated.sequence([
+        Animated.timing(bounceAnim, {
+          toValue: -6,
+          duration: 260,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(bounceAnim, {
+          toValue: 0,
+          duration: 260,
+          easing: Easing.in(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(350),
+      ]);
+      bounceCycleRef.current = cycle;
+      cycle.start(({ finished }) => {
+        bounceCycleRef.current = null;
+        if (finished && isBounceRunningRef.current) {
+          runCycle();
+        }
+      });
     };
-  }, [shouldAnimateBounce, bounceAnim]);
+
+    runCycle();
+  }, [bounceAnim]);
+
+  useEffect(() => {
+    if (shouldAnimateBounce) {
+      startBounce();
+      return;
+    }
+    stopBounce(true);
+  }, [shouldAnimateBounce, startBounce, stopBounce]);
+
+  useEffect(
+    () => () => {
+      stopBounce(false);
+    },
+    [stopBounce]
+  );
 
   return (
     <View
@@ -112,7 +169,6 @@ export default function BottomDock({
           const focused = state.index === index;
           const isAlertsRoute = route.name === 'AlertsTab';
           const onPress = () => {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             const event = navigation.emit({
               type: 'tabPress',
               target: route.key,
@@ -121,6 +177,9 @@ export default function BottomDock({
             if (!focused && !event.defaultPrevented) {
               navigation.navigate(route.name);
             }
+            requestAnimationFrame(() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+            });
           };
           const { active, inactive } = ICONS[route.name] ?? {
             active: 'ellipse',
@@ -140,6 +199,7 @@ export default function BottomDock({
               style={styles.tabButton}
               onPress={onPress}
               activeOpacity={0.75}
+              delayPressIn={0}
             >
               <View style={styles.tabContent}>
                 <Animated.View

@@ -44,6 +44,20 @@ type TwilioEventData = {
   callerName?: string;
 };
 
+type NativeCallEndedEvent = {
+  callUUID?: string;
+  callSid?: string;
+  source?: string;
+};
+
+function hasNativeCallPayload(value: unknown) {
+  if (!value) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === 'object') return Object.keys(value as Record<string, unknown>).length > 0;
+  return Boolean(value);
+}
+
 function parseTwilioEventData(data: unknown) {
   const payload = (data && typeof data === 'object' ? (data as TwilioEventData) : {}) as TwilioEventData;
   const callSid = payload.call_sid ?? payload.callSid;
@@ -58,6 +72,15 @@ function parseTwilioEventData(data: unknown) {
     callUuid: typeof callUuid === 'string' ? callUuid : undefined,
     callerName: typeof callerName === 'string' ? callerName : null,
   };
+}
+
+function parseNativeCallEndedEvent(data: unknown): NativeCallEndedEvent {
+  const payload =
+    data && typeof data === 'object' ? (data as Record<string, unknown>) : {};
+  const callUUID = typeof payload.callUUID === 'string' ? payload.callUUID : undefined;
+  const callSid = typeof payload.callSid === 'string' ? payload.callSid : undefined;
+  const source = typeof payload.source === 'string' ? payload.source : undefined;
+  return { callUUID, callSid, source };
 }
 
 function normalizePhoneDigits(value?: string | null) {
@@ -235,7 +258,8 @@ export default function TwilioVoiceClientManager() {
   }, [activeProfile?.id]);
 
   const clearActiveCall = (callSid?: string | null) => {
-    const targetCallSid = callSid ?? activeCallSidRef.current;
+    const currentActiveCallSid = activeCallSidRef.current;
+    const targetCallSid = callSid ?? currentActiveCallSid;
     if (targetCallSid) {
       connectedAtByCallSidRef.current.delete(targetCallSid);
       clearIncomingCallMetadata(targetCallSid);
@@ -258,8 +282,29 @@ export default function TwilioVoiceClientManager() {
           livePayloadArgsByCallSidRef.current.delete(targetCallSid);
         });
     }
-    activeCallSidRef.current = null;
-    dismissActiveCall();
+    const shouldDismiss = !targetCallSid || currentActiveCallSid === targetCallSid;
+    if (shouldDismiss) {
+      activeCallSidRef.current = null;
+      dismissActiveCall();
+    }
+  };
+
+  const getNativeCallSnapshot = async () => {
+    const [activeCallResult, inviteResult] = await Promise.allSettled([
+      TwilioVoice.getActiveCall(),
+      TwilioVoice.getCallInvite(),
+    ]);
+    const activeCall = activeCallResult.status === 'fulfilled' ? activeCallResult.value : null;
+    const invite = inviteResult.status === 'fulfilled' ? inviteResult.value : null;
+
+    return {
+      snapshotReliable:
+        activeCallResult.status === 'fulfilled' && inviteResult.status === 'fulfilled',
+      hasActiveCall: hasNativeCallPayload(activeCall),
+      hasPendingInvite: hasNativeCallPayload(invite),
+      activeCall,
+      invite,
+    };
   };
 
   const refreshSessionIfNeeded = (reason: string) => {
@@ -277,7 +322,8 @@ export default function TwilioVoiceClientManager() {
   const reportLifecycle = (
     state: TwilioClientCallLifecycleState,
     eventData: unknown,
-    fallbackCallSid?: string | null
+    fallbackCallSid?: string | null,
+    metadata: Record<string, unknown> = {}
   ) => {
     const profileId = activeProfile?.id;
     if (!profileId) return;
@@ -299,7 +345,7 @@ export default function TwilioVoiceClientManager() {
       toNumber: parsed.toNumber,
       toClientIdentity: twilioClientIdentity ?? null,
       eventAt: new Date().toISOString(),
-      metadata: {},
+      metadata,
     };
 
     recordTwilioClientCallLifecycle(profileId, payload).catch((err) => {
@@ -315,7 +361,7 @@ export default function TwilioVoiceClientManager() {
     const profileId = activeProfile?.id;
     if (!profileId) return;
     fetchTwilioClientActiveCall(profileId)
-      .then((result) => {
+      .then(async (result) => {
         const session = result?.session;
         if (!session) {
           clearActiveCall();
@@ -328,6 +374,53 @@ export default function TwilioVoiceClientManager() {
           console.info('[twilio-voice] Skipping hydrate for non-active call state:', session.state);
           clearActiveCall();
           return;
+        }
+
+        const canVerifyNativeCallState =
+          isTwilioClientReady && Boolean(twilioClientToken) && Boolean(twilioClientIdentity);
+        if (canVerifyNativeCallState) {
+          const nativeSnapshot = await getNativeCallSnapshot();
+          if (!nativeSnapshot.snapshotReliable) {
+            console.info('[twilio-voice] hydrate_skip_native_verify_snapshot_unreliable', {
+              callSid: session.call_sid,
+              state: session.state,
+            });
+          } else if (!nativeSnapshot.hasActiveCall && !nativeSnapshot.hasPendingInvite) {
+            console.info('[twilio-voice] hydrate_backend_active_native_inactive', {
+              callSid: session.call_sid,
+              state: session.state,
+            });
+            reportLifecycle(
+              'ended',
+              {
+                call_sid: session.call_sid,
+                call_from: session.from_number,
+                call_to: session.to_number,
+              },
+              session.call_sid,
+              {
+                reason: 'stale_hydrate_cleanup',
+                source: 'app_active_hydrate',
+                backendState: session.state,
+              }
+            );
+            clearActiveCall(session.call_sid);
+            return;
+          }
+
+          if (nativeSnapshot.snapshotReliable) {
+            console.info('[twilio-voice] hydrate_confirmed_active', {
+              callSid: session.call_sid,
+              state: session.state,
+              hasNativeActiveCall: nativeSnapshot.hasActiveCall,
+              hasPendingInvite: nativeSnapshot.hasPendingInvite,
+            });
+          }
+        } else {
+          console.info('[twilio-voice] hydrate_skipped_native_verify_client_not_ready', {
+            callSid: session.call_sid,
+            state: session.state,
+          });
         }
 
         activeCallSidRef.current = session.call_sid;
@@ -366,6 +459,49 @@ export default function TwilioVoiceClientManager() {
           message: err instanceof Error ? err.message : String(err),
         });
       });
+  };
+
+  const reconcileLiveActivityState = async (reason: string) => {
+    try {
+      const nativeSnapshot = await getNativeCallSnapshot();
+      if (!nativeSnapshot.snapshotReliable) {
+        console.info('[twilio-voice] reconcile_skip_snapshot_unreliable', { reason });
+        return;
+      }
+
+      if (nativeSnapshot.hasActiveCall || nativeSnapshot.hasPendingInvite) {
+        return;
+      }
+
+      const activeCallSid = activeCallSidRef.current;
+      if (activeCallSid) {
+        reportLifecycle(
+          'ended',
+          { call_sid: activeCallSid },
+          activeCallSid,
+          {
+            reason: 'native_no_active_call',
+            source: reason,
+          }
+        );
+        clearActiveCall(activeCallSid);
+        return;
+      }
+
+      await endLiveCallActivity({
+        status: 'Ended',
+        label: 'Protected Call',
+        callerName: 'Incoming Call',
+        isTrusted: false,
+        connectedAtEpochSeconds: null,
+      });
+      livePayloadArgsByCallSidRef.current.clear();
+    } catch (error) {
+      console.warn('[twilio-voice] live activity reconcile failed', {
+        reason,
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
   };
 
   useEffect(() => {
@@ -698,6 +834,55 @@ export default function TwilioVoiceClientManager() {
   }, [activeProfile?.id, refreshTwilioClientSession, twilioClientIdentity]);
 
   useEffect(() => {
+    if (Platform.OS !== 'ios' || !VoIPPushModule) {
+      return;
+    }
+    const voipEmitter = new NativeEventEmitter(VoIPPushModule);
+    const subscription = voipEmitter.addListener('callEnded', (event: unknown) => {
+      const parsed = parseNativeCallEndedEvent(event);
+      if (parsed.source === 'placeholder_handoff') {
+        return;
+      }
+      const callSid = parsed.callSid ?? activeCallSidRef.current;
+      if (!callSid) {
+        endLiveCallActivity({
+          status: 'Ended',
+          label: 'Protected Call',
+          callerName: 'Incoming Call',
+          isTrusted: false,
+          connectedAtEpochSeconds: null,
+        })
+          .then(() => {
+            livePayloadArgsByCallSidRef.current.clear();
+          })
+          .catch((err) => {
+            console.warn('[twilio-voice] failed ending live activity from native callEnded', {
+              message: err instanceof Error ? err.message : String(err),
+            });
+          });
+        return;
+      }
+      reportLifecycle(
+        'ended',
+        {
+          call_sid: callSid,
+          call_uuid: parsed.callUUID,
+        },
+        callSid,
+        {
+          reason: 'callkit_end',
+          source: parsed.source ?? 'callkit',
+        }
+      );
+      clearActiveCall(callSid);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [activeProfile?.id, twilioClientIdentity]);
+
+  useEffect(() => {
     const listener = AppState.addEventListener('change', (nextState: string) => {
       if (nextState === 'active') {
         // Skip hydration on initial app launch
@@ -707,7 +892,9 @@ export default function TwilioVoiceClientManager() {
           return;
         }
         refreshSessionIfNeeded('app_active');
-        hydrateActiveCall();
+        void reconcileLiveActivityState('app_active').finally(() => {
+          hydrateActiveCall();
+        });
       }
     });
     return () => listener.remove();

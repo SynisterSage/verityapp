@@ -36,4 +36,6 @@ export interface VoIPTokenUpdate {
 export interface VoIPCallActionEvent {
   type: 'callAnswered' | 'callEnded';
   callUUID: string;
+  callSid?: string;
+  source?: string;
 }

@@ -10,11 +10,17 @@ let pushListener: any = null;
 let answerListener: any = null;
 let endListener: any = null;
 
+export interface VoIPCallEndedPayload {
+  callUUID: string;
+  callSid?: string;
+  source?: string;
+}
+
 export interface VoIPCallHandlers {
   onTokenUpdate: (token: string) => void;
   onIncomingCall: (payload: VoIPPushPayload) => void;
   onCallAnswered?: (callUUID: string) => void;
-  onCallEnded?: (callUUID: string) => void;
+  onCallEnded?: (payload: VoIPCallEndedPayload) => void;
 }
 
 /**
@@ -64,10 +70,20 @@ export function initializeVoIPPush(handlers: VoIPCallHandlers): () => void {
   // Listen for call ended via CallKit
   endListener = voipEventEmitter.addListener(
     'callEnded',
-    (data: { callUUID: string }) => {
-      console.info('[VoIPPush] Call ended via CallKit:', data.callUUID);
+    (data: { callUUID?: string; callSid?: string; source?: string }) => {
+      if (!data?.callUUID) {
+        return;
+      }
+      console.info('[VoIPPush] Call ended via CallKit:', data.callUUID, {
+        callSid: data.callSid ?? null,
+        source: data.source ?? null,
+      });
       if (handlers.onCallEnded) {
-        handlers.onCallEnded(data.callUUID);
+        handlers.onCallEnded({
+          callUUID: data.callUUID,
+          callSid: data.callSid,
+          source: data.source,
+        });
       }
     }
   );
@@ -120,7 +136,11 @@ export function initializeVoIPPush(handlers: VoIPCallHandlers): () => void {
           }
           if (action.type === 'callEnded') {
             console.info('[VoIPPush] Recovered pending CallKit end action');
-            handlers.onCallEnded?.(action.callUUID);
+            handlers.onCallEnded?.({
+              callUUID: action.callUUID,
+              callSid: action.callSid,
+              source: action.source,
+            });
           }
         });
       })

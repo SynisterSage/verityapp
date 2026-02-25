@@ -14,6 +14,8 @@ class VoIPPushModule: RCTEventEmitter {
   private var latestVoIPToken: String?
   private var lastVoIPPushPayload: [String: Any]?
   private var pendingCallActions: [[String: String]] = []
+  private var callSidByUUID: [UUID: String] = [:]
+  private var internalEndSourceByUUID: [UUID: String] = [:]
   private var hasJsListeners = false
   private var nativeAutoAnswerDeadline: Date?
   private var nativeAutoAnswerExcludedCallUUID: UUID?
@@ -77,7 +79,10 @@ class VoIPPushModule: RCTEventEmitter {
     }
   }
 
-  private func requestEndCall(_ callUUID: UUID) {
+  private func requestEndCall(_ callUUID: UUID, source: String? = nil) {
+    if let source, !source.isEmpty {
+      internalEndSourceByUUID[callUUID] = source
+    }
     let endCallAction = CXEndCallAction(call: callUUID)
     let transaction = CXTransaction(action: endCallAction)
     callKitCallController.request(transaction) { error in
@@ -114,7 +119,7 @@ class VoIPPushModule: RCTEventEmitter {
       stopNativeAutoAnswer()
       if let placeholderUUID {
         print("[VoIPPush] Ending stale placeholder call after auto-answer timeout")
-        requestEndCall(placeholderUUID)
+        requestEndCall(placeholderUUID, source: "auto_answer_timeout")
       }
       return
     }
@@ -130,7 +135,7 @@ class VoIPPushModule: RCTEventEmitter {
         print("[VoIPPush] Native auto-answer succeeded for call \(targetCall.uuid.uuidString)")
         self.stopNativeAutoAnswer()
         if let placeholderUUID {
-          self.requestEndCall(placeholderUUID)
+          self.requestEndCall(placeholderUUID, source: "placeholder_handoff")
         }
         return
       }
@@ -286,6 +291,10 @@ class VoIPPushModule: RCTEventEmitter {
                           resolver: @escaping RCTPromiseResolveBlock,
                           rejecter: @escaping RCTPromiseRejectBlock) {
     let uuid = UUID(uuidString: callUUID) ?? UUID()
+    let normalizedCallSid = callSid.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !normalizedCallSid.isEmpty {
+      callSidByUUID[uuid] = normalizedCallSid
+    }
     let handle = CXHandle(type: .phoneNumber, value: fromNumber)
 
     let update = CXCallUpdate()
@@ -393,6 +402,10 @@ extension VoIPPushModule: PKPushRegistryDelegate {
     // REQUIRED: iOS 13+ must report to CallKit immediately or future VoIP pushes are blocked
     // Create placeholder CallKit call, will be ended when Twilio's real call arrives
     let uuid = UUID(uuidString: callUUID) ?? UUID()
+    let normalizedCallSid = callSid.trimmingCharacters(in: .whitespacesAndNewlines)
+    if !normalizedCallSid.isEmpty {
+      callSidByUUID[uuid] = normalizedCallSid
+    }
     let handle = CXHandle(type: .phoneNumber, value: fromNumber)
     let callUpdate = CXCallUpdate()
     callUpdate.remoteHandle = handle
@@ -443,27 +456,37 @@ extension VoIPPushModule: CXProviderDelegate {
   func providerDidReset(_ provider: CXProvider) {
     print("[VoIPPush] Provider reset")
     stopNativeAutoAnswer()
+    callSidByUUID.removeAll()
+    internalEndSourceByUUID.removeAll()
+    latestPlaceholderCallUUID = nil
   }
 
   func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
     print("[VoIPPush] User answered call")
 
-    let payload = [
+    var payload = [
       "callUUID": action.callUUID.uuidString
     ]
+    if let callSid = callSidByUUID[action.callUUID], !callSid.isEmpty {
+      payload["callSid"] = callSid
+    }
     if hasJsListeners {
       sendEvent(withName: "callAnswered", body: payload)
     } else {
-      pendingCallActions.append([
+      var pendingPayload = [
         "type": "callAnswered",
         "callUUID": action.callUUID.uuidString
-      ])
+      ]
+      if let callSid = callSidByUUID[action.callUUID], !callSid.isEmpty {
+        pendingPayload["callSid"] = callSid
+      }
+      pendingCallActions.append(pendingPayload)
     }
 
     let isPlaceholderCall = (action.callUUID == latestPlaceholderCallUUID)
     if isPlaceholderCall {
       print("[VoIPPush] Answered placeholder call; ending placeholder to avoid busy client leg")
-      requestEndCall(action.callUUID)
+      requestEndCall(action.callUUID, source: "placeholder_handoff")
       // Keep watching for the real Twilio invite and answer it as soon as it appears.
       startNativeAutoAnswer(excluding: action.callUUID)
     } else {
@@ -478,20 +501,36 @@ extension VoIPPushModule: CXProviderDelegate {
     if action.callUUID == nativeAutoAnswerExcludedCallUUID {
       stopNativeAutoAnswer()
     }
+    let endSource = internalEndSourceByUUID.removeValue(forKey: action.callUUID) ?? "callkit_user_end"
+    let callSid = callSidByUUID.removeValue(forKey: action.callUUID)
     if action.callUUID == latestPlaceholderCallUUID {
       latestPlaceholderCallUUID = nil
     }
+    if endSource == "placeholder_handoff" {
+      print("[VoIPPush] Ignoring placeholder handoff end event")
+      action.fulfill()
+      return
+    }
 
-    let payload = [
-      "callUUID": action.callUUID.uuidString
+    var payload = [
+      "callUUID": action.callUUID.uuidString,
+      "source": endSource
     ]
+    if let callSid, !callSid.isEmpty {
+      payload["callSid"] = callSid
+    }
     if hasJsListeners {
       sendEvent(withName: "callEnded", body: payload)
     } else {
-      pendingCallActions.append([
+      var pendingPayload = [
         "type": "callEnded",
-        "callUUID": action.callUUID.uuidString
-      ])
+        "callUUID": action.callUUID.uuidString,
+        "source": endSource
+      ]
+      if let callSid, !callSid.isEmpty {
+        pendingPayload["callSid"] = callSid
+      }
+      pendingCallActions.append(pendingPayload)
     }
 
     action.fulfill()
