@@ -37,6 +37,7 @@ export default function OnboardingInviteCodeScreen() {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [code, setCode] = useState('');
+  const [footerHeight, setFooterHeight] = useState(188);
   const firstNameRef = useRef<TextInput | null>(null);
   const lastNameRef = useRef<TextInput | null>(null);
   const codeInputRef = useRef<TextInput | null>(null);
@@ -126,7 +127,7 @@ export default function OnboardingInviteCodeScreen() {
               {
                 paddingTop: 28,
                 flexGrow: 1,
-                paddingBottom: Math.max(insets.bottom, 32) + 260,
+                paddingBottom: footerHeight + 24,
               },
             ]}
             showsVerticalScrollIndicator={false}
@@ -205,6 +206,10 @@ export default function OnboardingInviteCodeScreen() {
           onPrimaryPress={acceptCode}
           primaryLoading={isSubmitting}
           primaryDisabled={!areNamesEntered || !isCodeComplete || isSubmitting}
+          onLayout={(event) => {
+            const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+            setFooterHeight((prev) => (Math.abs(prev - nextHeight) > 1 ? nextHeight : prev));
+          }}
         />
       </SafeAreaView>
     </View>

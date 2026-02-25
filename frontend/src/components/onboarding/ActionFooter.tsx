@@ -1,5 +1,13 @@
 import React, { ReactNode } from 'react';
-import { StyleSheet, Text, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
+import {
+  type LayoutChangeEvent,
+  StyleSheet,
+  Text,
+  TextStyle,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../context/ThemeContext';
@@ -31,6 +39,7 @@ type ActionFooterProps = {
   helperActionLabel?: string;
   onHelperPress?: () => void;
   style?: ViewStyle;
+  onLayout?: (event: LayoutChangeEvent) => void;
 };
 
 export default function ActionFooter({
@@ -60,6 +69,7 @@ export default function ActionFooter({
   helperActionLabel,
   onHelperPress,
   style,
+  onLayout,
 }: ActionFooterProps) {
   const { theme } = useTheme();
   const colors = theme.colors as { surfaceAlt?: string; surface: string; border: string };
@@ -78,6 +88,7 @@ export default function ActionFooter({
         theme.shadows.card,
         style,
       ]}
+      onLayout={onLayout}
     >
       {primaryLabel ? (
         <TouchableOpacity

@@ -56,6 +56,30 @@ const useCases = [
   },
 ] as const;
 
+const comparisonPoints = [
+  {
+    icon: 'shield-outline' as const,
+    title: 'More than just block or silence',
+    copy: 'iPhone call screening can reduce spam, but Verity also adds family review, trusted routing, and shared alerts.',
+  },
+  {
+    icon: 'people-circle-outline' as const,
+    title: 'Shared visibility for families',
+    copy: 'Other tools protect one phone. Verity lets caregivers and family members see what happened and respond together.',
+  },
+  {
+    icon: 'document-text-outline' as const,
+    title: 'Actionable call context',
+    copy: 'Instead of a missed call only, Verity provides transcript snippets and risk markers so people can make safer decisions.',
+  },
+] as const;
+
+const caregiverPoints = [
+  'Know when a risky call was blocked without asking your parent to explain every detail.',
+  'Review suspicious calls quickly and decide together what to do next.',
+  'Keep independence in place while adding backup for high-pressure scam moments.',
+] as const;
+
 const socialLinks = [
   { label: 'Website', url: 'https://www.verityprotect.com/' },
   { label: 'X', url: 'https://x.com/VerityProtect' },
@@ -111,7 +135,7 @@ export default function WhyChooseVerityScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.screen} edges={[]}>
       <View style={styles.headerRow}>
         <Pressable
           style={styles.backButton}
@@ -129,7 +153,7 @@ export default function WhyChooseVerityScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Math.max(insets.bottom, 24) + 36 },
+          { paddingBottom: Math.max(insets.bottom, 24) + 32 },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -182,6 +206,35 @@ export default function WhyChooseVerityScreen() {
                   <Text style={styles.useCaseTitle}>{item.title}</Text>
                   <Text style={styles.useCaseCopy}>{item.copy}</Text>
                 </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.sectionWrap}>
+          <Text style={styles.sectionTitle}>How Verity is different</Text>
+          <View style={styles.useCasesWrap}>
+            {comparisonPoints.map((item) => (
+              <View key={item.title} style={styles.useCaseCard}>
+                <View style={styles.useCaseIconWrap}>
+                  <Ionicons name={item.icon} size={16} color={theme.colors.accent} />
+                </View>
+                <View style={styles.useCaseTextWrap}>
+                  <Text style={styles.useCaseTitle}>{item.title}</Text>
+                  <Text style={styles.useCaseCopy}>{item.copy}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.sectionWrap}>
+          <Text style={styles.sectionTitle}>Built for adult children and caregivers</Text>
+          <View style={styles.caregiverCard}>
+            {caregiverPoints.map((point) => (
+              <View key={point} style={styles.caregiverRow}>
+                <Ionicons name="checkmark-circle" size={15} color={theme.colors.accent} />
+                <Text style={styles.caregiverPoint}>{point}</Text>
               </View>
             ))}
           </View>
@@ -433,11 +486,31 @@ const createStyles = (theme: AppTheme) =>
       lineHeight: 18,
       color: theme.colors.textMuted,
     },
+    caregiverCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      padding: 12,
+      gap: 10,
+    },
+    caregiverRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+    },
+    caregiverPoint: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.colors.text,
+      fontWeight: '600',
+    },
     supportCard: {
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: withOpacity(theme.colors.success, 0.35),
-      backgroundColor: withOpacity(theme.colors.success, 0.1),
+      borderColor: withOpacity(theme.colors.accent, 0.35),
+      backgroundColor: withOpacity(theme.colors.accent, 0.1),
       padding: 13,
       gap: 8,
     },

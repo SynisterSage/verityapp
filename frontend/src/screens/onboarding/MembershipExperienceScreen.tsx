@@ -248,8 +248,8 @@ export default function MembershipExperienceScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <View style={styles.headerRow}>
+    <SafeAreaView style={styles.screen} edges={['bottom']}>
+      <View style={[styles.headerRow, { paddingTop: Math.max(insets.top, 14) }]}>
         <Pressable
           style={styles.backButton}
           onPress={() => {
@@ -264,7 +264,7 @@ export default function MembershipExperienceScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 24) + 40 }]}
+        contentContainerStyle={[styles.content, { paddingBottom: Math.max(insets.bottom, 24) + 32 }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.introWrap}>
@@ -288,7 +288,6 @@ export default function MembershipExperienceScreen() {
               style={styles.video}
               resizeMode={ResizeMode.COVER}
               isMuted={videoIsMuted}
-              shouldPlay={false}
               isLooping={false}
               useNativeControls={false}
               progressUpdateIntervalMillis={250}
@@ -408,16 +407,6 @@ export default function MembershipExperienceScreen() {
 
           {activeStep === 'trusted' ? (
             <View style={styles.trustedPreviewWrap}>
-              <View style={styles.trustedActionsRow}>
-                <View style={styles.trustedActionPill}>
-                  <Ionicons name="person-add-outline" size={12} color={theme.colors.accent} />
-                  <Text style={styles.trustedActionText}>Import</Text>
-                </View>
-                <View style={styles.trustedActionPill}>
-                  <Ionicons name="sync-outline" size={12} color={theme.colors.accent} />
-                  <Text style={styles.trustedActionText}>Sync</Text>
-                </View>
-              </View>
               <Text style={styles.trustedSectionLabel}>Manual Entry</Text>
               {[
                 { name: 'Dr. Stuart', relationship: 'Doctor' },
@@ -483,9 +472,9 @@ export default function MembershipExperienceScreen() {
               </View>
               <View style={styles.reviewAlertCard}>
                 <Text style={styles.reviewAlertTitle}>Unknown Caller</Text>
-                <Text style={styles.reviewAlertNumber}>+1 (609) 444-7419</Text>
+                <Text style={styles.reviewAlertNumber}>+1 (862) 226-9281</Text>
                 <Text style={styles.reviewSnippet}>
-                  \"Your account was locked. Tell me the number we texted you to unlock it.\"
+                  Your account was locked. Tell me the number we texted you to unlock it.
                 </Text>
               </View>
               <View style={styles.reviewActionsRow}>
@@ -634,8 +623,6 @@ const createStyles = (theme: AppTheme) =>
     videoFrame: {
       borderRadius: 16,
       overflow: 'hidden',
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withOpacity(theme.colors.border, 0.9),
       backgroundColor: withOpacity(theme.colors.text, 0.05),
       aspectRatio: 16 / 9,
       position: 'relative',
@@ -657,9 +644,7 @@ const createStyles = (theme: AppTheme) =>
       borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.accent, 0.9),
-      borderWidth: 1,
-      borderColor: withOpacity('#FFFFFF', 0.35),
+      backgroundColor: theme.colors.accent,
     },
     videoPlayOverlayText: {
       fontSize: 13,
@@ -704,9 +689,7 @@ const createStyles = (theme: AppTheme) =>
       flex: 1,
       minHeight: 34,
       borderRadius: 12,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withOpacity(theme.colors.border, 0.9),
-      backgroundColor: withOpacity(theme.colors.surfaceAlt, 0.75),
+      backgroundColor: theme.colors.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
@@ -795,9 +778,7 @@ const createStyles = (theme: AppTheme) =>
     connectNode: {
       width: '42%',
       borderRadius: 14,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: withOpacity(theme.colors.surfaceAlt, 0.75),
+      backgroundColor: theme.colors.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
       paddingVertical: 12,
@@ -810,8 +791,6 @@ const createStyles = (theme: AppTheme) =>
     },
     connectForwardingCard: {
       borderRadius: 14,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       backgroundColor: theme.colors.surfaceAlt,
       padding: 12,
       flexDirection: 'row',
@@ -845,27 +824,6 @@ const createStyles = (theme: AppTheme) =>
     },
     trustedPreviewWrap: {
       gap: 8,
-    },
-    trustedActionsRow: {
-      flexDirection: 'row',
-      gap: 8,
-      marginBottom: 2,
-    },
-    trustedActionPill: {
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.35),
-      backgroundColor: withOpacity(theme.colors.accent, 0.12),
-      paddingHorizontal: 8,
-      paddingVertical: 6,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    trustedActionText: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: theme.colors.accent,
     },
     trustedSectionLabel: {
       fontSize: 11,

@@ -32,6 +32,7 @@ export default function EnterInviteCodeScreen() {
   const [message, setMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [code, setCode] = useState('');
+  const [footerHeight, setFooterHeight] = useState(212);
   const firstNameRef = useRef<TextInput | null>(null);
   const lastNameRef = useRef<TextInput | null>(null);
   const codeInputRef = useRef<TextInput | null>(null);
@@ -134,7 +135,7 @@ export default function EnterInviteCodeScreen() {
           contentContainerStyle={[
             styles.body,
             {
-              paddingBottom: Math.max(insets.bottom, 32) + 220,
+              paddingBottom: footerHeight + 24,
               paddingTop: Math.max(insets.top, 12) + 0,
 
             },
@@ -212,6 +213,10 @@ export default function EnterInviteCodeScreen() {
           primaryDisabled={!areNamesEntered || !isCodeComplete || isSubmitting}
           secondaryLabel="Never mind"
           onSecondaryPress={() => navigation.goBack()}
+          onLayout={(event) => {
+            const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+            setFooterHeight((prev) => (Math.abs(prev - nextHeight) > 1 ? nextHeight : prev));
+          }}
         />
       </SafeAreaView>
     </View>

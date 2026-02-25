@@ -300,7 +300,7 @@ export default function MembershipBillingScreen() {
         contentContainerStyle={[
           styles.body,
           {
-            paddingBottom: Math.max(insets.bottom, 32) + 42,
+            paddingBottom: Math.max(insets.bottom, 24) + 32,
             paddingTop: Math.max(insets.top, 16),
           },
         ]}

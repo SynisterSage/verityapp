@@ -194,8 +194,10 @@ export default function MembershipScreen() {
   const [feedback, setFeedback] = useState<MembershipFeedback | null>(null);
   const [isBillingExpanded, setIsBillingExpanded] = useState(false);
   const [showPurchaseSuccess, setShowPurchaseSuccess] = useState(false);
+  const [footerHeight, setFooterHeight] = useState(156);
   const purchaseSuccessScale = useRef(new Animated.Value(0.84)).current;
   const purchaseSuccessOpacity = useRef(new Animated.Value(0)).current;
+  const planScaleByIdRef = useRef<Record<string, Animated.Value>>({});
   const hasLoggedMembershipView = useRef(false);
   const showInviteCodeAction = status?.canJoinWithInviteCode !== false;
   const plansUnavailable = !isLoadingProducts && products.length === 0;
@@ -224,7 +226,30 @@ export default function MembershipScreen() {
     planOptions[0] ??
     fallbackPlans[0];
 
+  const getPlanScale = (productId: string) => {
+    if (!planScaleByIdRef.current[productId]) {
+      planScaleByIdRef.current[productId] = new Animated.Value(1);
+    }
+    return planScaleByIdRef.current[productId];
+  };
+
   const setPlan = (productId: string) => {
+    const planScale = getPlanScale(productId);
+    planScale.stopAnimation();
+    planScale.setValue(1);
+    Animated.sequence([
+      Animated.timing(planScale, {
+        toValue: 1.018,
+        duration: 95,
+        useNativeDriver: true,
+      }),
+      Animated.spring(planScale, {
+        toValue: 1,
+        speed: 24,
+        bounciness: 5,
+        useNativeDriver: true,
+      }),
+    ]).start();
     void Haptics.selectionAsync().catch(() => null);
     setSelectedProductId(productId);
     setFeedback(null);
@@ -312,11 +337,14 @@ export default function MembershipScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.screen} edges={[]}>
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Math.max(insets.bottom, 24) + 144 },
+          {
+            paddingTop: Math.max(insets.top, 0) + 26,
+            paddingBottom: footerHeight + 36,
+          },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -327,85 +355,95 @@ export default function MembershipScreen() {
           </Text>
         </View>
 
-        <Pressable
-          style={styles.experienceCard}
-          onPress={() => {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-            logEvent('membership_experience_opened', {
-              screen: 'MembershipScreen',
-            });
-            navigation.navigate('MembershipExperience');
-          }}
-        >
-          <View style={styles.experienceIconWrap}>
-            <Ionicons name="sparkles-outline" size={18} color={theme.colors.accent} />
-          </View>
-          <View style={styles.experienceTextWrap}>
-            <Text style={styles.experienceTitle}>See how Verity works</Text>
-            <Text style={styles.experienceCopy}>
-              Walk through the full call-screening flow with an interactive demo.
-            </Text>
-          </View>
-          <View style={styles.experienceChevronWrap}>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
-          </View>
-        </Pressable>
+        <View style={styles.experienceCardsWrap}>
+          <Pressable
+            style={styles.experienceCard}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+              logEvent('membership_experience_opened', {
+                screen: 'MembershipScreen',
+              });
+              navigation.navigate('MembershipExperience');
+            }}
+          >
+            <View style={styles.experienceIconWrap}>
+              <Ionicons name="sparkles-outline" size={18} color={theme.colors.accent} />
+            </View>
+            <View style={styles.experienceTextWrap}>
+              <Text style={styles.experienceTitle}>See how Verity works</Text>
+              <Text style={styles.experienceCopy}>
+                Walk through the full call-screening flow with an interactive demo.
+              </Text>
+            </View>
+            <View style={styles.experienceChevronWrap}>
+              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+            </View>
+          </Pressable>
 
-        <Pressable
-          style={[styles.experienceCard, styles.whyChooseCard]}
-          onPress={() => {
-            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-            logEvent('membership_why_choose_opened', {
-              screen: 'MembershipScreen',
-            });
-            navigation.navigate('WhyChooseVerity');
-          }}
-        >
-          <View style={styles.experienceIconWrap}>
-            <Ionicons name="trending-up-outline" size={18} color={theme.colors.accent} />
-          </View>
-          <View style={styles.experienceTextWrap}>
-            <Text style={styles.experienceTitle}>Why choose Verity</Text>
-            <Text style={styles.experienceCopy}>
-              See real fraud trends, use cases, and how families and facilities use Verity.
-            </Text>
-          </View>
-          <View style={styles.experienceChevronWrap}>
-            <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
-          </View>
-        </Pressable>
+          <Pressable
+            style={styles.experienceCard}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+              logEvent('membership_why_choose_opened', {
+                screen: 'MembershipScreen',
+              });
+              navigation.navigate('WhyChooseVerity');
+            }}
+          >
+            <View style={styles.experienceIconWrap}>
+              <Ionicons name="trending-up-outline" size={18} color={theme.colors.accent} />
+            </View>
+            <View style={styles.experienceTextWrap}>
+              <Text style={styles.experienceTitle}>Why choose Verity</Text>
+              <Text style={styles.experienceCopy}>
+                See real fraud trends, use cases, and how families and facilities use Verity.
+              </Text>
+            </View>
+            <View style={styles.experienceChevronWrap}>
+              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+            </View>
+          </Pressable>
+        </View>
 
         <View style={styles.planSection}>
           <Text style={styles.planSectionTitle}>Choose your plan</Text>
           {planOptions.map((plan) => {
             const selected = selectedPlan.productId === plan.productId;
             return (
-              <Pressable
+              <Animated.View
                 key={plan.productId}
-                style={[styles.planCard, selected && styles.planCardSelected]}
-                onPress={() => setPlan(plan.productId)}
+                style={{ transform: [{ scale: getPlanScale(plan.productId) }] }}
               >
-                <View style={styles.planMainRow}>
-                  <View style={styles.planTextWrap}>
-                    <Text style={styles.planTitle}>{plan.title}</Text>
-                    <Text style={styles.planDetail}>{plan.detail}</Text>
+                <Pressable
+                  style={[styles.planCard, selected && styles.planCardSelected]}
+                  onPress={() => setPlan(plan.productId)}
+                >
+                  <View style={styles.planMainRow}>
+                    <View style={styles.planTextWrap}>
+                      <Text style={styles.planTitle}>{plan.title}</Text>
+                      <Text style={styles.planDetail}>{plan.detail}</Text>
+                    </View>
+                    <View style={styles.planPriceWrap}>
+                      <Text style={styles.planPrice}>{plan.price}</Text>
+                      {plan.badge ? <Text style={styles.planBadge}>{plan.badge}</Text> : null}
+                    </View>
                   </View>
-                  <View style={styles.planPriceWrap}>
-                    <Text style={styles.planPrice}>{plan.price}</Text>
-                    {plan.badge ? <Text style={styles.planBadge}>{plan.badge}</Text> : null}
+                  <View style={[styles.radio, selected && styles.radioSelected]}>
+                    {selected ? <View style={styles.radioInner} /> : null}
                   </View>
-                </View>
-                <View style={[styles.radio, selected && styles.radioSelected]}>
-                  {selected ? <View style={styles.radioInner} /> : null}
-                </View>
-              </Pressable>
+                </Pressable>
+              </Animated.View>
             );
           })}
         </View>
 
         <View style={[styles.actionsInline, !showInviteCodeAction && styles.actionsInlineSingle]}>
           <Pressable
-            style={styles.inlineButton}
+            style={({ pressed }) => [
+              styles.inlineButton,
+              pressed && styles.inlineButtonPressed,
+              isProcessingPurchase && styles.inlineButtonDisabled,
+            ]}
             onPress={handleRestore}
             disabled={isProcessingPurchase}
           >
@@ -413,7 +451,11 @@ export default function MembershipScreen() {
           </Pressable>
           {showInviteCodeAction ? (
             <Pressable
-              style={styles.inlineButton}
+              style={({ pressed }) => [
+                styles.inlineButton,
+                pressed && styles.inlineButtonPressed,
+                isProcessingPurchase && styles.inlineButtonDisabled,
+              ]}
               onPress={() => {
                 void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
                 logEvent('membership_invite_code_tapped', {
@@ -512,17 +554,17 @@ export default function MembershipScreen() {
             paddingBottom: Math.max(insets.bottom, 20),
           },
         ]}
+        onLayout={(event) => {
+          const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+          setFooterHeight((prev) => (Math.abs(prev - nextHeight) > 1 ? nextHeight : prev));
+        }}
       >
         {plansUnavailable ? (
-          <View style={styles.catalogErrorCard}>
-            <Text style={styles.catalogErrorTitle}>Could not load App Store plans</Text>
-            <Text style={styles.catalogErrorText}>
-              {productsError ?? 'Check your connection and load plans again.'}
+          <Pressable style={styles.catalogErrorInlineSimple} onPress={retryProducts}>
+            <Text numberOfLines={1} style={styles.catalogErrorInlineSimpleText}>
+              Could not load App Store plans. Tap to retry.
             </Text>
-            <Pressable style={styles.catalogErrorButton} onPress={retryProducts}>
-              <Text style={styles.catalogErrorButtonText}>Retry loading plans</Text>
-            </Pressable>
-          </View>
+          </Pressable>
         ) : null}
 
         <Pressable
@@ -573,6 +615,7 @@ const createMembershipStyles = (theme: AppTheme) =>
     content: {
       paddingHorizontal: 24,
       paddingTop: 26,
+      flexGrow: 1,
       gap: 18,
     },
     headerBlock: {
@@ -602,9 +645,8 @@ const createMembershipStyles = (theme: AppTheme) =>
       alignItems: 'center',
       gap: 12,
     },
-    whyChooseCard: {
-      backgroundColor: withOpacity(theme.colors.surfaceAlt, 0.8),
-      borderColor: theme.colors.border,
+    experienceCardsWrap: {
+      gap: 10,
     },
     experienceIconWrap: {
       width: 36,
@@ -633,8 +675,8 @@ const createMembershipStyles = (theme: AppTheme) =>
       height: 32,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: withOpacity(theme.colors.border, 0.9),
-      backgroundColor: theme.colors.surface,
+      borderColor: withOpacity(theme.colors.accent, 0.35),
+      backgroundColor: withOpacity(theme.colors.accent, 0.14),
       alignItems: 'center',
       justifyContent: 'center',
       marginLeft: 2,
@@ -722,18 +764,23 @@ const createMembershipStyles = (theme: AppTheme) =>
     },
     inlineButton: {
       flex: 1,
+      minHeight: 52,
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
-      paddingVertical: 12,
+      backgroundColor: theme.colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    inlineButtonPressed: {
+      opacity: 0.9,
+      transform: [{ scale: 0.99 }],
+    },
+    inlineButtonDisabled: {
+      opacity: 0.62,
     },
     inlineButtonText: {
       fontSize: 14,
       fontWeight: '700',
-      color: theme.colors.accent,
+      color: '#FFFFFF',
       textAlign: 'center',
     },
     billingCard: {
@@ -845,40 +892,20 @@ const createMembershipStyles = (theme: AppTheme) =>
       borderTopColor: theme.colors.border,
       backgroundColor: withOpacity(theme.colors.bg, 0.98),
     },
-    catalogErrorCard: {
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.warning, 0.4),
-      backgroundColor: withOpacity(theme.colors.warning, 0.11),
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      gap: 4,
+    catalogErrorInlineSimple: {
       marginBottom: 10,
+      borderRadius: 12,
+      backgroundColor: withOpacity(theme.colors.accent, 0.09),
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    catalogErrorTitle: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.colors.text,
-    },
-    catalogErrorText: {
-      fontSize: 12,
-      color: theme.colors.textMuted,
-      lineHeight: 17,
-    },
-    catalogErrorButton: {
-      marginTop: 3,
-      alignSelf: 'flex-start',
-      borderRadius: 10,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.4),
-      backgroundColor: withOpacity(theme.colors.accent, 0.15),
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-    },
-    catalogErrorButtonText: {
+    catalogErrorInlineSimpleText: {
       fontSize: 12,
       fontWeight: '700',
       color: theme.colors.accent,
+      textAlign: 'center',
     },
     primaryButton: {
       height: 58,
