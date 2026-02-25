@@ -392,7 +392,7 @@ private func mapProduct(_ product: Product) -> [String: Any] {
     "description": product.description,
     "displayPrice": product.displayPrice,
     "price": NSDecimalNumber(decimal: product.price),
-    "currencyCode": product.priceFormatStyle.currencyCode.identifier,
+    "currencyCode": product.priceFormatStyle.currencyCode,
     "subscriptionPeriodUnit": periodUnit as Any,
     "subscriptionPeriodCount": product.subscription?.subscriptionPeriod.value as Any,
   ]
