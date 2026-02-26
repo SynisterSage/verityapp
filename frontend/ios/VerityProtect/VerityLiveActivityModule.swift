@@ -296,16 +296,16 @@ class VeritySubscriptionsModule: NSObject {
           resolver([
             "status": "failed",
             "message": "No active subscription found",
-            "receiptData": receiptData as Any,
+            "receiptData": bridgeValue(receiptData),
           ])
           return
         }
         resolver([
           "status": "purchased",
-          "productId": activeEntitlement["productId"] as? String as Any,
-          "transactionId": activeEntitlement["transactionId"] as? String as Any,
-          "originalTransactionId": activeEntitlement["originalTransactionId"] as? String as Any,
-          "receiptData": receiptData as Any,
+          "productId": bridgeValue(activeEntitlement["productId"] as? String),
+          "transactionId": bridgeValue(activeEntitlement["transactionId"] as? String),
+          "originalTransactionId": bridgeValue(activeEntitlement["originalTransactionId"] as? String),
+          "receiptData": bridgeValue(receiptData),
         ])
       } catch {
         rejecter("STOREKIT_RESTORE_FAILED", error.localizedDescription, error)
@@ -333,7 +333,7 @@ class VeritySubscriptionsModule: NSObject {
         let receiptData = try? await fetchReceiptData(syncIfMissing: false)
         resolver([
           "entitlements": entitlements,
-          "receiptData": receiptData as Any,
+          "receiptData": bridgeValue(receiptData),
         ])
       } catch {
         rejecter("STOREKIT_ENTITLEMENTS_FAILED", error.localizedDescription, error)
@@ -383,6 +383,11 @@ private func parseState(_ payload: NSDictionary) -> VerityCallLiveActivityAttrib
 
 #if canImport(StoreKit)
 @available(iOS 15.0, *)
+private func bridgeValue(_ value: Any?) -> Any {
+  value ?? NSNull()
+}
+
+@available(iOS 15.0, *)
 private func mapProduct(_ product: Product) -> [String: Any] {
   let subscriptionPeriodUnit = product.subscription?.subscriptionPeriod.unit
   let periodUnit: String?
@@ -405,9 +410,9 @@ private func mapProduct(_ product: Product) -> [String: Any] {
     "description": product.description,
     "displayPrice": product.displayPrice,
     "price": NSDecimalNumber(decimal: product.price),
-    "currencyCode": product.priceFormatStyle.currencyCode,
-    "subscriptionPeriodUnit": periodUnit as Any,
-    "subscriptionPeriodCount": product.subscription?.subscriptionPeriod.value as Any,
+    "currencyCode": bridgeValue(product.priceFormatStyle.currencyCode),
+    "subscriptionPeriodUnit": bridgeValue(periodUnit),
+    "subscriptionPeriodCount": bridgeValue(product.subscription?.subscriptionPeriod.value),
   ]
 }
 
@@ -442,9 +447,9 @@ private func loadCurrentEntitlements() async throws -> [[String: Any]] {
       "productId": transaction.productID,
       "transactionId": String(transaction.id),
       "originalTransactionId": String(transaction.originalID),
-      "purchasedAt": isoTimestamp(transaction.purchaseDate) as Any,
-      "expiresAt": isoTimestamp(transaction.expirationDate) as Any,
-      "revokedAt": isoTimestamp(transaction.revocationDate) as Any,
+      "purchasedAt": bridgeValue(isoTimestamp(transaction.purchaseDate)),
+      "expiresAt": bridgeValue(isoTimestamp(transaction.expirationDate)),
+      "revokedAt": bridgeValue(isoTimestamp(transaction.revocationDate)),
       "isActive": isActive,
     ])
   }
