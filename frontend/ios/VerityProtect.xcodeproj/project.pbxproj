@@ -241,6 +241,7 @@
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				D7DE6DDD2F3D555B003E8AC0 /* Embed Foundation Extensions */,
 				1D7C46915A7BD39C904BA004 /* [CP] Embed Pods Frameworks */,
+				F2B3C4D5E6F708192A3B4C5D /* Strip & Re-sign Twilio (Release) */,
 				FE6AA3BA779E41968DED7584 /* [CP] Copy Pods Resources */,
 			);
 			buildRules = (
@@ -409,6 +410,21 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# This script configures Expo modules and generates the modules provider file.\nbash -l -c \"./Pods/Target\\ Support\\ Files/Pods-VerityProtect/expo-configure-project.sh\"\n";
+		};
+		F2B3C4D5E6F708192A3B4C5D /* Strip & Re-sign Twilio (Release) */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Strip & Re-sign Twilio (Release)";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"${CONFIGURATION}\" != \"Release\" ]; then\n  echo \"Skipping Twilio strip for ${CONFIGURATION}.\"\n  exit 0\nfi\n\nTWILIO_FRAMEWORK=\"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/TwilioVoice.framework\"\nTWILIO_BIN=\"${TWILIO_FRAMEWORK}/TwilioVoice\"\nif [ ! -f \"${TWILIO_BIN}\" ]; then\n  echo \"TwilioVoice binary not found; skipping bitcode strip.\"\n  exit 0\nfi\n\necho \"Stripping bitcode from TwilioVoice.framework\"\nxcrun bitcode_strip \"${TWILIO_BIN}\" -r -o \"${TWILIO_BIN}\"\n\nif [ \"${CODE_SIGNING_ALLOWED:-NO}\" = \"YES\" ] && [ -n \"${EXPANDED_CODE_SIGN_IDENTITY:-}\" ]; then\n  echo \"Re-signing TwilioVoice.framework\"\n  /usr/bin/codesign --force --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" --preserve-metadata=identifier,entitlements \"${TWILIO_FRAMEWORK}\"\nfi\n";
+			showEnvVarsInLog = 0;
 		};
 		FE6AA3BA779E41968DED7584 /* [CP] Copy Pods Resources */ = {
 			isa = PBXShellScriptBuildPhase;
