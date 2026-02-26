@@ -248,7 +248,7 @@ export default function MembershipExperienceScreen() {
   }, []);
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={[]}>
       <View style={[styles.headerRow, { paddingTop: Math.max(insets.top, 14) }]}>
         <Pressable
           style={styles.backButton}

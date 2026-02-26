@@ -171,12 +171,7 @@ class VeritySubscriptionsModule: NSObject {
 
     Task {
       do {
-        var products = try await Product.products(for: Set(ids))
-        if products.isEmpty {
-          // Retry once after syncing with App Store in case product metadata just propagated.
-          try? await AppStore.sync()
-          products = try await Product.products(for: Set(ids))
-        }
+        let products = try await Product.products(for: Set(ids))
 
         guard !products.isEmpty else {
           let bundleId = Bundle.main.bundleIdentifier ?? "unknown-bundle"
@@ -223,13 +218,7 @@ class VeritySubscriptionsModule: NSObject {
 
     Task {
       do {
-        var products = try await Product.products(for: [normalizedProductId])
-        if products.first == nil {
-          // Product metadata can lag right after TestFlight/App Store Connect changes.
-          // Sync once and retry before failing purchase.
-          try? await AppStore.sync()
-          products = try await Product.products(for: [normalizedProductId])
-        }
+        let products = try await Product.products(for: [normalizedProductId])
 
         guard let selectedProduct = products.first else {
           resolver([
@@ -256,7 +245,7 @@ class VeritySubscriptionsModule: NSObject {
           ])
         case .success(let verificationResult):
           let transaction = try checkVerified(verificationResult)
-          let receiptData = try await fetchReceiptData(syncIfMissing: true)
+          let receiptData = try await fetchReceiptData()
           let payload: [String: Any] = [
             "status": "purchased",
             "productId": transaction.productID,
@@ -297,7 +286,7 @@ class VeritySubscriptionsModule: NSObject {
       do {
         try await AppStore.sync()
         let entitlements = try await loadCurrentEntitlements()
-        let receiptData = try? await fetchReceiptData(syncIfMissing: false)
+        let receiptData = try? await fetchReceiptData()
         let activeEntitlement = entitlements.first { ($0["isActive"] as? Bool) == true }
         guard let activeEntitlement else {
           resolver([
@@ -337,7 +326,7 @@ class VeritySubscriptionsModule: NSObject {
     Task {
       do {
         let entitlements = try await loadCurrentEntitlements()
-        let receiptData = try? await fetchReceiptData(syncIfMissing: false)
+        let receiptData = try? await fetchReceiptData()
         resolver([
           "entitlements": entitlements,
           "receiptData": bridgeValue(receiptData),
@@ -464,16 +453,9 @@ private func loadCurrentEntitlements() async throws -> [[String: Any]] {
 }
 
 @available(iOS 15.0, *)
-private func fetchReceiptData(syncIfMissing: Bool) async throws -> String {
+private func fetchReceiptData() async throws -> String {
   if let base64 = readReceiptData() {
     return base64
-  }
-
-  if syncIfMissing {
-    try await AppStore.sync()
-    if let base64 = readReceiptData() {
-      return base64
-    }
   }
 
   throw NSError(

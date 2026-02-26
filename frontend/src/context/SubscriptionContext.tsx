@@ -100,7 +100,17 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const lastStatusFetchAtRef = useRef(0);
 
   const toErrorMessage = useCallback((err: unknown, fallback: string) => {
-    return err instanceof Error && err.message.trim().length > 0 ? err.message.trim() : fallback;
+    const raw = err instanceof Error && err.message.trim().length > 0 ? err.message.trim() : fallback;
+
+    if (/ASDErrorDomain\s*Code\s*=\s*509/i.test(raw) || /No active account/i.test(raw)) {
+      return 'No active App Store account found on this device. Sign in to App Store and try again.';
+    }
+
+    if (/Unable to complete request/i.test(raw)) {
+      return 'App Store could not complete this request right now. Try again in a minute.';
+    }
+
+    return raw;
   }, []);
 
   const toProductsErrorMessage = useCallback((err: unknown) => {
