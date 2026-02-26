@@ -81,17 +81,21 @@ if command -v ruby >/dev/null 2>&1; then
   export PATH="$GEM_USER_BIN:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 fi
 
-if ! command -v pod >/dev/null 2>&1; then
-  install_ruby_gem cocoapods 1.16.2
+if [ -f "Gemfile" ]; then
+  install_ruby_gem bundler 2.6.9
+  retry_run 3 8 bundle config set path vendor/bundle
+  retry_run 3 8 bundle install --jobs 4 --retry 3
+  run bundle exec pod --version
+  # CocoaPods CDN can intermittently fail DNS resolution on Xcode Cloud.
+  # Retry pod install a few times so transient network failures don't fail the build.
+  retry_run 4 10 bundle exec pod install --verbose
+else
+  if ! command -v pod >/dev/null 2>&1; then
+    install_ruby_gem cocoapods 1.16.2
+  fi
+  run pod --version
+  retry_run 4 10 pod install --verbose
 fi
-
-# Ensure xcodeproj parser supports current Xcode project format on CI.
-install_ruby_gem xcodeproj 1.27.0
-
-run pod --version
-# CocoaPods CDN can intermittently fail DNS resolution on Xcode Cloud.
-# Retry pod install a few times so transient network failures don't fail the build.
-retry_run 4 10 pod install --verbose
 
 test -f "Pods/Target Support Files/Pods-VerityProtect/Pods-VerityProtect.release.xcconfig"
 echo "Xcode Cloud post-clone setup complete."
