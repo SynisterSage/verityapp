@@ -223,7 +223,14 @@ class VeritySubscriptionsModule: NSObject {
 
     Task {
       do {
-        let products = try await Product.products(for: [normalizedProductId])
+        var products = try await Product.products(for: [normalizedProductId])
+        if products.first == nil {
+          // Product metadata can lag right after TestFlight/App Store Connect changes.
+          // Sync once and retry before failing purchase.
+          try? await AppStore.sync()
+          products = try await Product.products(for: [normalizedProductId])
+        }
+
         guard let selectedProduct = products.first else {
           resolver([
             "status": "failed",

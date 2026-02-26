@@ -164,8 +164,22 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         const bIndex = PRODUCT_IDS.indexOf(b.productId);
         return (aIndex < 0 ? 99 : aIndex) - (bIndex < 0 ? 99 : bIndex);
       });
+
+      const availableIds = new Set(sortedProducts.map((product) => product.productId));
+      const missingIds = PRODUCT_IDS.filter((id) => !availableIds.has(id));
       setProducts(sortedProducts);
-      setProductsError(null);
+      if (missingIds.length > 0 && sortedProducts.length > 0) {
+        const partialMessage =
+          'Some plans are still syncing from App Store Connect. Available plans can be purchased now; missing plans should appear shortly.';
+        setProductsError(partialMessage);
+        logEvent('membership_products_partial', {
+          level: 'warning',
+          screen: 'SubscriptionContext',
+          extra: { missingIds: missingIds.join(','), availableCount: sortedProducts.length },
+        });
+      } else {
+        setProductsError(null);
+      }
       logEvent('membership_products_loaded', {
         screen: 'SubscriptionContext',
         extra: { count: sortedProducts.length },
@@ -375,22 +389,24 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     let mounted = true;
     setHasResolvedStatus(false);
     setIsLoadingStatus(true);
-    setIsLoadingProducts(true);
+    // Do not force StoreKit product fetch during global app bootstrap.
+    // We load plans when membership/billing UI mounts to avoid startup crashes
+    // from native StoreKit invocation on some TestFlight environments.
+    setIsLoadingProducts(false);
 
-    Promise.all([refreshStatus(), refreshProducts()])
+    refreshStatus()
       .catch(() => null)
       .finally(() => {
         if (!mounted) {
           return;
         }
         setIsLoadingStatus(false);
-        setIsLoadingProducts(false);
       });
 
     return () => {
       mounted = false;
     };
-  }, [session, refreshProducts, refreshStatus]);
+  }, [session, refreshStatus]);
 
   useEffect(() => {
     if (!session) {

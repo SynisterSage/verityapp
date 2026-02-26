@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -145,6 +145,13 @@ export default function MembershipBillingScreen() {
   const subscription = status?.subscription ?? null;
   const hasActiveSubscription = Boolean(status?.hasActiveSubscription);
   const hasProductsLoaded = products.length > 0;
+
+  useEffect(() => {
+    if (hasProductsLoaded || isLoadingProducts) {
+      return;
+    }
+    void refreshProducts();
+  }, [hasProductsLoaded, isLoadingProducts, refreshProducts]);
 
   const planName = useMemo(() => {
     if (!subscription?.productId) {

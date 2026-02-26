@@ -1,7 +1,8 @@
 import { supabase } from './supabase';
 import { logError, logEvent } from './sentry';
+import { getPublicEnv } from './publicConfig';
 
-const baseUrl = process.env.EXPO_PUBLIC_API_URL ?? '';
+const baseUrl = getPublicEnv('EXPO_PUBLIC_API_URL') || getPublicEnv('EXPO_PUBLIC_API_BASE_URL');
 
 type AuthorizedFetchOptions = RequestInit & {
   skipUnauthorizedSignOut?: boolean;

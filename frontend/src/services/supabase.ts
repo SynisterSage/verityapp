@@ -1,8 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
+import { getPublicEnv } from './publicConfig';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
+const supabaseUrl = getPublicEnv('EXPO_PUBLIC_SUPABASE_URL');
+const supabaseAnonKey = getPublicEnv('EXPO_PUBLIC_SUPABASE_ANON_KEY');
 
 const secureStoreOptions: SecureStore.SecureStoreOptions = {
   // Allows background reads after first device unlock, which prevents transient

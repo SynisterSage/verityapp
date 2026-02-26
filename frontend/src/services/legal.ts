@@ -1,3 +1,5 @@
+import { getPublicEnv } from './publicConfig';
+
 export type LegalVersions = {
   termsVersion: string;
   privacyVersion: string;
@@ -13,7 +15,7 @@ export const FALLBACK_LEGAL_VERSIONS: LegalVersions = {
 };
 
 function getBaseUrl() {
-  return process.env.EXPO_PUBLIC_API_URL ?? process.env.EXPO_PUBLIC_API_BASE_URL ?? '';
+  return getPublicEnv('EXPO_PUBLIC_API_URL') || getPublicEnv('EXPO_PUBLIC_API_BASE_URL');
 }
 
 function isValidLegalVersions(payload: unknown): payload is LegalVersions {
@@ -49,4 +51,3 @@ export async function fetchCurrentLegalVersions(): Promise<LegalVersions> {
     return FALLBACK_LEGAL_VERSIONS;
   }
 }
-

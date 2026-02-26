@@ -214,6 +214,13 @@ export default function MembershipScreen() {
   const plansUnavailable = !isLoadingProducts && products.length === 0;
 
   useEffect(() => {
+    if (products.length > 0 || isLoadingProducts) {
+      return;
+    }
+    void refreshProducts();
+  }, [isLoadingProducts, products.length, refreshProducts]);
+
+  useEffect(() => {
     setSelectedProductId((prev) => {
       if (planOptions.some((plan) => plan.productId === prev)) {
         return prev;

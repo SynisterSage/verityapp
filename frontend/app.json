@@ -53,6 +53,10 @@
       ]
     ],
     "extra": {
+      "EXPO_PUBLIC_API_URL": "https://api.verityprotect.com/api/v1",
+      "EXPO_PUBLIC_API_BASE_URL": "https://api.verityprotect.com/api/v1",
+      "EXPO_PUBLIC_SUPABASE_URL": "https://fxnjkabxigdldmgciaxi.supabase.co",
+      "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_Tb3NkPDZvtE-PJfWz0gXfA_QxApwMVn",
       "eas": {
         "projectId": "3c07d22a-d47c-4729-b40b-f28fc78a5ecc",
         "build": {
