@@ -31,9 +31,16 @@ const ENABLE_CUSTOM_VOIP_PUSH = process.env.EXPO_PUBLIC_ENABLE_CUSTOM_VOIP_PUSH 
 const EXPO_PUSH_BASE_URL = 'https://exp.host/--/api/v2/';
 // We manage push token registration ourselves via backend APIs.
 // Disable Expo's automatic token updater to avoid noisy appId:null dev warnings.
-void Notifications.setAutoServerRegistrationEnabledAsync(false).catch((err) => {
+try {
+  const disableAutoRegistration = (Notifications as any).setAutoServerRegistrationEnabledAsync;
+  if (typeof disableAutoRegistration === 'function') {
+    void Promise.resolve(disableAutoRegistration(false)).catch((err) => {
+      console.warn('[push] Failed to disable Expo auto registration', err);
+    });
+  }
+} catch (err) {
   console.warn('[push] Failed to disable Expo auto registration', err);
-});
+}
 
 export type Profile = {
   id: string;

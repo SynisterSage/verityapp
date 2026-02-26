@@ -34,7 +34,12 @@ export function initializeVoIPPush(handlers: VoIPCallHandlers): () => void {
   }
 
   // Create event emitter
-  voipEventEmitter = new NativeEventEmitter(VoIPPushModule);
+  try {
+    voipEventEmitter = new NativeEventEmitter(VoIPPushModule);
+  } catch (error) {
+    console.error('[VoIPPush] Failed to create native event emitter:', error);
+    return () => {};
+  }
 
   // Listen for token updates
   tokenListener = voipEventEmitter.addListener(

@@ -837,7 +837,13 @@ export default function TwilioVoiceClientManager() {
     if (Platform.OS !== 'ios' || !VoIPPushModule) {
       return;
     }
-    const voipEmitter = new NativeEventEmitter(VoIPPushModule);
+    let voipEmitter: NativeEventEmitter;
+    try {
+      voipEmitter = new NativeEventEmitter(VoIPPushModule);
+    } catch (error) {
+      console.warn('[twilio-voice] failed to create VoIP native event emitter', error);
+      return;
+    }
     const subscription = voipEmitter.addListener('callEnded', (event: unknown) => {
       const parsed = parseNativeCallEndedEvent(event);
       if (parsed.source === 'placeholder_handoff') {

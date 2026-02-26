@@ -46,3 +46,4 @@ yarn-error.*
 
 
 .env.local
+ios/.xcode.env.local
