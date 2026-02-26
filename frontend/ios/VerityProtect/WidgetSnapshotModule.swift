@@ -98,7 +98,11 @@ class WidgetSnapshotModule: NSObject {
     defaults.removeObject(forKey: pendingSiriRouteKey)
     resolver([
       "ok": true,
-      "route": route as Any,
+      "route": bridgeValue(route),
     ])
+  }
+
+  private func bridgeValue(_ value: Any?) -> Any {
+    value ?? NSNull()
   }
 }
