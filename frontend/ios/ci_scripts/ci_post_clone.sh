@@ -32,6 +32,16 @@ retry_run() {
   done
 }
 
+install_ruby_gem() {
+  local gem_name="$1"
+  local gem_version="$2"
+  if ! command -v gem >/dev/null 2>&1; then
+    echo "error: gem is not available, cannot install ${gem_name}"
+    return 1
+  fi
+  retry_run 3 8 gem install --user-install "${gem_name}" -v "${gem_version}" --no-document
+}
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 if [ -n "${CI_WORKSPACE:-}" ] && [ -d "$CI_WORKSPACE/frontend" ]; then
@@ -58,29 +68,25 @@ run node -v
 run npm -v
 
 if [ -f package-lock.json ]; then
-  run npm ci --no-audit --no-fund
+  retry_run 3 8 npm ci --no-audit --no-fund
 else
-  run npm install --no-audit --no-fund
+  retry_run 3 8 npm install --no-audit --no-fund
 fi
 
 cd ios
 echo "Using iOS directory: $(pwd)"
 
-if ! command -v pod >/dev/null 2>&1; then
-  if command -v brew >/dev/null 2>&1; then
-    run brew install cocoapods
-    export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
-  elif command -v gem >/dev/null 2>&1; then
-    run gem install --user-install cocoapods --no-document
-    if command -v ruby >/dev/null 2>&1; then
-      GEM_USER_BIN="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin"
-      export PATH="$GEM_USER_BIN:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
-    fi
-  else
-    echo "error: pod is not available and cannot be installed"
-    exit 1
-  fi
+if command -v ruby >/dev/null 2>&1; then
+  GEM_USER_BIN="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin"
+  export PATH="$GEM_USER_BIN:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
 fi
+
+if ! command -v pod >/dev/null 2>&1; then
+  install_ruby_gem cocoapods 1.16.2
+fi
+
+# Ensure xcodeproj parser supports current Xcode project format on CI.
+install_ruby_gem xcodeproj 1.27.0
 
 run pod --version
 # CocoaPods CDN can intermittently fail DNS resolution on Xcode Cloud.

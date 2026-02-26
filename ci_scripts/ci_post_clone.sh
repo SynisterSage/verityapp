@@ -1,69 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
-trap 'echo "error: ci_post_clone failed at line $LINENO: $BASH_COMMAND"' ERR
-
-echo "Running Xcode Cloud post-clone setup for Verity Protect..."
-echo "CI_WORKSPACE=${CI_WORKSPACE:-<unset>}"
-export PATH="/opt/homebrew/bin:/opt/homebrew/opt/node@20/bin:/usr/local/opt/node@20/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
-export NPM_CONFIG_PRODUCTION=false
-export NODE_ENV=development
-
-run() {
-  echo "+ $*"
-  "$@"
-}
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-if [ -n "${CI_WORKSPACE:-}" ] && [ -d "$CI_WORKSPACE/frontend" ]; then
+if [ -n "${CI_WORKSPACE:-}" ] && [ -d "$CI_WORKSPACE/frontend/ios/ci_scripts" ]; then
   REPO_ROOT="$CI_WORKSPACE"
 fi
 
-FRONTEND_DIR="$REPO_ROOT/frontend"
-if [ ! -d "$FRONTEND_DIR" ]; then
-  echo "error: frontend directory not found at $FRONTEND_DIR"
+DELEGATE_SCRIPT="$REPO_ROOT/frontend/ios/ci_scripts/ci_post_clone.sh"
+if [ ! -x "$DELEGATE_SCRIPT" ]; then
+  echo "error: delegate post-clone script not found or not executable at $DELEGATE_SCRIPT"
   exit 1
 fi
 
-cd "$FRONTEND_DIR"
-echo "Using frontend directory: $FRONTEND_DIR"
-
-if ! command -v node >/dev/null 2>&1; then
-  if command -v brew >/dev/null 2>&1; then
-    run brew install node@20 || run brew install node
-    export PATH="/opt/homebrew/bin:/opt/homebrew/opt/node@20/bin:/usr/local/opt/node@20/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
-  fi
-fi
-
-run node -v
-run npm -v
-
-if [ -f package-lock.json ]; then
-  run npm ci --no-audit --no-fund
-else
-  run npm install --no-audit --no-fund
-fi
-
-cd ios
-echo "Using iOS directory: $(pwd)"
-
-if ! command -v pod >/dev/null 2>&1; then
-  if command -v brew >/dev/null 2>&1; then
-    run brew install cocoapods
-    export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
-  elif command -v gem >/dev/null 2>&1; then
-    run gem install --user-install cocoapods --no-document
-    if command -v ruby >/dev/null 2>&1; then
-      GEM_USER_BIN="$(ruby -r rubygems -e 'puts Gem.user_dir')/bin"
-      export PATH="$GEM_USER_BIN:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${PATH:-}"
-    fi
-  else
-    echo "error: pod is not available and cannot be installed"
-    exit 1
-  fi
-fi
-
-run pod --version
-run pod install --verbose
-
-echo "Post-clone setup complete."
+exec "$DELEGATE_SCRIPT"
