@@ -13,6 +13,25 @@ run() {
   "$@"
 }
 
+retry_run() {
+  local max_attempts="$1"
+  local sleep_seconds="$2"
+  shift 2
+
+  local attempt=1
+  until run "$@"; do
+    if [ "$attempt" -ge "$max_attempts" ]; then
+      echo "error: command failed after ${attempt} attempts: $*"
+      return 1
+    fi
+    echo "warn: attempt ${attempt}/${max_attempts} failed for: $*"
+    echo "warn: retrying in ${sleep_seconds}s..."
+    sleep "$sleep_seconds"
+    attempt=$((attempt + 1))
+    sleep_seconds=$((sleep_seconds * 2))
+  done
+}
+
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 if [ -n "${CI_WORKSPACE:-}" ] && [ -d "$CI_WORKSPACE/frontend" ]; then
@@ -64,7 +83,9 @@ if ! command -v pod >/dev/null 2>&1; then
 fi
 
 run pod --version
-run pod install --verbose
+# CocoaPods CDN can intermittently fail DNS resolution on Xcode Cloud.
+# Retry pod install a few times so transient network failures don't fail the build.
+retry_run 4 10 pod install --verbose
 
 test -f "Pods/Target Support Files/Pods-VerityProtect/Pods-VerityProtect.release.xcconfig"
 echo "Xcode Cloud post-clone setup complete."
