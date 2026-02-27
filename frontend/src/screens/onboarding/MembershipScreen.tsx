@@ -188,6 +188,7 @@ export default function MembershipScreen() {
     refreshProducts,
     purchase,
     restore,
+    showMembershipActivationNotice,
   } = useSubscription();
 
   const planOptions = useMemo<PlanOption[]>(() => {
@@ -200,13 +201,10 @@ export default function MembershipScreen() {
   const [selectedProductId, setSelectedProductId] = useState<string>(selectedDefaultProductId);
   const [feedback, setFeedback] = useState<MembershipFeedback | null>(null);
   const [isBillingExpanded, setIsBillingExpanded] = useState(false);
-  const [showPurchaseSuccess, setShowPurchaseSuccess] = useState(false);
   const [footerHeight, setFooterHeight] = useState(156);
   const [showExitModal, setShowExitModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isOpeningManage, setIsOpeningManage] = useState(false);
-  const purchaseSuccessScale = useRef(new Animated.Value(0.84)).current;
-  const purchaseSuccessOpacity = useRef(new Animated.Value(0)).current;
   const exitBackdropOpacity = useRef(new Animated.Value(0)).current;
   const exitCardOpacity = useRef(new Animated.Value(0)).current;
   const exitCardTranslateY = useRef(new Animated.Value(10)).current;
@@ -280,40 +278,6 @@ export default function MembershipScreen() {
     });
   };
 
-  const runPurchaseSuccessAnimation = async () => {
-    setShowPurchaseSuccess(true);
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
-
-    await new Promise<void>((resolve) => {
-      Animated.sequence([
-        Animated.parallel([
-          Animated.spring(purchaseSuccessScale, {
-            toValue: 1,
-            speed: 20,
-            bounciness: 8,
-            useNativeDriver: true,
-          }),
-          Animated.timing(purchaseSuccessOpacity, {
-            toValue: 1,
-            duration: 180,
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.delay(420),
-        Animated.timing(purchaseSuccessOpacity, {
-          toValue: 0,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-      ]).start(() => {
-        purchaseSuccessScale.setValue(0.84);
-        purchaseSuccessOpacity.setValue(0);
-        setShowPurchaseSuccess(false);
-        resolve();
-      });
-    });
-  };
-
   const handlePurchase = async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => null);
     setFeedback(null);
@@ -323,7 +287,10 @@ export default function MembershipScreen() {
     });
     const result = await purchase(selectedPlan.productId);
     if (result.status === 'purchased') {
-      await runPurchaseSuccessAnimation();
+      showMembershipActivationNotice({
+        productId: selectedPlan.productId,
+        planLabel: selectedPlan.title,
+      });
       logEvent('membership_purchase_success', {
         screen: 'MembershipScreen',
         extra: { productId: selectedPlan.productId },
@@ -342,8 +309,15 @@ export default function MembershipScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     setFeedback(null);
     const result = await restore();
-    await refreshStatus({ silent: true });
+    const snapshot = await refreshStatus({ silent: true });
     if (result.status === 'purchased') {
+      const restoredProductId = snapshot?.subscription?.productId ?? status?.subscription?.productId ?? null;
+      const restoredPlan =
+        (restoredProductId && planOptions.find((plan) => plan.productId === restoredProductId)?.title) ?? null;
+      showMembershipActivationNotice({
+        productId: restoredProductId,
+        planLabel: restoredPlan,
+      });
       return;
     }
     setFeedback(toRestoreFeedback(result));
@@ -583,7 +557,7 @@ export default function MembershipScreen() {
               }}
               disabled={isProcessingPurchase}
             >
-              <Text style={styles.inlineButtonSecondaryText}>I have an invite code</Text>
+              <Text style={styles.inlineButtonSecondaryText}>Use invite code</Text>
             </Pressable>
           ) : null}
         </View>
@@ -710,26 +684,6 @@ export default function MembershipScreen() {
           Secure billing via Apple • Cancel anytime • 3-day grace period
         </Text>
       </View>
-
-      {showPurchaseSuccess ? (
-        <View style={styles.purchaseSuccessOverlay} pointerEvents="none">
-          <Animated.View
-            style={[
-              styles.purchaseSuccessCard,
-              {
-                opacity: purchaseSuccessOpacity,
-                transform: [{ scale: purchaseSuccessScale }],
-              },
-            ]}
-          >
-            <View style={styles.purchaseSuccessIcon}>
-              <Ionicons name="checkmark" size={22} color="#FFFFFF" />
-            </View>
-            <Text style={styles.purchaseSuccessTitle}>Membership Activated</Text>
-            <Text style={styles.purchaseSuccessText}>Verity protection is now live.</Text>
-          </Animated.View>
-        </View>
-      ) : null}
 
       <Modal
         visible={showExitModal}
@@ -964,7 +918,7 @@ const createMembershipStyles = (theme: AppTheme) =>
       opacity: 0.62,
     },
     inlineButtonText: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '700',
       color: '#FFFFFF',
       textAlign: 'center',
@@ -980,7 +934,7 @@ const createMembershipStyles = (theme: AppTheme) =>
       paddingHorizontal: 14,
     },
     inlineButtonSecondaryText: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '700',
       color: theme.colors.text,
       textAlign: 'center',

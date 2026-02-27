@@ -198,19 +198,28 @@ export const createSupportBugReportSchema = z
 
 export const verifySubscriptionReceiptSchema = z
   .object({
-    receiptData: z.string().min(20, 'receiptData is required'),
+    receiptData: z.string().min(20).optional(),
     platform: z.literal('ios').optional(),
     productId: z.string().min(1).max(128).optional(),
     transactionId: z.string().min(1).max(128).optional(),
     originalTransactionId: z.string().min(1).max(128).optional(),
   })
+  .refine(
+    (value) =>
+      (typeof value.receiptData === 'string' && value.receiptData.trim().length >= 20) ||
+      (typeof value.transactionId === 'string' && value.transactionId.trim().length > 0),
+    {
+      message: 'receiptData or transactionId is required',
+      path: ['receiptData'],
+    }
+  )
   .strict();
 
 export const syncSubscriptionEntitlementSchema = z
   .object({
     platform: z.literal('ios').optional(),
     productId: z.string().min(1).max(128),
-    transactionId: z.string().min(1).max(128),
+    transactionId: z.string().min(1).max(128).optional(),
     originalTransactionId: z.string().min(1).max(128).optional(),
     purchasedAt: z.string().datetime().optional(),
     expiresAt: z.string().datetime().optional(),

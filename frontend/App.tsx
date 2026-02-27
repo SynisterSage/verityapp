@@ -74,6 +74,7 @@ import OnboardingChoiceScreen from './src/screens/onboarding/OnboardingChoiceScr
 import OnboardingInviteCodeScreen from './src/screens/onboarding/OnboardingInviteCodeScreen';
 import OnboardingSuccessScreen from './src/screens/onboarding/OnboardingSuccessScreen';
 import MembershipScreen from './src/screens/onboarding/MembershipScreen';
+import MembershipActivatedScreen from './src/screens/onboarding/MembershipActivatedScreen';
 import MembershipExperienceScreen from './src/screens/onboarding/MembershipExperienceScreen';
 import WhyChooseVerityScreen from './src/screens/onboarding/WhyChooseVerityScreen';
 import {
@@ -753,7 +754,7 @@ function AppTabs() {
 function RootNavigator() {
   const { session } = useAuth();
   const { onboardingComplete, authInvalid } = useProfile();
-  const { status: subscriptionStatus, hasResolvedStatus } = useSubscription();
+  const { status: subscriptionStatus, hasResolvedStatus, membershipActivationNotice } = useSubscription();
   const shouldRequireMembership = Boolean(
     subscriptionStatus?.requiresPaidMembership && !subscriptionStatus?.hasActiveSubscription
   );
@@ -807,6 +808,13 @@ function RootNavigator() {
           </>
         ) : !onboardingComplete ? (
           <>
+            {membershipActivationNotice ? (
+              <RootStack.Screen
+                name="MembershipActivated"
+                component={MembershipActivatedScreen}
+                options={{ headerShown: false }}
+              />
+            ) : null}
             <RootStack.Screen
               name="OnboardingChoice"
               component={OnboardingChoiceScreen}

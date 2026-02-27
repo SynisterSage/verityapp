@@ -4,6 +4,7 @@ import logger from 'jet-logger';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { getAuthenticatedUserId } from '@src/common/util/auth';
 import { verifyAppleSubscriptionReceipt } from '@src/services/appleSubscriptions';
+import { getAppStoreServerTransactionById } from '@src/services/appStoreServerApi';
 import {
   getSubscriptionAccessSnapshot,
   getUserSubscription,
@@ -18,12 +19,34 @@ const ALLOWED_PRODUCT_IDS = new Set(
     .map((value) => value.trim())
     .filter(Boolean)
 );
+const SUBSCRIPTION_STATUS_VALUES = new Set([
+  'active',
+  'inactive',
+  'expired',
+  'cancelled',
+  'billing_retry',
+  'unknown',
+]);
 
 function isAllowedProductId(productId: string) {
   if (ALLOWED_PRODUCT_IDS.size === 0) {
     return true;
   }
   return ALLOWED_PRODUCT_IDS.has(productId);
+}
+
+function normalizeSubscriptionStatus(
+  value: string | null | undefined,
+  fallback: 'inactive' | 'unknown' = 'unknown'
+) {
+  if (!value) {
+    return fallback;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!SUBSCRIPTION_STATUS_VALUES.has(normalized)) {
+    return fallback;
+  }
+  return normalized;
 }
 
 function serializeSubscription(row: UserSubscriptionRow | null) {
@@ -44,6 +67,29 @@ function serializeSubscription(row: UserSubscriptionRow | null) {
     receiptStatus: row.latest_receipt_status,
     lastVerifiedAt: row.last_verified_at,
   };
+}
+
+function toLogMessage(context: string, error: unknown) {
+  if (error instanceof Error && error.message) {
+    return `[${context}] ${error.message}`;
+  }
+  if (typeof error === 'object' && error !== null) {
+    const maybeMessage =
+      'message' in error && typeof (error as { message?: unknown }).message === 'string'
+        ? (error as { message: string }).message
+        : null;
+    const maybeCode =
+      'code' in error && typeof (error as { code?: unknown }).code === 'string'
+        ? (error as { code: string }).code
+        : null;
+    if (maybeMessage && maybeCode) {
+      return `[${context}] ${maybeCode}: ${maybeMessage}`;
+    }
+    if (maybeMessage) {
+      return `[${context}] ${maybeMessage}`;
+    }
+  }
+  return `[${context}] unknown_error`;
 }
 
 async function status(req: Request, res: Response) {
@@ -67,7 +113,7 @@ async function status(req: Request, res: Response) {
       subscription: serializeSubscription(subscription),
     });
   } catch (error) {
-    logger.err(error);
+    logger.err(toLogMessage('subscriptions.status', error));
     return res
       .status(HTTP_STATUS_CODES.InternalServerError)
       .json({ error: 'Failed to load subscription status' });
@@ -94,16 +140,68 @@ async function verify(req: Request, res: Response) {
     originalTransactionId?: string;
   };
 
-  if (!receiptData || typeof receiptData !== 'string' || receiptData.trim().length === 0) {
-    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'receiptData is required' });
+  const normalizedReceiptData =
+    typeof receiptData === 'string' && receiptData.trim().length > 0 ? receiptData.trim() : null;
+  const normalizedTransactionId =
+    typeof transactionId === 'string' && transactionId.trim().length > 0 ? transactionId.trim() : null;
+
+  if (!normalizedReceiptData && !normalizedTransactionId) {
+    return res
+      .status(HTTP_STATUS_CODES.BadRequest)
+      .json({ error: 'receiptData or transactionId is required' });
   }
 
   try {
-    const verification = await verifyAppleSubscriptionReceipt(receiptData.trim());
-    const verifiedSubscription = verification.subscription;
+    let verification:
+      | Awaited<ReturnType<typeof verifyAppleSubscriptionReceipt>>
+      | {
+          status: number | null;
+          environment: string | null;
+          latestReceiptData: string | null;
+          subscription: null;
+        };
 
-    const nextStatus = verifiedSubscription?.status ?? 'inactive';
-    const isActive = Boolean(verifiedSubscription?.isActive);
+    if (normalizedReceiptData) {
+      verification = await verifyAppleSubscriptionReceipt(normalizedReceiptData);
+    } else {
+      verification = {
+        status: null,
+        environment: null,
+        latestReceiptData: null,
+        subscription: null,
+      };
+    }
+
+    const verifiedSubscription = verification.subscription;
+    let serverTransaction:
+      | Awaited<ReturnType<typeof getAppStoreServerTransactionById>>
+      | null = null;
+    let serverTransactionLookupFailed = false;
+
+    if (normalizedTransactionId) {
+      try {
+        serverTransaction = await getAppStoreServerTransactionById(normalizedTransactionId);
+      } catch (serverErr) {
+        serverTransactionLookupFailed = true;
+        logger.warn(toLogMessage('subscriptions.verify.app_store_server_api', serverErr));
+      }
+    }
+
+    if (serverTransaction?.productId && !isAllowedProductId(serverTransaction.productId)) {
+      return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Unsupported productId' });
+    }
+    if (productId && !isAllowedProductId(productId)) {
+      return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Unsupported productId' });
+    }
+
+    const hasReceiptActiveSubscription = Boolean(verifiedSubscription?.isActive);
+    const hasServerActiveSubscription = Boolean(serverTransaction?.isActive);
+    const isActive = hasReceiptActiveSubscription || hasServerActiveSubscription;
+
+    const nextStatus = hasServerActiveSubscription
+      ? 'active'
+      : normalizeSubscriptionStatus(verifiedSubscription?.status ?? null, 'inactive');
+    const source = hasServerActiveSubscription ? 'app_store_server_api' : 'app_store';
 
     const { error: upsertError } = await supabaseAdmin
       .from('user_subscriptions')
@@ -111,23 +209,37 @@ async function verify(req: Request, res: Response) {
         {
           user_id: userId,
           platform: typeof platform === 'string' && platform.trim() ? platform.trim() : 'ios',
-          source: 'app_store',
+          source,
           status: nextStatus,
           is_active: isActive,
-          product_id: verifiedSubscription?.productId ?? productId ?? null,
-          transaction_id: verifiedSubscription?.transactionId ?? transactionId ?? null,
+          product_id: serverTransaction?.productId ?? verifiedSubscription?.productId ?? productId ?? null,
+          transaction_id:
+            serverTransaction?.transactionId ??
+            verifiedSubscription?.transactionId ??
+            normalizedTransactionId,
           original_transaction_id:
-            verifiedSubscription?.originalTransactionId ?? originalTransactionId ?? null,
-          purchased_at: verifiedSubscription?.purchasedAt ?? null,
-          expires_at: verifiedSubscription?.expiresAt ?? null,
-          verification_environment: verification.environment,
+            serverTransaction?.originalTransactionId ??
+            verifiedSubscription?.originalTransactionId ??
+            originalTransactionId ??
+            null,
+          purchased_at: serverTransaction?.purchaseDate ?? verifiedSubscription?.purchasedAt ?? null,
+          expires_at: serverTransaction?.expiresDate ?? verifiedSubscription?.expiresAt ?? null,
+          verification_environment: serverTransaction?.environment ?? verification.environment ?? null,
           latest_receipt_status: verification.status,
-          latest_receipt_data: verification.latestReceiptData ?? receiptData.trim(),
+          latest_receipt_data: verification.latestReceiptData ?? normalizedReceiptData,
           metadata: {
             verifyRequestProductId: productId ?? null,
-            verifyRequestTransactionId: transactionId ?? null,
+            verifyRequestTransactionId: normalizedTransactionId,
             verifyRequestOriginalTransactionId: originalTransactionId ?? null,
             hasVerifiedSubscription: Boolean(verifiedSubscription),
+            hasServerTransaction: Boolean(serverTransaction),
+            serverTransactionLookupFailed,
+            verificationMethod:
+              hasServerActiveSubscription || Boolean(serverTransaction)
+                ? 'app_store_server_api'
+                : normalizedReceiptData
+                  ? 'verify_receipt'
+                  : 'none',
           },
           last_verified_at: new Date().toISOString(),
         },
@@ -135,7 +247,7 @@ async function verify(req: Request, res: Response) {
       );
 
     if (upsertError) {
-      logger.err(upsertError);
+      logger.err(toLogMessage('subscriptions.verify.upsert', upsertError));
       return res
         .status(HTTP_STATUS_CODES.InternalServerError)
         .json({ error: 'Failed to persist subscription verification' });
@@ -147,7 +259,8 @@ async function verify(req: Request, res: Response) {
     ]);
 
     return res.status(HTTP_STATUS_CODES.Ok).json({
-      verified: verification.status === 0 && Boolean(verifiedSubscription),
+      verified:
+        (verification.status === 0 && Boolean(verifiedSubscription)) || Boolean(serverTransaction?.isActive),
       hasActiveSubscription: access.hasActiveSubscription,
       requiresPaidMembership: access.requiresPaidMembership,
       ownerProfileCount: access.ownerProfileCount,
@@ -155,9 +268,72 @@ async function verify(req: Request, res: Response) {
       canJoinWithInviteCode: true,
       subscription: serializeSubscription(subscription),
       receiptStatus: verification.status,
+      verificationSource: source,
     });
   } catch (error) {
-    logger.err(error);
+    if (normalizedTransactionId) {
+      try {
+        const serverTransaction = await getAppStoreServerTransactionById(normalizedTransactionId);
+        if (serverTransaction && (!serverTransaction.productId || isAllowedProductId(serverTransaction.productId))) {
+          const { error: upsertError } = await supabaseAdmin.from('user_subscriptions').upsert(
+            {
+              user_id: userId,
+              platform: typeof platform === 'string' && platform.trim() ? platform.trim() : 'ios',
+              source: 'app_store_server_api',
+              status: normalizeSubscriptionStatus(serverTransaction.status, 'unknown'),
+              is_active: Boolean(serverTransaction.isActive),
+              product_id: serverTransaction.productId ?? productId ?? null,
+              transaction_id: serverTransaction.transactionId ?? normalizedTransactionId,
+              original_transaction_id:
+                serverTransaction.originalTransactionId ?? originalTransactionId ?? null,
+              purchased_at: serverTransaction.purchaseDate ?? null,
+              expires_at: serverTransaction.expiresDate ?? null,
+              verification_environment: serverTransaction.environment ?? null,
+              latest_receipt_status: null,
+              latest_receipt_data: normalizedReceiptData,
+              metadata: {
+                verifyRequestProductId: productId ?? null,
+                verifyRequestTransactionId: normalizedTransactionId,
+                verifyRequestOriginalTransactionId: originalTransactionId ?? null,
+                hasVerifiedSubscription: false,
+                hasServerTransaction: true,
+                verificationMethod: 'app_store_server_api_fallback_after_error',
+              },
+              last_verified_at: new Date().toISOString(),
+            },
+            { onConflict: 'user_id' }
+          );
+
+          if (upsertError) {
+            logger.err(toLogMessage('subscriptions.verify.fallback_upsert', upsertError));
+            return res
+              .status(HTTP_STATUS_CODES.InternalServerError)
+              .json({ error: 'Failed to persist subscription verification' });
+          }
+
+          const [access, subscription] = await Promise.all([
+            getSubscriptionAccessSnapshot(userId),
+            getUserSubscription(userId),
+          ]);
+
+          return res.status(HTTP_STATUS_CODES.Ok).json({
+            verified: Boolean(serverTransaction.isActive),
+            hasActiveSubscription: access.hasActiveSubscription,
+            requiresPaidMembership: access.requiresPaidMembership,
+            ownerProfileCount: access.ownerProfileCount,
+            memberProfileCount: access.memberProfileCount,
+            canJoinWithInviteCode: true,
+            subscription: serializeSubscription(subscription),
+            receiptStatus: null,
+            verificationSource: 'app_store_server_api',
+          });
+        }
+      } catch (fallbackError) {
+        logger.err(toLogMessage('subscriptions.verify.fallback', fallbackError));
+      }
+    }
+
+    logger.err(toLogMessage('subscriptions.verify', error));
     return res
       .status(HTTP_STATUS_CODES.BadGateway)
       .json({ error: 'Subscription verification failed' });
@@ -180,7 +356,7 @@ async function syncEntitlement(req: Request, res: Response) {
   } = req.body as {
     platform?: string;
     productId: string;
-    transactionId: string;
+    transactionId?: string;
     originalTransactionId?: string;
     purchasedAt?: string;
     expiresAt?: string;
@@ -192,31 +368,75 @@ async function syncEntitlement(req: Request, res: Response) {
 
   const existing = await getUserSubscription(userId);
   const nowIso = new Date().toISOString();
+  const normalizedTransactionId =
+    typeof transactionId === 'string' && transactionId.trim().length > 0 ? transactionId.trim() : null;
+  let serverTransaction:
+    | Awaited<ReturnType<typeof getAppStoreServerTransactionById>>
+    | null = null;
+  let serverTransactionLookupFailed = false;
+
+  if (normalizedTransactionId) {
+    try {
+      serverTransaction = await getAppStoreServerTransactionById(normalizedTransactionId);
+      if (serverTransaction?.productId && !isAllowedProductId(serverTransaction.productId)) {
+        return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Unsupported productId' });
+      }
+    } catch (error) {
+      serverTransactionLookupFailed = true;
+      logger.warn(toLogMessage('subscriptions.sync_entitlement.app_store_server_api', error));
+    }
+  }
+
+  const nextStatus = serverTransaction
+    ? normalizeSubscriptionStatus(serverTransaction.status, 'unknown')
+    : normalizeSubscriptionStatus(existing?.status ?? null, 'unknown');
+  const nextSource = serverTransaction
+    ? 'app_store_server_api'
+    : existing?.source ?? 'storekit_local_entitlement';
+  const nextIsActive = serverTransaction ? Boolean(serverTransaction.isActive) : Boolean(existing?.is_active);
+
   const { error: upsertError } = await supabaseAdmin.from('user_subscriptions').upsert(
     {
       user_id: userId,
       platform: typeof platform === 'string' && platform.trim() ? platform.trim() : 'ios',
-      source: existing?.source ?? 'storekit_local_entitlement',
-      status: existing?.status ?? 'reported_unverified',
-      is_active: existing?.is_active ?? false,
-      product_id: productId ?? null,
-      transaction_id: transactionId ?? null,
-      original_transaction_id: originalTransactionId ?? null,
-      purchased_at: purchasedAt ?? null,
-      expires_at: expiresAt ?? null,
-      verification_environment: existing?.verification_environment ?? null,
+      source: nextSource,
+      status: nextStatus,
+      is_active: nextIsActive,
+      product_id: serverTransaction?.productId ?? productId ?? null,
+      transaction_id: serverTransaction?.transactionId ?? normalizedTransactionId,
+      original_transaction_id:
+        serverTransaction?.originalTransactionId ?? originalTransactionId ?? null,
+      purchased_at: serverTransaction?.purchaseDate ?? purchasedAt ?? null,
+      expires_at: serverTransaction?.expiresDate ?? expiresAt ?? null,
+      verification_environment: serverTransaction?.environment ?? existing?.verification_environment ?? null,
       latest_receipt_status: existing?.latest_receipt_status ?? null,
       latest_receipt_data: existing?.latest_receipt_data ?? null,
       metadata: {
         ...(existing?.metadata ?? {}),
+        appStoreServerTransaction: serverTransaction
+          ? {
+              environment: serverTransaction.environment,
+              productId: serverTransaction.productId,
+              transactionId: serverTransaction.transactionId,
+              originalTransactionId: serverTransaction.originalTransactionId,
+              purchaseDate: serverTransaction.purchaseDate,
+              expiresDate: serverTransaction.expiresDate,
+              revocationDate: serverTransaction.revocationDate,
+              status: serverTransaction.status,
+              isActive: serverTransaction.isActive,
+              checkedAt: nowIso,
+            }
+          : null,
         entitlementReport: {
           source: 'storekit_entitlement',
           reportedAt: nowIso,
           productId,
-          transactionId,
+          transactionId: normalizedTransactionId,
           originalTransactionId: originalTransactionId ?? null,
           purchasedAt: purchasedAt ?? null,
           expiresAt: expiresAt ?? null,
+          appStoreServerApiChecked: Boolean(normalizedTransactionId),
+          appStoreServerApiLookupFailed: serverTransactionLookupFailed,
         },
       },
       last_verified_at: nowIso,
@@ -225,7 +445,7 @@ async function syncEntitlement(req: Request, res: Response) {
   );
 
   if (upsertError) {
-    logger.err(upsertError);
+    logger.err(toLogMessage('subscriptions.sync_entitlement.upsert', upsertError));
     return res
       .status(HTTP_STATUS_CODES.InternalServerError)
       .json({ error: 'Failed to persist subscription entitlement sync' });

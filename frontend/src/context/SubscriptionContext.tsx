@@ -54,8 +54,15 @@ type PurchaseActionResult = {
   hasActiveSubscription: boolean;
 };
 
+export type MembershipActivationNotice = {
+  productId: string | null;
+  planLabel: string | null;
+  activatedAt: string;
+};
+
 type SubscriptionContextValue = {
   status: SubscriptionStatusSnapshot | null;
+  membershipActivationNotice: MembershipActivationNotice | null;
   products: StoreProduct[];
   selectedDefaultProductId: string;
   isLoadingStatus: boolean;
@@ -68,6 +75,11 @@ type SubscriptionContextValue = {
   refreshProducts: () => Promise<StoreProduct[]>;
   purchase: (productId: string) => Promise<PurchaseActionResult>;
   restore: () => Promise<PurchaseActionResult>;
+  showMembershipActivationNotice: (notice: {
+    productId?: string | null;
+    planLabel?: string | null;
+  }) => void;
+  clearMembershipActivationNotice: () => void;
 };
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
@@ -136,6 +148,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [hasResolvedStatus, setHasResolvedStatus] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [productsError, setProductsError] = useState<string | null>(null);
+  const [membershipActivationNotice, setMembershipActivationNotice] =
+    useState<MembershipActivationNotice | null>(null);
   const lastStatusFetchAtRef = useRef(0);
   const statusRef = useRef<SubscriptionStatusSnapshot | null>(null);
 
@@ -248,33 +262,6 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         if (!normalized.hasActiveSubscription) {
           const activeEntitlement = await getActiveStoreEntitlement();
           if (activeEntitlement) {
-            const canSyncEntitlement =
-              typeof activeEntitlement.transactionId === 'string' &&
-              activeEntitlement.transactionId.trim().length > 0;
-
-            if (!canSyncEntitlement) {
-              const optimistic = buildActiveSnapshot(
-                normalized,
-                {
-                  productId: activeEntitlement.productId,
-                  transactionId: activeEntitlement.transactionId,
-                  originalTransactionId: activeEntitlement.originalTransactionId,
-                  purchasedAt: activeEntitlement.purchasedAt,
-                  expiresAt: activeEntitlement.expiresAt,
-                },
-                new Date().toISOString()
-              );
-              setStatus(optimistic);
-              setStatusError(null);
-              lastStatusFetchAtRef.current = Date.now();
-              logEvent('membership_status_reconciled_from_storekit', {
-                level: 'warning',
-                screen: 'SubscriptionContext',
-                extra: { productId: activeEntitlement.productId, synced: false },
-              });
-              return optimistic;
-            }
-
             try {
               const synced = await syncEntitlement({
                 productId: activeEntitlement.productId,
@@ -353,33 +340,6 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       } catch (err) {
         const activeEntitlement = await getActiveStoreEntitlement();
         if (activeEntitlement) {
-          const canSyncEntitlement =
-            typeof activeEntitlement.transactionId === 'string' &&
-            activeEntitlement.transactionId.trim().length > 0;
-
-          if (!canSyncEntitlement) {
-            const optimistic = buildActiveSnapshot(
-              null,
-              {
-                productId: activeEntitlement.productId,
-                transactionId: activeEntitlement.transactionId,
-                originalTransactionId: activeEntitlement.originalTransactionId,
-                purchasedAt: activeEntitlement.purchasedAt,
-                expiresAt: activeEntitlement.expiresAt,
-              },
-              new Date().toISOString()
-            );
-            setStatus(optimistic);
-            setStatusError(null);
-            lastStatusFetchAtRef.current = Date.now();
-            logEvent('membership_status_failed_recovered_from_storekit', {
-              level: 'warning',
-              screen: 'SubscriptionContext',
-              extra: { productId: activeEntitlement.productId, synced: false },
-            });
-            return optimistic;
-          }
-
           try {
             const synced = await syncEntitlement({
               productId: activeEntitlement.productId,
@@ -587,19 +547,11 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           };
           applyActiveEntitlement(entitlementPayload);
 
-          const canSyncEntitlement =
-            typeof entitlementPayload.productId === 'string' &&
-            entitlementPayload.productId.length > 0 &&
-            typeof entitlementPayload.transactionId === 'string' &&
-            entitlementPayload.transactionId.length > 0;
-
-          if (canSyncEntitlement) {
-            const syncProductId = entitlementPayload.productId as string;
-            const syncTransactionId = entitlementPayload.transactionId as string;
+          if (entitlementPayload.productId) {
             try {
               await syncEntitlement({
-                productId: syncProductId,
-                transactionId: syncTransactionId,
+                productId: entitlementPayload.productId,
+                transactionId: entitlementPayload.transactionId ?? null,
                 originalTransactionId: entitlementPayload.originalTransactionId ?? null,
                 purchasedAt: entitlementPayload.purchasedAt ?? null,
                 expiresAt: entitlementPayload.expiresAt ?? null,
@@ -740,12 +692,28 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     }
   }, [mapPurchaseOutcome, status?.hasActiveSubscription, toErrorMessage]);
 
+  const showMembershipActivationNotice = useCallback(
+    (notice: { productId?: string | null; planLabel?: string | null }) => {
+      setMembershipActivationNotice({
+        productId: notice.productId ?? null,
+        planLabel: notice.planLabel ?? null,
+        activatedAt: new Date().toISOString(),
+      });
+    },
+    []
+  );
+
+  const clearMembershipActivationNotice = useCallback(() => {
+    setMembershipActivationNotice(null);
+  }, []);
+
   useEffect(() => {
     if (!session) {
       setStatus(null);
       setProducts([]);
       setStatusError(null);
       setProductsError(null);
+      setMembershipActivationNotice(null);
       setHasResolvedStatus(true);
       setIsLoadingStatus(false);
       setIsLoadingProducts(false);
@@ -819,6 +787,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const value = useMemo<SubscriptionContextValue>(
     () => ({
       status,
+      membershipActivationNotice,
       products,
       selectedDefaultProductId,
       isLoadingStatus,
@@ -831,9 +800,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       refreshProducts,
       purchase,
       restore,
+      showMembershipActivationNotice,
+      clearMembershipActivationNotice,
     }),
     [
       status,
+      membershipActivationNotice,
       products,
       selectedDefaultProductId,
       isLoadingStatus,
@@ -846,6 +818,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       refreshProducts,
       purchase,
       restore,
+      showMembershipActivationNotice,
+      clearMembershipActivationNotice,
     ]
   );
 
