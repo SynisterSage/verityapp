@@ -12,9 +12,11 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { useAuth } from './AuthContext';
 import { authorizedFetch } from '../services/backend';
 import {
+  getStoreEntitlements,
   getStoreProducts,
   purchaseStoreProduct,
   restoreStorePurchases,
+  type Entitlement,
   type PurchaseResult,
   type StoreProduct,
 } from '../native/Subscriptions';
@@ -70,6 +72,14 @@ type SubscriptionContextValue = {
 
 const SubscriptionContext = createContext<SubscriptionContextValue | undefined>(undefined);
 
+type ActiveEntitlementInput = {
+  productId?: string | null;
+  transactionId?: string | null;
+  originalTransactionId?: string | null;
+  purchasedAt?: string | null;
+  expiresAt?: string | null;
+};
+
 function normalizeSubscriptionStatus(raw: any): SubscriptionStatusSnapshot {
   return {
     hasActiveSubscription: Boolean(raw?.hasActiveSubscription),
@@ -84,6 +94,35 @@ function normalizeSubscriptionStatus(raw: any): SubscriptionStatusSnapshot {
         : 0,
     canJoinWithInviteCode: raw?.canJoinWithInviteCode !== false,
     subscription: raw?.subscription ?? null,
+  };
+}
+
+function buildActiveSnapshot(
+  base: SubscriptionStatusSnapshot | null | undefined,
+  entitlement: ActiveEntitlementInput,
+  nowIso: string
+): SubscriptionStatusSnapshot {
+  return {
+    hasActiveSubscription: true,
+    requiresPaidMembership: false,
+    ownerProfileCount: base?.ownerProfileCount ?? 0,
+    memberProfileCount: base?.memberProfileCount ?? 0,
+    canJoinWithInviteCode: base?.canJoinWithInviteCode ?? true,
+    subscription: {
+      status: 'active',
+      isActive: true,
+      platform: 'ios',
+      source: 'storekit_local_entitlement',
+      productId: entitlement.productId ?? base?.subscription?.productId ?? null,
+      transactionId: entitlement.transactionId ?? base?.subscription?.transactionId ?? null,
+      originalTransactionId:
+        entitlement.originalTransactionId ?? base?.subscription?.originalTransactionId ?? null,
+      purchasedAt: entitlement.purchasedAt ?? base?.subscription?.purchasedAt ?? null,
+      expiresAt: entitlement.expiresAt ?? base?.subscription?.expiresAt ?? null,
+      verificationEnvironment: base?.subscription?.verificationEnvironment ?? null,
+      receiptStatus: base?.subscription?.receiptStatus ?? null,
+      lastVerifiedAt: nowIso,
+    },
   };
 }
 
@@ -121,6 +160,20 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     return raw;
   }, [toErrorMessage]);
 
+  const applyActiveEntitlement = useCallback(
+    (entitlement: ActiveEntitlementInput, options?: { fallback?: SubscriptionStatusSnapshot | null }) => {
+      const nowIso = new Date().toISOString();
+      setStatus((prev) => buildActiveSnapshot(prev ?? options?.fallback, entitlement, nowIso));
+      setStatusError(null);
+    },
+    []
+  );
+
+  const getActiveStoreEntitlement = useCallback(async (): Promise<Entitlement | null> => {
+    const local = await getStoreEntitlements().catch(() => ({ entitlements: [], receiptData: null }));
+    return local.entitlements.find((entitlement) => entitlement.isActive) ?? null;
+  }, []);
+
   const refreshStatus = useCallback(
     async (options?: { silent?: boolean }) => {
       if (!session) {
@@ -137,11 +190,62 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       try {
         const response = await authorizedFetch('/subscriptions/status');
         const normalized = normalizeSubscriptionStatus(response);
+
+        if (!normalized.hasActiveSubscription) {
+          const activeEntitlement = await getActiveStoreEntitlement();
+          if (activeEntitlement) {
+            const optimistic = buildActiveSnapshot(
+              normalized,
+              {
+                productId: activeEntitlement.productId,
+                transactionId: activeEntitlement.transactionId,
+                originalTransactionId: activeEntitlement.originalTransactionId,
+                purchasedAt: activeEntitlement.purchasedAt,
+                expiresAt: activeEntitlement.expiresAt,
+              },
+              new Date().toISOString()
+            );
+            setStatus(optimistic);
+            setStatusError(null);
+            lastStatusFetchAtRef.current = Date.now();
+            logEvent('membership_status_reconciled_from_storekit', {
+              level: 'warning',
+              screen: 'SubscriptionContext',
+              extra: { productId: activeEntitlement.productId },
+            });
+            return optimistic;
+          }
+        }
+
         setStatus(normalized);
         setStatusError(null);
         lastStatusFetchAtRef.current = Date.now();
         return normalized;
       } catch (err) {
+        const activeEntitlement = await getActiveStoreEntitlement();
+        if (activeEntitlement) {
+          const optimistic = buildActiveSnapshot(
+            null,
+            {
+              productId: activeEntitlement.productId,
+              transactionId: activeEntitlement.transactionId,
+              originalTransactionId: activeEntitlement.originalTransactionId,
+              purchasedAt: activeEntitlement.purchasedAt,
+              expiresAt: activeEntitlement.expiresAt,
+            },
+            new Date().toISOString()
+          );
+          setStatus(optimistic);
+          setStatusError(null);
+          lastStatusFetchAtRef.current = Date.now();
+          logEvent('membership_status_failed_recovered_from_storekit', {
+            level: 'warning',
+            screen: 'SubscriptionContext',
+            extra: { productId: activeEntitlement.productId },
+          });
+          return optimistic;
+        }
+
         const message = err instanceof Error ? err.message : 'Failed to load membership status';
         setStatusError(message);
         logError(err, {
@@ -156,7 +260,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         }
       }
     },
-    [session]
+    [getActiveStoreEntitlement, session]
   );
 
   const refreshProducts = useCallback(async () => {
@@ -242,54 +346,6 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     []
   );
 
-  const activateLocalEntitlement = useCallback((result: PurchaseResult) => {
-    const nowIso = new Date().toISOString();
-    const entitlement =
-      result.activeEntitlement && typeof result.activeEntitlement === 'object'
-        ? result.activeEntitlement
-        : null;
-
-    setStatus((prev) => {
-      const nextSubscription = {
-        status: 'active',
-        isActive: true,
-        platform: 'ios',
-        source: 'storekit_local_entitlement',
-        productId: entitlement?.productId ?? result.productId ?? prev?.subscription?.productId ?? null,
-        transactionId:
-          entitlement?.transactionId ?? result.transactionId ?? prev?.subscription?.transactionId ?? null,
-        originalTransactionId:
-          entitlement?.originalTransactionId ??
-          result.originalTransactionId ??
-          prev?.subscription?.originalTransactionId ??
-          null,
-        purchasedAt: entitlement?.purchasedAt ?? prev?.subscription?.purchasedAt ?? null,
-        expiresAt: entitlement?.expiresAt ?? prev?.subscription?.expiresAt ?? null,
-        verificationEnvironment: prev?.subscription?.verificationEnvironment ?? null,
-        receiptStatus: prev?.subscription?.receiptStatus ?? null,
-        lastVerifiedAt: nowIso,
-      };
-
-      if (prev) {
-        return {
-          ...prev,
-          hasActiveSubscription: true,
-          requiresPaidMembership: false,
-          subscription: nextSubscription,
-        };
-      }
-
-      return {
-        hasActiveSubscription: true,
-        requiresPaidMembership: false,
-        ownerProfileCount: 0,
-        memberProfileCount: 0,
-        canJoinWithInviteCode: true,
-        subscription: nextSubscription,
-      };
-    });
-  }, []);
-
   const mapPurchaseOutcome = useCallback(
     async (result: PurchaseResult): Promise<PurchaseActionResult> => {
       if (result.status === 'cancelled') {
@@ -321,7 +377,17 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
       if (!receiptData) {
         if (result.hasActiveEntitlement) {
-          activateLocalEntitlement(result);
+          const entitlement =
+            result.activeEntitlement && typeof result.activeEntitlement === 'object'
+              ? result.activeEntitlement
+              : null;
+          applyActiveEntitlement({
+            productId: entitlement?.productId ?? result.productId,
+            transactionId: entitlement?.transactionId ?? result.transactionId,
+            originalTransactionId: entitlement?.originalTransactionId ?? result.originalTransactionId,
+            purchasedAt: entitlement?.purchasedAt ?? null,
+            expiresAt: entitlement?.expiresAt ?? null,
+          });
           logEvent('membership_receipt_missing_used_local_entitlement', {
             level: 'warning',
             screen: 'SubscriptionContext',
@@ -360,7 +426,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         hasActiveSubscription,
       };
     },
-    [activateLocalEntitlement, status?.hasActiveSubscription, verifyReceipt]
+    [applyActiveEntitlement, status?.hasActiveSubscription, verifyReceipt]
   );
 
   const purchase = useCallback(
@@ -469,19 +535,35 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     // from native StoreKit invocation on some TestFlight environments.
     setIsLoadingProducts(false);
 
-    refreshStatus()
-      .catch(() => null)
-      .finally(() => {
-        if (!mounted) {
-          return;
-        }
-        setIsLoadingStatus(false);
-      });
+    void (async () => {
+      const activeEntitlement = await getActiveStoreEntitlement();
+      if (mounted && activeEntitlement) {
+        applyActiveEntitlement({
+          productId: activeEntitlement.productId,
+          transactionId: activeEntitlement.transactionId,
+          originalTransactionId: activeEntitlement.originalTransactionId,
+          purchasedAt: activeEntitlement.purchasedAt,
+          expiresAt: activeEntitlement.expiresAt,
+        });
+        setHasResolvedStatus(true);
+        logEvent('membership_status_bootstrapped_from_storekit', {
+          level: 'warning',
+          screen: 'SubscriptionContext',
+          extra: { productId: activeEntitlement.productId },
+        });
+      }
+
+      await refreshStatus().catch(() => null);
+      if (!mounted) {
+        return;
+      }
+      setIsLoadingStatus(false);
+    })();
 
     return () => {
       mounted = false;
     };
-  }, [session, refreshStatus]);
+  }, [applyActiveEntitlement, getActiveStoreEntitlement, session, refreshStatus]);
 
   useEffect(() => {
     if (!session) {

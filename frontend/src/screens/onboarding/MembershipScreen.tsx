@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -183,6 +184,7 @@ export default function MembershipScreen() {
     isProcessingPurchase,
     statusError,
     productsError,
+    refreshStatus,
     refreshProducts,
     purchase,
     restore,
@@ -202,6 +204,7 @@ export default function MembershipScreen() {
   const [footerHeight, setFooterHeight] = useState(156);
   const [showExitModal, setShowExitModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [isOpeningManage, setIsOpeningManage] = useState(false);
   const purchaseSuccessScale = useRef(new Animated.Value(0.84)).current;
   const purchaseSuccessOpacity = useRef(new Animated.Value(0)).current;
   const exitBackdropOpacity = useRef(new Animated.Value(0)).current;
@@ -339,10 +342,42 @@ export default function MembershipScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     setFeedback(null);
     const result = await restore();
+    await refreshStatus({ silent: true });
     if (result.status === 'purchased') {
       return;
     }
     setFeedback(toRestoreFeedback(result));
+  };
+
+  const handleManageInStore = async () => {
+    if (isOpeningManage || isProcessingPurchase) {
+      return;
+    }
+    setFeedback(null);
+    setIsOpeningManage(true);
+    void Haptics.selectionAsync().catch(() => null);
+    const targets = [
+      'itms-apps://apps.apple.com/account/subscriptions',
+      'https://apps.apple.com/account/subscriptions',
+    ];
+    try {
+      for (const target of targets) {
+        try {
+          await Linking.openURL(target);
+          return;
+        } catch {
+          continue;
+        }
+      }
+      setFeedback({
+        kind: 'failed',
+        title: 'Could not open subscriptions',
+        detail: 'Open iPhone Settings > Apple Account > Subscriptions to manage billing.',
+        tone: 'error',
+      });
+    } finally {
+      setIsOpeningManage(false);
+    }
   };
 
   const retryProducts = async () => {
@@ -518,6 +553,19 @@ export default function MembershipScreen() {
             disabled={isProcessingPurchase}
           >
             <Text style={styles.inlineButtonText}>Restore purchase</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.inlineButton,
+              pressed && styles.inlineButtonPressed,
+              (isProcessingPurchase || isOpeningManage) && styles.inlineButtonDisabled,
+            ]}
+            onPress={handleManageInStore}
+            disabled={isProcessingPurchase || isOpeningManage}
+          >
+            <Text style={styles.inlineButtonText}>
+              {isOpeningManage ? 'Opening…' : 'Manage subscription'}
+            </Text>
           </Pressable>
           {showInviteCodeAction ? (
             <Pressable
