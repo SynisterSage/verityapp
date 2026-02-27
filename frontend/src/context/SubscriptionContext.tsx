@@ -234,12 +234,42 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       });
 
       const normalized = normalizeSubscriptionStatus(response);
+      if (!normalized.hasActiveSubscription) {
+        const activeEntitlement = await getActiveStoreEntitlement().catch(() => null);
+        if (activeEntitlement) {
+          const optimistic = buildActiveSnapshot(
+            normalized,
+            {
+              productId: activeEntitlement.productId,
+              transactionId: activeEntitlement.transactionId ?? args.transactionId ?? null,
+              originalTransactionId:
+                activeEntitlement.originalTransactionId ?? args.originalTransactionId ?? null,
+              purchasedAt: activeEntitlement.purchasedAt ?? args.purchasedAt ?? null,
+              expiresAt: activeEntitlement.expiresAt ?? args.expiresAt ?? null,
+            },
+            new Date().toISOString()
+          );
+          setStatus(optimistic);
+          setStatusError(null);
+          lastStatusFetchAtRef.current = Date.now();
+          logEvent('membership_sync_entitlement_preserved_storekit_active', {
+            level: 'warning',
+            screen: 'SubscriptionContext',
+            extra: {
+              productId: activeEntitlement.productId,
+              reason: 'backend_sync_returned_inactive',
+            },
+          });
+          return optimistic;
+        }
+      }
+
       setStatus(normalized);
       setStatusError(null);
       lastStatusFetchAtRef.current = Date.now();
       return normalized;
     },
-    []
+    [getActiveStoreEntitlement]
   );
 
   const refreshStatus = useCallback(
