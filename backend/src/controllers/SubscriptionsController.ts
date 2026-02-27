@@ -11,6 +11,21 @@ import {
 } from '@src/services/subscriptionAccess';
 import supabaseAdmin from '@src/services/supabase';
 
+const DEFAULT_PRODUCT_IDS = ['verityprotect_monthly', 'verityprotect_annual'];
+const ALLOWED_PRODUCT_IDS = new Set(
+  (process.env.APPLE_SUBSCRIPTION_PRODUCT_IDS ?? DEFAULT_PRODUCT_IDS.join(','))
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+
+function isAllowedProductId(productId: string) {
+  if (ALLOWED_PRODUCT_IDS.size === 0) {
+    return true;
+  }
+  return ALLOWED_PRODUCT_IDS.has(productId);
+}
+
 function serializeSubscription(row: UserSubscriptionRow | null) {
   if (!row) {
     return null;
@@ -149,7 +164,90 @@ async function verify(req: Request, res: Response) {
   }
 }
 
+async function syncEntitlement(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const {
+    platform,
+    productId,
+    transactionId,
+    originalTransactionId,
+    purchasedAt,
+    expiresAt,
+  } = req.body as {
+    platform?: string;
+    productId: string;
+    transactionId: string;
+    originalTransactionId?: string;
+    purchasedAt?: string;
+    expiresAt?: string;
+  };
+
+  if (!isAllowedProductId(productId)) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Unsupported productId' });
+  }
+
+  const existing = await getUserSubscription(userId);
+  const nowIso = new Date().toISOString();
+  const { error: upsertError } = await supabaseAdmin.from('user_subscriptions').upsert(
+    {
+      user_id: userId,
+      platform: typeof platform === 'string' && platform.trim() ? platform.trim() : 'ios',
+      source: existing?.source ?? 'storekit_local_entitlement',
+      status: existing?.status ?? 'reported_unverified',
+      is_active: existing?.is_active ?? false,
+      product_id: productId ?? null,
+      transaction_id: transactionId ?? null,
+      original_transaction_id: originalTransactionId ?? null,
+      purchased_at: purchasedAt ?? null,
+      expires_at: expiresAt ?? null,
+      verification_environment: existing?.verification_environment ?? null,
+      latest_receipt_status: existing?.latest_receipt_status ?? null,
+      latest_receipt_data: existing?.latest_receipt_data ?? null,
+      metadata: {
+        ...(existing?.metadata ?? {}),
+        entitlementReport: {
+          source: 'storekit_entitlement',
+          reportedAt: nowIso,
+          productId,
+          transactionId,
+          originalTransactionId: originalTransactionId ?? null,
+          purchasedAt: purchasedAt ?? null,
+          expiresAt: expiresAt ?? null,
+        },
+      },
+      last_verified_at: nowIso,
+    },
+    { onConflict: 'user_id' }
+  );
+
+  if (upsertError) {
+    logger.err(upsertError);
+    return res
+      .status(HTTP_STATUS_CODES.InternalServerError)
+      .json({ error: 'Failed to persist subscription entitlement sync' });
+  }
+
+  const [access, subscription] = await Promise.all([
+    getSubscriptionAccessSnapshot(userId),
+    getUserSubscription(userId),
+  ]);
+
+  return res.status(HTTP_STATUS_CODES.Ok).json({
+    hasActiveSubscription: access.hasActiveSubscription,
+    requiresPaidMembership: access.requiresPaidMembership,
+    ownerProfileCount: access.ownerProfileCount,
+    memberProfileCount: access.memberProfileCount,
+    canJoinWithInviteCode: true,
+    subscription: serializeSubscription(subscription),
+  });
+}
+
 export default {
   status,
   verify,
+  syncEntitlement,
 };

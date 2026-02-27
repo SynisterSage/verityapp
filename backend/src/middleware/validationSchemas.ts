@@ -206,6 +206,23 @@ export const verifySubscriptionReceiptSchema = z
   })
   .strict();
 
+export const syncSubscriptionEntitlementSchema = z
+  .object({
+    platform: z.literal('ios').optional(),
+    productId: z.string().min(1).max(128),
+    transactionId: z.string().min(1).max(128),
+    originalTransactionId: z.string().min(1).max(128).optional(),
+    purchasedAt: z.string().datetime().optional(),
+    expiresAt: z.string().datetime().optional(),
+  })
+  .strict();
+
+export const appStoreNotificationSchema = z
+  .object({
+    signedPayload: z.string().min(20, 'signedPayload is required'),
+  })
+  .strict();
+
 // Type exports for use in controllers
 export type ResetPasswordRequest = z.infer<typeof resetPasswordSchema>;
 export type LegalAcceptanceRequest = z.infer<typeof legalAcceptanceSchema>;
@@ -228,3 +245,5 @@ export type AssignNumberRequest = z.infer<typeof assignNumberSchema>;
 export type CreateSupportMessageRequest = z.infer<typeof createSupportMessageSchema>;
 export type CreateSupportBugReportRequest = z.infer<typeof createSupportBugReportSchema>;
 export type VerifySubscriptionReceiptRequest = z.infer<typeof verifySubscriptionReceiptSchema>;
+export type SyncSubscriptionEntitlementRequest = z.infer<typeof syncSubscriptionEntitlementSchema>;
+export type AppStoreNotificationRequest = z.infer<typeof appStoreNotificationSchema>;

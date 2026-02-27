@@ -114,7 +114,9 @@ const apiLimiter = rateLimit({
   limit: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path.startsWith('/webhook/twilio'),
+  skip: (req) =>
+    req.path.startsWith('/webhook/twilio') ||
+    req.path.startsWith(Paths.Webhooks.AppleAppStoreNotifications),
 });
 
 // Show routes called in console during development

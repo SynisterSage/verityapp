@@ -542,35 +542,35 @@ export default function MembershipScreen() {
           })}
         </View>
 
-        <View style={[styles.actionsInline, !showInviteCodeAction && styles.actionsInlineSingle]}>
-          <Pressable
-            style={({ pressed }) => [
-              styles.inlineButton,
-              pressed && styles.inlineButtonPressed,
-              isProcessingPurchase && styles.inlineButtonDisabled,
-            ]}
-            onPress={handleRestore}
-            disabled={isProcessingPurchase}
-          >
-            <Text style={styles.inlineButtonText}>Restore purchase</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.inlineButton,
-              pressed && styles.inlineButtonPressed,
-              (isProcessingPurchase || isOpeningManage) && styles.inlineButtonDisabled,
-            ]}
-            onPress={handleManageInStore}
-            disabled={isProcessingPurchase || isOpeningManage}
-          >
-            <Text style={styles.inlineButtonText}>
-              {isOpeningManage ? 'Opening…' : 'Manage subscription'}
-            </Text>
-          </Pressable>
-          {showInviteCodeAction ? (
+        <View style={styles.actionsStack}>
+          <View style={[styles.actionsInline, !showInviteCodeAction && styles.actionsInlineSingle]}>
             <Pressable
               style={({ pressed }) => [
                 styles.inlineButton,
+                pressed && styles.inlineButtonPressed,
+                isProcessingPurchase && styles.inlineButtonDisabled,
+              ]}
+              onPress={handleRestore}
+              disabled={isProcessingPurchase}
+            >
+              <Text style={styles.inlineButtonText}>Restore</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.inlineButton,
+                pressed && styles.inlineButtonPressed,
+                (isProcessingPurchase || isOpeningManage) && styles.inlineButtonDisabled,
+              ]}
+              onPress={handleManageInStore}
+              disabled={isProcessingPurchase || isOpeningManage}
+            >
+              <Text style={styles.inlineButtonText}>{isOpeningManage ? 'Opening…' : 'Manage'}</Text>
+            </Pressable>
+          </View>
+          {showInviteCodeAction ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.inlineButtonSecondary,
                 pressed && styles.inlineButtonPressed,
                 isProcessingPurchase && styles.inlineButtonDisabled,
               ]}
@@ -583,7 +583,7 @@ export default function MembershipScreen() {
               }}
               disabled={isProcessingPurchase}
             >
-              <Text style={styles.inlineButtonText}>I have an invite code</Text>
+              <Text style={styles.inlineButtonSecondaryText}>I have an invite code</Text>
             </Pressable>
           ) : null}
         </View>
@@ -942,6 +942,9 @@ const createMembershipStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       gap: 10,
     },
+    actionsStack: {
+      gap: 10,
+    },
     actionsInlineSingle: {
       justifyContent: 'flex-start',
     },
@@ -964,6 +967,22 @@ const createMembershipStyles = (theme: AppTheme) =>
       fontSize: 14,
       fontWeight: '700',
       color: '#FFFFFF',
+      textAlign: 'center',
+    },
+    inlineButtonSecondary: {
+      minHeight: 52,
+      borderRadius: 16,
+      backgroundColor: withOpacity(theme.colors.textMuted, 0.12),
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.textMuted, 0.34),
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 14,
+    },
+    inlineButtonSecondaryText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.colors.text,
       textAlign: 'center',
     },
     billingCard: {

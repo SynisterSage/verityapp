@@ -137,6 +137,11 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [statusError, setStatusError] = useState<string | null>(null);
   const [productsError, setProductsError] = useState<string | null>(null);
   const lastStatusFetchAtRef = useRef(0);
+  const statusRef = useRef<SubscriptionStatusSnapshot | null>(null);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
 
   const toErrorMessage = useCallback((err: unknown, fallback: string) => {
     const raw = err instanceof Error && err.message.trim().length > 0 ? err.message.trim() : fallback;
@@ -174,6 +179,55 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     return local.entitlements.find((entitlement) => entitlement.isActive) ?? null;
   }, []);
 
+  const shouldPreserveLocalActive = useCallback((snapshot: SubscriptionStatusSnapshot | null) => {
+    if (!snapshot?.hasActiveSubscription) {
+      return false;
+    }
+    if (snapshot.subscription?.source !== 'storekit_local_entitlement') {
+      return false;
+    }
+
+    const expiresAt = Date.parse(snapshot.subscription?.expiresAt ?? '');
+    if (Number.isFinite(expiresAt) && expiresAt > Date.now()) {
+      return true;
+    }
+
+    const verifiedAt = Date.parse(snapshot.subscription?.lastVerifiedAt ?? '');
+    if (!Number.isFinite(verifiedAt)) {
+      return false;
+    }
+    return Date.now() - verifiedAt < 15 * 60 * 1000;
+  }, []);
+
+  const syncEntitlement = useCallback(
+    async (args: {
+      productId: string;
+      transactionId?: string | null;
+      originalTransactionId?: string | null;
+      purchasedAt?: string | null;
+      expiresAt?: string | null;
+    }) => {
+      const response = await authorizedFetch('/subscriptions/sync-entitlement', {
+        method: 'POST',
+        body: JSON.stringify({
+          platform: 'ios',
+          productId: args.productId,
+          transactionId: args.transactionId ?? undefined,
+          originalTransactionId: args.originalTransactionId ?? undefined,
+          purchasedAt: args.purchasedAt ?? undefined,
+          expiresAt: args.expiresAt ?? undefined,
+        }),
+      });
+
+      const normalized = normalizeSubscriptionStatus(response);
+      setStatus(normalized);
+      setStatusError(null);
+      lastStatusFetchAtRef.current = Date.now();
+      return normalized;
+    },
+    []
+  );
+
   const refreshStatus = useCallback(
     async (options?: { silent?: boolean }) => {
       if (!session) {
@@ -194,8 +248,118 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         if (!normalized.hasActiveSubscription) {
           const activeEntitlement = await getActiveStoreEntitlement();
           if (activeEntitlement) {
+            const canSyncEntitlement =
+              typeof activeEntitlement.transactionId === 'string' &&
+              activeEntitlement.transactionId.trim().length > 0;
+
+            if (!canSyncEntitlement) {
+              const optimistic = buildActiveSnapshot(
+                normalized,
+                {
+                  productId: activeEntitlement.productId,
+                  transactionId: activeEntitlement.transactionId,
+                  originalTransactionId: activeEntitlement.originalTransactionId,
+                  purchasedAt: activeEntitlement.purchasedAt,
+                  expiresAt: activeEntitlement.expiresAt,
+                },
+                new Date().toISOString()
+              );
+              setStatus(optimistic);
+              setStatusError(null);
+              lastStatusFetchAtRef.current = Date.now();
+              logEvent('membership_status_reconciled_from_storekit', {
+                level: 'warning',
+                screen: 'SubscriptionContext',
+                extra: { productId: activeEntitlement.productId, synced: false },
+              });
+              return optimistic;
+            }
+
+            try {
+              const synced = await syncEntitlement({
+                productId: activeEntitlement.productId,
+                transactionId: activeEntitlement.transactionId ?? null,
+                originalTransactionId: activeEntitlement.originalTransactionId ?? null,
+                purchasedAt: activeEntitlement.purchasedAt ?? null,
+                expiresAt: activeEntitlement.expiresAt ?? null,
+              });
+              logEvent('membership_status_reconciled_from_storekit', {
+                level: 'warning',
+                screen: 'SubscriptionContext',
+                extra: { productId: activeEntitlement.productId, synced: true },
+              });
+              return synced;
+            } catch (syncErr) {
+              logError(syncErr, {
+                screen: 'SubscriptionContext',
+                extra: {
+                  reason: 'sync_entitlement_failed_during_refresh',
+                  productId: activeEntitlement.productId,
+                },
+              });
+
+              const optimistic = buildActiveSnapshot(
+                normalized,
+                {
+                  productId: activeEntitlement.productId,
+                  transactionId: activeEntitlement.transactionId,
+                  originalTransactionId: activeEntitlement.originalTransactionId,
+                  purchasedAt: activeEntitlement.purchasedAt,
+                  expiresAt: activeEntitlement.expiresAt,
+                },
+                new Date().toISOString()
+              );
+              setStatus(optimistic);
+              setStatusError(null);
+              lastStatusFetchAtRef.current = Date.now();
+              logEvent('membership_status_reconciled_from_storekit', {
+                level: 'warning',
+                screen: 'SubscriptionContext',
+                extra: { productId: activeEntitlement.productId, synced: false },
+              });
+              return optimistic;
+            }
+          }
+
+          const previous = statusRef.current;
+          if (shouldPreserveLocalActive(previous)) {
+            const previousSnapshot = previous as SubscriptionStatusSnapshot;
+            const held: SubscriptionStatusSnapshot = {
+              ...previousSnapshot,
+              ownerProfileCount: normalized.ownerProfileCount,
+              memberProfileCount: normalized.memberProfileCount,
+              canJoinWithInviteCode: normalized.canJoinWithInviteCode,
+              requiresPaidMembership: normalized.requiresPaidMembership,
+            };
+            setStatus(held);
+            setStatusError(null);
+            lastStatusFetchAtRef.current = Date.now();
+            logEvent('membership_status_preserved_local_active', {
+              level: 'warning',
+              screen: 'SubscriptionContext',
+              extra: {
+                reason: 'backend_inactive_without_entitlement',
+                productId: previous?.subscription?.productId ?? null,
+              },
+            });
+            return held;
+          }
+        }
+
+        setStatus(normalized);
+        setStatusError(null);
+        lastStatusFetchAtRef.current = Date.now();
+        return normalized;
+      } catch (err) {
+        const activeEntitlement = await getActiveStoreEntitlement();
+        if (activeEntitlement) {
+          const canSyncEntitlement =
+            typeof activeEntitlement.transactionId === 'string' &&
+            activeEntitlement.transactionId.trim().length > 0;
+
+          if (!canSyncEntitlement) {
             const optimistic = buildActiveSnapshot(
-              normalized,
+              null,
               {
                 productId: activeEntitlement.productId,
                 transactionId: activeEntitlement.transactionId,
@@ -208,42 +372,75 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
             setStatus(optimistic);
             setStatusError(null);
             lastStatusFetchAtRef.current = Date.now();
-            logEvent('membership_status_reconciled_from_storekit', {
+            logEvent('membership_status_failed_recovered_from_storekit', {
               level: 'warning',
               screen: 'SubscriptionContext',
-              extra: { productId: activeEntitlement.productId },
+              extra: { productId: activeEntitlement.productId, synced: false },
+            });
+            return optimistic;
+          }
+
+          try {
+            const synced = await syncEntitlement({
+              productId: activeEntitlement.productId,
+              transactionId: activeEntitlement.transactionId ?? null,
+              originalTransactionId: activeEntitlement.originalTransactionId ?? null,
+              purchasedAt: activeEntitlement.purchasedAt ?? null,
+              expiresAt: activeEntitlement.expiresAt ?? null,
+            });
+            logEvent('membership_status_failed_recovered_from_storekit', {
+              level: 'warning',
+              screen: 'SubscriptionContext',
+              extra: { productId: activeEntitlement.productId, synced: true },
+            });
+            return synced;
+          } catch (syncErr) {
+            logError(syncErr, {
+              screen: 'SubscriptionContext',
+              extra: {
+                reason: 'sync_entitlement_failed_after_refresh_error',
+                productId: activeEntitlement.productId,
+              },
+            });
+
+            const optimistic = buildActiveSnapshot(
+              null,
+              {
+                productId: activeEntitlement.productId,
+                transactionId: activeEntitlement.transactionId,
+                originalTransactionId: activeEntitlement.originalTransactionId,
+                purchasedAt: activeEntitlement.purchasedAt,
+                expiresAt: activeEntitlement.expiresAt,
+              },
+              new Date().toISOString()
+            );
+            setStatus(optimistic);
+            setStatusError(null);
+            lastStatusFetchAtRef.current = Date.now();
+            logEvent('membership_status_failed_recovered_from_storekit', {
+              level: 'warning',
+              screen: 'SubscriptionContext',
+              extra: { productId: activeEntitlement.productId, synced: false },
             });
             return optimistic;
           }
         }
 
-        setStatus(normalized);
-        setStatusError(null);
-        lastStatusFetchAtRef.current = Date.now();
-        return normalized;
-      } catch (err) {
-        const activeEntitlement = await getActiveStoreEntitlement();
-        if (activeEntitlement) {
-          const optimistic = buildActiveSnapshot(
-            null,
-            {
-              productId: activeEntitlement.productId,
-              transactionId: activeEntitlement.transactionId,
-              originalTransactionId: activeEntitlement.originalTransactionId,
-              purchasedAt: activeEntitlement.purchasedAt,
-              expiresAt: activeEntitlement.expiresAt,
-            },
-            new Date().toISOString()
-          );
-          setStatus(optimistic);
+        const previous = statusRef.current;
+        if (shouldPreserveLocalActive(previous)) {
+          const previousSnapshot = previous as SubscriptionStatusSnapshot;
+          setStatus(previousSnapshot);
           setStatusError(null);
           lastStatusFetchAtRef.current = Date.now();
-          logEvent('membership_status_failed_recovered_from_storekit', {
+          logEvent('membership_status_preserved_on_refresh_error', {
             level: 'warning',
             screen: 'SubscriptionContext',
-            extra: { productId: activeEntitlement.productId },
+            extra: {
+              reason: 'status_refresh_failed',
+              productId: previousSnapshot.subscription?.productId ?? null,
+            },
           });
-          return optimistic;
+          return previousSnapshot;
         }
 
         const message = err instanceof Error ? err.message : 'Failed to load membership status';
@@ -260,7 +457,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         }
       }
     },
-    [getActiveStoreEntitlement, session]
+    [getActiveStoreEntitlement, session, shouldPreserveLocalActive, syncEntitlement]
   );
 
   const refreshProducts = useCallback(async () => {
@@ -381,19 +578,47 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
             result.activeEntitlement && typeof result.activeEntitlement === 'object'
               ? result.activeEntitlement
               : null;
-          applyActiveEntitlement({
+          const entitlementPayload = {
             productId: entitlement?.productId ?? result.productId,
             transactionId: entitlement?.transactionId ?? result.transactionId,
             originalTransactionId: entitlement?.originalTransactionId ?? result.originalTransactionId,
             purchasedAt: entitlement?.purchasedAt ?? null,
             expiresAt: entitlement?.expiresAt ?? null,
-          });
+          };
+          applyActiveEntitlement(entitlementPayload);
+
+          const canSyncEntitlement =
+            typeof entitlementPayload.productId === 'string' &&
+            entitlementPayload.productId.length > 0 &&
+            typeof entitlementPayload.transactionId === 'string' &&
+            entitlementPayload.transactionId.length > 0;
+
+          if (canSyncEntitlement) {
+            const syncProductId = entitlementPayload.productId as string;
+            const syncTransactionId = entitlementPayload.transactionId as string;
+            try {
+              await syncEntitlement({
+                productId: syncProductId,
+                transactionId: syncTransactionId,
+                originalTransactionId: entitlementPayload.originalTransactionId ?? null,
+                purchasedAt: entitlementPayload.purchasedAt ?? null,
+                expiresAt: entitlementPayload.expiresAt ?? null,
+              });
+            } catch (syncErr) {
+              logError(syncErr, {
+                screen: 'SubscriptionContext',
+                extra: {
+                  reason: 'sync_entitlement_failed_after_purchase',
+                  productId: entitlementPayload.productId,
+                },
+              });
+            }
+          }
           logEvent('membership_receipt_missing_used_local_entitlement', {
             level: 'warning',
             screen: 'SubscriptionContext',
             extra: {
               productId: result.productId ?? null,
-              transactionId: result.transactionId ?? null,
             },
           });
           return {
@@ -426,7 +651,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         hasActiveSubscription,
       };
     },
-    [applyActiveEntitlement, status?.hasActiveSubscription, verifyReceipt]
+    [applyActiveEntitlement, status?.hasActiveSubscription, syncEntitlement, verifyReceipt]
   );
 
   const purchase = useCallback(

@@ -22,10 +22,15 @@ const PATHS = {
     _: '/auth',
     ResetPassword: '/reset-password',
   },
+  Webhooks: {
+    _: '/webhook',
+    AppleAppStoreNotifications: '/apple/app-store-notifications',
+  },
   Subscriptions: {
     _: '/subscriptions',
     Status: '/status',
     Verify: '/verify',
+    SyncEntitlement: '/sync-entitlement',
   },
   Fraud: {
     _: '/fraud',

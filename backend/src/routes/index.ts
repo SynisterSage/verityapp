@@ -12,6 +12,7 @@ import SubscriptionsRoutes from './SubscriptionsRoutes';
 import SupportRoutes from './SupportRoutes';
 import SupportTicketsRoutes from './SupportTicketsRoutes';
 import SupportSetupRoutes from './SupportSetupRoutes';
+import AppStoreNotificationsRoutes from './AppStoreNotificationsRoutes';
 import TwilioNumberPoolController from '@src/controllers/TwilioNumberPoolController';
 import { validateRequest } from '@src/middleware/validateRequest';
 import { assignNumberSchema } from '@src/middleware/validationSchemas';
@@ -49,6 +50,7 @@ const assignNumberLimiter = rateLimit({
 });
 
 apiRouter.use('/webhook/twilio', TwilioRoutes);
+apiRouter.use(PATHS.Webhooks.AppleAppStoreNotifications, AppStoreNotificationsRoutes);
 apiRouter.use(PATHS.Calls._, CallsRoutes);
 apiRouter.use(PATHS.Alerts._, AlertsRoutes);
 apiRouter.use(PATHS.Fraud._, FraudRoutes);
