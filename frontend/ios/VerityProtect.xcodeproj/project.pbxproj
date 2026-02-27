@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 60;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -517,6 +517,8 @@
 					"FB_SONARKIT_ENABLED=1",
 				);
 				INFOPLIST_FILE = VerityProtect/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Verity Protect";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -555,6 +557,8 @@
 				DEVELOPMENT_TEAM = CAY3N8J725;
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = CAY3N8J725;
 				INFOPLIST_FILE = VerityProtect/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Verity Protect";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.productivity";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

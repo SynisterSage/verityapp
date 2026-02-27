@@ -143,6 +143,15 @@ class VerityLiveActivityModule: NSObject {
 
 @objc(VeritySubscriptionsModule)
 class VeritySubscriptionsModule: NSObject {
+  override init() {
+    super.init()
+#if canImport(StoreKit)
+    if #available(iOS 15.0, *) {
+      VeritySubscriptionsModule.startTransactionUpdatesObserverIfNeeded()
+    }
+#endif
+  }
+
   @objc static func requiresMainQueueSetup() -> Bool {
     return false
   }
@@ -171,7 +180,7 @@ class VeritySubscriptionsModule: NSObject {
 
     Task {
       do {
-        let products = try await Product.products(for: Set(ids))
+        let products = try await fetchProducts(Set(ids))
 
         guard !products.isEmpty else {
           let bundleId = Bundle.main.bundleIdentifier ?? "unknown-bundle"
@@ -218,7 +227,7 @@ class VeritySubscriptionsModule: NSObject {
 
     Task {
       do {
-        let products = try await Product.products(for: [normalizedProductId])
+        let products = try await fetchProducts(Set([normalizedProductId]))
 
         guard let selectedProduct = products.first else {
           resolver([
@@ -245,15 +254,21 @@ class VeritySubscriptionsModule: NSObject {
           ])
         case .success(let verificationResult):
           let transaction = try checkVerified(verificationResult)
-          let receiptData = try await fetchReceiptData()
+          await transaction.finish()
+          await syncAppStoreBestEffort()
+          let entitlements = await loadCurrentEntitlementsWithRetry()
+          let receiptData = try? await fetchReceiptData()
+          let activeEntitlement = entitlements.first { ($0["isActive"] as? Bool) == true }
           let payload: [String: Any] = [
             "status": "purchased",
             "productId": transaction.productID,
             "transactionId": String(transaction.id),
             "originalTransactionId": String(transaction.originalID),
-            "receiptData": receiptData,
+            "receiptData": bridgeValue(receiptData),
+            "entitlements": entitlements,
+            "hasActiveEntitlement": activeEntitlement != nil,
+            "activeEntitlement": bridgeValue(activeEntitlement),
           ]
-          await transaction.finish()
           resolver(payload)
         @unknown default:
           resolver([
@@ -284,8 +299,8 @@ class VeritySubscriptionsModule: NSObject {
 
     Task {
       do {
-        try await AppStore.sync()
-        let entitlements = try await loadCurrentEntitlements()
+        await syncAppStoreBestEffort()
+        let entitlements = await loadCurrentEntitlementsWithRetry()
         let receiptData = try? await fetchReceiptData()
         let activeEntitlement = entitlements.first { ($0["isActive"] as? Bool) == true }
         guard let activeEntitlement else {
@@ -325,7 +340,7 @@ class VeritySubscriptionsModule: NSObject {
 
     Task {
       do {
-        let entitlements = try await loadCurrentEntitlements()
+        let entitlements = await loadCurrentEntitlementsWithRetry()
         let receiptData = try? await fetchReceiptData()
         resolver([
           "entitlements": entitlements,
@@ -384,6 +399,29 @@ private func bridgeValue(_ value: Any?) -> Any {
 }
 
 @available(iOS 15.0, *)
+private extension VeritySubscriptionsModule {
+  static var updatesObserverStarted = false
+  static var updatesObserverTask: Task<Void, Never>?
+
+  static func startTransactionUpdatesObserverIfNeeded() {
+    guard !updatesObserverStarted else {
+      return
+    }
+    updatesObserverStarted = true
+    updatesObserverTask = Task.detached(priority: .background) {
+      for await result in Transaction.updates {
+        do {
+          let transaction = try checkVerified(result)
+          await transaction.finish()
+        } catch {
+          NSLog("[VeritySubscriptions] Failed to verify transaction update: \(error.localizedDescription)")
+        }
+      }
+    }
+  }
+}
+
+@available(iOS 15.0, *)
 private func mapProduct(_ product: Product) -> [String: Any] {
   let subscriptionPeriodUnit = product.subscription?.subscriptionPeriod.unit
   let periodUnit: String?
@@ -410,6 +448,39 @@ private func mapProduct(_ product: Product) -> [String: Any] {
     "subscriptionPeriodUnit": bridgeValue(periodUnit),
     "subscriptionPeriodCount": bridgeValue(product.subscription?.subscriptionPeriod.value),
   ]
+}
+
+@available(iOS 15.0, *)
+private func fetchProducts(_ productIds: Set<String>, retries: Int = 1) async throws -> [Product] {
+  let products = try await Product.products(for: productIds)
+  if !products.isEmpty || retries <= 0 {
+    return products
+  }
+
+  try? await Task.sleep(nanoseconds: 500_000_000)
+  return try await fetchProducts(productIds, retries: retries - 1)
+}
+
+@available(iOS 15.0, *)
+private func syncAppStoreBestEffort() async {
+  do {
+    try await AppStore.sync()
+  } catch {
+    NSLog("[VeritySubscriptions] AppStore.sync failed: \(error.localizedDescription)")
+  }
+}
+
+@available(iOS 15.0, *)
+private func loadCurrentEntitlementsWithRetry(retries: Int = 2) async -> [[String: Any]] {
+  for attempt in 0...retries {
+    if let entitlements = try? await loadCurrentEntitlements(), !entitlements.isEmpty {
+      return entitlements
+    }
+    if attempt < retries {
+      try? await Task.sleep(nanoseconds: 500_000_000)
+    }
+  }
+  return (try? await loadCurrentEntitlements()) ?? []
 }
 
 @available(iOS 15.0, *)
