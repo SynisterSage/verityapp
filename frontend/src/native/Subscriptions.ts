@@ -17,6 +17,8 @@ export type PurchaseResult = {
   transactionId?: string | null;
   originalTransactionId?: string | null;
   receiptData?: string | null;
+  hasActiveEntitlement?: boolean;
+  activeEntitlement?: Entitlement | null;
   message?: string | null;
 };
 

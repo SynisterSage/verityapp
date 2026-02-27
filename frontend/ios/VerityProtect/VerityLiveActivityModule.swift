@@ -317,6 +317,8 @@ class VeritySubscriptionsModule: NSObject {
           "transactionId": bridgeValue(activeEntitlement["transactionId"] as? String),
           "originalTransactionId": bridgeValue(activeEntitlement["originalTransactionId"] as? String),
           "receiptData": bridgeValue(receiptData),
+          "hasActiveEntitlement": true,
+          "activeEntitlement": activeEntitlement,
         ])
       } catch {
         rejecter("STOREKIT_RESTORE_FAILED", error.localizedDescription, error)

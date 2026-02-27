@@ -242,6 +242,54 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     []
   );
 
+  const activateLocalEntitlement = useCallback((result: PurchaseResult) => {
+    const nowIso = new Date().toISOString();
+    const entitlement =
+      result.activeEntitlement && typeof result.activeEntitlement === 'object'
+        ? result.activeEntitlement
+        : null;
+
+    setStatus((prev) => {
+      const nextSubscription = {
+        status: 'active',
+        isActive: true,
+        platform: 'ios',
+        source: 'storekit_local_entitlement',
+        productId: entitlement?.productId ?? result.productId ?? prev?.subscription?.productId ?? null,
+        transactionId:
+          entitlement?.transactionId ?? result.transactionId ?? prev?.subscription?.transactionId ?? null,
+        originalTransactionId:
+          entitlement?.originalTransactionId ??
+          result.originalTransactionId ??
+          prev?.subscription?.originalTransactionId ??
+          null,
+        purchasedAt: entitlement?.purchasedAt ?? prev?.subscription?.purchasedAt ?? null,
+        expiresAt: entitlement?.expiresAt ?? prev?.subscription?.expiresAt ?? null,
+        verificationEnvironment: prev?.subscription?.verificationEnvironment ?? null,
+        receiptStatus: prev?.subscription?.receiptStatus ?? null,
+        lastVerifiedAt: nowIso,
+      };
+
+      if (prev) {
+        return {
+          ...prev,
+          hasActiveSubscription: true,
+          requiresPaidMembership: false,
+          subscription: nextSubscription,
+        };
+      }
+
+      return {
+        hasActiveSubscription: true,
+        requiresPaidMembership: false,
+        ownerProfileCount: 0,
+        memberProfileCount: 0,
+        canJoinWithInviteCode: true,
+        subscription: nextSubscription,
+      };
+    });
+  }, []);
+
   const mapPurchaseOutcome = useCallback(
     async (result: PurchaseResult): Promise<PurchaseActionResult> => {
       if (result.status === 'cancelled') {
@@ -272,6 +320,23 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           : null;
 
       if (!receiptData) {
+        if (result.hasActiveEntitlement) {
+          activateLocalEntitlement(result);
+          logEvent('membership_receipt_missing_used_local_entitlement', {
+            level: 'warning',
+            screen: 'SubscriptionContext',
+            extra: {
+              productId: result.productId ?? null,
+              transactionId: result.transactionId ?? null,
+            },
+          });
+          return {
+            status: 'purchased',
+            message: 'Membership activated from App Store entitlement.',
+            hasActiveSubscription: true,
+          };
+        }
+
         return {
           status: 'failed',
           message: 'Could not verify purchase receipt. Try restore purchase.',
@@ -295,7 +360,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         hasActiveSubscription,
       };
     },
-    [status?.hasActiveSubscription, verifyReceipt]
+    [activateLocalEntitlement, status?.hasActiveSubscription, verifyReceipt]
   );
 
   const purchase = useCallback(
