@@ -40,6 +40,8 @@ type AuthContextValue = {
   /** Call this before any operation that will cause Supabase to fire SIGNED_OUT
    *  server-side (e.g. account deletion), so the session-expired modal is suppressed. */
   markSignOutIntentional: () => void;
+  /** Dismiss the session-expired banner after the user acknowledges it. */
+  clearSessionExpired: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -385,6 +387,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       markSignOutIntentional: () => {
         intentionalSignOutRef.current = true;
         hadSessionRef.current = false;
+        setSessionExpired(false);
+      },
+      clearSessionExpired: () => {
         setSessionExpired(false);
       },
     }),

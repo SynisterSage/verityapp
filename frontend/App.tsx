@@ -94,6 +94,7 @@ import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientM
 import { logEvent } from './src/services/sentry';
 import type { AppTheme } from './src/theme/tokens';
 import { withOpacity } from './src/utils/color';
+import { initReviewPrompt } from './src/hooks/useReviewPrompt';
 
 enableScreens(true);
 
@@ -1201,38 +1202,18 @@ type SessionExpiredModalProps = {
   visible: boolean;
   theme: AppTheme;
   mode: string;
-  signIn: (email: string, password: string) => Promise<string | null>;
+  onDismiss: () => void;
 };
 
-function SessionExpiredModal({ visible, theme, mode, signIn }: SessionExpiredModalProps) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleSignIn = useCallback(async () => {
-    if (!email.trim() || !password) {
-      setError('Enter your email and password.');
-      return;
-    }
-    setIsSigningIn(true);
-    setError(null);
-    try {
-      const err = await signIn(email.trim(), password);
-      if (err) {
-        setError(err);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Sign in failed. Try again.');
-    } finally {
-      setIsSigningIn(false);
-    }
-  }, [email, password, signIn]);
-
+function SessionExpiredModal({ visible, theme, mode, onDismiss }: SessionExpiredModalProps) {
   const isDark = mode === 'dark';
   const cardBg = theme.colors.surface;
   const overlayBg = isDark ? 'rgba(0,0,0,0.72)' : 'rgba(15,23,42,0.55)';
-  const inputBg = theme.colors.surfaceAlt;
+
+  const handleOk = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onDismiss();
+  }, [onDismiss]);
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
@@ -1240,64 +1221,45 @@ function SessionExpiredModal({ visible, theme, mode, signIn }: SessionExpiredMod
         <View style={{
           backgroundColor: cardBg,
           borderRadius: 28,
-          padding: 24,
-          gap: 16,
+          padding: 28,
+          gap: 20,
+          alignItems: 'center',
           shadowColor: '#000',
           shadowOpacity: isDark ? 0.45 : 0.18,
           shadowRadius: 28,
           shadowOffset: { width: 0, height: 14 },
           elevation: 16,
         }}>
-          <View style={{ alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text, textAlign: 'center' }}>
-              Session expired
+          {/* Icon */}
+          <View style={{
+            width: 56, height: 56, borderRadius: 18,
+            backgroundColor: withOpacity(theme.colors.warning, 0.12),
+            alignItems: 'center', justifyContent: 'center',
+          }}>
+            <Ionicons name="lock-closed" size={26} color={theme.colors.warning} />
+          </View>
+
+          {/* Copy */}
+          <View style={{ gap: 6, alignItems: 'center' }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text, textAlign: 'center' }}>
+              You were signed out
             </Text>
             <Text style={{ fontSize: 14, lineHeight: 20, color: theme.colors.textMuted, textAlign: 'center' }}>
-              Your session timed out. Sign back in to continue where you left off.
+              Your session ended automatically for your security. Sign back in to pick up where you left off.
             </Text>
           </View>
-          <TextInput
-            style={{
-              height: 50, borderRadius: 16, paddingHorizontal: 16,
-              backgroundColor: inputBg, color: theme.colors.text, fontSize: 15,
-            }}
-            placeholder="Email"
-            placeholderTextColor={withOpacity(theme.colors.textMuted, 0.7)}
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoCorrect={false}
-            editable={!isSigningIn}
-          />
-          <TextInput
-            style={{
-              height: 50, borderRadius: 16, paddingHorizontal: 16,
-              backgroundColor: inputBg, color: theme.colors.text, fontSize: 15,
-            }}
-            placeholder="Password"
-            placeholderTextColor={withOpacity(theme.colors.textMuted, 0.7)}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            editable={!isSigningIn}
-          />
-          {error ? (
-            <Text style={{ fontSize: 13, color: theme.colors.danger, fontWeight: '600', textAlign: 'center' }}>
-              {error}
-            </Text>
-          ) : null}
+
+          {/* OK button */}
           <Pressable
             style={({ pressed }) => ({
-              height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
-              backgroundColor: theme.colors.accent, opacity: (pressed || isSigningIn) ? 0.75 : 1,
+              width: '100%', height: 50, borderRadius: 16,
+              alignItems: 'center', justifyContent: 'center',
+              backgroundColor: theme.colors.accent,
+              opacity: pressed ? 0.75 : 1,
             })}
-            onPress={handleSignIn}
-            disabled={isSigningIn}
+            onPress={handleOk}
           >
-            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>
-              {isSigningIn ? 'Signing in…' : 'Sign in'}
-            </Text>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>Got it</Text>
           </Pressable>
         </View>
       </View>
@@ -1307,7 +1269,7 @@ function SessionExpiredModal({ visible, theme, mode, signIn }: SessionExpiredMod
 
 function NavigationHost() {
   const { mode, theme } = useTheme();
-  const { session, isLoading, sessionExpired, signIn } = useAuth();
+  const { session, isLoading, sessionExpired, clearSessionExpired } = useAuth();
   const {
     isLoadingStatus: subscriptionLoading,
     hasResolvedStatus: hasResolvedSubscriptionStatus,
@@ -1703,13 +1665,18 @@ function NavigationHost() {
         visible={sessionExpired && !session}
         theme={theme}
         mode={mode}
-        signIn={signIn}
+        onDismiss={clearSessionExpired}
       />
     </View>
   );
 }
 
 function AppContent() {
+  // Stamp first-launch date for review prompt gating (idempotent)
+  useEffect(() => {
+    void initReviewPrompt();
+  }, []);
+
   useEffect(() => {
     if (Platform.OS !== 'android') {
       return;

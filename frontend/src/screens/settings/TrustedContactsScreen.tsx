@@ -28,6 +28,7 @@ import type { AppTheme } from '../../theme/tokens';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import { getAllContacts, selectContacts } from '../../native/ContactPicker';
+import { useReviewPrompt } from '../../hooks/useReviewPrompt';
 import {
   getContactsPermissionEnabled,
   subscribeToContactsPermissionChange,
@@ -104,6 +105,7 @@ export default function TrustedContactsScreen() {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { activeProfile, canManageProfile } = useProfile();
+  const { recordMeaningfulAction } = useReviewPrompt();
   const [trustedList, setTrustedList] = useState<TrustedContactRow[]>([]);
   const [contactMap, setContactMap] = useState<Record<string, ContactMapEntry>>({});
   const [importing, setImporting] = useState(false);
@@ -483,6 +485,7 @@ export default function TrustedContactsScreen() {
         await persistRelationshipTag(activeProfile.id, number, selectedTag, displayName);
         await mergeContactMapEntries([{ numbers: [number], name: displayName, relationship: selectedTag }]);
         await loadTrustedList();
+        void recordMeaningfulAction();
         closeTray();
         return;
       }
@@ -498,6 +501,7 @@ export default function TrustedContactsScreen() {
         setPendingImports(remaining);
         if (remaining.length === 0) {
           await loadTrustedList();
+          void recordMeaningfulAction();
           closeTray();
         } else {
           setTrayContact(remaining[0]);
