@@ -111,8 +111,14 @@ export default function AccountScreen() {
   const lastPhoneKey = useRef<string | null>(null);
   const lastFallbackPhoneKey = useRef<string | null>(null);
 
+  // Only reinitialize form fields when the profile ID changes (i.e., user switches
+  // profiles). Using activeProfile directly would reset inputs on every background
+  // refresh, reverting unsaved edits while the user is typing.
+  const initializedProfileIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activeProfile) return;
+    if (initializedProfileIdRef.current === activeProfile.id) return;
+    initializedProfileIdRef.current = activeProfile.id;
     setFirstName(activeProfile.first_name ?? '');
     setLastName(activeProfile.last_name ?? '');
     setPhoneDigits(normalizePhoneDigits(activeProfile.phone_number ?? ''));

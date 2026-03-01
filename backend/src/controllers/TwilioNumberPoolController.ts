@@ -34,7 +34,7 @@ async function assignNumber(req: Request, res: Response) {
   const isCaretaker = profile.caretaker_id === userId;
 
   if (!isCaretaker) {
-    // If not caretaker, check if they're a member
+    // Only caretaker/admin members can assign numbers — family members cannot
     const { data: membership } = await supabaseAdmin
       .from('profile_members')
       .select('role, is_caretaker')
@@ -42,9 +42,10 @@ async function assignNumber(req: Request, res: Response) {
       .eq('user_id', userId)
       .maybeSingle();
 
-    if (!membership) {
+    const canAssign = membership && (membership.is_caretaker || membership.role === 'admin');
+    if (!canAssign) {
       return res.status(HTTP_STATUS_CODES.Forbidden).json({ 
-        error: 'You do not have access to this profile' 
+        error: 'You do not have permission to assign numbers to this profile' 
       });
     }
   }

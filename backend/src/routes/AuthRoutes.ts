@@ -41,10 +41,17 @@ router.get('/health', (req, res) => {
   });
 });
 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 router.get('/check-email', checkEmailLimiter, validateRequest(checkEmailSchema), checkEmailExists);
 router.get('/legal-versions', getLegalVersions);
 router.post('/legal-acceptance', validateRequest(legalAcceptanceSchema), recordLegalAcceptance);
-router.post('/login', login);
+router.post('/login', loginLimiter, login);
 router.post(PATHS.Auth.ResetPassword, validateRequest(resetPasswordSchema), resetPassword);
 router.post('/refresh-token', refreshToken);
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -107,9 +107,15 @@ export default function AutomationScreen() {
     );
   }, [activeProfile]);
 
+  // Only sync when the profile ID changes (sign-in or profile switch).
+  // Using syncFromProfile directly would re-run on every background profile
+  // refresh, resetting sliders/toggles while the user is adjusting them.
+  const syncedProfileIdRef = useRef<string | null>(null);
   useEffect(() => {
+    if (syncedProfileIdRef.current === (activeProfile?.id ?? null)) return;
+    syncedProfileIdRef.current = activeProfile?.id ?? null;
     syncFromProfile();
-  }, [syncFromProfile]);
+  }, [activeProfile?.id, syncFromProfile]);
 
   useEffect(() => {
       const loadManualPref = async () => {

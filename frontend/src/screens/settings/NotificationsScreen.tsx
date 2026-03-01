@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Keyboard,
   ScrollView,
@@ -78,8 +78,11 @@ export default function NotificationsScreen() {
   const [levelLabel, setLevelLabel] = useState(() => getLevelLabel(threshold));
   const [useLegacyAlertPrefsApi, setUseLegacyAlertPrefsApi] = useState(false);
 
+  const initializedProfileIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activeProfile) return;
+    if (initializedProfileIdRef.current === activeProfile.id) return;
+    initializedProfileIdRef.current = activeProfile.id;
     setThreshold(activeProfile.alert_threshold_score ?? 90);
     setPushTrustedActivity(activeProfile.enable_push_trusted_activity ?? true);
     setPushCircleActivity(activeProfile.enable_push_circle_activity ?? true);

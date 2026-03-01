@@ -172,7 +172,7 @@ async function listMembers(req: Request, res: Response) {
     }
     const formatted = resolveName(userId, entry);
     return {
-      ...entry,
+      id: entry.id,
       user_metadata: {
         ...(entry.user_metadata ?? {}),
         full_name: formatted ?? entry.user_metadata?.full_name,

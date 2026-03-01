@@ -80,7 +80,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [showCallFlowModal, setShowCallFlowModal] = useState(false);
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
   const { theme, mode } = useTheme();
-  const styles = useMemo(() => createProfileStyles(theme), [theme]);
+  const styles = useMemo(() => createProfileStyles(theme, mode), [theme, mode]);
   const placeholderColor = withOpacity(theme.colors.textMuted, 0.7);
 
   const formattedPhone = useMemo(() => formatPhone(phoneDigits), [phoneDigits]);
@@ -464,7 +464,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   );
 }
 
-const createProfileStyles = (theme: AppTheme) =>
+const createProfileStyles = (theme: AppTheme, mode?: string) =>
   StyleSheet.create({
     outer: {
       flex: 1,
@@ -600,12 +600,15 @@ const createProfileStyles = (theme: AppTheme) =>
     },
     modalCard: {
       borderRadius: 28,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
       paddingHorizontal: 20,
       paddingVertical: 22,
       gap: 12,
+      shadowColor: '#000',
+      shadowOpacity: mode === 'dark' ? 0.35 : 0.16,
+      shadowRadius: 24,
+      shadowOffset: { width: 0, height: 12 },
+      elevation: 12,
     },
     modalTitle: {
       color: theme.colors.text,
@@ -624,7 +627,7 @@ const createProfileStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       alignItems: 'flex-start',
       gap: 10,
-      backgroundColor: withOpacity(theme.colors.surface, 0.7),
+      backgroundColor: theme.colors.surfaceAlt,
       borderRadius: 16,
       paddingVertical: 10,
       paddingHorizontal: 12,
@@ -644,11 +647,9 @@ const createProfileStyles = (theme: AppTheme) =>
       flex: 1,
       height: 46,
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.surface, 0.55),
+      backgroundColor: theme.colors.surfaceAlt,
     },
     modalSecondaryText: {
       color: theme.colors.textMuted,

@@ -317,7 +317,7 @@ export default function TrustedContactsScreen() {
   useEffect(() => {
     refreshContactMap();
     loadTrustedList();
-  }, [refreshContactMap, loadTrustedList]);
+  }, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const loop = Animated.loop(

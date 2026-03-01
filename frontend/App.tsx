@@ -13,7 +13,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Alert, AppState, Platform, StyleSheet, View } from 'react-native';
+import { Alert, AppState, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { ActivityIndicator } from 'react-native';
 import {
   SafeAreaProvider,
@@ -87,6 +87,8 @@ import { rootNavigationRef } from './src/navigation/rootNavigator';
 import { consumePendingSiriRoute as consumePendingSiriRouteNative } from './src/native/WidgetSnapshot';
 import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientManager';
 import { logEvent } from './src/services/sentry';
+import type { AppTheme } from './src/theme/tokens';
+import { withOpacity } from './src/utils/color';
 
 enableScreens(true);
 
@@ -809,17 +811,25 @@ function RootNavigator() {
         ) : !onboardingComplete ? (
           <>
             {membershipActivationNotice ? (
+              <>
+                <RootStack.Screen
+                  name="MembershipActivated"
+                  component={MembershipActivatedScreen}
+                  options={{ headerShown: false }}
+                />
+                <RootStack.Screen
+                  name="OnboardingChoice"
+                  component={OnboardingChoiceScreen}
+                  options={{ headerShown: false }}
+                />
+              </>
+            ) : (
               <RootStack.Screen
-                name="MembershipActivated"
-                component={MembershipActivatedScreen}
+                name="OnboardingChoice"
+                component={OnboardingChoiceScreen}
                 options={{ headerShown: false }}
               />
-            ) : null}
-            <RootStack.Screen
-              name="OnboardingChoice"
-              component={OnboardingChoiceScreen}
-              options={{ headerShown: false }}
-            />
+            )}
             <RootStack.Screen
               name="OnboardingProfile"
               component={CreateProfileScreen}
@@ -1153,9 +1163,117 @@ function AuthCallbackHandler() {
   return null;
 }
 
+type SessionExpiredModalProps = {
+  visible: boolean;
+  theme: AppTheme;
+  mode: string;
+  signIn: (email: string, password: string) => Promise<string | null>;
+};
+
+function SessionExpiredModal({ visible, theme, mode, signIn }: SessionExpiredModalProps) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSignIn = useCallback(async () => {
+    if (!email.trim() || !password) {
+      setError('Enter your email and password.');
+      return;
+    }
+    setIsSigningIn(true);
+    setError(null);
+    try {
+      const err = await signIn(email.trim(), password);
+      if (err) {
+        setError(err);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Sign in failed. Try again.');
+    } finally {
+      setIsSigningIn(false);
+    }
+  }, [email, password, signIn]);
+
+  const isDark = mode === 'dark';
+  const cardBg = theme.colors.surface;
+  const overlayBg = isDark ? 'rgba(0,0,0,0.72)' : 'rgba(15,23,42,0.55)';
+  const inputBg = theme.colors.surfaceAlt;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
+      <View style={{ flex: 1, backgroundColor: overlayBg, justifyContent: 'center', paddingHorizontal: 28 }}>
+        <View style={{
+          backgroundColor: cardBg,
+          borderRadius: 28,
+          padding: 24,
+          gap: 16,
+          shadowColor: '#000',
+          shadowOpacity: isDark ? 0.45 : 0.18,
+          shadowRadius: 28,
+          shadowOffset: { width: 0, height: 14 },
+          elevation: 16,
+        }}>
+          <View style={{ alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text, textAlign: 'center' }}>
+              Session expired
+            </Text>
+            <Text style={{ fontSize: 14, lineHeight: 20, color: theme.colors.textMuted, textAlign: 'center' }}>
+              Your session timed out. Sign back in to continue where you left off.
+            </Text>
+          </View>
+          <TextInput
+            style={{
+              height: 50, borderRadius: 16, paddingHorizontal: 16,
+              backgroundColor: inputBg, color: theme.colors.text, fontSize: 15,
+            }}
+            placeholder="Email"
+            placeholderTextColor={withOpacity(theme.colors.textMuted, 0.7)}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            autoCorrect={false}
+            editable={!isSigningIn}
+          />
+          <TextInput
+            style={{
+              height: 50, borderRadius: 16, paddingHorizontal: 16,
+              backgroundColor: inputBg, color: theme.colors.text, fontSize: 15,
+            }}
+            placeholder="Password"
+            placeholderTextColor={withOpacity(theme.colors.textMuted, 0.7)}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            editable={!isSigningIn}
+          />
+          {error ? (
+            <Text style={{ fontSize: 13, color: theme.colors.danger, fontWeight: '600', textAlign: 'center' }}>
+              {error}
+            </Text>
+          ) : null}
+          <Pressable
+            style={({ pressed }) => ({
+              height: 50, borderRadius: 16, alignItems: 'center', justifyContent: 'center',
+              backgroundColor: theme.colors.accent, opacity: (pressed || isSigningIn) ? 0.75 : 1,
+            })}
+            onPress={handleSignIn}
+            disabled={isSigningIn}
+          >
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#fff' }}>
+              {isSigningIn ? 'Signing in…' : 'Sign in'}
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function NavigationHost() {
   const { mode, theme } = useTheme();
-  const { session, isLoading } = useAuth();
+  const { session, isLoading, sessionExpired, signIn } = useAuth();
   const {
     isLoadingStatus: subscriptionLoading,
     hasResolvedStatus: hasResolvedSubscriptionStatus,
@@ -1550,6 +1668,12 @@ function NavigationHost() {
           <SplashScreen persistent={!navigationReady} />
         </View>
       ) : null}
+      <SessionExpiredModal
+        visible={sessionExpired && !session}
+        theme={theme}
+        mode={mode}
+        signIn={signIn}
+      />
     </View>
   );
 }

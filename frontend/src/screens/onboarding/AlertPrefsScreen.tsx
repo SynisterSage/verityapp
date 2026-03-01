@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -81,8 +81,11 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
   const [levelLabel, setLevelLabel] = useState(() => getLevelLabel(threshold));
   const [useLegacyAlertPrefsApi, setUseLegacyAlertPrefsApi] = useState(false);
 
+  const initializedProfileIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!activeProfile) return;
+    if (initializedProfileIdRef.current === activeProfile.id) return;
+    initializedProfileIdRef.current = activeProfile.id;
     const trusted = activeProfile.enable_push_trusted_activity ?? true;
     const circle = activeProfile.enable_push_circle_activity ?? true;
     setThreshold(activeProfile.alert_threshold_score ?? 90);

@@ -90,7 +90,7 @@ export default function SafePhrasesScreen() {
 
   useEffect(() => {
     loadPhrases({ showLoading: true });
-  }, [activeProfile]);
+  }, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const loop = Animated.loop(

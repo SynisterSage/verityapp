@@ -263,7 +263,7 @@ export default function MembersScreen() {
         initialMembersLoadedRef.current = true;
       }
     }
-  }, [activeProfile]);
+  }, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchInvites = useCallback(async () => {
     if (!activeProfile) {
@@ -285,7 +285,7 @@ export default function MembersScreen() {
         initialInvitesLoadedRef.current = true;
       }
     }
-  }, [activeProfile]);
+  }, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!activeProfile) return;
@@ -315,7 +315,7 @@ export default function MembersScreen() {
     return () => {
       channel.unsubscribe();
     };
-  }, [activeProfile, fetchInvites, fetchMembers]);
+  }, [activeProfile?.id, fetchInvites, fetchMembers]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -338,7 +338,7 @@ export default function MembersScreen() {
         fetchInvites();
       }, 60_000);
       return () => clearInterval(interval);
-    }, [activeProfile, fetchMembers, fetchInvites])
+    }, [activeProfile?.id, fetchMembers, fetchInvites])
   );
 
   const resolveInviteToken = (invite: Invite) => (invite.short_code ?? invite.id ?? '').trim();

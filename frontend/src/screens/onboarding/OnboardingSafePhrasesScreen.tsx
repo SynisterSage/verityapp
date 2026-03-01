@@ -84,7 +84,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
 
   useEffect(() => {
     loadPhrases();
-  }, [activeProfile]);
+  }, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addPhrase = async () => {
     if (!input.trim() || !activeProfile) return;

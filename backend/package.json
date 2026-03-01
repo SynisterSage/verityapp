@@ -18,6 +18,7 @@
     "node": ">=16.0.0"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^2.0.0",
     "@sentry/node": "^10.38.0",
     "@sentry/profiling-node": "^10.38.0",
     "@supabase/supabase-js": "^2.89.0",

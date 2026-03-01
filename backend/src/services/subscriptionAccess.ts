@@ -38,6 +38,10 @@ function hasFutureExpiry(expiresAt: string | null | undefined) {
   return timestamp > Date.now();
 }
 
+// How long after last_verified_at we still trust is_active=true, even if expires_at is
+// slightly past. Covers sandbox's 3-minute renewal windows and production webhook delays.
+const VERIFIED_GRACE_MS = 10 * 60 * 1000; // 10 minutes
+
 export function isSubscriptionActive(row: UserSubscriptionRow | null | undefined) {
   if (!row) {
     return false;
@@ -45,7 +49,12 @@ export function isSubscriptionActive(row: UserSubscriptionRow | null | undefined
   if (!row.is_active) {
     return false;
   }
-  return hasFutureExpiry(row.expires_at);
+  if (hasFutureExpiry(row.expires_at)) {
+    return true;
+  }
+  // Grace period: recently verified as active, expires_at may just be stale.
+  const verifiedAt = Date.parse(row.last_verified_at);
+  return Number.isFinite(verifiedAt) && Date.now() - verifiedAt < VERIFIED_GRACE_MS;
 }
 
 export async function getUserSubscription(userId: string) {

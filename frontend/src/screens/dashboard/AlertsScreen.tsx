@@ -263,7 +263,7 @@ const loadMemberNames = useCallback(async () => {
   } catch {
     setMemberNames({});
   }
-}, [activeProfile]);
+}, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadAlerts = async (silent = false) => {
     if (!activeProfile) {

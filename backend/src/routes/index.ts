@@ -50,7 +50,7 @@ const assignNumberLimiter = rateLimit({
 });
 
 apiRouter.use('/webhook/twilio', TwilioRoutes);
-apiRouter.use(PATHS.Webhooks.AppleAppStoreNotifications, AppStoreNotificationsRoutes);
+apiRouter.use('/webhook' + PATHS.Webhooks.AppleAppStoreNotifications, AppStoreNotificationsRoutes);
 apiRouter.use(PATHS.Calls._, CallsRoutes);
 apiRouter.use(PATHS.Alerts._, AlertsRoutes);
 apiRouter.use(PATHS.Fraud._, FraudRoutes);

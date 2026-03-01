@@ -77,6 +77,9 @@ async function addSafePhrase(req: Request, res: Response) {
   if (!profileId || !phrase?.trim()) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId or phrase' });
   }
+  if (phrase.trim().length > 200) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'phrase must be 200 characters or fewer' });
+  }
 
   const allowed = await userCanManageProfile(userId, profileId);
   if (!allowed) {
@@ -211,6 +214,12 @@ async function addBlockedCaller(req: Request, res: Response) {
 
   if (!profileId || !callerNumber) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId or callerNumber' });
+  }
+  if (callerNumber.length > 30) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'callerNumber exceeds maximum length' });
+  }
+  if (reason && reason.length > 500) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'reason must be 500 characters or fewer' });
   }
 
   const allowed = await userCanManageProfile(userId, profileId);
@@ -352,7 +361,8 @@ async function listTrustedContacts(req: Request, res: Response) {
     return true;
   });
 
-  return res.status(HTTP_STATUS_CODES.Ok).json({ trusted_contacts: deduped });
+  const response = deduped.map(({ caller_hash: _h, ...rest }) => rest);
+  return res.status(HTTP_STATUS_CODES.Ok).json({ trusted_contacts: response });
 }
 
 async function addTrustedContacts(req: Request, res: Response) {
@@ -388,6 +398,14 @@ async function addTrustedContacts(req: Request, res: Response) {
     : callerNumber
       ? [callerNumber]
       : [];
+
+  // Validate input lengths
+  if (rawNumbers.some((n) => typeof n !== 'string' || n.length > 30)) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'One or more callerNumbers exceed maximum length' });
+  }
+  if (rawNumbers.length > 500) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Too many numbers in a single request' });
+  }
 
   const normalizedNumbers = Array.from(
     new Set(

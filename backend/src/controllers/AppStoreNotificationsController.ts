@@ -1,3 +1,7 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+
+import { Environment, SignedDataVerifier, VerificationException } from '@apple/app-store-server-library';
 import { Request, Response } from 'express';
 import logger from 'jet-logger';
 
@@ -20,44 +24,19 @@ const ACTIONABLE_NOTIFICATION_TYPES = new Set([
   'GRACE_PERIOD_EXPIRED',
 ]);
 
-function decodeBase64Url(value: string) {
-  const normalized = value.replace(/-/g, '+').replace(/_/g, '/');
-  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-  return Buffer.from(padded, 'base64').toString('utf8');
-}
+// Load Apple root certificates for JWS signature verification
+const CERT_DIR = join(__dirname, '../../certs');
+const appleRootCerts = [
+  readFileSync(join(CERT_DIR, 'AppleRootCA-G3.cer')),
+  readFileSync(join(CERT_DIR, 'AppleRootCA-G2.cer')),
+];
 
-function parseJwsPayload<T = Record<string, unknown>>(signedPayload: string): T {
-  const parts = signedPayload.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid JWS format');
-  }
+const bundleId = process.env.APPLE_APP_STORE_BUNDLE_ID ?? process.env.IOS_BUNDLE_IDENTIFIER ?? '';
+const appAppleId = process.env.APPLE_APP_STORE_APP_ID ? Number(process.env.APPLE_APP_STORE_APP_ID) : undefined;
+const isSandbox = (process.env.APPLE_ENVIRONMENT ?? 'Sandbox') !== 'Production';
+const appleEnvironment = isSandbox ? Environment.SANDBOX : Environment.PRODUCTION;
 
-  const payloadRaw = decodeBase64Url(parts[1] ?? '');
-  return JSON.parse(payloadRaw) as T;
-}
-
-type NotificationPayload = {
-  notificationType?: string;
-  subtype?: string;
-  environment?: string;
-  notificationUUID?: string;
-  data?: {
-    signedTransactionInfo?: string;
-    appAppleId?: number;
-    bundleId?: string;
-  };
-};
-
-type TransactionInfo = {
-  originalTransactionId?: string;
-  transactionId?: string;
-  productId?: string;
-  purchaseDate?: number;
-  expiresDate?: number;
-  revocationDate?: number;
-  environment?: string;
-  appAccountToken?: string;
-};
+const verifier = new SignedDataVerifier(appleRootCerts, true, appleEnvironment, bundleId, appAppleId);
 
 function toIso(millis?: number | null): string | null {
   if (!millis || !Number.isFinite(millis) || millis <= 0) {
@@ -66,10 +45,12 @@ function toIso(millis?: number | null): string | null {
   return new Date(millis).toISOString();
 }
 
+type TransactionDates = { expiresDate?: number | null; revocationDate?: number | null };
+
 function deriveSubscriptionStatus(
   notificationType: string,
   subtype: string | null,
-  transactionInfo: TransactionInfo
+  transactionInfo: TransactionDates
 ): { status: string; isActive: boolean } {
   const now = Date.now();
   const expiresAtMs = transactionInfo.expiresDate ?? 0;
@@ -108,10 +89,11 @@ async function receive(req: Request, res: Response) {
   }
 
   try {
-    const payload = parseJwsPayload<NotificationPayload>(signedPayload.trim());
+    // Verify Apple JWS signature — throws VerificationException on invalid/forged payloads
+    const payload = await verifier.verifyAndDecodeNotification(signedPayload.trim());
     const notificationType = payload.notificationType ?? 'unknown';
     const subtype = payload.subtype ?? null;
-    const environment = payload.environment ?? null;
+    const environment = payload.data?.environment ?? null;
     const notificationUUID = payload.notificationUUID ?? null;
 
     logger.info(
@@ -129,7 +111,8 @@ async function receive(req: Request, res: Response) {
       return res.status(HTTP_STATUS_CODES.Ok).json({ received: true, processed: false });
     }
 
-    const transactionInfo = parseJwsPayload<TransactionInfo>(signedTransactionInfo);
+    // Verify and decode the inner transaction JWS
+    const transactionInfo = await verifier.verifyAndDecodeTransaction(signedTransactionInfo);
     const originalTransactionId = transactionInfo.originalTransactionId;
 
     if (!originalTransactionId) {
@@ -156,7 +139,10 @@ async function receive(req: Request, res: Response) {
       return res.status(HTTP_STATUS_CODES.Ok).json({ received: true, processed: false });
     }
 
-    const { status, isActive } = deriveSubscriptionStatus(notificationType, subtype, transactionInfo);
+    const { status, isActive } = deriveSubscriptionStatus(notificationType, subtype, {
+      expiresDate: transactionInfo.expiresDate,
+      revocationDate: transactionInfo.revocationDate ?? undefined,
+    });
     const nowIso = new Date().toISOString();
 
     const { error: updateError } = await supabaseAdmin
@@ -168,7 +154,7 @@ async function receive(req: Request, res: Response) {
         product_id: transactionInfo.productId ?? existingSubscription.product_id,
         purchased_at: toIso(transactionInfo.purchaseDate),
         expires_at: toIso(transactionInfo.expiresDate),
-        verification_environment: transactionInfo.environment ?? environment,
+        verification_environment: transactionInfo.environment ?? String(environment ?? ''),
         source: 'app_store_server_notification',
         last_verified_at: nowIso,
         metadata: {
@@ -195,6 +181,11 @@ async function receive(req: Request, res: Response) {
 
     return res.status(HTTP_STATUS_CODES.Ok).json({ received: true, processed: true });
   } catch (error) {
+    if (error instanceof VerificationException) {
+      // Forged or invalid Apple signature — reject silently with 200 to avoid Apple retry loop
+      logger.warn(`[AppleASN] JWS verification failed: status=${error.status}`);
+      return res.status(HTTP_STATUS_CODES.Ok).json({ received: true, processed: false });
+    }
     const message = error instanceof Error ? error.message : 'unknown';
     logger.warn(`[AppleASN] processing error: ${message}`);
     // Return 200 to prevent Apple retry loops for malformed payloads

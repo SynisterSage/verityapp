@@ -25,6 +25,7 @@ import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { logEvent } from '../../services/sentry';
 import { MEMBERSHIP_SIGNOUT_NOTE_KEY } from '../../utils/membership';
+import { FALLBACK_LEGAL_VERSIONS, fetchCurrentLegalVersions } from '../../services/legal';
 
 type PlanOption = {
   productId: string;
@@ -205,6 +206,10 @@ export default function MembershipScreen() {
   const [showExitModal, setShowExitModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isOpeningManage, setIsOpeningManage] = useState(false);
+  const [legalVersions, setLegalVersions] = useState(FALLBACK_LEGAL_VERSIONS);
+  useEffect(() => {
+    fetchCurrentLegalVersions().then(setLegalVersions).catch(() => null);
+  }, []);
   const exitBackdropOpacity = useRef(new Animated.Value(0)).current;
   const exitCardOpacity = useRef(new Animated.Value(0)).current;
   const exitCardTranslateY = useRef(new Animated.Value(10)).current;
@@ -629,6 +634,26 @@ export default function MembershipScreen() {
           <Text style={styles.notNowText}>Not now</Text>
         </Pressable>
 
+        <View style={styles.legalFooter}>
+          <Text style={styles.legalText}>
+            Payment charged to your Apple Account at confirmation. Subscription auto-renews unless
+            cancelled at least 24 hours before the end of the current period.{' '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => Linking.openURL(legalVersions.privacyUrl).catch(() => null)}
+            >
+              Privacy Policy
+            </Text>
+            {' · '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => Linking.openURL(legalVersions.termsUrl).catch(() => null)}
+            >
+              Terms of Use
+            </Text>
+          </Text>
+        </View>
+
         {(statusError || feedback) ? (
           <View
             style={[
@@ -1008,6 +1033,22 @@ const createMembershipStyles = (theme: AppTheme) =>
     notNowText: {
       fontSize: 13,
       fontWeight: '600',
+      color: theme.colors.textMuted,
+      textDecorationLine: 'underline',
+    },
+    legalFooter: {
+      marginTop: 16,
+      paddingHorizontal: 4,
+      paddingBottom: 8,
+    },
+    legalText: {
+      fontSize: 11,
+      color: theme.colors.textMuted,
+      textAlign: 'center',
+      lineHeight: 16,
+    },
+    legalLink: {
+      fontSize: 11,
       color: theme.colors.textMuted,
       textDecorationLine: 'underline',
     },

@@ -123,8 +123,8 @@ function mapProductIdLabel(productId?: string | null) {
 
 export default function MembershipBillingScreen() {
   const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
-  const styles = useMemo(() => createMembershipBillingStyles(theme), [theme]);
+  const { theme, mode } = useTheme();
+  const styles = useMemo(() => createMembershipBillingStyles(theme, mode), [theme, mode]);
   const [feedback, setFeedback] = useState<BillingFeedback | null>(null);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isReloadingPlans, setIsReloadingPlans] = useState(false);
@@ -315,31 +315,30 @@ export default function MembershipBillingScreen() {
       >
         <Text style={styles.sectionLabel}>Current membership</Text>
         <View style={styles.card}>
-          <View style={styles.statusRow}>
-            <View>
-              <Text style={styles.metaLabel}>Status</Text>
-              <Text style={styles.statusValue}>{statusLabel}</Text>
+          {/* Status hero row */}
+          <View style={styles.membershipHero}>
+            <View style={[styles.membershipIconWrap, hasActiveSubscription ? styles.membershipIconWrapActive : styles.membershipIconWrapInactive]}>
+              <Ionicons
+                name={hasActiveSubscription ? 'shield-checkmark' : 'shield-outline'}
+                size={26}
+                color={hasActiveSubscription ? theme.colors.success : theme.colors.textMuted}
+              />
             </View>
-            <View
-              style={[
-                styles.statusPill,
-                statusTone === 'active' ? styles.statusPillActive : styles.statusPillInactive,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.statusPillText,
-                  statusTone === 'active' ? styles.statusPillTextActive : styles.statusPillTextInactive,
-                ]}
-              >
+            <View style={styles.membershipHeroText}>
+              <Text style={styles.membershipPlanName}>{planName}</Text>
+              <Text style={[styles.membershipStatusText, hasActiveSubscription ? styles.membershipStatusActive : styles.membershipStatusInactive]}>
+                {statusLabel}
+              </Text>
+            </View>
+            <View style={[styles.statusPill, statusTone === 'active' ? styles.statusPillActive : styles.statusPillInactive]}>
+              <Text style={[styles.statusPillText, statusTone === 'active' ? styles.statusPillTextActive : styles.statusPillTextInactive]}>
                 {statusTone === 'active' ? 'LIVE' : 'OFF'}
               </Text>
             </View>
           </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Plan</Text>
-            <Text style={styles.metaValue}>{planName}</Text>
-          </View>
+
+          <View style={styles.membershipDivider} />
+
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>Renews / Expires</Text>
             <Text style={styles.metaValue}>{formatDateLabel(subscription?.expiresAt)}</Text>
@@ -419,19 +418,34 @@ export default function MembershipBillingScreen() {
             Invited caretakers and family members can join an active paid circle without purchasing
             their own plan.
           </Text>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Invite code join access</Text>
-            <Text style={[styles.metaValue, inviteBypassEnabled ? styles.successText : styles.warningText]}>
-              {inviteBypassEnabled ? 'Enabled' : 'Unavailable'}
-            </Text>
+          <View style={styles.circleRow}>
+            <View style={[styles.circleIconWrap, inviteBypassEnabled ? styles.circleIconWrapActive : styles.circleIconWrapMuted]}>
+              <Ionicons name="key-outline" size={16} color={inviteBypassEnabled ? theme.colors.success : theme.colors.textMuted} />
+            </View>
+            <View style={styles.circleRowText}>
+              <Text style={styles.circleRowLabel}>Invite code join access</Text>
+              <Text style={[styles.circleRowValue, inviteBypassEnabled ? styles.successText : styles.warningText]}>
+                {inviteBypassEnabled ? 'Enabled' : 'Unavailable'}
+              </Text>
+            </View>
           </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Owner profiles</Text>
-            <Text style={styles.metaValue}>{status?.ownerProfileCount ?? 0}</Text>
+          <View style={styles.circleRow}>
+            <View style={styles.circleIconWrap}>
+              <Ionicons name="person-outline" size={16} color={theme.colors.accent} />
+            </View>
+            <View style={styles.circleRowText}>
+              <Text style={styles.circleRowLabel}>Owner profiles</Text>
+              <Text style={styles.circleRowValue}>{status?.ownerProfileCount ?? 0}</Text>
+            </View>
           </View>
-          <View style={styles.metaRow}>
-            <Text style={styles.metaLabel}>Member profiles</Text>
-            <Text style={styles.metaValue}>{status?.memberProfileCount ?? 0}</Text>
+          <View style={styles.circleRow}>
+            <View style={styles.circleIconWrap}>
+              <Ionicons name="people-outline" size={16} color={theme.colors.accent} />
+            </View>
+            <View style={styles.circleRowText}>
+              <Text style={styles.circleRowLabel}>Member profiles</Text>
+              <Text style={styles.circleRowValue}>{status?.memberProfileCount ?? 0}</Text>
+            </View>
           </View>
         </View>
 
@@ -467,7 +481,7 @@ export default function MembershipBillingScreen() {
   );
 }
 
-const createMembershipBillingStyles = (theme: AppTheme) =>
+const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
   StyleSheet.create({
     screen: {
       flex: 1,
@@ -487,36 +501,68 @@ const createMembershipBillingStyles = (theme: AppTheme) =>
     card: {
       backgroundColor: theme.colors.surface,
       borderRadius: 24,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
       padding: 18,
       gap: 12,
+      shadowColor: '#000',
+      shadowOpacity: mode === 'dark' ? 0.3 : 0.1,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
       elevation: 8,
     },
-    statusRow: {
+    // ── Membership hero ──────────────────────────────────
+    membershipHero: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
+      gap: 14,
     },
-    statusValue: {
-      fontSize: 22,
-      lineHeight: 28,
+    membershipIconWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    membershipIconWrapActive: {
+      backgroundColor: withOpacity(theme.colors.success, 0.14),
+    },
+    membershipIconWrapInactive: {
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    membershipHeroText: {
+      flex: 1,
+      gap: 2,
+    },
+    membershipPlanName: {
+      fontSize: 17,
       fontWeight: '700',
       color: theme.colors.text,
+      letterSpacing: -0.2,
     },
+    membershipStatusText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    membershipStatusActive: {
+      color: theme.colors.success,
+    },
+    membershipStatusInactive: {
+      color: theme.colors.textMuted,
+    },
+    membershipDivider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.colors.surfaceAlt,
+      marginVertical: 2,
+    },
+    // ── Status pill ──────────────────────────────────────
     statusPill: {
       borderRadius: 999,
-      borderWidth: 1,
       paddingHorizontal: 10,
       paddingVertical: 5,
     },
     statusPillActive: {
-      borderColor: withOpacity(theme.colors.success, 0.6),
       backgroundColor: withOpacity(theme.colors.success, 0.14),
     },
     statusPillInactive: {
-      borderColor: withOpacity(theme.colors.warning, 0.6),
       backgroundColor: withOpacity(theme.colors.warning, 0.12),
     },
     statusPillText: {
@@ -530,6 +576,7 @@ const createMembershipBillingStyles = (theme: AppTheme) =>
     statusPillTextInactive: {
       color: theme.colors.warning,
     },
+    // ── Meta rows ────────────────────────────────────────
     metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -560,6 +607,7 @@ const createMembershipBillingStyles = (theme: AppTheme) =>
       fontSize: 13,
       fontWeight: '600',
     },
+    // ── Billing action rows ──────────────────────────────
     actionRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -580,8 +628,6 @@ const createMembershipBillingStyles = (theme: AppTheme) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: withOpacity(theme.colors.accent, 0.14),
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.24),
     },
     actionTextWrap: {
       flex: 1,
@@ -603,10 +649,53 @@ const createMembershipBillingStyles = (theme: AppTheme) =>
       height: StyleSheet.hairlineWidth,
       marginLeft: 54,
       marginVertical: 2,
-      backgroundColor: withOpacity(theme.colors.textMuted, 0.25),
+      backgroundColor: theme.colors.surfaceAlt,
     },
-    bodyText: {
+    // ── Circle access rows ───────────────────────────────
+    circleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      borderRadius: 14,
+      backgroundColor: theme.colors.surfaceAlt,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+    },
+    circleIconWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+    },
+    circleIconWrapActive: {
+      backgroundColor: withOpacity(theme.colors.success, 0.14),
+    },
+    circleIconWrapMuted: {
+      backgroundColor: theme.colors.surface,
+    },
+    circleRowText: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    circleRowLabel: {
       color: theme.colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    circleRowValue: {
+      color: theme.colors.text,
+      fontSize: 14,
+      fontWeight: '700',
+      textAlign: 'right',
+    },
+    // ── General ──────────────────────────────────────────
+    bodyText: {
+      color: theme.colors.textMuted,
       fontSize: 14,
       lineHeight: 22,
       fontWeight: '500',
@@ -629,22 +718,19 @@ const createMembershipBillingStyles = (theme: AppTheme) =>
       lineHeight: 17,
       fontWeight: '500',
     },
+    // ── Feedback ─────────────────────────────────────────
     feedbackCard: {
       borderRadius: 18,
-      borderWidth: 1,
       padding: 14,
       gap: 6,
     },
     feedbackSuccess: {
-      borderColor: withOpacity(theme.colors.success, 0.45),
       backgroundColor: withOpacity(theme.colors.success, 0.12),
     },
     feedbackInfo: {
-      borderColor: withOpacity(theme.colors.accent, 0.4),
       backgroundColor: withOpacity(theme.colors.accent, 0.1),
     },
     feedbackError: {
-      borderColor: withOpacity(theme.colors.danger, 0.45),
       backgroundColor: withOpacity(theme.colors.danger, 0.12),
     },
     feedbackTitle: {

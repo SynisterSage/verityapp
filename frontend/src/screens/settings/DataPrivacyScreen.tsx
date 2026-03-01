@@ -238,7 +238,7 @@ export default function DataPrivacyScreen() {
   const { activeProfile, canManageProfile, canDeleteProfile, refreshProfiles } = useProfile();
   const { signOut } = useAuth();
   const { theme, mode } = useTheme();
-  const styles = useMemo(() => createDataPrivacyStyles(theme), [theme]);
+  const styles = useMemo(() => createDataPrivacyStyles(theme, mode), [theme, mode]);
   const policyIconColor = theme.colors.accent;
   const placeholderColor = useMemo(
     () => withOpacity(theme.colors.textMuted, 0.65),
@@ -246,6 +246,8 @@ export default function DataPrivacyScreen() {
   );
   const [manageAction, setManageAction] = useState<ManageActionKey | null>(null);
   const [manageError, setManageError] = useState('');
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [pendingDeletePin, setPendingDeletePin] = useState('');
   const [pinModalAction, setPinModalAction] = useState<ManageActionKey | null>(null);
   const [pinValue, setPinValue] = useState('');
   const [pinError, setPinError] = useState('');
@@ -329,31 +331,18 @@ export default function DataPrivacyScreen() {
   };
 
   const promptDeleteAccount = (pin: string) => {
-    Alert.alert(
-      'Delete profile?',
-      'This will delete all calls, alerts, and settings for this profile.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Continue',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Are you absolutely sure?',
-              'Everything will be lost. This cannot be undone.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete profile',
-                  style: 'destructive',
-                  onPress: () => runDeleteAccount(pin),
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+    setPendingDeletePin(pin);
+    setShowDeleteConfirmModal(true);
+  };
+
+  const handleManageSubscription = async () => {
+    const targets = [
+      'itms-apps://apps.apple.com/account/subscriptions',
+      'https://apps.apple.com/account/subscriptions',
+    ];
+    for (const url of targets) {
+      try { await Linking.openURL(url); return; } catch { continue; }
+    }
   };
 
   const closePinModal = () => {
@@ -620,6 +609,72 @@ export default function DataPrivacyScreen() {
             </View>
           </Modal>
         ) : null}
+
+        {showDeleteConfirmModal ? (
+          <Modal
+            visible
+            transparent
+            animationType="fade"
+            onRequestClose={() => setShowDeleteConfirmModal(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <Pressable
+                style={styles.modalBackdrop}
+                onPress={() => setShowDeleteConfirmModal(false)}
+              >
+                <BlurView
+                  intensity={65}
+                  tint={mode === 'dark' ? 'dark' : 'light'}
+                  style={styles.modalBlur}
+                />
+              </Pressable>
+              <View style={styles.deleteModal}>
+                <View style={styles.deleteIconWrap}>
+                  <Ionicons name="trash-outline" size={26} color={theme.colors.danger} />
+                </View>
+                <Text style={styles.deleteTitle}>Delete your account?</Text>
+                <Text style={styles.deleteBody}>
+                  This permanently removes your account, all calls, alerts, and settings. This cannot be undone.
+                </Text>
+                <View style={styles.deleteWarningCard}>
+                  <Ionicons name="warning-outline" size={16} color={theme.colors.warning} style={{ marginTop: 1 }} />
+                  <Text style={styles.deleteWarningText}>
+                    Your Verity membership will{' '}
+                    <Text style={styles.deleteWarningBold}>keep billing through Apple</Text>
+                    {' '}even after deletion. Cancel your subscription first.
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.manageSubButton}
+                  onPress={handleManageSubscription}
+                >
+                  <Ionicons name="card-outline" size={15} color={theme.colors.accent} />
+                  <Text style={styles.manageSubButtonText}>Manage subscription in App Store</Text>
+                  <Ionicons name="open-outline" size={13} color={theme.colors.textMuted} />
+                </Pressable>
+                <View style={styles.deleteActions}>
+                  <Pressable
+                    style={styles.modalButton}
+                    onPress={() => setShowDeleteConfirmModal(false)}
+                  >
+                    <Text style={styles.modalButtonLabel}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalButton, styles.deleteConfirmButton]}
+                    onPress={() => {
+                      setShowDeleteConfirmModal(false);
+                      runDeleteAccount(pendingDeletePin);
+                    }}
+                  >
+                    <Text style={[styles.modalButtonLabel, styles.deleteConfirmButtonLabel]}>
+                      Delete account
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        ) : null}
       </SafeAreaView>
     </View>
   );
@@ -627,7 +682,7 @@ export default function DataPrivacyScreen() {
 
 
 
-const createDataPrivacyStyles = (theme: AppTheme) =>
+const createDataPrivacyStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
   StyleSheet.create({
     outer: {
       flex: 1,
@@ -880,6 +935,82 @@ const createDataPrivacyStyles = (theme: AppTheme) =>
     },
     modalButtonLabelPrimary: {
       color: theme.colors.surface,
+    },
+    deleteModal: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      padding: 24,
+      width: '100%',
+      maxWidth: 360,
+      gap: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: mode === 'dark' ? 0.4 : 0.12,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    deleteIconWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 16,
+      backgroundColor: withOpacity(theme.colors.danger, 0.1),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deleteTitle: {
+      color: theme.colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    deleteBody: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    deleteWarningCard: {
+      flexDirection: 'row',
+      gap: 10,
+      backgroundColor: theme.colors.surfaceAlt,
+      borderRadius: 14,
+      padding: 14,
+      alignItems: 'flex-start',
+    },
+    deleteWarningText: {
+      flex: 1,
+      fontSize: 13,
+      color: theme.colors.textMuted,
+      lineHeight: 18,
+    },
+    deleteWarningBold: {
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    manageSubButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.colors.surfaceAlt,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    manageSubButtonText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.accent,
+    },
+    deleteActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 2,
+    },
+    deleteConfirmButton: {
+      borderColor: withOpacity(theme.colors.danger, 0.4),
+      backgroundColor: withOpacity(theme.colors.danger, 0.1),
+    },
+    deleteConfirmButtonLabel: {
+      color: theme.colors.danger,
     },
     contactCard: {
       borderRadius: 20,

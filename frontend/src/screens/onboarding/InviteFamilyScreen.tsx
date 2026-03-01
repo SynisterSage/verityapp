@@ -191,7 +191,7 @@ export default function InviteFamilyScreen({ navigation }: Props) {
         initialMembersLoadedRef.current = true;
       }
     }
-  }, [activeProfile]);
+  }, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchInvites = useCallback(async () => {
     if (!activeProfile) {
@@ -213,7 +213,7 @@ export default function InviteFamilyScreen({ navigation }: Props) {
         initialInvitesLoadedRef.current = true;
       }
     }
-  }, [activeProfile]);
+  }, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (availableInviteRoles.length && !availableInviteRoles.includes(inviteRole)) {
@@ -258,7 +258,7 @@ export default function InviteFamilyScreen({ navigation }: Props) {
     return () => {
       channel.unsubscribe();
     };
-  }, [activeProfile, fetchInvites, fetchMembers, sessionUserId]);
+  }, [activeProfile?.id, fetchInvites, fetchMembers, sessionUserId]);
 
   useEffect(() => {
     const loop = Animated.loop(

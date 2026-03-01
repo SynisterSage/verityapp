@@ -398,15 +398,13 @@ async function syncEntitlement(req: Request, res: Response) {
 
   const nextStatus = serverTransaction
     ? normalizeSubscriptionStatus(serverTransaction.status, 'unknown')
-    : entitlementIsActiveByClaim
-      ? 'active'
-      : normalizeSubscriptionStatus(existing?.status ?? null, 'unknown');
+    : normalizeSubscriptionStatus(existing?.status ?? null, 'unknown');
   const nextSource = serverTransaction
     ? 'app_store_server_api'
     : existing?.source ?? 'storekit_local_entitlement';
   const nextIsActive = serverTransaction
     ? Boolean(serverTransaction.isActive)
-    : entitlementIsActiveByClaim || Boolean(existing?.is_active);
+    : Boolean(existing?.is_active); // never trust client-supplied expiresAt — preserve existing state on API failure
 
   const { error: upsertError } = await supabaseAdmin.from('user_subscriptions').upsert(
     {

@@ -135,13 +135,30 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const voipTokenSyncInFlightRef = useRef<Promise<void> | null>(null);
   const pendingVoipRefreshRef = useRef(false);
   const skipTwilioDelayRef = useRef(false);
+  // Stable refs so refreshProfiles can read latest session/signOut/activeProfileId
+  // without closing over them as useCallback dependencies. This prevents two problems:
+  //   1. refreshProfiles had activeProfile as dep → setActiveProfile → new ref →
+  //      useEffect re-fires → infinite loop (fixed in prior step via activeProfileIdRef).
+  //   2. refreshProfiles had session as dep → every TOKEN_REFRESHED event creates a new
+  //      session object → new refreshProfiles ref → useEffect re-fires → re-fetches
+  //      /profiles and resets activeProfile → all settings screen useEffect([activeProfile])
+  //      fire and reset form state while the user is typing.
+  const activeProfileIdRef = useRef<string | null>(null);
+  const sessionRef = useRef(session);
+  const signOutRef = useRef(signOut);
+  useEffect(() => { activeProfileIdRef.current = activeProfile?.id ?? null; }, [activeProfile]);
+  useEffect(() => { sessionRef.current = session; }, [session]);
+  useEffect(() => { signOutRef.current = signOut; }, [signOut]);
 
+  // Fully stable — deps are read from refs so the function reference never changes.
   const refreshProfiles = useCallback(async (options?: { silent?: boolean }) => {
-    const targetSessionKey = session?.user?.id ?? '__anon__';
+    const currentSession = sessionRef.current;
+    const currentSignOut = signOutRef.current;
+    const targetSessionKey = currentSession?.user?.id ?? '__anon__';
     if (!options?.silent) {
       setIsLoading(true);
     }
-    if (!session) {
+    if (!currentSession) {
       setProfiles([]);
       setActiveProfile(null);
       setActiveMembership(null);
@@ -153,8 +170,9 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     try {
       const data = await authorizedFetch('/profiles');
       const list = (data?.profiles ?? []) as Profile[];
+      const currentId = activeProfileIdRef.current;
       const selectedProfile =
-        (activeProfile ? list.find((profile) => profile.id === activeProfile.id) : null) ??
+        (currentId ? list.find((profile) => profile.id === currentId) : null) ??
         list[0] ??
         null;
       setProfiles(list);
@@ -164,7 +182,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     } catch (err) {
       const message = err instanceof Error ? err.message.toLowerCase() : '';
       if (message.includes('401') || message.includes('unauthorized')) {
-        await signOut();
+        await currentSignOut();
         setAuthInvalid(true);
         setProfiles([]);
         setActiveProfile(null);
@@ -174,15 +192,19 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         // Keep the current profile snapshot on transient failures to avoid UI flicker.
         console.warn('Failed to refresh profiles; keeping previous profile state', err);
       }
-   } finally {
-     setIsLoading(false);
-     setResolvedSessionKey(targetSessionKey);
-   }
-  }, [activeProfile, session, signOut]);
+    } finally {
+      setIsLoading(false);
+      setResolvedSessionKey(targetSessionKey);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps — intentionally reads from refs
 
+  // Only re-run when the signed-in user changes (sign in / sign out).
+  // Token refreshes emit a new session object but keep the same user ID —
+  // watching user ID prevents unnecessary /profiles fetches and form resets.
+  const userId = session?.user?.id ?? null;
   useEffect(() => {
     refreshProfiles();
-  }, [session, refreshProfiles]);
+  }, [userId, refreshProfiles]);
 
   const refreshTwilioClientToken = useCallback(async (profileId: string) => {
     const MIN_REFRESH_INTERVAL_MS = 45_000;

@@ -175,6 +175,9 @@ async function submitFeedback(req: Request, res: Response) {
   if (!status || !allowedStatuses.has(status)) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Invalid status' });
   }
+  if (notes !== undefined && notes !== null && (typeof notes !== 'string' || notes.length > 1000)) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'notes must be a string under 1000 characters' });
+  }
 
   const access = await authorizeCallAccess(callId, userId, true);
   if ('status' in access) {

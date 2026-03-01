@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import * as AuthSession from 'expo-auth-session';
 import { Linking } from 'react-native';
@@ -26,6 +26,7 @@ const PENDING_LEGAL_ACCEPTANCE_KEY = 'auth:pending-legal-acceptance';
 type AuthContextValue = {
   session: Session | null;
   isLoading: boolean;
+  sessionExpired: boolean;
   signIn: (email: string, password: string) => Promise<string | null>;
   signUp: (
     email: string,
@@ -46,6 +47,9 @@ WebBrowser.maybeCompleteAuthSession();
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  // Tracks whether the current sign-out was initiated intentionally by the user.
+  const intentionalSignOutRef = useRef(false);
 
   const recordLegalAcceptance = async (
     accessToken: string,
@@ -180,8 +184,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      if (nextSession) {
+        // Session restored (sign in or token refresh success) — clear any expiry state.
+        setSessionExpired(false);
+      } else if (event === 'SIGNED_OUT' && !intentionalSignOutRef.current) {
+        // Unexpected sign-out (token refresh failure or server-side invalidation).
+        setSessionExpired(true);
+      }
+      intentionalSignOutRef.current = false;
     });
 
     return () => {
@@ -214,6 +226,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       session,
       isLoading,
+      sessionExpired,
       signIn: async (email, password) => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         return error ? error.message : null;
@@ -351,6 +364,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null;
       },
       signOut: async () => {
+        intentionalSignOutRef.current = true;
+        setSessionExpired(false);
         try {
           await supabase.auth.signOut({ scope: 'local' });
         } finally {
@@ -361,7 +376,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       },
     }),
-    [session, isLoading]
+    [session, isLoading, sessionExpired]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
