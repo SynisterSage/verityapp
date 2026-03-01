@@ -20,7 +20,6 @@
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		C1E2D3F4A5B6C7D8E9F00111 /* VerityProtect/VeritySiriShortcuts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1E2D3F4A5B6C7D8E9F00222 /* VerityProtect/VeritySiriShortcuts.swift */; };
 		D5C39349C669774172EDB0EF /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44E42D475140FD759215B196 /* ExpoModulesProvider.swift */; };
-		D74620872F50DE92008D1BD6 /* VerityProtect.storekit in Resources */ = {isa = PBXBuildFile; fileRef = D74620862F50DE92008D1BD6 /* VerityProtect.storekit */; };
 		D7DE6E122F40EA8A003E8AC0 /* VoIPPushModuleBridge.m in Sources */ = {isa = PBXBuildFile; fileRef = D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */; };
 		D7DE6E132F40EA8A003E8AC0 /* VoIPPushModule.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */; };
 		E3F3F15537164A6032B7BD05 /* libPods-VerityProtect.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 46018E7CB6BEEFE2AAD8913C /* libPods-VerityProtect.a */; };
@@ -68,7 +67,6 @@
 		B766A7B792C42EF7485E19A3 /* Pods-VerityProtect.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-VerityProtect.debug.xcconfig"; path = "Target Support Files/Pods-VerityProtect/Pods-VerityProtect.debug.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		C1E2D3F4A5B6C7D8E9F00222 /* VerityProtect/VeritySiriShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerityProtect/VeritySiriShortcuts.swift; sourceTree = "<group>"; };
-		D74620862F50DE92008D1BD6 /* VerityProtect.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = VerityProtect.storekit; sourceTree = "<group>"; };
 		D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoIPPushModule.swift; sourceTree = "<group>"; };
 		D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = VoIPPushModuleBridge.m; sourceTree = "<group>"; };
 		E59EC8EB6F913453E714D5A2 /* VerityProtect/support-notification.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "VerityProtect/support-notification.wav"; sourceTree = "<group>"; };
@@ -152,7 +150,6 @@
 		83CBB9F61A601CBA00E9B192 = {
 			isa = PBXGroup;
 			children = (
-				D74620862F50DE92008D1BD6 /* VerityProtect.storekit */,
 				D7DE6E102F40EA8A003E8AC0 /* VoIPPushModule.swift */,
 				D7DE6E112F40EA8A003E8AC0 /* VoIPPushModuleBridge.m */,
 				13B07FAE1A68108700A75B9A /* VerityProtect */,
@@ -314,7 +311,6 @@
 				1C95708C7460F60661DEEEB4 /* PrivacyInfo.xcprivacy in Resources */,
 				9FA17C325A11B4DBA03E11A0 /* VerityProtect/activity-notification.wav in Resources */,
 				E59EC8EC6F913453E714D5A2 /* VerityProtect/support-notification.wav in Resources */,
-				D74620872F50DE92008D1BD6 /* VerityProtect.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

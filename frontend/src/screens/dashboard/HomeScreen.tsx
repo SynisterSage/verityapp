@@ -105,6 +105,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     [theme.colors.accent, theme.colors.bg]
   );
   const [recentCall, setRecentCall] = useState<CallRow | null>(null);
+  const [recentTrustedAlert, setRecentTrustedAlert] = useState<{ label: string; created_at: string; callId?: string } | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [alertsThisWeek, setAlertsThisWeek] = useState<number | null>(null);
   const [blockedCount, setBlockedCount] = useState<number | null>(null);
@@ -119,6 +120,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const loadStats = async (isRefresh = false, silent = false) => {
     if (!activeProfile) {
       setRecentCall(null);
+      setRecentTrustedAlert(null);
       setRecentActivity([]);
       setAlertsThisWeek(null);
       setBlockedCount(null);
@@ -312,6 +314,23 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       setAlertsThisWeek(nextAlertsThisWeek);
       setBlockedCount(nextBlockedCount);
       setRecentActivity(activityItems);
+
+      // Surface most recent trusted alert for the featured event hero
+      const latestTrusted = alertRows
+        .filter((a) => a.alert_type === 'trusted')
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] ?? null;
+      if (latestTrusted) {
+        const callerNumber = latestTrusted.payload?.callerNumber as string | undefined;
+        const payloadName = (latestTrusted.payload?.contactName as string | undefined) ?? '';
+        const resolvedName = payloadName || (callerNumber ? contactNameMap[callerNumber] : '') || 'Trusted contact';
+        setRecentTrustedAlert({
+          label: resolvedName,
+          created_at: latestTrusted.created_at,
+          callId: latestTrusted.call_id ?? undefined,
+        });
+      } else {
+        setRecentTrustedAlert(null);
+      }
     } catch (error) {
       console.warn('[home] loadStats failed', error);
     } finally {
@@ -327,6 +346,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   useEffect(() => {
     setRecentCall(null);
+    setRecentTrustedAlert(null);
     setRecentActivity([]);
     setAlertsThisWeek(null);
     setBlockedCount(null);
@@ -414,32 +434,55 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   }, [triggerLightHaptic]);
 
   const hasHeroCall = Boolean(recentCall?.caller_number);
-  const heroTitle = hasHeroCall
+
+  // Pick whichever is newer: a trusted alert or a regular call
+  const trustedIsHero =
+    recentTrustedAlert !== null &&
+    (!hasHeroCall ||
+      new Date(recentTrustedAlert.created_at).getTime() > new Date(recentCall!.created_at).getTime());
+
+  const heroTitle = trustedIsHero
+    ? recentTrustedAlert!.label
+    : hasHeroCall
     ? formatPhoneNumber(recentCall?.caller_number, 'Recent Call')
     : hasTwilioNumber
     ? 'No calls yet'
     : waitingForProfile
     ? 'Loading…'
     : 'Missing #';
-  const heroTranscript = recentCall?.transcript ?? (loading ? 'Loading…' : null);
-  const heroIsHandledFraud = hasHeroCall && recentCall?.feedback_status === 'marked_fraud';
-  const heroFraudLevel = heroIsHandledFraud
+  const heroTranscript = trustedIsHero
+    ? 'A trusted contact connected to this call.'
+    : recentCall?.transcript ?? (loading ? 'Loading…' : null);
+  const heroIsHandledFraud = !trustedIsHero && hasHeroCall && recentCall?.feedback_status === 'marked_fraud';
+  const heroFraudLevel = trustedIsHero
+    ? 'low'
+    : heroIsHandledFraud
     ? undefined
     : recentCall?.feedback_status === 'marked_fraud'
     ? 'critical'
     : recentCall?.feedback_status === 'marked_safe'
     ? 'low'
     : recentCall?.fraud_risk_level;
-  const heroBadgeLabel = heroIsHandledFraud
+  const heroBadgeLabel = trustedIsHero
+    ? 'Trusted'
+    : heroIsHandledFraud
     ? 'Handled'
     : hasHeroCall && recentCall?.feedback_status === 'marked_safe'
     ? 'Safe'
     : undefined;
-  const heroBadgeBackgroundColor = heroIsHandledFraud
+  const heroBadgeBackgroundColor = trustedIsHero
+    ? withOpacity(theme.colors.accent, 0.16)
+    : heroIsHandledFraud
     ? withOpacity(theme.colors.textDim, 0.2)
     : undefined;
-  const heroBadgeTextColor = heroIsHandledFraud ? theme.colors.textDim : undefined;
-  const heroSubtitleLabel = hasHeroCall
+  const heroBadgeTextColor = trustedIsHero
+    ? theme.colors.accent
+    : heroIsHandledFraud
+    ? theme.colors.textDim
+    : undefined;
+  const heroSubtitleLabel = trustedIsHero
+    ? undefined
+    : hasHeroCall
     ? undefined
     : hasTwilioNumber
     ? 'Calls and alerts will show up here once they start.'
@@ -569,24 +612,32 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               <RecentCallCard
                 title={heroTitle}
                 transcript={heroTranscript}
-                createdAt={recentCall?.created_at}
+                createdAt={trustedIsHero ? recentTrustedAlert!.created_at : recentCall?.created_at}
                 fraudLevel={heroFraudLevel}
                 badgeLabel={heroBadgeLabel}
                 badgeBackgroundColor={heroBadgeBackgroundColor}
                 badgeTextColor={heroBadgeTextColor}
-                hideBadge={!hasHeroCall}
+                hideBadge={!hasHeroCall && !trustedIsHero}
                 subtitleLabel={heroSubtitleLabel}
+                iconName={trustedIsHero ? 'shield-checkmark' : 'call'}
+                iconColor={trustedIsHero ? theme.colors.accent : undefined}
+                iconBackgroundColor={trustedIsHero ? withOpacity(theme.colors.accent, 0.12) : undefined}
+                footerLabel={trustedIsHero ? 'View in Activity' : 'Review Call Recording'}
                 emptyText={
                   hasTwilioNumber
                     ? 'No calls recorded yet.'
                     : 'Add a Verity Protect number to start recording calls.'
                 }
-                onPress={() =>
-                  navigation.navigate('CallsTab', {
-                    screen: 'Calls',
-                    params: { initialCallId: recentCall?.id },
-                  })
-                }
+                onPress={() => {
+                  if (trustedIsHero) {
+                    navigation.navigate('AlertsTab');
+                  } else {
+                    navigation.navigate('CallsTab', {
+                      screen: 'Calls',
+                      params: { initialCallId: recentCall?.id },
+                    });
+                  }
+                }}
               />
             </View>
 

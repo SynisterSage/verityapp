@@ -50,6 +50,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionExpired, setSessionExpired] = useState(false);
   // Tracks whether the current sign-out was initiated intentionally by the user.
   const intentionalSignOutRef = useRef(false);
+  // Tracks whether a session was ever established (prevents modal on auth screens).
+  const hadSessionRef = useRef(false);
 
   const recordLegalAcceptance = async (
     accessToken: string,
@@ -188,8 +190,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(nextSession);
       if (nextSession) {
         // Session restored (sign in or token refresh success) — clear any expiry state.
+        hadSessionRef.current = true;
         setSessionExpired(false);
-      } else if (event === 'SIGNED_OUT' && !intentionalSignOutRef.current) {
+      } else if (event === 'SIGNED_OUT' && !intentionalSignOutRef.current && hadSessionRef.current) {
         // Unexpected sign-out (token refresh failure or server-side invalidation).
         setSessionExpired(true);
       }
@@ -365,6 +368,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       },
       signOut: async () => {
         intentionalSignOutRef.current = true;
+        hadSessionRef.current = false;
         setSessionExpired(false);
         try {
           await supabase.auth.signOut({ scope: 'local' });

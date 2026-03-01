@@ -48,14 +48,14 @@ const fallbackPlans: PlanOption[] = [
     productId: 'verityprotect_monthly',
     title: 'Monthly',
     price: '$9.99 / month',
-    detail: 'Flexible monthly billing',
+    detail: 'Flexible, cancel anytime',
   },
   {
     productId: 'verityprotect_annual',
     title: 'Annual',
     price: '$99.99 / year',
-    detail: 'Best value for long-term protection',
-    badge: 'Save over monthly',
+    detail: 'Save 17% vs monthly',
+    badge: 'Best Value',
   },
 ];
 
@@ -79,11 +79,19 @@ function toPlanOption(product: {
     price: `${product.displayPrice}${suffix}`,
     detail:
       product.productId === 'verityprotect_annual'
-        ? 'Best value for long-term protection'
-        : 'Flexible monthly billing',
-    badge: product.productId === 'verityprotect_annual' ? 'Save over monthly' : undefined,
+        ? 'Save 17% vs monthly'
+        : 'Flexible, cancel anytime',
+    badge: product.productId === 'verityprotect_annual' ? 'Best Value' : undefined,
   };
 }
+
+const FEATURES: { icon: string; text: string }[] = [
+  { icon: 'shield-checkmark-outline', text: 'Screens every call before it reaches you' },
+  { icon: 'warning-outline', text: 'Flags scam and fraud attempts in real time' },
+  { icon: 'person-circle-outline', text: 'Trusted contacts skip screening automatically' },
+  { icon: 'mic-outline', text: 'Call recordings and transcripts saved securely' },
+  { icon: 'people-outline', text: 'Add family members to your protection circle' },
+];
 
 function isNetworkIssue(message: string) {
   return /network|internet|offline|timed out|could not connect/i.test(message);
@@ -435,60 +443,24 @@ export default function MembershipScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerBlock}>
-          <Text style={styles.title}>Protect your family phone line</Text>
+          <View style={styles.heroIconWrap}>
+            <Ionicons name="shield-checkmark" size={32} color={theme.colors.accent} />
+          </View>
+          <Text style={styles.title}>Your family's call protection</Text>
           <Text style={styles.subtitle}>
-            Learn how Verity works, then choose a plan to activate call protection.
+            Every call screened, every fraud attempt flagged — before it reaches you.
           </Text>
         </View>
 
-        <View style={styles.experienceCardsWrap}>
-          <Pressable
-            style={styles.experienceCard}
-            onPress={() => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-              logEvent('membership_experience_opened', {
-                screen: 'MembershipScreen',
-              });
-              navigation.navigate('MembershipExperience');
-            }}
-          >
-            <View style={styles.experienceIconWrap}>
-              <Ionicons name="sparkles-outline" size={18} color={theme.colors.accent} />
+        <View style={styles.featuresCard}>
+          {FEATURES.map((f) => (
+            <View key={f.text} style={styles.featureRow}>
+              <View style={styles.featureIconWrap}>
+                <Ionicons name={f.icon as any} size={16} color={theme.colors.accent} />
+              </View>
+              <Text style={styles.featureText}>{f.text}</Text>
             </View>
-            <View style={styles.experienceTextWrap}>
-              <Text style={styles.experienceTitle}>See how Verity works</Text>
-              <Text style={styles.experienceCopy}>
-                Walk through the full call-screening flow with an interactive demo.
-              </Text>
-            </View>
-            <View style={styles.experienceChevronWrap}>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
-            </View>
-          </Pressable>
-
-          <Pressable
-            style={styles.experienceCard}
-            onPress={() => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-              logEvent('membership_why_choose_opened', {
-                screen: 'MembershipScreen',
-              });
-              navigation.navigate('WhyChooseVerity');
-            }}
-          >
-            <View style={styles.experienceIconWrap}>
-              <Ionicons name="trending-up-outline" size={18} color={theme.colors.accent} />
-            </View>
-            <View style={styles.experienceTextWrap}>
-              <Text style={styles.experienceTitle}>Why choose Verity</Text>
-              <Text style={styles.experienceCopy}>
-                See real fraud trends, use cases, and how families and facilities use Verity.
-              </Text>
-            </View>
-            <View style={styles.experienceChevronWrap}>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
-            </View>
-          </Pressable>
+          ))}
         </View>
 
         <View style={styles.planSection}>
@@ -567,6 +539,32 @@ export default function MembershipScreen() {
               <Text style={styles.inlineButtonSecondaryText}>Use invite code</Text>
             </Pressable>
           ) : null}
+        </View>
+
+        <View style={styles.learnMoreRow}>
+          <Pressable
+            style={styles.learnMoreBtn}
+            onPress={() => {
+              void Haptics.selectionAsync().catch(() => null);
+              logEvent('membership_experience_opened', { screen: 'MembershipScreen' });
+              navigation.navigate('MembershipExperience');
+            }}
+          >
+            <Ionicons name="sparkles-outline" size={14} color={theme.colors.accent} />
+            <Text style={styles.learnMoreText}>See how it works</Text>
+          </Pressable>
+          <Text style={styles.learnMoreDivider}>·</Text>
+          <Pressable
+            style={styles.learnMoreBtn}
+            onPress={() => {
+              void Haptics.selectionAsync().catch(() => null);
+              logEvent('membership_why_choose_opened', { screen: 'MembershipScreen' });
+              navigation.navigate('WhyChooseVerity');
+            }}
+          >
+            <Ionicons name="trending-up-outline" size={14} color={theme.colors.accent} />
+            <Text style={styles.learnMoreText}>Why Verity</Text>
+          </Pressable>
         </View>
 
         <View style={styles.billingCard}>
@@ -704,7 +702,7 @@ export default function MembershipScreen() {
           {isProcessingPurchase || isLoadingProducts ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.primaryButtonText}>Continue with App Store</Text>
+            <Text style={styles.primaryButtonText}>Start Protection</Text>
           )}
         </Pressable>
         <Text style={styles.trustStrip}>
@@ -783,8 +781,18 @@ const createMembershipStyles = (theme: AppTheme) =>
       gap: 18,
     },
     headerBlock: {
-      gap: 8,
-      marginBottom: 6,
+      gap: 10,
+      marginBottom: 4,
+      alignItems: 'flex-start',
+    },
+    heroIconWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: 18,
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 2,
     },
     title: {
       fontSize: 34,
@@ -798,52 +806,57 @@ const createMembershipStyles = (theme: AppTheme) =>
       color: theme.colors.textMuted,
       lineHeight: 22,
     },
-    experienceCard: {
-      borderRadius: 24,
+    featuresCard: {
+      borderRadius: 20,
       borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.35),
-      backgroundColor: withOpacity(theme.colors.accent, 0.08),
-      paddingHorizontal: 15,
-      paddingVertical: 17,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 12,
+    },
+    featureRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
     },
-    experienceCardsWrap: {
-      gap: 10,
-    },
-    experienceIconWrap: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+    featureIconWrap: {
+      width: 30,
+      height: 30,
+      borderRadius: 10,
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.accent, 0.16),
     },
-    experienceTextWrap: {
+    featureText: {
       flex: 1,
-      gap: 2,
-    },
-    experienceTitle: {
-      fontSize: 15,
-      fontWeight: '700',
+      fontSize: 14,
+      fontWeight: '500',
       color: theme.colors.text,
+      lineHeight: 20,
     },
-    experienceCopy: {
-      fontSize: 13,
-      lineHeight: 19,
-      color: theme.colors.textMuted,
-    },
-    experienceChevronWrap: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.35),
-      backgroundColor: withOpacity(theme.colors.accent, 0.14),
+    learnMoreRow: {
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      marginLeft: 2,
+      gap: 8,
+      marginTop: -4,
+    },
+    learnMoreBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingVertical: 4,
+      paddingHorizontal: 6,
+    },
+    learnMoreText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.accent,
+    },
+    learnMoreDivider: {
+      fontSize: 14,
+      color: theme.colors.textMuted,
     },
     planSection: {
       gap: 10,

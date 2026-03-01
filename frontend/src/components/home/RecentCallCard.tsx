@@ -20,6 +20,10 @@ type RecentCallCardProps = {
   hideBadge?: boolean;
   badgeBackgroundColor?: string;
   badgeTextColor?: string;
+  iconName?: keyof typeof Ionicons.glyphMap;
+  iconColor?: string;
+  iconBackgroundColor?: string;
+  footerLabel?: string;
 };
 
 export default function RecentCallCard({
@@ -35,6 +39,10 @@ export default function RecentCallCard({
   hideBadge = false,
   badgeBackgroundColor,
   badgeTextColor,
+  iconName = 'call',
+  iconColor,
+  iconBackgroundColor,
+  footerLabel = 'Review Call Recording',
 }: RecentCallCardProps) {
   const { theme } = useTheme();
   const formattedCreatedAt = createdAt ? formatTimestamp(createdAt) : undefined;
@@ -61,8 +69,8 @@ export default function RecentCallCard({
     <TouchableOpacity style={[styles.card, { backgroundColor: theme.colors.surface }]} onPress={handlePress} activeOpacity={0.85}>
       <View style={headerRowStyles}>
         <View style={styles.headerRowLeft}>
-          <View style={[styles.iconCircle, { backgroundColor: theme.colors.surfaceAlt }]}>
-            <Ionicons name="call" size={24} color={theme.colors.accent} />
+          <View style={[styles.iconCircle, { backgroundColor: iconBackgroundColor ?? theme.colors.surfaceAlt }]}>
+            <Ionicons name={iconName} size={24} color={iconColor ?? theme.colors.accent} />
           </View>
           <View style={styles.headerText}>
             <Text
@@ -94,7 +102,7 @@ export default function RecentCallCard({
         </Text>
       </View>
       <View style={styles.footerRow}>
-        <Text style={[styles.footerText, { color: theme.colors.accent }]}>Review Call Recording</Text>
+        <Text style={[styles.footerText, { color: theme.colors.accent }]}>{footerLabel}</Text>
         <Ionicons name="chevron-forward" size={18} color={theme.colors.accent} style={styles.footerIcon} />
       </View>
     </TouchableOpacity>

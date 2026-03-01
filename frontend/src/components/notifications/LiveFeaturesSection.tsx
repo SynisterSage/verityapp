@@ -12,7 +12,6 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 
 import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
@@ -150,18 +149,7 @@ export default function LiveFeaturesSection({
       >
         <View style={styles.modalOverlay}>
           <TouchableWithoutFeedback onPress={() => setActiveTopic(null)}>
-            <View style={styles.modalBackdrop}>
-              <LinearGradient
-                colors={
-                  mode === 'dark'
-                    ? ['rgba(39, 128, 255, 0.10)', 'rgba(2, 10, 22, 0.84)']
-                    : ['rgba(39, 128, 255, 0.06)', 'rgba(8, 24, 46, 0.34)']
-                }
-                start={{ x: 0.5, y: 0 }}
-                end={{ x: 0.5, y: 1 }}
-                style={styles.modalBackdropGradient}
-              />
-            </View>
+            <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
           {modalContent ? (
             <View style={styles.modalCard}>
@@ -275,10 +263,7 @@ const createLiveFeaturesStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
     },
     modalBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: mode === 'dark' ? 'rgba(2, 10, 22, 0.7)' : 'rgba(8, 24, 46, 0.2)',
-    },
-    modalBackdropGradient: {
-      ...StyleSheet.absoluteFillObject,
+      backgroundColor: mode === 'dark' ? 'rgba(0,0,0,0.72)' : 'rgba(15,23,42,0.55)',
     },
     modalCard: {
       width: '100%',

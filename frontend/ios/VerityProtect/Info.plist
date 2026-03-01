@@ -46,21 +46,21 @@
 		<true/>
 	</dict>
 	<key>NSContactsUsageDescription</key>
-	<string>Verity Protect uses your contacts to let trusted callers skip the passcode.</string>
+	<string>Verity Protect uses your contacts to identify trusted callers and skip the safety passcode.</string>
 	<key>NSFaceIDUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your Face ID biometric data.</string>
+	<string>Verity Protect uses Face ID to quickly and securely verify your identity.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Location lets us find care professionals nearby to add to your trusted list.</string>
+	<string>Verity Protect uses your location to find nearby care professionals for your trusted list.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your location</string>
+	<string>Verity Protect uses your location to find nearby care professionals for your trusted list.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Location lets us find care professionals nearby to add to your trusted list.</string>
+	<string>Verity Protect uses your location to find nearby care professionals for your trusted list.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to access your microphone</string>
+	<string>Verity Protect uses your microphone to screen and record incoming calls for fraud detection.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSVoIPUsageDescription</key>
-	<string>Allow $(PRODUCT_NAME) to run in the background, to wake for calls</string>
+	<string>Verity Protect runs in the background to receive and screen incoming calls in real time.</string>
 	<key>RCTNewArchEnabled</key>
 	<false/>
 	<key>UIBackgroundModes</key>

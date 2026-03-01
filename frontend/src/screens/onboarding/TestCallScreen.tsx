@@ -152,7 +152,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
           </View>
           <View style={styles.infoContent}>
             <View style={styles.infoLabelRow}>
-              <Text style={styles.infoLabel}>Reliable fallback number</Text>
+              <Text style={styles.infoLabel}>Fallback number</Text>
               <Pressable
                 onPress={(event) => {
                   event.stopPropagation();
@@ -282,8 +282,7 @@ const createTestCallStyles = (theme: AppTheme) =>
     infoLabelRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 10,
+      gap: 6,
     },
     infoHelpButton: {
       width: 22,

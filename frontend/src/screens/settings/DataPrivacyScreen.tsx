@@ -84,6 +84,7 @@ const POLICY_SECTIONS = [
       'Supabase: Secures authentication, database, and access control.',
       'Resend: Delivers account verification and alert emails.',
       'Sentry: Monitors errors and performance (no personal data).',
+      'Pixabay: Notification sounds used under free commercial license.',
     ],
   },
 ];
@@ -783,7 +784,7 @@ const createDataPrivacyStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
       gap: 16,
     },
     policyBlock: {
-      backgroundColor: theme.colors.surfaceAlt,
+      backgroundColor: theme.colors.surface,
       borderRadius: 24,
       borderWidth: 1,
       borderColor: theme.colors.border,

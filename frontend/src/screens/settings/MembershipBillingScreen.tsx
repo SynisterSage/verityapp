@@ -387,20 +387,6 @@ export default function MembershipBillingScreen() {
           )}
           {renderActionRow(
             {
-              key: 'reload',
-              title: isReloadingPlans || isLoadingProducts ? 'Reloading plans…' : 'Reload App Store plans',
-              detail: isReloadingPlans || isLoadingProducts
-                ? 'Refreshing App Store products…'
-                : 'Refresh plan availability for this build.',
-              icon: 'cloud-download-outline',
-              onPress: handleReloadPlans,
-              loading: isReloadingPlans || isLoadingProducts,
-              disabled: isAnyActionBusy,
-            },
-            false
-          )}
-          {renderActionRow(
-            {
               key: 'support',
               title: 'Billing help',
               detail: 'Contact support for subscription or receipt questions.',
