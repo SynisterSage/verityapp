@@ -443,7 +443,18 @@ export default function CallsScreen({
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadCalls(true);
+    try {
+      await Promise.race([
+        loadCalls(true),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('calls_refresh_timeout')), 12000)
+        ),
+      ]);
+    } catch (err) {
+      console.warn('[Calls] Pull-to-refresh timed out or failed', err);
+    } finally {
+      setRefreshing(false);
+    }
   }, [loadCalls]);
 
   const showTray = useCallback((call: CallRow) => {
@@ -862,25 +873,32 @@ export default function CallsScreen({
   );
 
   const renderTrustedItem = useCallback(
-    ({ item }: { item: TrustedActivityRow }) => (
-      <View style={styles.trustedItem}>
-        <ActivityRow
-          type="alert"
-          label={item.label}
-          createdAt={item.created_at}
-          badge="TRUSTED"
-          badgeLevel="circle"
-          iconName="shield-checkmark"
-          iconColor={theme.colors.accent}
-          iconBackgroundColor={withOpacity(theme.colors.accent, 0.16)}
-          borderRadius={32}
-          disabled
-          onLongPress={canManageProfile ? () => showTrustedTray(item) : undefined}
-          onPress={() => {}}
-        />
-      </View>
-    ),
-    [canManageProfile, showTrustedTray, styles, theme.colors.accent]
+    ({ item }: { item: TrustedActivityRow }) => {
+      const handlePress = () => {
+        const rootNavigator = navigation.getParent()?.getParent();
+        if (rootNavigator?.navigate) {
+          rootNavigator.navigate('TrustedCallDetail', { alertId: item.id });
+        }
+      };
+      return (
+        <View style={styles.trustedItem}>
+          <ActivityRow
+            type="alert"
+            label={item.label}
+            createdAt={item.created_at}
+            badge="TRUSTED"
+            badgeLevel="circle"
+            iconName="shield-checkmark"
+            iconColor={theme.colors.accent}
+            iconBackgroundColor={withOpacity(theme.colors.accent, 0.16)}
+            borderRadius={32}
+            onLongPress={canManageProfile ? () => showTrustedTray(item) : undefined}
+            onPress={handlePress}
+          />
+        </View>
+      );
+    },
+    [canManageProfile, navigation, showTrustedTray, styles, theme.colors.accent]
   );
 
   const renderSectionHeader = ({ section }: { section: CallSection }) => (

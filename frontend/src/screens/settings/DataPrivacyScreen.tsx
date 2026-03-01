@@ -12,6 +12,9 @@ import {
   View,
   Pressable,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
+import { Audio } from 'expo-av';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -184,11 +187,68 @@ function Toggle({
   );
 }
 
+type OsPermissionRowProps = {
+  icon: string;
+  label: string;
+  description: string;
+  granted: boolean | null;
+  styles: ReturnType<typeof createDataPrivacyStyles>;
+  theme: AppTheme;
+};
+
+function OsPermissionRow({ icon, label, description, granted, styles, theme }: OsPermissionRowProps) {
+  const isGranted = granted === true;
+  const statusColor = granted === null
+    ? theme.colors.textMuted
+    : isGranted
+    ? theme.colors.success
+    : theme.colors.danger;
+  const statusLabel = granted === null ? '—' : isGranted ? 'Allowed' : 'Denied';
+
+  return (
+    <View style={[styles.row, styles.rowBorder]}>
+      <View style={[styles.iconBox, styles.iconBoxAlt]}>
+        <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={20} color={theme.colors.accent} />
+      </View>
+      <View style={styles.rowText}>
+        <Text style={[styles.rowTitle, { color: theme.colors.text }]}>{label}</Text>
+        <Text style={[styles.rowDescription, { color: theme.colors.textMuted }]}>{description}</Text>
+      </View>
+      <TouchableOpacity
+        onPress={() => Linking.openSettings()}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <View style={[styles.osPermBadge, { backgroundColor: withOpacity(statusColor, 0.1) }]}>
+          <View style={[styles.osPermDot, { backgroundColor: statusColor }]} />
+          <Text style={[styles.osPermLabel, { color: statusColor }]}>{statusLabel}</Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 export default function DataPrivacyScreen() {
   const insets = useSafeAreaInsets();
   const [permissions, setPermissions] = useState(
     PERMISSIONS.reduce((acc, item) => ({ ...acc, [item.name]: true }), {} as Record<string, boolean>)
   );
+
+  // OS-level permission status (read-only — user must go to iOS Settings to change)
+  const [notifGranted, setNotifGranted] = useState<boolean | null>(null);
+  const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
+  const [micGranted, setMicGranted] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      setNotifGranted(status === 'granted');
+    }).catch(() => setNotifGranted(false));
+    Location.getForegroundPermissionsAsync().then(({ status }) => {
+      setLocationGranted(status === 'granted');
+    }).catch(() => setLocationGranted(false));
+    Audio.getPermissionsAsync().then(({ status }) => {
+      setMicGranted(status === 'granted');
+    }).catch(() => setMicGranted(false));
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -441,6 +501,30 @@ export default function DataPrivacyScreen() {
                 />
               </SettingRow>
             ))}
+            <OsPermissionRow
+              icon="notifications-outline"
+              label="Notifications"
+              description="Required to receive call alerts and circle updates"
+              granted={notifGranted}
+              styles={styles}
+              theme={theme}
+            />
+            <OsPermissionRow
+              icon="location-outline"
+              label="Location"
+              description="Used to find nearby care providers in Doctor Lookup"
+              granted={locationGranted}
+              styles={styles}
+              theme={theme}
+            />
+            <OsPermissionRow
+              icon="mic-outline"
+              label="Microphone"
+              description="Used to screen and connect incoming calls"
+              granted={micGranted}
+              styles={styles}
+              theme={theme}
+            />
           </View>
 
           <Text style={styles.sectionLabel}>Policy details</Text>
@@ -779,6 +863,29 @@ const createDataPrivacyStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
     },
     toggleThumbInactive: {
       transform: [{ translateX: 0 }],
+    },
+    rowBorder: {
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      paddingTop: 12,
+      marginTop: 4,
+    },
+    osPermBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+    },
+    osPermDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+    },
+    osPermLabel: {
+      fontSize: 12,
+      fontWeight: '700',
     },
     policyList: {
       gap: 16,

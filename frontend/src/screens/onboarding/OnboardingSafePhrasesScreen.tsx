@@ -42,6 +42,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   const [phrases, setPhrases] = useState<SafePhrase[]>([]);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const shimmer = useMemo(() => new Animated.Value(0.6), []);
@@ -87,8 +88,9 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   }, [activeProfile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addPhrase = async () => {
-    if (!input.trim() || !activeProfile) return;
+    if (!input.trim() || !activeProfile || adding) return;
     setError('');
+    setAdding(true);
     try {
       const phrase = normalizePhrase(input);
       await authorizedFetch('/fraud/safe-phrases', {
@@ -99,6 +101,8 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
       loadPhrases();
     } catch (err: any) {
       setError(err?.message || 'Failed to add phrase.');
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -160,12 +164,17 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
             <Pressable
               style={({ pressed }) => [
                 styles.addButton,
-                { opacity: pressed || !input.trim() ? 0.3 : 1 },
+                (!input.trim() || adding) && styles.addButtonDisabled,
+                { opacity: pressed || !input.trim() || adding ? 0.4 : 1 },
               ]}
               onPress={addPhrase}
-              disabled={!input.trim()}
+              disabled={!input.trim() || adding}
             >
-              <Ionicons name="add" size={24} color={theme.colors.surface} />
+              {adding ? (
+                <ActivityIndicator size="small" color={theme.colors.surface} />
+              ) : (
+                <Ionicons name="add" size={24} color={theme.colors.surface} />
+              )}
             </Pressable>
           </View>
           {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -285,6 +294,9 @@ const createSafePhrasesStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    addButtonDisabled: {
+      backgroundColor: theme.colors.accent,
     },
     error: {
       color: theme.colors.danger,

@@ -171,9 +171,9 @@ export default function SupportInfoScreen() {
                 style={({ pressed }) => [
                   styles.resourceTile,
                   {
-                    backgroundColor: pressed
-                      ? withOpacity(theme.colors.surfaceAlt, 0.9)
-                      : theme.colors.surfaceAlt,
+                    backgroundColor: theme.colors.surface,
+                    borderColor: theme.colors.border,
+                    opacity: pressed ? 0.75 : 1,
                   },
                 ]}
                 onPress={() =>
@@ -470,7 +470,8 @@ const styles = StyleSheet.create({
   resourceTile: {
     width: '48%',
     borderRadius: 18,
-    padding: 10,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,

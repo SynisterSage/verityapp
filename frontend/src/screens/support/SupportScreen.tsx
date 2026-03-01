@@ -725,7 +725,7 @@ export default function SupportScreen() {
                   ) : (
                     <Ionicons
                       name="arrow-up"
-                      size={20}
+                      size={17}
                       color={composerDisabled ? (mode === 'light' ? theme.colors.text : '#fff') : '#fff'}
                       style={styles.sendIcon}
                     />
@@ -981,11 +981,6 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: withOpacity(theme.colors.success, mode === 'dark' ? 0.58 : 0.35),
       zIndex: 2,
-      shadowColor: theme.colors.success,
-      shadowOpacity: mode === 'dark' ? 0.28 : 0.16,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 8 },
-      elevation: 8,
       pointerEvents: 'none',
     },
     successAnimationText: {
@@ -1065,10 +1060,10 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
     },
     composerOuter: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
+      flexWrap: 'nowrap',
       alignItems: 'flex-end',
-      paddingHorizontal: 18,
-      paddingVertical: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
       borderRadius: 30,
       marginHorizontal: 12,
       marginBottom: 14,
@@ -1081,29 +1076,24 @@ const createStyles = (theme: AppTheme, mode: ThemeMode) =>
     },
     input: {
       flex: 1,
-      minWidth: '72%',
       minHeight: 6,
       maxHeight: 180,
       borderRadius: 24,
-      paddingHorizontal: 18,
-      paddingVertical: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
       fontSize: 16,
     },
     sendButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
-      marginLeft: 12,
-      shadowColor: '#000',
-      shadowOpacity: 0.25,
-      shadowRadius: 18,
-      shadowOffset: { width: 0, height: 10 },
-      elevation: 8,
+      marginLeft: 8,
+      flexShrink: 0,
     },
     sendIcon: {
-      marginTop: -2,
+      marginTop: -1,
     },
     sendErrorRow: {
       width: '100%',

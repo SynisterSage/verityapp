@@ -31,8 +31,15 @@ import EmptyState from '../../components/common/EmptyState';
 import AlertCard from '../../components/alerts/AlertCard';
 import { useProfile } from '../../context/ProfileContext';
 
-function toCircleActivityItem(alert: AlertRow): CircleActivityItem {
-  const actorLabel = alert.payload?.actor_label ?? 'Circle member';
+function toCircleActivityItem(
+  alert: AlertRow,
+  memberNames: Record<string, string> = {}
+): CircleActivityItem {
+  const actorId = alert.payload?.actor_user_id as string | undefined;
+  const actorLabel =
+    (actorId && memberNames[actorId]) ??
+    alert.payload?.actor_label ??
+    'Circle member';
   const description =
     alert.payload?.message ??
     (alert.alert_type === 'circle_invite'
@@ -109,10 +116,23 @@ export default function CircleActivityScreen() {
     const loadCircleActivity = async () => {
       setIsLoadingActivities(true);
       try {
-        const data = await authorizedFetch(
-          `/alerts?limit=50&profileId=${encodeURIComponent(activeProfile.id)}`
-        );
-        const alerts = (data?.alerts ?? []) as AlertRow[];
+        const [alertsData, membersData] = await Promise.all([
+          authorizedFetch(`/alerts?limit=50&profileId=${encodeURIComponent(activeProfile.id)}`),
+          authorizedFetch(`/profiles/${activeProfile.id}/members`),
+        ]);
+
+        const alerts = (alertsData?.alerts ?? []) as AlertRow[];
+        const members = (membersData?.members ?? []) as Array<{
+          user_id?: string;
+          display_name?: string;
+        }>;
+        const memberNames: Record<string, string> = {};
+        members.forEach((member) => {
+          if (member.user_id && member.display_name) {
+            memberNames[member.user_id] = member.display_name;
+          }
+        });
+
         const mapped = alerts
           .filter((alert) => CIRCLE_ALERT_TYPES.has(alert.alert_type ?? ''))
           .sort(
@@ -120,7 +140,7 @@ export default function CircleActivityScreen() {
               (parseAlertTimestamp(b.created_at)?.getTime() ?? 0) -
               (parseAlertTimestamp(a.created_at)?.getTime() ?? 0)
           )
-          .map(toCircleActivityItem);
+          .map((alert) => toCircleActivityItem(alert, memberNames));
         if (!cancelled) {
           setActivityList(mapped);
         }
@@ -313,6 +333,7 @@ export default function CircleActivityScreen() {
                 iconName="people-outline"
                 iconColor={theme.colors.accent}
                 iconBackgroundColor={withOpacity(theme.colors.accent, 0.18)}
+                onPress={() => navigation.navigate('CircleActivityDetail', { alertId: activity.alertRow.id })}
                 onLongPress={
                   canManageProfile ? () => showTray(activity.alertRow) : undefined
                 }

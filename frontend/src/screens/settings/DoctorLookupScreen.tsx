@@ -354,7 +354,12 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
             ))}
           </View>
         ) : doctorTrusted.length === 0 ? (
-          <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>Add providers to your safe list</Text>
+          <View style={[styles.emptyCard, { borderColor: theme.colors.border, backgroundColor: theme.colors.surface }]}>
+            <View style={[styles.emptyIconCircle, { backgroundColor: withOpacity(theme.colors.accent, 0.12) }]}>
+              <Ionicons name="medkit" size={24} color={theme.colors.accent} />
+            </View>
+            <Text style={[styles.emptyText, { color: theme.colors.textMuted }]}>No providers added yet.</Text>
+          </View>
         ) : (
           doctorTrusted.map((contact) => {
             const isDeleting = deletingTrustedId === contact.id;
@@ -569,7 +574,7 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
           style={({ pressed }) => [
             styles.supportCard,
             {
-              backgroundColor: colors.surfaceAlt ?? colors.surface,
+              backgroundColor: colors.surface,
               borderColor: colors.border,
               opacity: pressed ? 0.8 : 1,
             },
@@ -778,10 +783,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
   },
+  emptyCard: {
+    borderRadius: 28,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  emptyIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
   emptyText: {
     textAlign: 'center',
-    color: '#94a3b8',
-    paddingVertical: 12,
+    paddingVertical: 4,
   },
   trustedWrapper: {
     borderRadius: 18,

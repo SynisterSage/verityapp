@@ -4,6 +4,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
 import DashboardHeader from '../../components/common/DashboardHeader';
 import { useTheme } from '../../context/ThemeContext';
 import { useAuth } from '../../context/AuthContext';
@@ -186,6 +187,15 @@ export default function SettingsScreen({
     }),
     [handleLogout]
   );
+  const howItWorksRow = useMemo<SettingsRowItem>(
+    () => ({
+      label: 'How It Works',
+      subtitle: 'Guides and docs for Verity Protect',
+      icon: 'book-outline',
+      onPress: () => navigation.navigate('HowItWorks'),
+    }),
+    [navigation]
+  );
   const supportRow = useMemo<SettingsRowItem>(
     () => ({
       label: 'Support',
@@ -280,6 +290,10 @@ export default function SettingsScreen({
               }
             />
             <SettingRow
+              item={howItWorksRow}
+              onPress={createRowHandler(howItWorksRow)}
+            />
+            <SettingRow
               item={supportRow}
               onPress={createRowHandler(supportRow)}
               isLast
@@ -292,7 +306,14 @@ export default function SettingsScreen({
             <SettingRow item={signOutRow} isLast onPress={signOutHandler} isWorking={isSigningOut} />
           </View>
         </View>
-        <Text style={[styles.footerText, { color: withOpacity(theme.colors.text, 0.5) }]}>Verity Protect. All rights reserved.</Text>
+        <View style={styles.footer}>
+          <Text style={[styles.footerText, { color: withOpacity(theme.colors.text, 0.4) }]}>Verity Protect</Text>
+          <Pressable onPress={() => navigation.navigate('WhatsNew' as any)}>
+            <Text style={[styles.footerVersion, { color: theme.colors.accent }]}>
+              Version {Constants.expoConfig?.version ?? '1.0.0'}
+            </Text>
+          </Pressable>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -447,10 +468,21 @@ const styles = StyleSheet.create({
   signOutCard: {
     marginTop: 0,
   },
-  footerText: {
+  footer: {
     marginTop: 14,
+    alignItems: 'center',
+    gap: 2,
+    paddingBottom: 8,
+  },
+  footerText: {
     textAlign: 'center',
     letterSpacing: 0.3,
     fontSize: 12,
+    fontWeight: '500',
+  },
+  footerVersion: {
+    textAlign: 'center',
+    fontSize: 11,
+    letterSpacing: 0.2,
   },
 });

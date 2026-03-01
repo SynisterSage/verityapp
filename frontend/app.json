@@ -19,7 +19,8 @@
       "infoPlist": {
         "NSContactsUsageDescription": "Verity Protect uses your contacts to let trusted callers skip the passcode.",
         "NSLocationWhenInUseUsageDescription": "Location lets us find care professionals nearby to add to your trusted list.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Location lets us find care professionals nearby to add to your trusted list."
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Location lets us find care professionals nearby to add to your trusted list.",
+        "NSMicrophoneUsageDescription": "Verity Protect uses your microphone to screen and connect calls."
       },
       "appleTeamId": "CAY3N8J725"
     },

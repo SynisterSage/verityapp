@@ -21,8 +21,11 @@ export type RootStackParamList = {
   OnboardingTestCall: undefined;
   OnboardingInviteCode: undefined;
   OnboardingSuccess: undefined;
+  PermissionPriming: undefined;
   AppTabs: NavigatorScreenParams<TabParamList> | undefined;
   CallDetailModal: { callId: string; compact?: boolean };
+  TrustedCallDetail: { alertId: string };
+  CircleActivityDetail: { alertId: string };
   SupportPortal: { initialResource?: SupportResourceType } | undefined;
   SupportModal: { ticketId?: string | null; profileId?: string | null; newTicket?: boolean; autoEnd?: boolean };
   SupportResource: { resource: SupportResourceType; title?: string };
@@ -67,5 +70,7 @@ export type SettingsStackParamList = {
   EnterInviteCode: undefined;
   Members: { highlightInviteEntry?: boolean } | undefined;
   SupportInfo: undefined;
+  HowItWorks: undefined;
+  WhatsNew: undefined;
   SafetyIntelligence: undefined;
 };

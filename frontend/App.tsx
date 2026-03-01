@@ -38,6 +38,7 @@ import ConfirmEmailScreen from './src/screens/auth/ConfirmEmailScreen';
 import HomeScreen from './src/screens/dashboard/HomeScreen';
 import CallsScreen from './src/screens/dashboard/CallsScreen';
 import CallDetailScreen from './src/screens/dashboard/CallDetailScreen';
+import TrustedCallDetailScreen from './src/screens/dashboard/TrustedCallDetailScreen';
 import ActiveCallScreen from './src/screens/dashboard/ActiveCallScreen';
 import CircleActivityScreen from './src/screens/dashboard/CircleActivityScreen';
 import AlertsScreen from './src/screens/dashboard/AlertsScreen';
@@ -56,6 +57,9 @@ import AutomationScreen from './src/screens/settings/AutomationScreen';
 import EnterInviteCodeScreen from './src/screens/settings/EnterInviteCodeScreen';
 import MembersScreen from './src/screens/settings/MembersScreen';
 import SupportInfoScreen from './src/screens/settings/SupportInfoScreen';
+import HowItWorksScreen from './src/screens/settings/HowItWorksScreen';
+import WhatsNewScreen from './src/screens/settings/WhatsNewScreen';
+import CircleActivityDetailScreen from './src/screens/dashboard/CircleActivityDetailScreen';
 import DoctorLookupScreen from './src/screens/settings/DoctorLookupScreen';
 import SupportScreen from './src/screens/support/SupportScreen';
 import SupportTicketsScreen from './src/screens/support/SupportTicketsScreen';
@@ -73,6 +77,7 @@ import SplashScreen from './src/components/common/SplashScreen';
 import OnboardingChoiceScreen from './src/screens/onboarding/OnboardingChoiceScreen';
 import OnboardingInviteCodeScreen from './src/screens/onboarding/OnboardingInviteCodeScreen';
 import OnboardingSuccessScreen from './src/screens/onboarding/OnboardingSuccessScreen';
+import PermissionPrimingScreen from './src/screens/onboarding/PermissionPrimingScreen';
 import MembershipScreen from './src/screens/onboarding/MembershipScreen';
 import MembershipActivatedScreen from './src/screens/onboarding/MembershipActivatedScreen';
 import MembershipExperienceScreen from './src/screens/onboarding/MembershipExperienceScreen';
@@ -103,6 +108,7 @@ type PendingNotificationData = {
     | 'call_detail'
     | 'calls_all'
     | 'calls_trusted'
+    | 'trusted_call_detail'
     | 'circle_activity'
     | 'alerts'
     | 'support_portal';
@@ -214,6 +220,13 @@ function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'
     return 'calls_trusted';
   }
   if (
+    normalized === 'trusted_call_detail' ||
+    normalized === 'trustedcalldetail' ||
+    normalized === 'trusted-call-detail'
+  ) {
+    return 'trusted_call_detail';
+  }
+  if (
     normalized === 'circle_activity' ||
     normalized === 'circleactivity' ||
     normalized === 'circle-activity' ||
@@ -302,7 +315,7 @@ function inferRouteTargetFromPayload(args: {
     return 'call_detail';
   }
   if (normalizedAlertType === 'trusted') {
-    return 'calls_trusted';
+    return alertId ? 'trusted_call_detail' : 'calls_trusted';
   }
   if (CIRCLE_ALERT_TYPES.has(normalizedAlertType)) {
     return 'circle_activity';
@@ -550,6 +563,7 @@ function SettingsStackNavigator() {
       />
       <SettingsStack.Screen name="Members" component={MembersScreen} />
       <SettingsStack.Screen name="SupportInfo" component={SupportInfoScreen} />
+      <SettingsStack.Screen name="HowItWorks" component={HowItWorksScreen} />
       <SettingsStack.Screen name="SafetyIntelligence" component={DoctorLookupScreen} />
     </SettingsStack.Navigator>
   );
@@ -909,6 +923,21 @@ function RootNavigator() {
               options={{ headerShown: false, presentation: 'modal' }}
             />
             <RootStack.Screen
+              name="TrustedCallDetail"
+              component={TrustedCallDetailScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="WhatsNew"
+              component={WhatsNewScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
+              name="CircleActivityDetail"
+              component={CircleActivityDetailScreen}
+              options={{ headerShown: false, presentation: 'modal' }}
+            />
+            <RootStack.Screen
               name="SupportPortal"
               component={SupportTicketsScreen}
               options={{ headerShown: false, presentation: 'modal' }}
@@ -963,6 +992,11 @@ function RootNavigator() {
       <RootStack.Screen
         name="OnboardingSuccess"
         component={OnboardingSuccessScreen}
+        options={{ headerShown: false, gestureEnabled: false }}
+      />
+      <RootStack.Screen
+        name="PermissionPriming"
+        component={PermissionPrimingScreen}
         options={{ headerShown: false, gestureEnabled: false }}
       />
     </RootStack.Navigator>
@@ -1445,14 +1479,22 @@ function NavigationHost() {
       pendingNotificationRef.current = null;
       delete notificationRetryCountRef.current[retryKey];
 
+      if (payload.routeTarget === 'trusted_call_detail' && payload.alertId) {
+        rootNavigationRef.current.navigate('TrustedCallDetail', { alertId: payload.alertId });
+        return;
+      }
       if (payload.routeTarget === 'calls_trusted') {
-        rootNavigationRef.current.navigate('AppTabs', {
-          screen: 'CallsTab',
-          params: {
-            screen: 'Calls',
-            params: { initialFilter: 'trusted' },
-          },
-        });
+        if (payload.alertId) {
+          rootNavigationRef.current.navigate('TrustedCallDetail', { alertId: payload.alertId });
+        } else {
+          rootNavigationRef.current.navigate('AppTabs', {
+            screen: 'CallsTab',
+            params: {
+              screen: 'Calls',
+              params: { initialFilter: 'trusted' },
+            },
+          });
+        }
         return;
       }
       if (payload.routeTarget === 'calls_all') {
@@ -1632,18 +1674,7 @@ function NavigationHost() {
     readySessionKey !== sessionKey || (Boolean(session) && resolvedSessionKey !== sessionKey);
 
   if (waitingForSessionBootstrap) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: theme.colors.bg,
-        }}
-      >
-        <ActivityIndicator size="small" color={theme.colors.accent} />
-      </View>
-    );
+    return <SplashScreen persistent />;
   }
 
   const showSplashOverlay = splashVisible || !navigationReady;

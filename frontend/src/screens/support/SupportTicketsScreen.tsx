@@ -106,6 +106,7 @@ export default function SupportTicketsScreen() {
   const [trayState, setTrayState] = useState<'active' | 'handled' | null>(null);
   const [trayProcessing, setTrayProcessing] = useState(false);
   const [activeTrayAction, setActiveTrayAction] = useState<'end' | 'delete' | null>(null);
+  const sectionListRef = useRef<SectionList<SupportTicketSummary>>(null);
 
   const primaryName = profiles[0]?.first_name;
   const greeting = primaryName ? `How can we assist you, ${primaryName}?` : 'How can we assist you today?';
@@ -133,10 +134,22 @@ export default function SupportTicketsScreen() {
     [profiles.length]
   );
 
+  const scrollTicketsToTop = useCallback(() => {
+    const list = sectionListRef.current as unknown as {
+      scrollToOffset?: (args: { offset: number; animated?: boolean }) => void;
+    } | null;
+    list?.scrollToOffset?.({ offset: 0, animated: true });
+  }, []);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    void loadTickets({ showLoading: false }).finally(() => setRefreshing(false));
-  }, [loadTickets]);
+    void loadTickets({ showLoading: false }).finally(() => {
+      setRefreshing(false);
+      requestAnimationFrame(() => {
+        scrollTicketsToTop();
+      });
+    });
+  }, [loadTickets, scrollTicketsToTop]);
 
   useEffect(() => {
     void loadTickets();
@@ -491,6 +504,7 @@ export default function SupportTicketsScreen() {
           </View>
         ) : (
         <SectionList
+          ref={sectionListRef}
           sections={sections}
           keyExtractor={(item) => item.ticket_id}
           renderItem={renderTicketItem}

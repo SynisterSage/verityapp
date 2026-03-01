@@ -423,7 +423,9 @@ export default function MembershipExperienceScreen() {
                       <Text style={styles.trustedRelationshipText}>{contact.relationship}</Text>
                     </View>
                   </View>
-                  <Text style={styles.trustedManageText}>Manage</Text>
+                  <View style={styles.trustedManageIcon}>
+                    <Ionicons name="create-outline" size={16} color={theme.colors.accent} />
+                  </View>
                 </View>
               ))}
             </View>
@@ -878,6 +880,14 @@ const createStyles = (theme: AppTheme) =>
       fontSize: 11,
       fontWeight: '700',
       color: theme.colors.accent,
+    },
+    trustedManageIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.1),
     },
     membersPreviewWrap: {
       gap: 8,

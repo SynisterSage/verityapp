@@ -29,7 +29,7 @@ const CIRCLE_ALERT_TYPES = new Set<string>([
   'data_cleared',
 ]);
 
-type PushRouteTarget = 'call_detail' | 'calls_trusted' | 'circle_activity' | 'alerts';
+type PushRouteTarget = 'call_detail' | 'trusted_call_detail' | 'calls_trusted' | 'circle_activity' | 'alerts';
 
 function coerceString(value: unknown) {
   if (typeof value !== 'string') {
@@ -54,7 +54,7 @@ function normalizePushSentence(value: unknown, fallback: string) {
 }
 
 function buildPushRoute(alertType: string, callId?: string | null): PushRouteTarget {
-  if (alertType === 'trusted') return 'calls_trusted';
+  if (alertType === 'trusted') return 'trusted_call_detail';
   if (CIRCLE_ALERT_TYPES.has(alertType)) return 'circle_activity';
   if (callId) return 'call_detail';
   return 'alerts';

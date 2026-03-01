@@ -35,10 +35,27 @@ const appleRootCerts = [
 
 const bundleId = process.env.APPLE_APP_STORE_BUNDLE_ID ?? process.env.IOS_BUNDLE_IDENTIFIER ?? '';
 const appAppleId = process.env.APPLE_APP_STORE_APP_ID ? Number(process.env.APPLE_APP_STORE_APP_ID) : undefined;
-const isSandbox = (process.env.APPLE_ENVIRONMENT ?? 'Sandbox') !== 'Production';
-const appleEnvironment = isSandbox ? Environment.SANDBOX : Environment.PRODUCTION;
 
-const verifier = new SignedDataVerifier(appleRootCerts, true, appleEnvironment, bundleId, appAppleId);
+// Keep both verifiers — Apple sends sandbox notifications even to production webhook endpoints
+// during testing, and the environment is encoded inside the JWS so we try both.
+const sandboxVerifier = new SignedDataVerifier(appleRootCerts, true, Environment.SANDBOX, bundleId, appAppleId);
+const productionVerifier = new SignedDataVerifier(appleRootCerts, true, Environment.PRODUCTION, bundleId, appAppleId);
+
+async function verifyNotification(signedPayload: string) {
+  try {
+    return await productionVerifier.verifyAndDecodeNotification(signedPayload);
+  } catch (e) {
+    if (e instanceof VerificationException && e.status === 4 /* INVALID_ENVIRONMENT */) {
+      return await sandboxVerifier.verifyAndDecodeNotification(signedPayload);
+    }
+    throw e;
+  }
+}
+
+async function verifyTransaction(signedTransactionInfo: string, isSandboxEnv: boolean) {
+  const verifier = isSandboxEnv ? sandboxVerifier : productionVerifier;
+  return verifier.verifyAndDecodeTransaction(signedTransactionInfo);
+}
 
 function toIso(millis?: number | null): string | null {
   if (!millis || !Number.isFinite(millis) || millis <= 0) {
@@ -91,8 +108,8 @@ async function receive(req: Request, res: Response) {
   }
 
   try {
-    // Verify Apple JWS signature — throws VerificationException on invalid/forged payloads
-    const payload = await verifier.verifyAndDecodeNotification(signedPayload.trim());
+    // Verify Apple JWS signature — tries production first, falls back to sandbox on env mismatch
+    const payload = await verifyNotification(signedPayload.trim());
     const notificationType = payload.notificationType ?? 'unknown';
     const subtype = payload.subtype ?? null;
     const environment = payload.data?.environment ?? null;
@@ -114,7 +131,8 @@ async function receive(req: Request, res: Response) {
     }
 
     // Verify and decode the inner transaction JWS
-    const transactionInfo = await verifier.verifyAndDecodeTransaction(signedTransactionInfo);
+    const isSandboxEnv = payload.data?.environment === Environment.SANDBOX;
+    const transactionInfo = await verifyTransaction(signedTransactionInfo, isSandboxEnv);
     const originalTransactionId = transactionInfo.originalTransactionId;
 
     if (!originalTransactionId) {

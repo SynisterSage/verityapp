@@ -108,6 +108,7 @@ export default function AccountScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [safetyMessage, setSafetyMessage] = useState('');
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
+  const [numberCopied, setNumberCopied] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
   const lastFallbackPhoneKey = useRef<string | null>(null);
 
@@ -124,6 +125,12 @@ export default function AccountScreen() {
     setPhoneDigits(normalizePhoneDigits(activeProfile.phone_number ?? ''));
     setFallbackPhoneDigits(normalizePhoneDigits(activeProfile.fallback_phone_number ?? ''));
   }, [activeProfile]);
+
+  useEffect(() => {
+    if (!numberCopied) return;
+    const t = setTimeout(() => setNumberCopied(false), 2000);
+    return () => clearTimeout(t);
+  }, [numberCopied]);
 
   const isReadOnly = !canManageProfile;
 
@@ -314,7 +321,7 @@ export default function AccountScreen() {
 
   const emailAddress = session?.user?.email ?? '';
   const createdAt = activeProfile?.created_at
-    ? new Date(activeProfile.created_at).toLocaleDateString()
+    ? new Date(activeProfile.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : '—';
   const twilioDigits = normalizePhoneDigits(activeProfile?.twilio_virtual_number ?? '');
   const hasTwilioNumber = Boolean(twilioDigits);
@@ -444,11 +451,15 @@ export default function AccountScreen() {
                   return;
                 }
                 Clipboard.setStringAsync(twilioNumber);
-                Alert.alert('Copied', 'Verity number copied to clipboard.');
+                setNumberCopied(true);
               }}
               disabled={!hasTwilioNumber}
             >
-              <Ionicons name="copy-outline" size={20} color={theme.colors.textMuted} />
+              <Ionicons
+                name={numberCopied ? 'checkmark' : 'copy-outline'}
+                size={20}
+                color={numberCopied ? theme.colors.success : theme.colors.textMuted}
+              />
             </Pressable>
           </View>
 

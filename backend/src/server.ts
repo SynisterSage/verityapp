@@ -157,25 +157,39 @@ app.use((err: Error, _: Request, res: Response, next: NextFunction) => {
 });
 
 
-// **** FrontEnd Content **** //
+// **** Legacy Users UI (disabled by default) **** //
+const enableLegacyUsersUi = process.env.ENABLE_LEGACY_USERS_UI === 'true';
 
-// Set views directory (html)
-const viewsDir = path.join(__dirname, 'views');
-app.set('views', viewsDir);
+if (enableLegacyUsersUi) {
+  // Set views directory (html)
+  const viewsDir = path.join(__dirname, 'views');
+  app.set('views', viewsDir);
 
-// Set static directory (js and css).
-const staticDir = path.join(__dirname, 'public');
-app.use(express.static(staticDir));
+  // Set static directory (js and css).
+  const staticDir = path.join(__dirname, 'public');
+  app.use(express.static(staticDir));
 
-// Nav to users pg by default
-app.get('/', (_: Request, res: Response) => {
-  return res.redirect('/users');
-});
+  // Nav to users pg by default
+  app.get('/', (_: Request, res: Response) => {
+    return res.redirect('/users');
+  });
 
-// Redirect to login if not logged in.
-app.get('/users', (_: Request, res: Response) => {
-  return res.sendFile('users.html', { root: viewsDir });
-});
+  app.get('/users', (_: Request, res: Response) => {
+    return res.sendFile('users.html', { root: viewsDir });
+  });
+} else {
+  app.get('/', (_: Request, res: Response) => {
+    return res.status(HTTP_STATUS_CODES.Ok).json({
+      service: 'SafeCall API',
+      status: 'ok',
+    });
+  });
+
+  // Catch all unmatched routes — return 404 with no extra information
+  app.use((_: Request, res: Response) => {
+    return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Not found' });
+  });
+}
 
 
 /******************************************************************************

@@ -376,9 +376,13 @@ export default function BlocklistScreen() {
         }}
         disabled={!canManageProfile}
       >
-        <Text style={[styles.manageText, !canManageProfile && styles.manageTextDisabled]}>
-          Manage
-        </Text>
+        <View style={[styles.manageIconBox, !canManageProfile && styles.manageIconBoxDisabled]}>
+          <Ionicons
+            name="create-outline"
+            size={16}
+            color={!canManageProfile ? withOpacity(theme.colors.accent, 0.4) : theme.colors.accent}
+          />
+        </View>
       </TouchableOpacity>
     </View>
   );
@@ -659,6 +663,17 @@ const createBlocklistStyles = (theme: AppTheme) =>
     },
     manageTextDisabled: {
       color: withOpacity(theme.colors.accent, 0.4),
+    },
+    manageIconBox: {
+      width: 30,
+      height: 30,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.1),
+    },
+    manageIconBoxDisabled: {
+      backgroundColor: withOpacity(theme.colors.accent, 0.05),
     },
     howItWorks: {
       borderRadius: 32,

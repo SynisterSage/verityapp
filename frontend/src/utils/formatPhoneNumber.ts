@@ -5,7 +5,7 @@ export function formatPhoneNumber(raw?: string | null, fallback = 'Recent Call')
 
   const digits = raw.replace(/\D/g, '');
   if (digits.length < 10) {
-    return raw;
+    return fallback;
   }
 
   const countryCodeLength = Math.max(0, digits.length - 10);
@@ -16,7 +16,7 @@ export function formatPhoneNumber(raw?: string | null, fallback = 'Recent Call')
   const line = national.slice(6, 10);
 
   if (!line) {
-    return `${countryCode}(${area})`;
+    return fallback;
   }
 
   return `${countryCode}(${area}) ${prefix}-${line}`;

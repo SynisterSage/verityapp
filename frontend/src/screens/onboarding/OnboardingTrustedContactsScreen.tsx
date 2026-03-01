@@ -409,11 +409,19 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
   };
 
   const getContactDisplayName = (contact: TrustedContactRow) =>
-    contact.contact_name ?? contactMap[contact.caller_number]?.name ?? contact.caller_number;
-  const getAvatarInitial = (label?: string, fallback = 'T') => {
-    if (!label) return fallback;
-    const match = label.match(/[A-Za-z0-9]/);
-    return (match ? match[0] : fallback).toUpperCase();
+    contact.contact_name ?? contactMap[contact.caller_number]?.name ?? 'Unknown';
+  const getAvatarInitial = (contact: TrustedContactRow, fallback = 'T') => {
+    const name = contact.contact_name ?? contactMap[contact.caller_number]?.name ?? '';
+    if (name.trim()) {
+      const match = name.trim().match(/[A-Za-z0-9]/);
+      return (match ? match[0] : fallback).toUpperCase();
+    }
+    const rel = contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? '';
+    if (rel.trim()) {
+      const match = rel.trim().match(/[A-Za-z]/);
+      return (match ? match[0] : fallback).toUpperCase();
+    }
+    return fallback;
   };
 
   const getRelationshipLabel = (contact: TrustedContactRow) => {
@@ -521,7 +529,7 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
                         ]}
                       >
                         <Text style={[styles.avatarText, { color: relationshipColor }]}>
-                          {getAvatarInitial(getContactDisplayName(contact), 'T')}
+                          {getAvatarInitial(contact, 'T')}
                         </Text>
                       </View>
                       <View style={styles.identityText}>
@@ -543,7 +551,9 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
                       </View>
                     </View>
                     <TouchableOpacity style={styles.manageAction} onPress={() => openManageTray(contact)}>
-                      <Text style={styles.manageLabel}>Manage</Text>
+                      <View style={styles.manageIconBox}>
+                        <Ionicons name="create-outline" size={16} color={theme.colors.accent} />
+                      </View>
                     </TouchableOpacity>
                   </View>
                 );
@@ -603,7 +613,7 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
                   <Text style={styles.trayAvatarText}>
                     {trayMode === 'import'
                       ? (trayContact as DeviceContact).name.charAt(0).toUpperCase()
-                      : getAvatarInitial(getContactDisplayName(trayContact as TrustedContactRow), 'T')}
+                      : getAvatarInitial(trayContact as TrustedContactRow, 'T')}
                   </Text>
                 </View>
                 <View style={styles.trayIdentityText}>
@@ -813,6 +823,14 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       fontSize: 11,
       letterSpacing: 1,
       fontWeight: '700',
+    },
+    manageIconBox: {
+      width: 30,
+      height: 30,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.1),
     },
     manageAction: {
       marginLeft: 12,

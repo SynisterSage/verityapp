@@ -74,6 +74,7 @@ function formatStatusLabel(input?: string | null) {
 type TrustedContact = {
   caller_number?: string | null;
   contact_name?: string | null;
+  relationship_tag?: string | null;
 };
 
 export default function ActiveCallScreen() {
@@ -87,6 +88,7 @@ export default function ActiveCallScreen() {
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
   const [elapsedLabel, setElapsedLabel] = useState('0:00');
   const [trustedDisplayName, setTrustedDisplayName] = useState<string | null>(null);
+  const [trustedRelationshipTag, setTrustedRelationshipTag] = useState<string | null>(null);
   const [identityLookupResolved, setIdentityLookupResolved] = useState(false);
   const [showIdentityFallback, setShowIdentityFallback] = useState(false);
   const [audioRouteLabel, setAudioRouteLabel] = useState('iPhone');
@@ -124,10 +126,21 @@ export default function ActiveCallScreen() {
   const callerSubtitle =
     trustedDisplayName && displayNumber ? displayNumber : showIdentityFallback ? 'Protected line' : '';
   const initials = useMemo(() => {
-    const source = identityLookupResolved ? callerTitle.trim() || 'TC' : 'TC';
-    const parts = source.split(/\s+/).slice(0, 2);
-    return parts.map((item) => item.charAt(0).toUpperCase()).join('');
-  }, [callerTitle, identityLookupResolved]);
+    if (identityLookupResolved) {
+      const name = callerTitle.trim();
+      if (name && name !== displayNumber && !/^\+?\d/.test(name)) {
+        // Real name — use first letters of first two words
+        const parts = name.split(/\s+/).slice(0, 2);
+        return parts.map((p) => p.charAt(0).toUpperCase()).join('');
+      }
+      // No name — use relationship tag initial
+      if (trustedRelationshipTag?.trim()) {
+        const match = trustedRelationshipTag.trim().match(/[A-Za-z]/);
+        if (match) return match[0].toUpperCase();
+      }
+    }
+    return 'TC';
+  }, [callerTitle, displayNumber, identityLookupResolved, trustedRelationshipTag]);
 
   useEffect(() => {
     setIdentityLookupResolved(false);
@@ -184,6 +197,7 @@ export default function ActiveCallScreen() {
         const name = matched?.contact_name?.trim();
         console.log('[ActiveCallScreen] Matched contact:', { name, matched: !!matched });
         setTrustedDisplayName(name ? name : null);
+        setTrustedRelationshipTag(matched?.relationship_tag?.trim() ?? null);
         setIdentityLookupResolved(true);
       })
       .catch(() => {

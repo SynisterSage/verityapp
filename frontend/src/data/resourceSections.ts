@@ -15,92 +15,142 @@ export const SYSTEM_BASICS_CONTENT: ResourceSection[] = [
       'Verity Protect brings your trusted circle, ticket history, automation, and call monitoring into one place. You never have to dig through different apps; everything happens inside the same interface so you can act quickly.',
   },
   {
-    id: 'twilio-call-flow',
-    title: 'Twilio number & paired device',
+    id: 'profile-setup',
+    title: 'Profile setup, fallback number, and call flow',
     body:
-      'Each profile pairs with a Twilio number. We record, analyze, and forward suspect calls, while also sending low-latency alerts to your phone. Add that number to your contacts so calls feel like a normal call from a trusted helper.',
+      'Each profile pairs with a Verity/Twilio number and a reliable fallback number. Verity rings your app first, then falls back if your device is unavailable.',
     bullets: [
-      'Link the Twilio number inside Settings → Paired Devices to see what hardware is listening.',
-      'Verity rings your app first. If the app is unavailable, Verity calls your reliable fallback number.',
-      'Set your fallback number to a direct number (not call-forwarded back to Verity) to prevent looped calls.',
-      'If you answer through the Twilio number, Verity automatically logs duration, transcription, and risk scores.',
-      'Lost your phone? Remove the device from the list so it stops receiving alerts and recordings.',
+      'Set a direct fallback number during profile setup or later in Settings → Account.',
+      'Do not use a number that forwards back to Verity, or calls can loop.',
+      'When calls route through Verity, logs include time, status, transcript, and risk context.',
+      'If you change phones, update devices and fallback details right away.',
     ],
   },
   {
-    id: 'calls-interactions',
-    title: 'Actions on the calls and alerts screens',
+    id: 'calls-page',
+    title: 'Calls page: filters, taps, and press actions',
     body:
-      'Calls and alerts stay together so you can take action fast. Tap a call or alert to open the detail view, or long press to bring up quick tools for that item.',
+      'The Calls screen is your review queue. You can filter quickly and act on calls without leaving the list.',
     bullets: [
-      'Long press a call to block the number, trust it, archive it, or delete the log when it is no longer helpful.',
-      'Long press a handled alert to delete it from your list while keeping the history for your circle.',
-      'Each call shows recordings, transcripts, and the fraud score so you know exactly what happened before sharing or blocking.',
+      'Use filters like All, Verified, Risk, Trusted, Handled, and Archived to focus the list.',
+      'Tap a call to open full call details.',
+      'Long press a call to open quick actions (for example trust, block, archive, or remove).',
+      'Trusted activity can jump directly into the trusted-filter view.',
     ],
   },
   {
-    id: 'circles',
-    title: 'Circle members & roles',
+    id: 'alerts-page',
+    title: 'Alerts page: needs attention and history',
     body:
-      'Invite caretakers, trusted contacts, or guests from the Members screen. Assign roles so caretakers manage automation, trusted contacts verify alerts, and guests just watch what you share.',
+      'Alerts prioritize risk events and show what still needs action versus what is already handled.',
     bullets: [
-      'Caretakers can change automation, invite people, and open tickets.',
-      'Trusted contacts see alerts and prove safety with a safe phrase. To load contacts from your phone, enable contact picker access inside Settings → Data & Privacy before you add trusteds.',
-      'Guests only get read-only history and cannot edit anything.',
+      'Use mode tabs such as Needs Attention and History to triage quickly.',
+      'Tap an alert to open the linked call detail when available.',
+      'Long press handled alerts to open quick options like delete.',
+      'Circle activity is tracked separately so operational alerts stay clean.',
     ],
   },
   {
-    id: 'automation-safe-phrases',
-    title: 'Automation, safe phrases, and blocked callers',
+    id: 'call-detail',
+    title: 'Call detail and quick-action modal',
     body:
-      'Automation watches keywords, call volume, location, and other signals. Combine it with safe phrases so your circle knows a call is okay without interrupting you. Adjust notifications inside Settings → Notifications to hear only the alerts you care about.',
+      'Call Detail is where you verify what happened on a call and decide the final status.',
     bullets: [
-      'Create automation rules for scam keywords; the system escalates alerts automatically.',
-      'Add safe phrases that the system accepts when heard on a call so your caretakers can keep listening without raising an alarm.',
-      'Use the blocked caller list in Settings to keep known scams out of the conversation.',
+      'Review recording playback, transcript, score, notes, and fraud indicators.',
+      'Mark calls safe or fraud based on what you hear and read.',
+      'Use quick actions to trust, block, or update the caller status without extra navigation.',
+      'Handled status flows back to Calls and Alerts automatically.',
     ],
   },
   {
-    id: 'pin-security',
-    title: 'PINs, passcodes, and security support',
+    id: 'automation',
+    title: 'Automation and how it works',
     body:
-      'The app lock is a PIN that you choose; change it anytime from Settings → Security. It keeps the timeline, automation, and circle controls private.',
+      'Automation combines transcript signals, risk patterns, and profile preferences to escalate suspicious calls.',
     bullets: [
-      'Enter the PIN when opening the app or changing privacy settings.',
-      'Reset it by verifying your email or phone number if you forget it.',
-      'Enable biometric unlock if your device allows it so you can skip typing the PIN.',
+      'Tune thresholds and behavior in Settings → Automation.',
+      'Automation can influence alert priority and follow-up workflows.',
+      'Use safe phrases to reduce false alarms for known-safe interactions.',
+    ],
+  },
+  {
+    id: 'my-circle',
+    title: 'My Circle: owner, caretaker, and family roles',
+    body:
+      'My Circle controls who can help manage the profile and what each member can do.',
+    bullets: [
+      'Owner manages the profile and core safety settings.',
+      'Caretaker/admin can help manage workflows and review events.',
+      'Family roles focus on visibility and day-to-day safety participation.',
+      'Role changes and membership updates appear in Circle Activity.',
+    ],
+  },
+  {
+    id: 'safety-lists',
+    title: 'Safe phrases, doctor lookup, trusted contacts, and blocked callers',
+    body:
+      'Safety lists help Verity separate expected calls from risky ones and reduce noise for your circle.',
+    bullets: [
+      'Safe phrases help confirm known-safe context during review.',
+      'Doctor Lookup can add verified offices into trusted workflows.',
+      'Trusted Contacts identifies approved numbers for easier handling.',
+      'Blocked callers prevents known scam numbers from reaching the profile.',
     ],
   },
   {
     id: 'notifications',
-    title: 'Notifications & alerts',
+    title: 'Notifications preferences',
     body:
-      'Alerts pop up when automation fires, a ticket is replied to, or a suspicious call happens. Tweak alerts from Settings → Notifications so you hear only what matters to you.',
+      'Notification controls let you decide which events should interrupt you and which can stay quiet.',
     bullets: [
-      'Turn on push, email, or SMS alerts for each type of event.',
-      'Mute an alert directly from the call or ticket card if it is not helpful.',
+      'Configure alert categories in Settings → Notifications.',
+      'Enable or disable trusted activity and circle activity notifications.',
+      'Use push/email combinations based on urgency and caregiver workflow.',
     ],
   },
   {
-    id: 'support-tickets',
-    title: 'Support tickets & feedback',
+    id: 'membership',
+    title: 'Membership and billing basics',
     body:
-      'Open a ticket whenever something feels off. We keep the conversation in the portal so you can scroll back through replies, file attachments, and automation notes. Each prompt now sends an auto-reply telling you an agent will join shortly.',
+      'Membership keeps call protection, storage, and monitoring active for the profile.',
     bullets: [
-      'Use quick-prompt chips to get straight to billing, automation, members, recordings, safe phrases, or number setup questions.',
-      'View the timeline to see past replies before writing a new message, and end the session when everything is resolved.',
-      'When you end a ticket we ask for feedback so the team can learn what went well or needs improvement.',
+      'Manage billing through Settings → Membership/Billing.',
+      'Store billing actions happen in Apple/Google account settings.',
+      'Subscription status affects safety feature availability.',
     ],
   },
   {
-    id: 'export-delete',
-    title: 'Exporting and deleting accounts',
+    id: 'security',
+    title: 'Security and PIN changes',
+    body:
+      'Security settings protect profile access and sensitive call data.',
+    bullets: [
+      'Change your app PIN in Settings → Security.',
+      'Use device security (Face ID/Touch ID/passcode) where available.',
+      'Keep credentials and device access limited to trusted users.',
+    ],
+  },
+  {
+    id: 'support-system',
+    title: 'Support system and tickets',
+    body:
+      'Support includes live ticket timelines, issue categories, and follow-up tracking from inside the app.',
+    bullets: [
+      'Open support from Settings and choose the right topic.',
+      'Review ticket history and replies in one timeline.',
+      'Use support for setup help, billing questions, automation issues, and privacy requests.',
+    ],
+  },
+  {
+    id: 'privacy-deletion',
+    title: 'Data, privacy, and account deletion',
     body:
       'You control your data. Export your timeline or delete your account with a few taps inside Settings.',
     bullets: [
-      'Export call logs, tickets, and automation history from Settings → Privacy.',
-      'Delete a profile from Settings → Account to remove active profile data and call history from the app.',
-      'Need help? Ask through the portal so we can verify you before processing exports or deletions.',
+      'Review privacy controls in Settings → Data & Privacy.',
+      'Export profile-related data when needed.',
+      'Delete your account/profile in Settings → Account when you want full removal.',
+      'Contact support for identity verification during sensitive requests.',
     ],
   },
 ];

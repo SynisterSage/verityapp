@@ -55,13 +55,22 @@ type Invite = {
   invited_by?: string | null;
 };
 
-const avatarColors = ['#4c7dff', '#6e60f8', '#00c2ff', '#47d6a5'];
 const APP_STORE_FALLBACK_URL = 'https://apps.apple.com/app/id6759526773';
 const INVITE_LINK_BASE_URL = 'https://verityprotect.com/invite';
 const ROLE_DISPLAY_NAMES: Record<MemberRole, string> = {
   editor: 'Family',
   admin: 'Caretaker',
 };
+
+function getMemberAvatarColor(member: Member, theme: AppTheme, mode: ThemeMode) {
+  if (member.is_caretaker) {
+    return theme.colors.accent;
+  }
+  if (member.role === 'admin') {
+    return mode === 'dark' ? '#8b5cf6' : '#7c3aed';
+  }
+  return mode === 'dark' ? '#14b8a6' : '#0d9488';
+}
 
 const createRoleHelperItems = (theme: AppTheme) => [
   {
@@ -642,7 +651,7 @@ export default function MembersScreen() {
                 <Text style={styles.emptyStateTitle}>No members yet</Text>
               </View>
             ) : (
-              members.map((member, index) => {
+              members.map((member) => {
                 const safeName =
                   (member.is_caretaker && activeProfile
                     ? `${activeProfile.first_name} ${activeProfile.last_name}`
@@ -651,7 +660,7 @@ export default function MembersScreen() {
                   ? 'Owner'
                   : ROLE_DISPLAY_NAMES[member.role] ??
                     member.role.charAt(0).toUpperCase() + member.role.slice(1);
-                const avatarColor = avatarColors[index % avatarColors.length];
+                const avatarColor = getMemberAvatarColor(member, theme, mode);
                 const isCurrentUser = sessionUserId === member.user_id;
                 return (
                   <View key={`${member.id}-${member.user_id}`}>

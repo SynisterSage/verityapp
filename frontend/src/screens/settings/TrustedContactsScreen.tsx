@@ -156,8 +156,13 @@ export default function TrustedContactsScreen() {
     []
   );
   const showSkeleton = loading && trustedList.length === 0;
+  const isContactsPermissionOff = !contactsPermissionEnabled;
   const isImportDisabled = importing || !contactsPermissionEnabled || !canManageProfile;
   const isSyncDisabled = syncing || !contactsPermissionEnabled || !canManageProfile;
+
+  const openDataPrivacy = useCallback(() => {
+    (navigation as any).navigate('DataPrivacy');
+  }, [navigation]);
 
   const refreshContactMap = useCallback(async () => {
     if (!activeProfile) return;
@@ -696,7 +701,21 @@ export default function TrustedContactsScreen() {
     contact.contact_name ??
     contactMap[contact.caller_number]?.name ??
     formatPhoneNumber(contact.caller_number, 'Unknown number');
-  const getAvatarInitial = (label?: string, fallback = 'T') => {
+  const getAvatarInitial = (contact: TrustedContactRow, fallback = 'T') => {
+    const name = contact.contact_name ?? contactMap[contact.caller_number]?.name ?? '';
+    if (name.trim()) {
+      const match = name.trim().match(/[A-Za-z0-9]/);
+      return (match ? match[0] : fallback).toUpperCase();
+    }
+    // No real name — use relationship tag initial
+    const rel = contact.relationship_tag ?? contactMap[contact.caller_number]?.relationship ?? '';
+    if (rel.trim()) {
+      const match = rel.trim().match(/[A-Za-z]/);
+      return (match ? match[0] : fallback).toUpperCase();
+    }
+    return fallback;
+  };
+  const getStringInitial = (label?: string, fallback = 'T') => {
     if (!label) return fallback;
     const match = label.match(/[A-Za-z0-9]/);
     return (match ? match[0] : fallback).toUpperCase();
@@ -759,7 +778,7 @@ export default function TrustedContactsScreen() {
       ? manualTrayNumber.replace(/\D/g, '')
       : manualManageDisplayName) ||
     'T';
-  const manualAvatarInitial = getAvatarInitial(manualAvatarInitialSource, 'T');
+  const manualAvatarInitial = getStringInitial(manualAvatarInitialSource, 'T');
 
   return (
     <KeyboardAvoidingView
@@ -788,6 +807,7 @@ export default function TrustedContactsScreen() {
                 style={({ pressed }) => [
                   styles.importCard,
                   isImportDisabled && styles.importCardDisabled,
+                  isContactsPermissionOff && styles.importCardPermissionOff,
                   !isImportDisabled && pressed && styles.importCardPressed,
                 ]}
                 onPress={isImportDisabled ? undefined : handleImport}
@@ -813,6 +833,7 @@ export default function TrustedContactsScreen() {
                   style={({ pressed }) => [
                     styles.syncButton,
                     isSyncDisabled && styles.syncButtonDisabled,
+                    isContactsPermissionOff && styles.syncButtonPermissionOff,
                     !isSyncDisabled && pressed && styles.syncButtonPressed,
                   ]}
                   onPress={isSyncDisabled ? undefined : syncContacts}
@@ -821,12 +842,37 @@ export default function TrustedContactsScreen() {
                   {syncing ? (
                     <ActivityIndicator color="#fff" />
                   ) : (
-                    <Ionicons name="sync-outline" size={18} color="#fff" />
+                    <Ionicons
+                      name={isContactsPermissionOff ? 'lock-closed-outline' : 'sync-outline'}
+                      size={18}
+                      color={isContactsPermissionOff ? theme.colors.textMuted : '#fff'}
+                    />
                   )}
-                  <Text style={styles.syncButtonText}>
-                    {syncing ? 'Syncing Contacts…' : 'Sync Contacts'}
+                  <Text
+                    style={[
+                      styles.syncButtonText,
+                      isContactsPermissionOff && styles.syncButtonTextPermissionOff,
+                    ]}
+                  >
+                    {syncing
+                      ? 'Syncing Contacts…'
+                      : isContactsPermissionOff
+                      ? 'Sync unavailable'
+                      : 'Sync Contacts'}
                   </Text>
                 </Pressable>
+                {isContactsPermissionOff && (
+                  <Pressable
+                    style={({ pressed }) => [
+                      styles.permissionCta,
+                      pressed && styles.permissionCtaPressed,
+                    ]}
+                    onPress={openDataPrivacy}
+                  >
+                    <Ionicons name="settings-outline" size={14} color={theme.colors.accent} />
+                    <Text style={styles.permissionCtaText}>Open Data &amp; Privacy</Text>
+                  </Pressable>
+                )}
               </View>
               <Text style={styles.sectionLabel}>Manual Entry</Text>
               <View style={styles.inputRow}>
@@ -892,7 +938,7 @@ export default function TrustedContactsScreen() {
                         <Text
                           style={[styles.avatarText, { color: relationshipColor }]}
                         >
-                          {getAvatarInitial(getContactDisplayName(contact), 'T')}
+                          {getAvatarInitial(contact, 'T')}
                         </Text>
                       </View>
                       <View style={styles.identityText}>
@@ -916,14 +962,13 @@ export default function TrustedContactsScreen() {
                       onPress={() => openManageTray(contact)}
                       disabled={!canManageProfile}
                     >
-                      <Text
-                        style={[
-                          styles.manageLabel,
-                          !canManageProfile && styles.manageLabelDisabled,
-                        ]}
-                      >
-                        Manage
-                      </Text>
+                      <View style={styles.manageIconBox}>
+                        <Ionicons
+                          name="create-outline"
+                          size={16}
+                          color={!canManageProfile ? withOpacity(theme.colors.accent, 0.4) : theme.colors.accent}
+                        />
+                      </View>
                     </TouchableOpacity>
                   </View>
                 );
@@ -1150,6 +1195,11 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       borderColor: withOpacity(theme.colors.border, 0.5),
       backgroundColor: withOpacity(theme.colors.surface, 0.75),
     },
+    importCardPermissionOff: {
+      borderStyle: 'dashed',
+      borderColor: withOpacity(theme.colors.textMuted, 0.35),
+      backgroundColor: withOpacity(theme.colors.surfaceAlt, 0.75),
+    },
     importCardPressed: {
       elevation: 4,
     },
@@ -1202,8 +1252,39 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
     syncButtonDisabled: {
       opacity: 0.6,
     },
+    syncButtonPermissionOff: {
+      backgroundColor: withOpacity(theme.colors.surfaceAlt, 0.9),
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: withOpacity(theme.colors.textMuted, 0.35),
+      opacity: 1,
+    },
     syncButtonText: {
       color: '#fff',
+      fontWeight: '600',
+    },
+    syncButtonTextPermissionOff: {
+      color: theme.colors.textMuted,
+    },
+    permissionCta: {
+      marginTop: 8,
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 10,
+      borderRadius: 999,
+      backgroundColor: withOpacity(theme.colors.accent, 0.1),
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, 0.25),
+    },
+    permissionCtaPressed: {
+      opacity: 0.75,
+    },
+    permissionCtaText: {
+      color: theme.colors.accent,
+      fontSize: 12,
       fontWeight: '600',
     },
     inputRow: {
@@ -1333,6 +1414,14 @@ const createTrustedContactsStyles = (theme: AppTheme) =>
       fontSize: 11,
       letterSpacing: 1,
       fontWeight: '700',
+    },
+    manageIconBox: {
+      width: 30,
+      height: 30,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.1),
     },
     manageAction: {
       marginLeft: 12,

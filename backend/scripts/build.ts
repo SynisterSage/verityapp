@@ -1,5 +1,3 @@
-import path from 'path';
-import fs from 'fs-extra';
 import logger from 'jet-logger';
 import { copy, copyFilesRec, exec, remove } from './common/utils';
 
@@ -22,13 +20,6 @@ import { copy, copyFilesRec, exec, remove } from './common/utils';
     await copyFilesRec('./src', './dist', ['.ts']);
     await copy('./temp/config.js', './config.js');
     await copy('./temp/src', './dist');
-    const voiceDetectorSrc = path.resolve(__dirname, '../voice-detector');
-    const voiceDetectorDest = path.resolve(__dirname, '../dist/voice-detector');
-    if (await fs.pathExists(voiceDetectorSrc)) {
-      await copyFilesRec(voiceDetectorSrc, voiceDetectorDest);
-    } else {
-      logger.warn(`Voice detector dir not found (skipping): ${voiceDetectorSrc}`);
-    }
     await remove('./temp/');
   } catch (err) {
     logger.err(err);

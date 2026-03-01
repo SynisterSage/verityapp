@@ -32,7 +32,7 @@ import { withOpacity } from '../../utils/color';
 import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
 import { useSupportContext } from '../../context/SupportContext';
-import { navigateToSupportPortal } from '../../navigation/rootNavigator';
+import { navigateToSupportPortal, rootNavigationRef } from '../../navigation/rootNavigator';
 
 type CallRow = {
   id: string;
@@ -76,6 +76,7 @@ type ActivityItem =
       badgeLevel?: string;
       muted?: boolean;
       viewOnly?: boolean;
+      alertId?: string;
     };
 
 type StatTile = {
@@ -105,7 +106,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     [theme.colors.accent, theme.colors.bg]
   );
   const [recentCall, setRecentCall] = useState<CallRow | null>(null);
-  const [recentTrustedAlert, setRecentTrustedAlert] = useState<{ label: string; created_at: string; callId?: string } | null>(null);
+  const [recentTrustedAlert, setRecentTrustedAlert] = useState<{ label: string; created_at: string; alertId?: string } | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [alertsThisWeek, setAlertsThisWeek] = useState<number | null>(null);
   const [blockedCount, setBlockedCount] = useState<number | null>(null);
@@ -303,6 +304,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             badgeLevel,
             muted: isHandled,
             viewOnly: isTrusted,
+            alertId: isTrusted ? alert.id : undefined,
           };
         }),
       ]
@@ -326,7 +328,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         setRecentTrustedAlert({
           label: resolvedName,
           created_at: latestTrusted.created_at,
-          callId: latestTrusted.call_id ?? undefined,
+          alertId: latestTrusted.id,
         });
       } else {
         setRecentTrustedAlert(null);
@@ -343,6 +345,23 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       }
     }
   };
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.race([
+        loadStats(true),
+        new Promise<void>((_, reject) =>
+          setTimeout(() => reject(new Error('home_refresh_timeout')), 12000)
+        ),
+      ]);
+    } catch (err) {
+      console.warn('[Home] Pull-to-refresh timed out or failed', err);
+    } finally {
+      setRefreshing(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProfile?.id]);
 
   useEffect(() => {
     setRecentCall(null);
@@ -529,7 +548,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
-              onRefresh={() => loadStats(true)}
+              onRefresh={handleRefresh}
               tintColor={refreshControlProps.tintColor}
               colors={refreshControlProps.colors}
               progressBackgroundColor={refreshControlProps.progressBackgroundColor}
@@ -622,19 +641,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 iconName={trustedIsHero ? 'shield-checkmark' : 'call'}
                 iconColor={trustedIsHero ? theme.colors.accent : undefined}
                 iconBackgroundColor={trustedIsHero ? withOpacity(theme.colors.accent, 0.12) : undefined}
-                footerLabel={trustedIsHero ? 'View in Activity' : 'Review Call Recording'}
+                footerLabel={trustedIsHero ? 'View Call Details' : 'Review Call Recording'}
                 emptyText={
                   hasTwilioNumber
                     ? 'No calls recorded yet.'
                     : 'Add a Verity Protect number to start recording calls.'
                 }
                 onPress={() => {
-                  if (trustedIsHero) {
-                    navigation.navigate('AlertsTab');
-                  } else {
+                  if (trustedIsHero && recentTrustedAlert?.alertId) {
+                    rootNavigationRef.navigate('TrustedCallDetail', { alertId: recentTrustedAlert.alertId });
+                  } else if (!trustedIsHero && recentCall?.id) {
                     navigation.navigate('CallsTab', {
                       screen: 'Calls',
-                      params: { initialCallId: recentCall?.id },
+                      params: { initialCallId: recentCall.id },
                     });
                   }
                 }}
@@ -751,7 +770,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                             isTrustedActivity ? withOpacity(theme.colors.accent, 0.16) : undefined
                           }
                           muted={item.muted}
-                          disabled={Boolean(item.viewOnly) && !isTrustedActivity}
+                          disabled={false}
                           badgeLevel={
                             item.badge === 'FRAUD'
                               ? 'critical'
@@ -760,11 +779,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                               : item.badgeLevel
                           }
                           onPress={() => {
-                            if (isTrustedActivity) {
-                              navigation.navigate('CallsTab', {
-                                screen: 'Calls',
-                                params: { initialFilter: 'trusted' },
-                              });
+                            if (item.viewOnly && item.type === 'alert' && item.alertId) {
+                              rootNavigationRef.navigate('TrustedCallDetail', { alertId: item.alertId });
                               return;
                             }
                             if (item.viewOnly) {

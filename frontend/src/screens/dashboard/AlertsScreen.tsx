@@ -768,7 +768,8 @@ const loadMemberNames = useCallback(async () => {
 
   const renderCircleSection = () => {
     if (!circleActivity.length) return null;
-    const preview = circleActivity.slice(0, 2);
+    const PREVIEW_COUNT = 3;
+    const preview = circleActivity.slice(0, PREVIEW_COUNT);
     const hasMore = circleActivity.length > preview.length;
     const headerRight = hasMore ? (
       <TouchableOpacity style={styles.circleViewAllButton} onPress={openCircleFeed} activeOpacity={0.7}>
@@ -794,11 +795,29 @@ const loadMemberNames = useCallback(async () => {
               iconName="people-outline"
               iconColor={theme.colors.accent}
               iconBackgroundColor={withOpacity(theme.colors.accent, 0.18)}
+              onPress={() => navigation.navigate('CircleActivityDetail', { alertId: activity.alertRow.id })}
               onLongPress={
                 canManageProfile ? () => showTray(activity.alertRow) : undefined
               }
             />
           ))}
+          {hasMore && (
+            <TouchableOpacity
+              onPress={openCircleFeed}
+              activeOpacity={0.7}
+              style={styles.circleMorePeek}
+            >
+              <View
+                style={[
+                  styles.circleMorePeekCard,
+                  {
+                    backgroundColor: theme.colors.surface,
+                    borderColor: withOpacity(theme.colors.text, 0.06),
+                  },
+                ]}
+              />
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -1327,6 +1346,17 @@ const createAlertStyles = (theme: AppTheme) =>
     circleViewAllIcon: {
       marginLeft: 4,
       marginBottom: 1,
+    },
+    circleMorePeek: {
+      marginTop: 6,
+      overflow: 'hidden',
+    },
+    circleMorePeekCard: {
+      height: 18,
+      borderRadius: 32,
+      borderWidth: StyleSheet.hairlineWidth,
+      marginHorizontal: 10,
+      opacity: 0.45,
     },
     emptyStateWrap: {
       marginTop: -60,

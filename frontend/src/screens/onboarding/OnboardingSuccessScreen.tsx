@@ -161,7 +161,7 @@ export default function OnboardingSuccessScreen() {
       }, 200 + index * 50);
     });
 
-    // After animation, set onboarding complete and force navigation to AppTabs
+    // After animation, navigate to permission priming before main app
     const timer = setTimeout(() => {
       setOnboardingComplete(true);
       // Small delay to let state update, then navigate
@@ -169,7 +169,7 @@ export default function OnboardingSuccessScreen() {
         navigation.dispatch(
           CommonActions.reset({
             index: 0,
-            routes: [{ name: 'AppTabs' as never }],
+            routes: [{ name: 'PermissionPriming' as never }],
           })
         );
       }, 100);
