@@ -52,6 +52,22 @@ function ensureServerApiConfig() {
   };
 }
 
+function getConfigDebugSummary() {
+  const parsedPrivateKey = parsePrivateKey();
+  return {
+    keyId: APP_STORE_SERVER_KEY_ID || null,
+    issuerIdSuffix: APP_STORE_SERVER_ISSUER_ID
+      ? APP_STORE_SERVER_ISSUER_ID.slice(-6)
+      : null,
+    bundleId: APP_STORE_SERVER_BUNDLE_ID || null,
+    privateKeyFormat: APP_STORE_SERVER_PRIVATE_KEY_RAW.includes('-----BEGIN PRIVATE KEY-----')
+      ? 'pem'
+      : 'base64',
+    privateKeyChars: APP_STORE_SERVER_PRIVATE_KEY_RAW.length,
+    parsedPrivateKeyHasHeader: parsedPrivateKey.includes('-----BEGIN PRIVATE KEY-----'),
+  };
+}
+
 let cachedToken: { token: string; expiresAtMs: number } | null = null;
 
 function getBearerToken() {
@@ -150,8 +166,9 @@ function mapSignedTransaction(payload: SignedTransactionPayload): AppStoreServer
 }
 
 async function fetchTransactionById(baseUrl: string, transactionId: string, token: string) {
+  const requestUrl = `${baseUrl.replace(/\/$/, '')}/inApps/v1/transactions/${encodeURIComponent(transactionId)}`;
   const response = await fetch(
-    `${baseUrl.replace(/\/$/, '')}/inApps/v1/transactions/${encodeURIComponent(transactionId)}`,
+    requestUrl,
     {
       method: 'GET',
       headers: {
@@ -164,7 +181,16 @@ async function fetchTransactionById(baseUrl: string, transactionId: string, toke
     return null;
   }
   if (!response.ok) {
-    throw new Error(`App Store Server API transaction request failed (${response.status})`);
+    const responseText = await response.text().catch(() => '');
+    const safeBodySnippet = responseText ? responseText.slice(0, 300) : 'empty';
+    const cfg = getConfigDebugSummary();
+    throw new Error(
+      `App Store Server API transaction request failed (${response.status}) ` +
+        `url=${requestUrl} keyId=${cfg.keyId ?? 'missing'} issuerSuffix=${cfg.issuerIdSuffix ?? 'missing'} ` +
+        `bundleId=${cfg.bundleId ?? 'missing'} privateKeyFormat=${cfg.privateKeyFormat} ` +
+        `privateKeyChars=${cfg.privateKeyChars} parsedHasHeader=${cfg.parsedPrivateKeyHasHeader} ` +
+        `body=${safeBodySnippet}`
+    );
   }
 
   const payload = (await response.json()) as AppStoreServerTransactionResponse;
@@ -183,11 +209,21 @@ export async function getAppStoreServerTransactionById(transactionId: string) {
   }
   const token = getBearerToken();
 
-  const production = await fetchTransactionById(APP_STORE_SERVER_PRODUCTION_BASE_URL, trimmed, token);
-  if (production) {
-    return production;
+  let productionError: unknown = null;
+  try {
+    const production = await fetchTransactionById(APP_STORE_SERVER_PRODUCTION_BASE_URL, trimmed, token);
+    if (production) {
+      return production;
+    }
+  } catch (err) {
+    // Production failed (e.g. 401 for a sandbox transaction) — fall through to sandbox.
+    productionError = err;
   }
 
-  return fetchTransactionById(APP_STORE_SERVER_SANDBOX_BASE_URL, trimmed, token);
+  try {
+    return await fetchTransactionById(APP_STORE_SERVER_SANDBOX_BASE_URL, trimmed, token);
+  } catch (sandboxErr) {
+    // Both failed — re-throw the original production error so callers see a meaningful message.
+    throw productionError ?? sandboxErr;
+  }
 }
-

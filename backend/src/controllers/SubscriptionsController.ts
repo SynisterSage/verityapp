@@ -387,13 +387,26 @@ async function syncEntitlement(req: Request, res: Response) {
     }
   }
 
+  // When no server transaction is available, derive is_active from the
+  // frontend-provided expiresAt (StoreKit entitlement) so that a valid
+  // entitlement with a future expiry is never left stuck as inactive due
+  // to a transient App Store Server API failure.
+  const entitlementExpiresAt =
+    typeof expiresAt === 'string' && expiresAt.trim().length > 0 ? expiresAt.trim() : null;
+  const entitlementIsActiveByClaim =
+    entitlementExpiresAt !== null && Date.parse(entitlementExpiresAt) > Date.now();
+
   const nextStatus = serverTransaction
     ? normalizeSubscriptionStatus(serverTransaction.status, 'unknown')
-    : normalizeSubscriptionStatus(existing?.status ?? null, 'unknown');
+    : entitlementIsActiveByClaim
+      ? 'active'
+      : normalizeSubscriptionStatus(existing?.status ?? null, 'unknown');
   const nextSource = serverTransaction
     ? 'app_store_server_api'
     : existing?.source ?? 'storekit_local_entitlement';
-  const nextIsActive = serverTransaction ? Boolean(serverTransaction.isActive) : Boolean(existing?.is_active);
+  const nextIsActive = serverTransaction
+    ? Boolean(serverTransaction.isActive)
+    : entitlementIsActiveByClaim || Boolean(existing?.is_active);
 
   const { error: upsertError } = await supabaseAdmin.from('user_subscriptions').upsert(
     {

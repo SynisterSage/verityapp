@@ -291,6 +291,7 @@ export default function MembershipScreen() {
         productId: selectedPlan.productId,
         planLabel: selectedPlan.title,
       });
+      navigation.replace('MembershipActivated');
       logEvent('membership_purchase_success', {
         screen: 'MembershipScreen',
         extra: { productId: selectedPlan.productId },
@@ -318,6 +319,7 @@ export default function MembershipScreen() {
         productId: restoredProductId,
         planLabel: restoredPlan,
       });
+      navigation.replace('MembershipActivated');
       return;
     }
     setFeedback(toRestoreFeedback(result));
