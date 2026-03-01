@@ -25,7 +25,7 @@ const ACTIONABLE_NOTIFICATION_TYPES = new Set([
 ]);
 
 // Load Apple root certificates for JWS signature verification
-const CERT_DIR = join(__dirname, '../../certs');
+const CERT_DIR = join(__dirname, '../certs');
 const appleRootCerts = [
   readFileSync(join(CERT_DIR, 'AppleRootCA-G3.cer')),
   readFileSync(join(CERT_DIR, 'AppleRootCA-G2.cer')),
