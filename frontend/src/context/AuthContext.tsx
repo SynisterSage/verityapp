@@ -37,6 +37,9 @@ type AuthContextValue = {
   signInWithGoogle: () => Promise<string | null>;
   signInWithApple: () => Promise<string | null>;
   signOut: () => Promise<void>;
+  /** Call this before any operation that will cause Supabase to fire SIGNED_OUT
+   *  server-side (e.g. account deletion), so the session-expired modal is suppressed. */
+  markSignOutIntentional: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -378,6 +381,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setSession(null);
           setIsLoading(false);
         }
+      },
+      markSignOutIntentional: () => {
+        intentionalSignOutRef.current = true;
+        hadSessionRef.current = false;
+        setSessionExpired(false);
       },
     }),
     [session, isLoading, sessionExpired]

@@ -297,7 +297,7 @@ export default function DataPrivacyScreen() {
   };
 
   const { activeProfile, canManageProfile, canDeleteProfile, refreshProfiles } = useProfile();
-  const { signOut } = useAuth();
+  const { signOut, markSignOutIntentional } = useAuth();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createDataPrivacyStyles(theme, mode), [theme, mode]);
   const policyIconColor = theme.colors.accent;
@@ -370,6 +370,10 @@ export default function DataPrivacyScreen() {
     setManageAction('delete');
     setManageError('');
     try {
+      // Mark sign-out as intentional BEFORE the backend deletes the user.
+      // This prevents Supabase's SIGNED_OUT event from triggering the
+      // "session expired" modal during account deletion.
+      markSignOutIntentional();
       await deleteProfile(activeProfile.id, pin);
       await refreshProfiles();
       await signOut();
