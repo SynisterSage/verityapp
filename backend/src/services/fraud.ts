@@ -1,5 +1,4 @@
 import { createHash } from 'crypto';
-import type { VoiceAnalysisResult } from '@src/services/voiceDetector';
 
 export type FraudRiskLevel = 'low' | 'medium' | 'high' | 'critical';
 
@@ -18,7 +17,6 @@ export type FraudMetadata = {
   repeatCallCount?: number;
   detectedLocale?: string | null;
   voiceSyntheticScore?: number | null;
-  voiceAnalysis?: VoiceAnalysisResult | null;
   safePhraseMatches?: string[];
 };
 
@@ -81,7 +79,6 @@ export type FraudNotes = {
   remoteAccessHits: number;
   voiceSyntheticScore: number | null;
   voiceBoost: number;
-  voiceAnalysis?: VoiceAnalysisResult | null;
 };
 
 export type FraudAnalysis = {
@@ -464,6 +461,17 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'free', weight: 12, category: 'prize' },
   { phrase: 'gift', weight: 14, category: 'prize' },
 
+  // Gambling scams
+  { phrase: 'casino', weight: 18, category: 'gambling' },
+  { phrase: 'gambling', weight: 18, category: 'gambling' },
+  { phrase: 'poker', weight: 14, category: 'gambling' },
+  { phrase: 'slots', weight: 14, category: 'gambling' },
+  { phrase: 'blackjack', weight: 14, category: 'gambling' },
+  { phrase: 'roulette', weight: 14, category: 'gambling' },
+  { phrase: 'sports bet', weight: 20, category: 'gambling' },
+  { phrase: 'wager', weight: 16, category: 'gambling' },
+  { phrase: 'betting', weight: 16, category: 'gambling' },
+
   // Donations & charities
   { phrase: 'charity donation', weight: 38, category: 'donation' },
   { phrase: 'donate now', weight: 38, category: 'donation' },
@@ -684,6 +692,26 @@ const DEFAULT_KEYWORDS: FraudKeyword[] = [
   { phrase: 'trading platform', weight: 28, category: 'investment' },
   { phrase: 'commission refund', weight: 26, category: 'investment' },
   { phrase: 'transfer shares', weight: 28, category: 'investment' },
+  { phrase: 'guaranteed return', weight: 32, category: 'investment' },
+  { phrase: 'guaranteed profit', weight: 32, category: 'investment' },
+  { phrase: 'double your money', weight: 30, category: 'investment' },
+  { phrase: 'trading mentor', weight: 26, category: 'investment' },
+  { phrase: 'passive income', weight: 22, category: 'investment' },
+
+  // Utility cutoff scams
+  { phrase: 'service disconnection', weight: 28, category: 'utility' },
+  { phrase: 'disconnect within', weight: 30, category: 'utility' },
+  { phrase: 'power will be shut', weight: 30, category: 'utility' },
+  { phrase: 'electricity will be cut', weight: 30, category: 'utility' },
+  { phrase: 'final notice before disconnection', weight: 32, category: 'utility' },
+  { phrase: 'immediate payment to avoid disconnection', weight: 36, category: 'utility' },
+
+  // Bail bond / grandchild variant
+  { phrase: 'bail money', weight: 34, category: 'family' },
+  { phrase: 'post bail', weight: 32, category: 'family' },
+  { phrase: 'arrested family member', weight: 36, category: 'family' },
+  { phrase: 'loved one is in trouble', weight: 34, category: 'family' },
+  { phrase: 'do not tell anyone', weight: 28, category: 'family' },
 
   // Urgency/pressure
   { phrase: 'immediately', weight: 18, category: 'urgency' },
@@ -1333,6 +1361,21 @@ const SWEEPSTAKES_TERMS = [
   'cash reward',
   'prize auditor',
   'reward notice',
+  // Gambling scams
+  'casino bonus',
+  'casino winnings',
+  'casino account',
+  'online casino',
+  'gambling winnings',
+  'poker winnings',
+  'slots bonus',
+  'betting winnings',
+  'sports bet',
+  'wager winnings',
+  'blackjack winnings',
+  'roulette winnings',
+  'casino payout',
+  'unclaimed casino',
 ];
 
 const TRAVEL_PROMO_TERMS = [
@@ -1477,6 +1520,29 @@ const BRAND_IMPERSONATION_TERMS = [
   'support center',
   'help desk',
   'security team',
+  // Additional brand impersonation
+  'facebook support',
+  'instagram support',
+  'amazon support',
+  'netflix support',
+  'social security office',
+  'medicare office',
+  'medicaid office',
+  'bank helpline',
+  'fraud helpline',
+  'federal reserve',
+  'treasury department',
+  'us treasury',
+  'department of treasury',
+  'ftc',
+  'federal trade commission',
+  'fbi',
+  'secret service',
+  'irs agent',
+  'irs officer',
+  'immigration enforcement',
+  'ice agent',
+  'warrant division',
 ];
 
 const LINK_TERMS = [
@@ -1962,6 +2028,128 @@ const INVESTMENT_TERMS = [
   'high-profit',
   'investors',
   'financial manager',
+];
+
+// Car/home warranty scams
+const WARRANTY_SCAM_TERMS = [
+  'vehicle warranty',
+  'car warranty',
+  'auto warranty',
+  'extended warranty',
+  'warranty expiring',
+  'warranty has expired',
+  'warranty department',
+  'vehicle protection plan',
+  'auto protection plan',
+  'home warranty',
+  'home warranty expiring',
+  'appliance warranty',
+  'warranty coverage lapsing',
+  'manufacturer warranty',
+  'warranty claim',
+];
+
+// Timeshare exit scams
+const TIMESHARE_SCAM_TERMS = [
+  'timeshare',
+  'timeshare exit',
+  'timeshare cancellation',
+  'get out of your timeshare',
+  'timeshare relief',
+  'timeshare transfer',
+  'timeshare resale',
+  'vacation ownership',
+  'exit your vacation',
+  'timeshare maintenance fee',
+  'cancel your timeshare',
+  'timeshare release',
+  'resort exit program',
+  'timeshare buyout',
+];
+
+// Student loan scams
+const STUDENT_LOAN_SCAM_TERMS = [
+  'student loan forgiveness',
+  'loan forgiveness program',
+  'student debt relief',
+  'federal loan forgiveness',
+  'student loan cancellation',
+  'apply for loan forgiveness',
+  'student loan department',
+  'loan discharge',
+  'student loan relief program',
+  'qualify for forgiveness',
+  'income driven repayment',
+  'pslf program',
+  'student loan consolidation fee',
+  'loan forgiveness fee',
+];
+
+// Inheritance / estate scams
+const INHERITANCE_SCAM_TERMS = [
+  'unclaimed inheritance',
+  'named in a will',
+  'estate beneficiary',
+  'inheritance transfer',
+  'inheritance fee',
+  'deceased estate',
+  'unclaimed funds',
+  'beneficiary notification',
+  'inheritance tax fee',
+  'estate lawyer',
+  'foreign estate',
+  'will and testament',
+  'probate fee',
+  'release of inheritance',
+  'inheritance claim',
+];
+
+// QR code / quishing scams
+const QR_SCAM_TERMS = [
+  'scan this qr code',
+  'qr code to verify',
+  'scan the barcode',
+  'qr code link',
+  'scan to pay',
+  'scan to confirm',
+  'qr code payment',
+  'qr code on your phone',
+  'scan to unlock',
+  'send you a qr',
+];
+
+// Solar / energy scams
+const SOLAR_SCAM_TERMS = [
+  'free solar panels',
+  'government solar program',
+  'solar rebate',
+  'solar grant',
+  'free energy program',
+  'solar installation fee',
+  'energy assistance program',
+  'utility rebate program',
+  'government energy rebate',
+  'solar savings program',
+  'zero cost solar',
+  'solar tax credit program',
+];
+
+// Veteran benefit scams
+const VETERAN_SCAM_TERMS = [
+  'veteran benefits',
+  'va benefits',
+  'va loan',
+  'veteran loan',
+  'veteran grant',
+  'disabled veteran',
+  'military benefit',
+  'gi bill',
+  'veterans administration',
+  'va disability',
+  'veteran payment',
+  'veteran assistance',
+  'military compensation',
+  'veteran fund',
 ];
 
 const MEDICAL_TERMS = [
@@ -2831,6 +3019,55 @@ const BANK_FRAUD_TERMS = [
   'banking details',
   'transaction records',
   'primary banks',
+  // Pig butchering / investment romance
+  'trading platform',
+  'investment platform',
+  'trading app',
+  'forex trading',
+  'fx trading',
+  'crypto trading platform',
+  'compound interest daily',
+  'high return investment',
+  'guaranteed return',
+  'guaranteed profit',
+  'double your money',
+  'triple your money',
+  'passive income program',
+  'financial mentor',
+  'trading mentor',
+  'trading signal',
+  'trading group',
+  // Deed / property fraud
+  'sign over your property',
+  'deed transfer',
+  'property lien',
+  'foreclosure notice',
+  'eviction notice',
+  'sign the deed',
+  // Bail bond scam
+  'bail money',
+  'bail bond',
+  'post bail',
+  'release from jail',
+  'arrested family member',
+  'lawyer fee',
+  'attorney retainer',
+  // AI / voice clone scam signals
+  'ai voice',
+  'cloned voice',
+  'i am calling on behalf of your family',
+  'your loved one is in trouble',
+  'do not tell anyone about this call',
+  // Utility / service cutoff scams
+  'power will be shut off',
+  'electricity will be cut',
+  'service disconnection',
+  'final notice before disconnection',
+  'utility disconnection',
+  'gas will be shut',
+  'water will be shut',
+  'disconnect within the hour',
+  'immediate payment to avoid disconnection',
 ];
 
 function escapeRegExp(value: string) {
@@ -3114,6 +3351,13 @@ function heuristicBoosts(text: string, safePhraseMatches: string[] = []) {
   const jobLoanHits = countPhraseHits(text, JOB_LOAN_TERMS);
   const familyEmergencyHits = countPhraseHits(text, FAMILY_EMERGENCY_TERMS);
   const governmentImpersonationHits = countPhraseHits(text, GOVERNMENT_IMPERSONATION_TERMS);
+  const warrantyHits = countPhraseHits(text, WARRANTY_SCAM_TERMS);
+  const timeshareHits = countPhraseHits(text, TIMESHARE_SCAM_TERMS);
+  const studentLoanHits = countPhraseHits(text, STUDENT_LOAN_SCAM_TERMS);
+  const inheritanceHits = countPhraseHits(text, INHERITANCE_SCAM_TERMS);
+  const qrScamHits = countPhraseHits(text, QR_SCAM_TERMS);
+  const solarScamHits = countPhraseHits(text, SOLAR_SCAM_TERMS);
+  const veteranScamHits = countPhraseHits(text, VETERAN_SCAM_TERMS);
 
   let boost = 0;
   if (urgencyHits >= 2) boost += 10;
@@ -3196,6 +3440,21 @@ function heuristicBoosts(text: string, safePhraseMatches: string[] = []) {
   if (deviceHits >= 1 && remoteAccessHits >= 1) boost += 12;
   if (deviceHits >= 1 && commandSensitiveHits > 0) boost += 8;
   if (travelPromoHits >= 1) boost += Math.min(24, travelPromoHits * 12);
+  if (warrantyHits >= 1) boost += 18;
+  if (warrantyHits >= 1 && paymentRequestHits >= 1) boost += 12;
+  if (warrantyHits >= 1 && urgencyHits >= 1) boost += 8;
+  if (timeshareHits >= 1) boost += 20;
+  if (timeshareHits >= 1 && paymentRequestHits >= 1) boost += 14;
+  if (studentLoanHits >= 1) boost += 22;
+  if (studentLoanHits >= 1 && paymentRequestHits >= 1) boost += 14;
+  if (inheritanceHits >= 1) boost += 24;
+  if (inheritanceHits >= 1 && paymentRequestHits >= 1) boost += 16;
+  if (qrScamHits >= 1) boost += 20;
+  if (qrScamHits >= 1 && paymentRequestHits >= 1) boost += 12;
+  if (solarScamHits >= 1) boost += 16;
+  if (solarScamHits >= 1 && paymentRequestHits >= 1) boost += 12;
+  if (veteranScamHits >= 1) boost += 18;
+  if (veteranScamHits >= 1 && paymentRequestHits >= 1) boost += 12;
 
   if (secrecyHits >= 1 && paymentAppHits >= 1) boost += 12;
   if (urgencyHits >= 1 && paymentAppHits >= 1) boost += 8;
@@ -3311,28 +3570,8 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   const localeBoost = calculateLocaleBoost(detectedLocale, callerCountry);
   const regionMismatchBoost =
     callerRegion && callerRegion !== '+1' ? 12 : callerCountry && callerCountry !== 'US' ? 12 : 0;
-  const voiceSyntheticScore =
-    typeof metadata.voiceSyntheticScore === 'number' ? metadata.voiceSyntheticScore : null;
-  const voiceAnalysis = metadata.voiceAnalysis ?? null;
-  const voiceMedian = voiceAnalysis?.chunkMedianFake ?? voiceSyntheticScore;
-  const voiceMax = voiceAnalysis?.chunkMaxFake ?? voiceSyntheticScore;
-  const inferredAlertBand =
-    voiceAnalysis?.alertBand ??
-    (voiceMedian != null
-      ? voiceMedian >= 0.93
-        ? 'high'
-        : voiceMedian >= 0.8
-        ? 'caution'
-        : 'none'
-      : 'none');
-  const voiceAlertBand: 'none' | 'caution' | 'high' = inferredAlertBand;
-  let voiceBoost = 0;
-  if (voiceAlertBand === 'high' && voiceMedian !== null) {
-    voiceBoost = Math.min(30, voiceMedian * 40);
-  } else if (voiceAlertBand === 'caution' && voiceMedian !== null) {
-    voiceBoost = Math.min(15, voiceMedian * 30);
-  }
-  const voiceHardOverride = voiceAlertBand === 'high' && (voiceMax ?? 0) >= 0.97;
+  const voiceSyntheticScore = null;
+  const voiceBoost = 0;
   const safePhraseMatches = (metadata.safePhraseMatches ?? []).filter(Boolean);
   const heuristic = heuristicBoosts(normalized, safePhraseMatches);
   const actionBoost = heuristic.actionBoost;
@@ -3398,7 +3637,6 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         remoteAccessHits: 0,
         voiceSyntheticScore,
         voiceBoost,
-        voiceAnalysis: metadata.voiceAnalysis ?? null,
       },
     } satisfies FraudAnalysis;
   }
@@ -3530,20 +3768,11 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   if (piiHarvestHits >= 2 && actionBoost > 0) {
     score = Math.max(score, 85);
   }
-  if (voiceAlertBand === 'high') {
-    score = Math.max(score, 90);
-  } else if (voiceAlertBand === 'caution') {
-    score = Math.max(score, 75);
-  }
-  if (voiceHardOverride) {
-    score = Math.max(score, 95);
-  }
 
   // If hard-block terms or tax+payment patterns hit, force alert-required signal.
   const hardBlockOverride =
     heuristic.hardBlockHits >= 1 ||
-    (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment'))) ||
-    voiceHardOverride;
+    (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment')));
   const techSupportOverride = strongTechSupportSignal || techSupportHits >= 3;
 
   const finalScore = Math.min(100, Math.round(score));
@@ -3606,7 +3835,6 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
         travelPromoHits: heuristic.travelPromoHits,
         voiceSyntheticScore,
         voiceBoost,
-        voiceAnalysis: metadata.voiceAnalysis ?? null,
       },
     override: hardBlockOverride || techSupportOverride,
   };
