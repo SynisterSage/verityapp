@@ -94,7 +94,6 @@ import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientM
 import { logEvent } from './src/services/sentry';
 import type { AppTheme } from './src/theme/tokens';
 import { withOpacity } from './src/utils/color';
-import { initReviewPrompt } from './src/hooks/useReviewPrompt';
 
 enableScreens(true);
 
@@ -1672,11 +1671,6 @@ function NavigationHost() {
 }
 
 function AppContent() {
-  // Stamp first-launch date for review prompt gating (idempotent)
-  useEffect(() => {
-    void initReviewPrompt();
-  }, []);
-
   useEffect(() => {
     if (Platform.OS !== 'android') {
       return;

@@ -28,7 +28,6 @@ import { BlurView } from 'expo-blur';
 
 import { supabase } from '../../services/supabase';
 import { authorizedFetch } from '../../services/backend';
-import { useReviewPrompt } from '../../hooks/useReviewPrompt';
 import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import { emitCallUpdated } from '../../utils/callEvents';
@@ -168,14 +167,6 @@ export default function CallDetailScreen({
   const { activeProfile, canManageProfile } = useProfile();
   const { theme, mode } = useTheme();
   const [callRow, setCallRow] = useState<CallRow | null>(null);
-  const { recordMeaningfulAction } = useReviewPrompt();
-
-  // Record a meaningful action when a screened call is successfully viewed
-  useEffect(() => {
-    if (callRow) {
-      void recordMeaningfulAction();
-    }
-  }, [callRow, recordMeaningfulAction]);
   const [recordingUrl, setRecordingUrl] = useState<string | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
