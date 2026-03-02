@@ -6,6 +6,7 @@ import {
   Easing,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -100,6 +101,7 @@ export default function CircleActivityScreen() {
   const trayAnim = useRef(new Animated.Value(0)).current;
   const [trayProcessing, setTrayProcessing] = useState(false);
   const [activeTrayAction, setActiveTrayAction] = useState<'delete' | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (route.params?.activities && route.params.activities.length > 0) {
@@ -160,6 +162,30 @@ export default function CircleActivityScreen() {
       cancelled = true;
     };
   }, [activeProfile?.id, route.params?.activities]);
+
+  const handleRefresh = useCallback(async () => {
+    if (!activeProfile?.id) return;
+    setRefreshing(true);
+    try {
+      const [alertsData, membersData] = await Promise.all([
+        authorizedFetch(`/alerts?limit=50&profileId=${encodeURIComponent(activeProfile.id)}`),
+        authorizedFetch(`/profiles/${activeProfile.id}/members`),
+      ]);
+      const alerts = (alertsData?.alerts ?? []) as AlertRow[];
+      const members = (membersData?.members ?? []) as Array<{ user_id?: string; display_name?: string }>;
+      const memberNames: Record<string, string> = {};
+      members.forEach((m) => { if (m.user_id && m.display_name) memberNames[m.user_id] = m.display_name; });
+      const mapped = alerts
+        .filter((a) => CIRCLE_ALERT_TYPES.has(a.alert_type ?? ''))
+        .sort((a, b) => (parseAlertTimestamp(b.created_at)?.getTime() ?? 0) - (parseAlertTimestamp(a.created_at)?.getTime() ?? 0))
+        .map((a) => toCircleActivityItem(a, memberNames));
+      setActivityList(mapped);
+    } catch {
+      // silently fail on pull-to-refresh
+    } finally {
+      setRefreshing(false);
+    }
+  }, [activeProfile?.id]);
 
   const deleteAlert = useCallback(async (alertId: string) => {
     try {
@@ -322,6 +348,14 @@ export default function CircleActivityScreen() {
         <ScrollView
           contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 24) }]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={theme.colors.accent}
+              colors={[theme.colors.accent]}
+            />
+          }
         >
           <View style={styles.cardList}>
             {activityList.map((activity) => (

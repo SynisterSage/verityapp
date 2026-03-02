@@ -1269,6 +1269,19 @@ function SessionExpiredModal({ visible, theme, mode, onDismiss }: SessionExpired
 function NavigationHost() {
   const { mode, theme } = useTheme();
   const { session, isLoading, sessionExpired, clearSessionExpired } = useAuth();
+
+  // Debounce the modal — only show after sessionExpired has been stable for
+  // 500ms. This prevents a brief flash during account deletion where the
+  // SIGNED_OUT event fires before our intentional-sign-out guard can take effect.
+  const [showSessionExpired, setShowSessionExpired] = useState(false);
+  useEffect(() => {
+    if (!sessionExpired || session) {
+      setShowSessionExpired(false);
+      return;
+    }
+    const t = setTimeout(() => setShowSessionExpired(true), 500);
+    return () => clearTimeout(t);
+  }, [sessionExpired, session]);
   const {
     isLoadingStatus: subscriptionLoading,
     hasResolvedStatus: hasResolvedSubscriptionStatus,
@@ -1661,7 +1674,7 @@ function NavigationHost() {
         </View>
       ) : null}
       <SessionExpiredModal
-        visible={sessionExpired && !session}
+        visible={showSessionExpired}
         theme={theme}
         mode={mode}
         onDismiss={clearSessionExpired}

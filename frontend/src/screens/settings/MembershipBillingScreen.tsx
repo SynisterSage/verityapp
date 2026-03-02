@@ -487,13 +487,10 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
     card: {
       backgroundColor: theme.colors.surface,
       borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
       padding: 18,
       gap: 12,
-      shadowColor: '#000',
-      shadowOpacity: mode === 'dark' ? 0.3 : 0.1,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 6 },
-      elevation: 8,
     },
     // ── Membership hero ──────────────────────────────────
     membershipHero: {

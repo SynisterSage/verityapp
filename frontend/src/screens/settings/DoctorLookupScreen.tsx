@@ -280,14 +280,18 @@ export default function DoctorLookupScreen({ navigation }: { navigation: any }) 
     });
   return Array.from(uniq.values());
 }, [trusted, optimisticTrusted]);
+  // Phone matching uses only server-confirmed trusted entries to avoid false positives
+  // when nearby providers share the same phone number (optimistic entries would otherwise
+  // briefly mark unrelated providers as trusted while the save is in flight).
   const trustedPhoneSet = useMemo(
     () =>
       new Set(
-        doctorTrusted
+        trusted
+          .filter((c) => c.source === 'professional_lookup' || includesDoctorTag(c))
           .map((prof) => prof.caller_number)
           .filter((phone): phone is string => Boolean(phone))
       ),
-    [doctorTrusted]
+    [trusted]
   );
   const trustedPlaceIdSet = useMemo(
     () =>

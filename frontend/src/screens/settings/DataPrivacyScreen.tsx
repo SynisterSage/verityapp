@@ -203,7 +203,7 @@ function OsPermissionRow({ icon, label, description, granted, styles, theme }: O
     : isGranted
     ? theme.colors.success
     : theme.colors.danger;
-  const statusLabel = granted === null ? '—' : isGranted ? 'Allowed' : 'Denied';
+  const statusLabel = granted === null ? 'Not asked' : isGranted ? 'Allowed' : 'Denied';
 
   return (
     <View style={[styles.row, styles.rowBorder]}>
@@ -240,13 +240,13 @@ export default function DataPrivacyScreen() {
 
   useEffect(() => {
     Notifications.getPermissionsAsync().then(({ status }) => {
-      setNotifGranted(status === 'granted');
+      setNotifGranted(status === 'granted' ? true : status === 'undetermined' ? null : false);
     }).catch(() => setNotifGranted(false));
     Location.getForegroundPermissionsAsync().then(({ status }) => {
-      setLocationGranted(status === 'granted');
+      setLocationGranted(status === 'granted' ? true : status === 'undetermined' ? null : false);
     }).catch(() => setLocationGranted(false));
     Audio.getPermissionsAsync().then(({ status }) => {
-      setMicGranted(status === 'granted');
+      setMicGranted(status === 'granted' ? true : status === 'undetermined' ? null : false);
     }).catch(() => setMicGranted(false));
   }, []);
 

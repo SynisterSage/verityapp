@@ -219,7 +219,7 @@ export default function CircleActivityDetailScreen({ route }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  const containerPaddingTop = insets.top > 0 ? 0 : 12;
+  const containerPaddingTop = Math.max(16, insets.top + 4);
   const contentPaddingBottom = Math.max(insets.bottom, 32);
 
   if (loading) {
@@ -296,6 +296,76 @@ export default function CircleActivityDetailScreen({ route }: Props) {
             </View>
           </View>
         </View>
+
+        {/* Specific details — shown for types with structured payload data */}
+        {(() => {
+          const rows: { label: string; value: string }[] = [];
+
+          if (alertType === 'safe_phrase_added' && typeof payload.phrase === 'string') {
+            rows.push({ label: 'Phrase', value: `"${payload.phrase}"` });
+          }
+
+          if (alertType === 'blocked_caller_added') {
+            if (typeof payload.caller_number === 'string') {
+              rows.push({ label: 'Number blocked', value: payload.caller_number });
+            }
+            if (typeof payload.reason === 'string' && payload.reason.trim()) {
+              rows.push({ label: 'Reason', value: payload.reason });
+            }
+          }
+
+          if (alertType === 'trusted_contact_added') {
+            const numbers = Array.isArray(payload.numbers) ? (payload.numbers as string[]) : [];
+            numbers.forEach((n, i) => {
+              rows.push({ label: i === 0 ? 'Number' + (numbers.length > 1 ? 's' : '') : '', value: n });
+            });
+          }
+
+          if (alertType === 'circle_invite') {
+            if (typeof payload.invite_email === 'string') {
+              rows.push({ label: 'Invited', value: payload.invite_email });
+            }
+            if (typeof payload.invite_role === 'string') {
+              rows.push({ label: 'Role', value: payload.invite_role.charAt(0).toUpperCase() + payload.invite_role.slice(1) });
+            }
+          }
+
+          if (alertType === 'member_role_changed') {
+            if (typeof payload.target_display_name === 'string') {
+              rows.push({ label: 'Member', value: payload.target_display_name });
+            }
+            if (typeof payload.target_role === 'string') {
+              rows.push({ label: 'New role', value: payload.target_role.charAt(0).toUpperCase() + payload.target_role.slice(1) });
+            }
+          }
+
+          if (alertType === 'member_removed' && typeof payload.target_display_name === 'string') {
+            rows.push({ label: 'Removed', value: payload.target_display_name });
+          }
+
+          if (alertType === 'automation_settings_updated') {
+            const changes = Array.isArray(payload.changes) ? (payload.changes as string[]) : [];
+            changes.forEach((c, i) => {
+              rows.push({ label: i === 0 ? 'Changes' : '', value: c });
+            });
+          }
+
+          if (rows.length === 0) return null;
+
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Specific Details</Text>
+              <View style={styles.card}>
+                {rows.map((row, i) => (
+                  <View key={i} style={[styles.metaRow, i > 0 && styles.metaRowBorder]}>
+                    <Text style={styles.metaLabel}>{row.label}</Text>
+                    <Text style={[styles.metaValue, styles.metaValueDetail]}>{row.value}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          );
+        })()}
 
         {/* Details card */}
         <View style={styles.section}>
@@ -457,6 +527,11 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
       color: theme.colors.text,
       fontSize: 14,
       fontWeight: '500',
+    },
+    metaValueDetail: {
+      flex: 1,
+      textAlign: 'right',
+      marginLeft: 12,
     },
     infoRow: {
       flexDirection: 'row',

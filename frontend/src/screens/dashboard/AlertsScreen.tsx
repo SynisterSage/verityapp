@@ -124,6 +124,7 @@ export default function AlertsScreen() {
     [theme.colors.bg]
   );
   const [activeTrayAction, setActiveTrayAction] = useState<'delete' | null>(null);
+  const [trayDoneAction, setTrayDoneAction] = useState<'delete' | null>(null);
   const [activeMode, setActiveMode] = useState<AlertsModeKey>('needs');
   const route = useRoute<RouteProp<TabParamList, 'AlertsTab'>>();
   const navigation = useNavigation<StackNavigationProp<RootStackParamList>>();
@@ -804,17 +805,65 @@ const loadMemberNames = useCallback(async () => {
           {hasMore && (
             <TouchableOpacity
               onPress={openCircleFeed}
-              activeOpacity={0.7}
+              activeOpacity={0.75}
               style={styles.circleMorePeek}
             >
+              {/* Ghost card that mimics an AlertCard layout */}
               <View
                 style={[
                   styles.circleMorePeekCard,
                   {
                     backgroundColor: theme.colors.surface,
-                    borderColor: withOpacity(theme.colors.text, 0.06),
+                    borderColor: withOpacity(theme.colors.border, 0.7),
                   },
                 ]}
+              >
+                {/* Icon placeholder */}
+                <View
+                  style={[
+                    styles.circleMorePeekIcon,
+                    { backgroundColor: withOpacity(theme.colors.accent, 0.12) },
+                  ]}
+                >
+                  <Ionicons name="people-outline" size={18} color={withOpacity(theme.colors.accent, 0.55)} />
+                </View>
+
+                {/* Text placeholders */}
+                <View style={styles.circleMorePeekText}>
+                  <View
+                    style={[
+                      styles.circleMorePeekLine,
+                      styles.circleMorePeekLineLong,
+                      { backgroundColor: withOpacity(theme.colors.text, 0.1) },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.circleMorePeekLine,
+                      styles.circleMorePeekLineShort,
+                      { backgroundColor: withOpacity(theme.colors.text, 0.065) },
+                    ]}
+                  />
+                </View>
+
+                {/* "N more" badge */}
+                <View
+                  style={[
+                    styles.circleMorePeekBadge,
+                    { backgroundColor: withOpacity(theme.colors.accent, 0.12) },
+                  ]}
+                >
+                  <Text style={[styles.circleMorePeekBadgeText, { color: theme.colors.accent }]}>
+                    +{circleActivity.length - preview.length} more
+                  </Text>
+                </View>
+              </View>
+
+              {/* Gradient mask fading the top of the card */}
+              <LinearGradient
+                colors={[theme.colors.bg, withOpacity(theme.colors.bg, 0)]}
+                style={styles.circleMorePeekGradient}
+                pointerEvents="none"
               />
             </TouchableOpacity>
           )}
@@ -859,8 +908,19 @@ const loadMemberNames = useCallback(async () => {
       setTrayAlert(null);
       setTrayProcessing(false);
       setActiveTrayAction(null);
+      setTrayDoneAction(null);
     });
   }, [trayAnim, trayDragY]);
+
+  const flashDoneThenHide = useCallback(
+    (action: 'delete') => {
+      setTrayDoneAction(action);
+      setTrayProcessing(false);
+      setActiveTrayAction(null);
+      setTimeout(() => hideTray(), 700);
+    },
+    [hideTray]
+  );
 
   const trayHandlePanResponder = useMemo(
     () =>
@@ -908,13 +968,14 @@ const loadMemberNames = useCallback(async () => {
     setTrayProcessing(true);
     setActiveTrayAction('delete');
     const success = await handleDelete(trayAlert.id);
-    setTrayProcessing(false);
-    setActiveTrayAction(null);
     if (success) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      hideTray();
+      flashDoneThenHide('delete');
+    } else {
+      setTrayProcessing(false);
+      setActiveTrayAction(null);
     }
-  }, [handleDelete, hideTray, trayAlert]);
+  }, [handleDelete, flashDoneThenHide, trayAlert]);
 
   const renderHandledSection = () => {
     if (!handledAlerts.length) return null;
@@ -1060,8 +1121,8 @@ const loadMemberNames = useCallback(async () => {
     outputRange: [0, 0.45],
     extrapolate: 'clamp',
   });
-  const deleteActionLabel =
-    trayProcessing && activeTrayAction === 'delete' ? 'Working…' : 'Delete alert';
+  const deleteActionDone = trayDoneAction === 'delete';
+  const deleteActionLabel = deleteActionDone ? 'Deleted' : trayProcessing && activeTrayAction === 'delete' ? 'Working…' : 'Delete alert';
   const trayHandledTimestamp = trayAlert?.feedback_at ?? trayAlert?.created_at;
   const trayHandledDisplay =
     trayHandledTimestamp && formatAlertDateLabel(trayHandledTimestamp)
@@ -1193,15 +1254,19 @@ const loadMemberNames = useCallback(async () => {
                 <Pressable
                   style={({ pressed }) => [
                     styles.trayAction,
-                    styles.trayDanger,
+                    !deleteActionDone && styles.trayDanger,
                     pressed && styles.trayActionPressed,
                     trayProcessing && styles.trayActionDisabled,
+                    deleteActionDone && styles.trayActionDone,
                   ]}
                   onPress={handleTrayDelete}
-                  disabled={trayProcessing}
+                  disabled={trayProcessing || deleteActionDone}
                 >
-                  <Text style={[styles.trayActionText, styles.trayDangerText]}>{deleteActionLabel}</Text>
-                  <Text style={styles.trayActionHint}>Removes the alert permanently.</Text>
+                  <View style={styles.trayActionRow}>
+                    {deleteActionDone && <Ionicons name="checkmark-circle" size={16} color={theme.colors.success} style={styles.trayActionIcon} />}
+                    <Text style={[styles.trayActionText, deleteActionDone ? styles.trayActionTextDone : styles.trayDangerText]}>{deleteActionLabel}</Text>
+                  </View>
+                  {!deleteActionDone && <Text style={styles.trayActionHint}>Removes the alert permanently.</Text>}
                 </Pressable>
                 <Pressable
                   style={({ pressed }) => [
@@ -1352,11 +1417,52 @@ const createAlertStyles = (theme: AppTheme) =>
       overflow: 'hidden',
     },
     circleMorePeekCard: {
-      height: 18,
+      flexDirection: 'row',
+      alignItems: 'center',
       borderRadius: 32,
       borderWidth: StyleSheet.hairlineWidth,
-      marginHorizontal: 10,
-      opacity: 0.45,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 12,
+      opacity: 0.6,
+    },
+    circleMorePeekIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    circleMorePeekText: {
+      flex: 1,
+      gap: 7,
+    },
+    circleMorePeekLine: {
+      height: 9,
+      borderRadius: 6,
+    },
+    circleMorePeekLineLong: {
+      width: '65%',
+    },
+    circleMorePeekLineShort: {
+      width: '38%',
+    },
+    circleMorePeekBadge: {
+      borderRadius: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+    },
+    circleMorePeekBadgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      letterSpacing: 0.1,
+    },
+    circleMorePeekGradient: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 28,
     },
     emptyStateWrap: {
       marginTop: -60,
@@ -1459,6 +1565,19 @@ const createAlertStyles = (theme: AppTheme) =>
     },
     trayActionDisabled: {
       opacity: 0.6,
+    },
+    trayActionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    trayActionIcon: {
+      marginRight: 7,
+    },
+    trayActionDone: {
+      backgroundColor: withOpacity(theme.colors.success, 0.12),
+    },
+    trayActionTextDone: {
+      color: theme.colors.success,
     },
     trayActionText: {
       color: theme.colors.text,

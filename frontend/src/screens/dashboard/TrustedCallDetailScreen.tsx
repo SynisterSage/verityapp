@@ -25,6 +25,7 @@ type TrustedAlertPayload = {
   contactName?: string | null;
   toNumber?: string | null;
   bridged?: boolean;
+  durationSeconds?: number | null;
 };
 
 type AlertRow = {
@@ -63,9 +64,28 @@ export default function TrustedCallDetailScreen({ route }: Props) {
   const callerNumber = payload.callerNumber ?? null;
   const contactName = payload.contactName ?? null;
   const toNumber = payload.toNumber ?? null;
+  const durationSeconds = typeof payload.durationSeconds === 'number' ? payload.durationSeconds : null;
 
-  const heroName = contactName || (callerNumber ? formatPhoneNumber(callerNumber, callerNumber) : 'Trusted contact');
-  const heroSubNumber = contactName && callerNumber ? formatPhoneNumber(callerNumber, callerNumber) : null;
+  const formattedDuration = durationSeconds !== null
+    ? durationSeconds < 60
+      ? `${durationSeconds}s`
+      : `${Math.floor(durationSeconds / 60)}m ${durationSeconds % 60}s`
+    : null;
+
+  const normalizedContactName = (contactName ?? '').trim();
+  const formattedCallerNumber = callerNumber ? formatPhoneNumber(callerNumber, callerNumber) : null;
+  const contactDigits = normalizedContactName.replace(/\D/g, '');
+  const callerDigits = (callerNumber ?? '').replace(/\D/g, '');
+  const isContactNameDistinct =
+    normalizedContactName.length > 0 &&
+    normalizedContactName.toLowerCase() !== (formattedCallerNumber ?? '').toLowerCase() &&
+    (!contactDigits || !callerDigits || contactDigits !== callerDigits);
+
+  const heroName = isContactNameDistinct
+    ? normalizedContactName
+    : formattedCallerNumber ?? 'Trusted contact';
+  const heroSubNumber =
+    isContactNameDistinct && formattedCallerNumber ? formattedCallerNumber : null;
   const lineLabel = toNumber ? formatPhoneNumber(toNumber, toNumber) : null;
 
   const heroDate = alert
@@ -76,7 +96,7 @@ export default function TrustedCallDetailScreen({ route }: Props) {
     : '';
   const heroMeta = [heroDate, heroTime].filter(Boolean).join(' • ');
 
-  const containerPaddingTop = insets.top > 0 ? 0 : 12;
+  const containerPaddingTop = Math.max(16, insets.top + 4);
   const contentPaddingBottom = Math.max(insets.bottom, 32);
 
   if (loading) {
@@ -152,6 +172,12 @@ export default function TrustedCallDetailScreen({ route }: Props) {
               <View style={[styles.metaRow, styles.metaRowBorder]}>
                 <Text style={styles.metaLabel}>Protected line</Text>
                 <Text style={styles.metaValue}>{lineLabel}</Text>
+              </View>
+            ) : null}
+            {formattedDuration ? (
+              <View style={[styles.metaRow, styles.metaRowBorder]}>
+                <Text style={styles.metaLabel}>Call length</Text>
+                <Text style={styles.metaValue}>{formattedDuration}</Text>
               </View>
             ) : null}
           </View>
@@ -289,4 +315,3 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
       fontWeight: '500',
     },
   });
-

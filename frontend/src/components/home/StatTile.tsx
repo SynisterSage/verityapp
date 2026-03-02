@@ -1,4 +1,4 @@
-import { Text, TouchableOpacity, View, StyleSheet } from 'react-native';
+import { Animated, Text, TouchableOpacity, View, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -12,6 +12,7 @@ type StatTileProps = {
   iconColor?: string;
   iconBackgroundColor?: string;
   onPress: () => void;
+  valueAnim?: Animated.Value;
 };
 
 export default function StatTile({
@@ -22,6 +23,7 @@ export default function StatTile({
   iconColor,
   iconBackgroundColor,
   onPress,
+  valueAnim,
 }: StatTileProps) {
   const { theme } = useTheme();
   const handlePress = () => {
@@ -41,7 +43,15 @@ export default function StatTile({
       activeOpacity={0.85}
     >
         <View style={styles.topRow}>
-          <Text style={[styles.value, { color: theme.colors.text }]}>{value}</Text>
+          <Animated.Text
+            style={[
+              styles.value,
+              { color: theme.colors.text },
+              valueAnim ? { opacity: valueAnim, transform: [{ scale: valueAnim }] } : null,
+            ]}
+          >
+            {value}
+          </Animated.Text>
           <View
             style={[
               styles.iconBox,

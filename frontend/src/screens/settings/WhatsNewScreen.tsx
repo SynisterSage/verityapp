@@ -40,7 +40,7 @@ export default function WhatsNewScreen() {
   const navigation = useNavigation();
   const styles = makeStyles(theme);
 
-  const containerPaddingTop = insets.top > 0 ? 0 : 12;
+  const containerPaddingTop = Math.max(16, insets.top + 4);
   const contentPaddingBottom = Math.max(insets.bottom, 32);
 
   return (
@@ -69,7 +69,10 @@ export default function WhatsNewScreen() {
         {RELEASES.map((release) => (
           <View key={release.version} style={styles.section}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionLabel}>{release.label}</Text>
+              <View style={styles.sectionHeaderLeft}>
+                <Text style={styles.sectionLabel}>{release.label}</Text>
+                <Text style={styles.sectionVersion}>{release.version}</Text>
+              </View>
               <Text style={styles.sectionDate}>{release.date}</Text>
             </View>
             <View style={styles.card}>
@@ -153,7 +156,10 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 10,
+      marginBottom: 16,
+    },
+    sectionHeaderLeft: {
+      gap: 3,
     },
     sectionLabel: {
       color: theme.colors.textMuted,
@@ -161,6 +167,12 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
       fontWeight: '700',
       letterSpacing: 0.4,
       textTransform: 'uppercase',
+    },
+    sectionVersion: {
+      color: theme.colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+      letterSpacing: -0.3,
     },
     sectionDate: {
       color: theme.colors.textMuted,

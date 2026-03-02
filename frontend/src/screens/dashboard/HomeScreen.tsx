@@ -3,6 +3,7 @@ import {
   Animated,
   AppState,
   AppStateStatus,
+  Linking,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -11,6 +12,7 @@ import {
   View,
   Pressable,
 } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -88,6 +90,7 @@ type StatTile = {
   iconColor?: string;
   iconBackgroundColor?: string;
   onPress: () => void;
+  valueAnim?: Animated.Value;
 };
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
@@ -109,11 +112,22 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [recentTrustedAlert, setRecentTrustedAlert] = useState<{ label: string; created_at: string; alertId?: string } | null>(null);
   const [recentActivity, setRecentActivity] = useState<ActivityItem[]>([]);
   const [alertsThisWeek, setAlertsThisWeek] = useState<number | null>(null);
+  const [alertsToday, setAlertsToday] = useState<number | null>(null);
+  const [alertsThisMonth, setAlertsThisMonth] = useState<number | null>(null);
+  const [alertPeriod, setAlertPeriod] = useState<'day' | 'week' | 'month'>('week');
+
+  useEffect(() => {
+    AsyncStorage.getItem('home:alertPeriod').then((val) => {
+      if (val === 'day' || val === 'week' || val === 'month') setAlertPeriod(val);
+    }).catch(() => null);
+  }, []);
+  const alertValueAnim = useRef(new Animated.Value(1)).current;
   const [blockedCount, setBlockedCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [hasInitialLoadCompleted, setHasInitialLoadCompleted] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
+  const [showNotifBanner, setShowNotifBanner] = useState(false);
   const shimmer = useRef(new Animated.Value(0.6)).current;
   const scrollRef = useRef<ScrollView>(null);
   const email = session?.user.email ?? 'Account';
@@ -124,6 +138,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       setRecentTrustedAlert(null);
       setRecentActivity([]);
       setAlertsThisWeek(null);
+      setAlertsToday(null);
+      setAlertsThisMonth(null);
       setBlockedCount(null);
       if (!session) {
         setLoading(false);
@@ -139,7 +155,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       setLoading(true);
     }
     try {
-      const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const now = Date.now();
+      const dayAgo = new Date(now - 1 * 24 * 60 * 60 * 1000).toISOString();
+      const weekAgo = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const monthAgo = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+
       const callsPromise = supabase
         .from('calls')
         .select(
@@ -149,27 +169,45 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         .order('created_at', { ascending: false })
         .limit(3);
 
-      const alertsPromise = supabase
+      const alertsDayPromise = supabase
+        .from('calls')
+        .select('id', { count: 'exact', head: true })
+        .eq('profile_id', activeProfile.id)
+        .eq('fraud_alert_required', true)
+        .gte('created_at', dayAgo);
+
+      const alertsWeekPromise = supabase
         .from('calls')
         .select('id', { count: 'exact', head: true })
         .eq('profile_id', activeProfile.id)
         .eq('fraud_alert_required', true)
         .gte('created_at', weekAgo);
 
+      const alertsMonthPromise = supabase
+        .from('calls')
+        .select('id', { count: 'exact', head: true })
+        .eq('profile_id', activeProfile.id)
+        .eq('fraud_alert_required', true)
+        .gte('created_at', monthAgo);
+
       const blockedPromise = supabase
         .from('blocked_callers')
         .select('id', { count: 'exact', head: true })
         .eq('profile_id', activeProfile.id);
 
-      const [callsRes, alertsRes, blockedRes] = await Promise.all([
+      const [callsRes, alertsDayRes, alertsWeekRes, alertsMonthRes, blockedRes] = await Promise.all([
         callsPromise,
-        alertsPromise,
+        alertsDayPromise,
+        alertsWeekPromise,
+        alertsMonthPromise,
         blockedPromise,
       ]);
 
       const callRows = callsRes.data ?? [];
       const nextRecentCall = callRows[0] ?? null;
-      const nextAlertsThisWeek = alertsRes.count ?? 0;
+      const nextAlertsThisWeek = alertsWeekRes.count ?? 0;
+      const nextAlertsToday = alertsDayRes.count ?? 0;
+      const nextAlertsThisMonth = alertsMonthRes.count ?? 0;
       const nextBlockedCount = blockedRes.count ?? 0;
 
       let alertRows: AlertRow[] = [];
@@ -314,6 +352,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       // Apply the full snapshot together to avoid partial first-paint states.
       setRecentCall(nextRecentCall);
       setAlertsThisWeek(nextAlertsThisWeek);
+      setAlertsToday(nextAlertsToday);
+      setAlertsThisMonth(nextAlertsThisMonth);
       setBlockedCount(nextBlockedCount);
       setRecentActivity(activityItems);
 
@@ -368,6 +408,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     setRecentTrustedAlert(null);
     setRecentActivity([]);
     setAlertsThisWeek(null);
+    setAlertsToday(null);
+    setAlertsThisMonth(null);
     setBlockedCount(null);
     setHasInitialLoadCompleted(false);
     loadStats();
@@ -413,19 +455,68 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     }, [])
   );
 
+  // Check notification permission once on mount — show banner if not granted (required for CallKit)
+  useEffect(() => {
+    Notifications.getPermissionsAsync()
+      .then(({ status }) => setShowNotifBanner(status !== 'granted'))
+      .catch(() => null);
+  }, []);
+
+  const handleNotifBannerEnable = useCallback(async () => {
+    try {
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        setShowNotifBanner(false);
+      } else {
+        Linking.openSettings();
+      }
+    } catch {
+      Linking.openSettings();
+    }
+  }, []);
+
+  const handleAlertPeriodPress = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    Animated.sequence([
+      Animated.timing(alertValueAnim, { toValue: 0, duration: 100, useNativeDriver: true }),
+      Animated.timing(alertValueAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+    ]).start();
+    setAlertPeriod((p) => {
+      const next = p === 'day' ? 'week' : p === 'week' ? 'month' : 'day';
+      AsyncStorage.setItem('home:alertPeriod', next).catch(() => null);
+      return next;
+    });
+  }, [alertValueAnim]);
+
+  const alertPeriodCount =
+    alertPeriod === 'day' ? alertsToday :
+    alertPeriod === 'month' ? alertsThisMonth :
+    alertsThisWeek;
+
+  const alertPeriodLabel =
+    alertPeriod === 'day' ? 'Daily \nAlerts' :
+    alertPeriod === 'month' ? 'Monthly \nAlerts' :
+    'Weekly \nAlerts';
+
+  const alertPeriodCaption =
+    alertPeriod === 'day' ? 'last 24 hours' :
+    alertPeriod === 'month' ? 'last 30 days' :
+    'last 7 days';
+
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `skeleton-${i}`), []);
   const waitingForProfile = Boolean(session) && !activeProfile;
   const showSkeleton = waitingForProfile || !hasInitialLoadCompleted;
   const statTiles: StatTile[] = [
     {
       key: 'alerts',
-      label: 'Weekly \nAlerts',
-      value: alertsThisWeek === null ? '—' : `${alertsThisWeek}`,
-      caption: 'alerts',
+      label: alertPeriodLabel,
+      value: alertPeriodCount === null ? '—' : `${alertPeriodCount}`,
+      caption: alertPeriodCaption,
       icon: 'alert-circle',
       iconColor: theme.colors.warning,
       iconBackgroundColor: withOpacity(theme.colors.warning, 0.15),
-      onPress: () => navigation.navigate('AlertsTab'),
+      onPress: handleAlertPeriodPress,
+      valueAnim: alertValueAnim,
     },
     {
       key: 'blocked',
@@ -470,7 +561,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     ? 'Loading…'
     : 'Missing #';
   const heroTranscript = trustedIsHero
-    ? 'A trusted contact connected to this call.'
+    ? 'Trusted contact connected.'
     : recentCall?.transcript ?? (loading ? 'Loading…' : null);
   const heroIsHandledFraud = !trustedIsHero && hasHeroCall && recentCall?.feedback_status === 'marked_fraud';
   const heroFraudLevel = trustedIsHero
@@ -626,6 +717,20 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </View>
         ) : (
           <View>
+            {showNotifBanner && (
+              <View style={[styles.notifBanner, { backgroundColor: withOpacity(theme.colors.warning, 0.12), borderColor: withOpacity(theme.colors.warning, 0.3) }]}>
+                <Ionicons name="notifications-off-outline" size={20} color={theme.colors.warning} style={styles.notifBannerIcon} />
+                <View style={styles.notifBannerText}>
+                  <Text style={[styles.notifBannerTitle, { color: theme.colors.text }]}>Notifications required for calls</Text>
+                  <Text style={[styles.notifBannerSub, { color: theme.colors.textMuted }]}>Enable notifications so incoming calls can ring on your device.</Text>
+                </View>
+                <View style={styles.notifBannerActions}>
+                  <Pressable onPress={handleNotifBannerEnable} style={[styles.notifBannerBtn, { backgroundColor: theme.colors.warning }]}>
+                    <Text style={styles.notifBannerBtnText}>Enable</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Featured Event</Text>
               <RecentCallCard
@@ -676,6 +781,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                       iconColor={tile.iconColor}
                       iconBackgroundColor={tile.iconBackgroundColor}
                       onPress={tile.onPress}
+                      valueAnim={tile.valueAnim}
                     />
                   </View>
                 ))}
@@ -835,6 +941,44 @@ const createStyles = (theme: AppTheme) =>
     },
     content: {
       paddingTop: 12,
+    },
+    notifBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 16,
+      borderWidth: 1,
+      padding: 12,
+      marginBottom: 4,
+    },
+    notifBannerIcon: {
+      marginRight: 10,
+    },
+    notifBannerText: {
+      flex: 1,
+    },
+    notifBannerTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    notifBannerSub: {
+      fontSize: 12,
+      marginTop: 1,
+    },
+    notifBannerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginLeft: 8,
+      gap: 6,
+    },
+    notifBannerBtn: {
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+    },
+    notifBannerBtnText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '600',
     },
     section: {
       marginTop: 20,

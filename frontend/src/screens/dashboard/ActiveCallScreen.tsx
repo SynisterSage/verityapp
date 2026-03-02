@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import * as Haptics from 'expo-haptics';
 import TwilioVoice from 'react-native-twilio-programmable-voice';
 
@@ -81,6 +81,7 @@ export default function ActiveCallScreen() {
   const route = useRoute<ActiveCallRoute>();
   const { theme, mode } = useTheme();
   const { activeProfile } = useProfile();
+  const navigation = useNavigation();
   const styles = useMemo(() => createStyles(theme, mode), [theme, mode]);
 
   const [muted, setMuted] = useState(false);
@@ -108,6 +109,16 @@ export default function ActiveCallScreen() {
     callSid: route.params?.callSid,
     toNumber: route.params?.toNumber,
   });
+
+  // Guard: if screen is mounted/updated with a terminal state or no callSid, dismiss immediately
+  // This prevents stale screens from a previous call blocking the new one
+  useEffect(() => {
+    const terminal = ['ended', 'failed', 'disconnected'];
+    if (!callSid || terminal.includes(status.toLowerCase())) {
+      console.warn('[ActiveCallScreen] Dismissing stale screen', { callSid, status });
+      if (navigation.canGoBack()) navigation.goBack();
+    }
+  }, [callSid, status, navigation]);
 
   // Start timer when call connects
   useEffect(() => {

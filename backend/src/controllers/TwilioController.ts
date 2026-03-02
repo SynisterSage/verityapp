@@ -84,8 +84,9 @@ async function logTrustedBridgeActivity(args: {
   toNumber?: string | null;
   bridgeTarget: string;
   trustedCaller?: { caller_number?: string | null; contact_name?: string | null } | null;
+  callSid?: string | null;
 }) {
-  const { profileId, caretakerId, fromNumber, toNumber, bridgeTarget, trustedCaller } = args;
+  const { profileId, caretakerId, fromNumber, toNumber, bridgeTarget, trustedCaller, callSid } = args;
   const contactName = trustedCaller?.contact_name ?? null;
   const callerNumber = fromNumber ?? trustedCaller?.caller_number ?? null;
   const payload = {
@@ -96,6 +97,7 @@ async function logTrustedBridgeActivity(args: {
     riskLevel: 'low',
     label: 'trusted',
     bridged: true,
+    callSid: callSid ?? null,
   };
 
   const { data: alertRow, error } = await supabaseAdmin
@@ -524,6 +526,7 @@ async function callIncoming(req: Request, res: Response) {
             toNumber,
             bridgeTarget,
             trustedCaller,
+            callSid,
           });
           logger.info(`Trusted caller bridged ${bridgeTarget} to=${toNumber} from=${fromNumber}`);
           return res.type('text/xml').send(twimlResponse.toString());
@@ -701,6 +704,7 @@ async function verifyPin(req: Request, res: Response) {
           toNumber,
           bridgeTarget,
           trustedCaller,
+          callSid,
         });
         logger.info(`Trusted caller bridged ${bridgeTarget} to=${toNumber} from=${fromNumber}`);
         return res.type('text/xml').send(twimlResponse.toString());
@@ -809,6 +813,36 @@ function dialStatus(req: Request, res: Response) {
   logger.info(
     `Dial status CallSid=${payload.CallSid} DialCallSid=${payload.DialCallSid} status=${payload.DialCallStatus} sip=${payload.SipResponseCode ?? 'n/a'}`
   );
+
+  // When the bridged leg completes, patch durationSeconds onto the trusted alert payload
+  const callSid = payload.CallSid as string | undefined;
+  const dialCallStatus = payload.DialCallStatus as string | undefined;
+  const dialCallDuration = payload.DialCallDuration as string | undefined;
+  if (
+    callSid &&
+    dialCallStatus?.toLowerCase() === 'completed' &&
+    dialCallDuration
+  ) {
+    const durationSeconds = Number.parseInt(dialCallDuration, 10);
+    if (!Number.isNaN(durationSeconds) && durationSeconds > 0) {
+      Promise.resolve(
+        supabaseAdmin
+          .from('alerts')
+          .select('id, payload')
+          .eq('alert_type', 'trusted')
+          .contains('payload', { callSid })
+          .maybeSingle()
+      ).then(({ data }) => {
+          if (!data) return;
+          return supabaseAdmin
+            .from('alerts')
+            .update({ payload: { ...(data.payload as object), durationSeconds } })
+            .eq('id', data.id);
+        })
+        .catch(() => null);
+    }
+  }
+
   return res.status(204).end();
 }
 
