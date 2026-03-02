@@ -475,16 +475,12 @@ export default function TwilioVoiceClientManager() {
 
       const activeCallSid = activeCallSidRef.current;
       if (activeCallSid) {
-        reportLifecycle(
-          'ended',
-          { call_sid: activeCallSid },
-          activeCallSid,
-          {
-            reason: 'native_no_active_call',
-            source: reason,
-          }
-        );
-        clearActiveCall(activeCallSid);
+        // Don't dismiss the active call UI here — hydrateActiveCall (called in the
+        // .finally() after this) will cross-check with both native and backend and
+        // dismiss cleanly if the call is truly over. Dismissing here races the
+        // placeholder→real-call handoff on cold-start VoIP answer and causes a
+        // visible close/reopen flash.
+        console.info('[twilio-voice] reconcile_deferred_to_hydrate', { activeCallSid, reason });
         return;
       }
 

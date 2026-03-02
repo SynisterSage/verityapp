@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -38,27 +38,57 @@ export default function MembershipActivatedScreen() {
   const { membershipActivationNotice, clearMembershipActivationNotice } = useSubscription();
   const planLabel = formatPlanLabel(membershipActivationNotice);
 
-  const scaleAnim = useRef(new Animated.Value(0.88)).current;
-  const opacityAnim = useRef(new Animated.Value(0)).current;
+  // Staggered entrance anims
+  const cardAnim = useRef(new Animated.Value(0)).current;
+  const iconAnim = useRef(new Animated.Value(0)).current;
+  const bodyAnim = useRef(new Animated.Value(0)).current;
+  const buttonAnim = useRef(new Animated.Value(0)).current;
+  // Ring pulse after entrance
+  const ringAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => null);
-    Animated.parallel([
-      Animated.spring(scaleAnim, {
+
+    Animated.sequence([
+      // Card fades/scales in
+      Animated.spring(cardAnim, {
         toValue: 1,
         useNativeDriver: true,
-        speed: 18,
-        bounciness: 7,
+        speed: 20,
+        bounciness: 5,
       }),
-      Animated.timing(opacityAnim, {
+      // Icon pops in
+      Animated.spring(iconAnim, {
         toValue: 1,
-        duration: 240,
+        useNativeDriver: true,
+        speed: 22,
+        bounciness: 10,
+      }),
+      // Title + subtitle fade up
+      Animated.timing(bodyAnim, {
+        toValue: 1,
+        duration: 200,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      // Button fades up
+      Animated.timing(buttonAnim, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.ease),
         useNativeDriver: true,
       }),
     ]).start(() => {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
+      // Single ring pulse
+      Animated.timing(ringAnim, {
+        toValue: 1,
+        duration: 600,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start();
     });
-  }, [opacityAnim, scaleAnim]);
+  }, [cardAnim, iconAnim, bodyAnim, buttonAnim, ringAnim]);
 
   const handleContinue = () => {
     void Haptics.selectionAsync().catch(() => null);
@@ -66,18 +96,63 @@ export default function MembershipActivatedScreen() {
     navigation.replace('OnboardingChoice');
   };
 
+  const ringScale = ringAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 1.8] });
+  const ringOpacity = ringAnim.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.5, 0.3, 0] });
+
+  const cardOpacity = cardAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+  const cardScale = cardAnim.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
+
+  const iconScale = iconAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
+  const iconOpacity = iconAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+
+  const bodyTranslate = bodyAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
+
+  const buttonTranslate = buttonAnim.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
+
   return (
     <SafeAreaView style={styles.screen}>
       <View style={styles.container}>
-        <Animated.View style={[styles.card, { opacity: opacityAnim, transform: [{ scale: scaleAnim }] }]}>
-          <View style={styles.iconWrap}>
-            <Ionicons name="checkmark" size={34} color="#FFFFFF" />
+        <Animated.View style={[styles.card, { opacity: cardOpacity, transform: [{ scale: cardScale }] }]}>
+          {/* Accent top stripe */}
+          <View style={styles.accentStripe} />
+
+          <View style={styles.cardInner}>
+            {/* Icon with ring pulse */}
+            <Animated.View style={[styles.iconOuter, { opacity: iconOpacity, transform: [{ scale: iconScale }] }]}>
+              <Animated.View
+                style={[
+                  styles.iconRing,
+                  { opacity: ringOpacity, transform: [{ scale: ringScale }] },
+                ]}
+              />
+              <View style={styles.iconWrap}>
+                <Ionicons name="checkmark" size={32} color="#FFFFFF" />
+              </View>
+            </Animated.View>
+
+            {/* Title + subtitle */}
+            <Animated.View
+              style={[
+                styles.bodyWrap,
+                { opacity: bodyAnim, transform: [{ translateY: bodyTranslate }] },
+              ]}
+            >
+              <Text style={styles.title}>Membership Activated</Text>
+              <Text style={styles.subtitle}>Your {planLabel} is active and protecting your account.</Text>
+            </Animated.View>
+
+            {/* Button */}
+            <Animated.View
+              style={[
+                styles.buttonWrap,
+                { opacity: buttonAnim, transform: [{ translateY: buttonTranslate }] },
+              ]}
+            >
+              <Pressable style={styles.primaryButton} onPress={handleContinue}>
+                <Text style={styles.primaryButtonText}>Continue setup</Text>
+              </Pressable>
+            </Animated.View>
           </View>
-          <Text style={styles.title}>Membership Activated</Text>
-          <Text style={styles.subtitle}>Your {planLabel} is active and protecting your account.</Text>
-          <Pressable style={styles.primaryButton} onPress={handleContinue}>
-            <Text style={styles.primaryButtonText}>Continue setup</Text>
-          </Pressable>
         </Animated.View>
       </View>
     </SafeAreaView>
@@ -100,41 +175,75 @@ const createStyles = (theme: AppTheme) =>
       width: '100%',
       borderRadius: 24,
       borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.35),
-      backgroundColor: withOpacity(theme.colors.accent, 0.08),
-      paddingHorizontal: 22,
-      paddingVertical: 28,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      overflow: 'hidden',
+      shadowColor: '#000',
+      shadowOpacity: 0.07,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 4,
+    },
+    accentStripe: {
+      height: 3,
+      backgroundColor: theme.colors.accent,
+    },
+    cardInner: {
+      paddingHorizontal: 24,
+      paddingTop: 28,
+      paddingBottom: 28,
       alignItems: 'center',
-      gap: 14,
+      gap: 16,
+    },
+    iconOuter: {
+      width: 80,
+      height: 80,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconRing: {
+      position: 'absolute',
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      borderWidth: 2,
+      borderColor: theme.colors.success,
     },
     iconWrap: {
-      width: 74,
-      height: 74,
-      borderRadius: 37,
+      width: 62,
+      height: 62,
+      borderRadius: 31,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.success,
       shadowColor: theme.colors.success,
-      shadowOpacity: 0.32,
-      shadowRadius: 12,
-      shadowOffset: { width: 0, height: 7 },
-      elevation: 7,
+      shadowOpacity: 0.28,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 5 },
+      elevation: 6,
+    },
+    bodyWrap: {
+      alignItems: 'center',
+      gap: 8,
     },
     title: {
-      fontSize: 28,
+      fontSize: 26,
       fontWeight: '800',
       color: theme.colors.text,
       textAlign: 'center',
       letterSpacing: -0.4,
     },
     subtitle: {
-      fontSize: 16,
+      fontSize: 15,
       lineHeight: 22,
       color: theme.colors.textMuted,
       textAlign: 'center',
     },
+    buttonWrap: {
+      alignSelf: 'stretch',
+      marginTop: 4,
+    },
     primaryButton: {
-      marginTop: 6,
       alignSelf: 'stretch',
       borderRadius: 16,
       backgroundColor: theme.colors.accent,

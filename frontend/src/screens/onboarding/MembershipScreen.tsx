@@ -467,23 +467,40 @@ export default function MembershipScreen() {
           <Text style={styles.planSectionTitle}>Choose your plan</Text>
           {planOptions.map((plan) => {
             const selected = selectedPlan.productId === plan.productId;
+            const isAnnual = plan.productId.includes('annual');
             return (
               <Animated.View
                 key={plan.productId}
                 style={{ transform: [{ scale: getPlanScale(plan.productId) }] }}
               >
                 <Pressable
-                  style={[styles.planCard, selected && styles.planCardSelected]}
+                  style={[styles.planCard, selected && styles.planCardSelected, isAnnual && styles.planCardAnnual]}
                   onPress={() => setPlan(plan.productId)}
                 >
+                  {/* Annual accent stripe */}
+                  {isAnnual && <View style={styles.planAnnualStripe} />}
+
                   <View style={styles.planMainRow}>
                     <View style={styles.planTextWrap}>
-                      <Text style={styles.planTitle}>{plan.title}</Text>
-                      <Text style={styles.planDetail}>{plan.detail}</Text>
+                      <View style={styles.planTitleRow}>
+                        <Text style={styles.planTitle}>{plan.title}</Text>
+                        {isAnnual && plan.badge ? (
+                          <View style={styles.planBestValuePill}>
+                            <Text style={styles.planBestValueText}>{plan.badge}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      {isAnnual ? (
+                        <View style={styles.planSavingsPill}>
+                          <Ionicons name="pricetag-outline" size={11} color="#92400e" style={{ marginTop: 1 }} />
+                          <Text style={styles.planSavingsText}>{plan.detail}</Text>
+                        </View>
+                      ) : (
+                        <Text style={styles.planDetail}>{plan.detail}</Text>
+                      )}
                     </View>
                     <View style={styles.planPriceWrap}>
-                      <Text style={styles.planPrice}>{plan.price}</Text>
-                      {plan.badge ? <Text style={styles.planBadge}>{plan.badge}</Text> : null}
+                      <Text style={[styles.planPrice, isAnnual && styles.planPriceAnnual]}>{plan.price}</Text>
                     </View>
                   </View>
                   <View style={[styles.radio, selected && styles.radioSelected]}>
@@ -876,6 +893,18 @@ const createMembershipStyles = (theme: AppTheme) =>
       borderWidth: 1,
       borderColor: theme.colors.border,
       gap: 10,
+      overflow: 'hidden',
+    },
+    planCardAnnual: {
+      paddingTop: 19,
+    },
+    planAnnualStripe: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 3,
+      backgroundColor: '#d97706',
     },
     planCardSelected: {
       borderColor: withOpacity(theme.colors.accent, 0.8),
@@ -888,12 +917,44 @@ const createMembershipStyles = (theme: AppTheme) =>
     },
     planTextWrap: {
       flex: 1,
-      gap: 2,
+      gap: 5,
+    },
+    planTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
     planTitle: {
       fontSize: 17,
       fontWeight: '700',
       color: theme.colors.text,
+    },
+    planBestValuePill: {
+      borderRadius: 20,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      backgroundColor: withOpacity('#2d6df6', 0.12),
+    },
+    planBestValueText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.colors.accent,
+      letterSpacing: 0.2,
+    },
+    planSavingsPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      alignSelf: 'flex-start',
+      borderRadius: 20,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      backgroundColor: 'rgba(217, 119, 6, 0.12)',
+    },
+    planSavingsText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#92400e',
     },
     planDetail: {
       fontSize: 13,
@@ -906,6 +967,9 @@ const createMembershipStyles = (theme: AppTheme) =>
     planPrice: {
       fontSize: 15,
       fontWeight: '700',
+      color: theme.colors.text,
+    },
+    planPriceAnnual: {
       color: theme.colors.text,
     },
     planBadge: {

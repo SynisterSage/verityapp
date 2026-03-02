@@ -771,7 +771,7 @@ const loadMemberNames = useCallback(async () => {
     if (!circleActivity.length) return null;
     const PREVIEW_COUNT = 3;
     const preview = circleActivity.slice(0, PREVIEW_COUNT);
-    const hasMore = circleActivity.length > preview.length;
+    const hasMore = circleActivity.length > PREVIEW_COUNT;
     const headerRight = hasMore ? (
       <TouchableOpacity style={styles.circleViewAllButton} onPress={openCircleFeed} activeOpacity={0.7}>
         <Text style={[styles.circleViewAllText, { color: theme.colors.accent }]}>View all</Text>
@@ -814,7 +814,6 @@ const loadMemberNames = useCallback(async () => {
                   styles.circleMorePeekCard,
                   {
                     backgroundColor: theme.colors.surface,
-                    borderColor: withOpacity(theme.colors.border, 0.7),
                   },
                 ]}
               >
@@ -1420,7 +1419,7 @@ const createAlertStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       alignItems: 'center',
       borderRadius: 32,
-      borderWidth: StyleSheet.hairlineWidth,
+      borderWidth: 0,
       paddingHorizontal: 16,
       paddingVertical: 14,
       gap: 12,
