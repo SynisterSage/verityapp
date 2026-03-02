@@ -13,7 +13,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Alert, AppState, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, AppState, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { ActivityIndicator } from 'react-native';
 import {
   SafeAreaProvider,
@@ -94,6 +94,8 @@ import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientM
 import { logEvent } from './src/services/sentry';
 import type { AppTheme } from './src/theme/tokens';
 import { withOpacity } from './src/utils/color';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 
 enableScreens(true);
 
