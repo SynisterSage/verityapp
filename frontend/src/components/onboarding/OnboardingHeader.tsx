@@ -16,6 +16,8 @@ type Props = {
   totalSteps?: number;
   activeStep?: number;
   showBack?: boolean;
+  /** Hides step pills and support button — just the chapter label */
+  minimal?: boolean;
 };
 
 const TOTAL_SEGMENTS = 10;
@@ -25,6 +27,7 @@ export default function OnboardingHeader({
   activeStep = 0,
   totalSteps = TOTAL_SEGMENTS,
   showBack = true,
+  minimal = false,
 }: Props) {
   const navigation = useNavigation();
   const insets = useSafeAreaInsets();
@@ -96,33 +99,37 @@ export default function OnboardingHeader({
             </View>
 
             <View style={styles.progressRow}>
-              <View style={styles.progress}>
-                {steps.map((step) => {
-                  const isActive = step < activeStep;
-                  const width = animatedWidths[step];
-                  return (
-                    <Animated.View
-                      key={step}
-                      style={[
-                        styles.pill,
-                        step !== steps.length - 1 && styles.pillSpacing,
-                        {
-                          width,
-                          backgroundColor: isActive ? progressActiveColor : progressInactiveColor,
-                        },
-                      ]}
-                    />
-                  );
-                })}
-              </View>
+              {!minimal ? (
+                <View style={styles.progress}>
+                  {steps.map((step) => {
+                    const isActive = step < activeStep;
+                    const width = animatedWidths[step];
+                    return (
+                      <Animated.View
+                        key={step}
+                        style={[
+                          styles.pill,
+                          step !== steps.length - 1 && styles.pillSpacing,
+                          {
+                            width,
+                            backgroundColor: isActive ? progressActiveColor : progressInactiveColor,
+                          },
+                        ]}
+                      />
+                    );
+                  })}
+                </View>
+              ) : null}
             </View>
 
-            <SupportButton
-              onPress={navigateToSupportPortal}
-              unreadCount={unreadAgentCount}
-              compact={showBack}
-              style={styles.supportButton}
-            />
+            {!minimal ? (
+              <SupportButton
+                onPress={navigateToSupportPortal}
+                unreadCount={unreadAgentCount}
+                compact={showBack}
+                style={styles.supportButton}
+              />
+            ) : null}
           </View>
         </View>
       </BlurView>

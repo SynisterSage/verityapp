@@ -171,7 +171,10 @@ function PermissionRow({ row, state, styles, theme, isActive, entryAnim }: PermR
   };
 
   return (
-    <Animated.View style={[styles.rowWrap, { backgroundColor: rowBgColor }, entryStyle]}>
+    // Entry animation uses native driver (opacity + translateY)
+    <Animated.View style={[styles.rowWrap, entryStyle]}>
+      {/* Background tint uses JS driver (backgroundColor interpolation) */}
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: rowBgColor }]} />
       <View style={styles.row}>
         <Animated.View
           style={[
@@ -347,7 +350,7 @@ export default function PermissionPrimingScreen() {
 
   return (
     <SafeAreaView edges={[]} style={[styles.container, { backgroundColor: theme.colors.bg }]}>
-      <OnboardingHeader chapter="permissions" activeStep={9} showBack={false} />
+      <OnboardingHeader chapter="permissions" showBack={false} minimal />
 
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 200 }]}
