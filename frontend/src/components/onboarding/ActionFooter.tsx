@@ -38,6 +38,10 @@ type ActionFooterProps = {
   helperPrefix?: string;
   helperActionLabel?: string;
   onHelperPress?: () => void;
+  subHelperPrimaryLabel?: string;
+  onSubHelperPrimaryPress?: () => void;
+  subHelperSecondaryLabel?: string;
+  onSubHelperSecondaryPress?: () => void;
   style?: ViewStyle;
   onLayout?: (event: LayoutChangeEvent) => void;
 };
@@ -68,6 +72,10 @@ export default function ActionFooter({
   helperPrefix,
   helperActionLabel,
   onHelperPress,
+  subHelperPrimaryLabel,
+  onSubHelperPrimaryPress,
+  subHelperSecondaryLabel,
+  onSubHelperSecondaryPress,
   style,
   onLayout,
 }: ActionFooterProps) {
@@ -263,6 +271,43 @@ export default function ActionFooter({
           </TouchableOpacity>
         </View>
       ) : null}
+
+      {subHelperPrimaryLabel && onSubHelperPrimaryPress ? (
+        <View style={styles.subHelperRow}>
+          <TouchableOpacity onPress={onSubHelperPrimaryPress}>
+            <Text
+              style={[
+                styles.subHelperLink,
+                { color: theme.colors.accent, fontFamily: theme.typography.fontFamily },
+              ]}
+            >
+              {subHelperPrimaryLabel}
+            </Text>
+          </TouchableOpacity>
+          {subHelperSecondaryLabel && onSubHelperSecondaryPress ? (
+            <>
+              <Text
+                style={[
+                  styles.subHelperSeparator,
+                  { color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily },
+                ]}
+              >
+                •
+              </Text>
+              <TouchableOpacity onPress={onSubHelperSecondaryPress}>
+                <Text
+                  style={[
+                    styles.subHelperLink,
+                    { color: theme.colors.accent, fontFamily: theme.typography.fontFamily },
+                  ]}
+                >
+                  {subHelperSecondaryLabel}
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -344,5 +389,21 @@ const styles = StyleSheet.create({
   customFooter: {
     marginTop: 12,
     alignItems: 'center',
+  },
+  subHelperRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
+  subHelperSeparator: {
+    fontSize: 13,
+    marginHorizontal: 7,
+  },
+  subHelperLink: {
+    fontSize: 13,
+    fontWeight: '600',
+    lineHeight: 18,
   },
 });

@@ -653,6 +653,16 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         helperPrefix="Already have an account?"
         helperActionLabel="Sign In"
         onHelperPress={() => navigation.navigate('SignIn')}
+        subHelperPrimaryLabel="How it works"
+        onSubHelperPrimaryPress={() => {
+          logEvent('signup_how_it_works_opened', { screen: 'SignUp' });
+          navigation.navigate('MembershipExperience');
+        }}
+        subHelperSecondaryLabel="Why choose Verity"
+        onSubHelperSecondaryPress={() => {
+          logEvent('signup_why_choose_opened', { screen: 'SignUp' });
+          navigation.navigate('WhyChooseVerity');
+        }}
       />
       {isSocialHandoffLoading ? (
         <View style={[styles.handoffOverlay, { backgroundColor: withOpacity(theme.colors.bg, 0.96) }]}>

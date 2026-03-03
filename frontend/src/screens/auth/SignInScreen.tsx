@@ -343,6 +343,16 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
         helperPrefix="New to Verity?"
         helperActionLabel="Join Now"
         onHelperPress={() => navigation.navigate('SignUp')}
+        subHelperPrimaryLabel="How it works"
+        onSubHelperPrimaryPress={() => {
+          logEvent('signin_how_it_works_opened', { screen: 'SignIn' });
+          navigation.navigate('MembershipExperience');
+        }}
+        subHelperSecondaryLabel="Why choose Verity"
+        onSubHelperSecondaryPress={() => {
+          logEvent('signin_why_choose_opened', { screen: 'SignIn' });
+          navigation.navigate('WhyChooseVerity');
+        }}
       />
     </SafeAreaView>
   );

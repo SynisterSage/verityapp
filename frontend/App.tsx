@@ -801,16 +801,6 @@ function RootNavigator() {
               options={{ headerShown: false }}
             />
             <RootStack.Screen
-              name="MembershipExperience"
-              component={MembershipExperienceScreen}
-              options={{ headerShown: false }}
-            />
-            <RootStack.Screen
-              name="WhyChooseVerity"
-              component={WhyChooseVerityScreen}
-              options={{ headerShown: false }}
-            />
-            <RootStack.Screen
               name="OnboardingInviteCode"
               component={OnboardingInviteCodeScreen}
               options={{ headerShown: false }}
@@ -1007,6 +997,16 @@ function RootNavigator() {
         name="PermissionPriming"
         component={PermissionPrimingScreen}
         options={{ headerShown: false, gestureEnabled: false }}
+      />
+      <RootStack.Screen
+        name="MembershipExperience"
+        component={MembershipExperienceScreen}
+        options={{ headerShown: false, presentation: 'modal' }}
+      />
+      <RootStack.Screen
+        name="WhyChooseVerity"
+        component={WhyChooseVerityScreen}
+        options={{ headerShown: false, presentation: 'modal' }}
       />
     </RootStack.Navigator>
   );
