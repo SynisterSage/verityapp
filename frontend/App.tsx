@@ -770,12 +770,21 @@ function AppTabs() {
 function RootNavigator() {
   const { session } = useAuth();
   const { onboardingComplete, authInvalid } = useProfile();
-  const { status: subscriptionStatus, hasResolvedStatus, membershipActivationNotice } = useSubscription();
+  const {
+    status: subscriptionStatus,
+    hasResolvedStatus,
+    isProcessingPurchase,
+    membershipActivationNotice,
+  } = useSubscription();
   const shouldRequireMembership = Boolean(
     subscriptionStatus?.requiresPaidMembership && !subscriptionStatus?.hasActiveSubscription
   );
 
-  const shouldHoldMembershipRouting = Boolean(session && !authInvalid && !hasResolvedStatus);
+  const shouldHoldMembershipRouting = Boolean(
+    session &&
+      !authInvalid &&
+      (!hasResolvedStatus || (isProcessingPurchase && shouldRequireMembership))
+  );
 
   if (shouldHoldMembershipRouting) {
     return <SplashScreen persistent />;

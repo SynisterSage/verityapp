@@ -149,9 +149,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       }
       return;
     }
-    if (isRefresh && !silent) {
-      setRefreshing(true);
-    } else if (!silent) {
+    if (!silent) {
       setLoading(true);
     }
     try {
@@ -431,7 +429,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       const active = nextState === 'active';
       setIsAppActive(active);
       if (active) {
-        loadStats(true);
+        loadStats(true, true);
       }
     };
     const sub = AppState.addEventListener('change', handleAppStateChange);

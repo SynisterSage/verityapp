@@ -477,22 +477,19 @@ export default function MembershipScreen() {
                   style={[styles.planCard, selected && styles.planCardSelected, isAnnual && styles.planCardAnnual]}
                   onPress={() => setPlan(plan.productId)}
                 >
-                  {/* Annual accent stripe */}
-                  {isAnnual && <View style={styles.planAnnualStripe} />}
-
                   <View style={styles.planMainRow}>
                     <View style={styles.planTextWrap}>
                       <View style={styles.planTitleRow}>
                         <Text style={styles.planTitle}>{plan.title}</Text>
-                        {isAnnual && plan.badge ? (
-                          <View style={styles.planBestValuePill}>
-                            <Text style={styles.planBestValueText}>{plan.badge}</Text>
-                          </View>
-                        ) : null}
                       </View>
                       {isAnnual ? (
                         <View style={styles.planSavingsPill}>
-                          <Ionicons name="pricetag-outline" size={11} color="#92400e" style={{ marginTop: 1 }} />
+                          <Ionicons
+                            name="pricetag-outline"
+                            size={11}
+                            color={theme.colors.accent}
+                            style={{ marginTop: 1 }}
+                          />
                           <Text style={styles.planSavingsText}>{plan.detail}</Text>
                         </View>
                       ) : (
@@ -501,6 +498,11 @@ export default function MembershipScreen() {
                     </View>
                     <View style={styles.planPriceWrap}>
                       <Text style={[styles.planPrice, isAnnual && styles.planPriceAnnual]}>{plan.price}</Text>
+                      {isAnnual && plan.badge ? (
+                        <View style={styles.planBestValuePill}>
+                          <Text style={styles.planBestValueText}>{plan.badge}</Text>
+                        </View>
+                      ) : null}
                     </View>
                   </View>
                   <View style={[styles.radio, selected && styles.radioSelected]}>
@@ -896,15 +898,7 @@ const createMembershipStyles = (theme: AppTheme) =>
       overflow: 'hidden',
     },
     planCardAnnual: {
-      paddingTop: 19,
-    },
-    planAnnualStripe: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 3,
-      backgroundColor: '#d97706',
+      paddingTop: 16,
     },
     planCardSelected: {
       borderColor: withOpacity(theme.colors.accent, 0.8),
@@ -932,8 +926,8 @@ const createMembershipStyles = (theme: AppTheme) =>
     planBestValuePill: {
       borderRadius: 20,
       paddingHorizontal: 8,
-      paddingVertical: 2,
-      backgroundColor: withOpacity('#2d6df6', 0.12),
+      paddingVertical: 3,
+      backgroundColor: withOpacity(theme.colors.accent, 0.14),
     },
     planBestValueText: {
       fontSize: 11,
@@ -949,12 +943,12 @@ const createMembershipStyles = (theme: AppTheme) =>
       borderRadius: 20,
       paddingHorizontal: 8,
       paddingVertical: 3,
-      backgroundColor: 'rgba(217, 119, 6, 0.12)',
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
     },
     planSavingsText: {
       fontSize: 12,
       fontWeight: '600',
-      color: '#92400e',
+      color: theme.colors.accent,
     },
     planDetail: {
       fontSize: 13,

@@ -646,6 +646,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       try {
         const nativeResult = await purchaseStoreProduct(productId);
         const mapped = await mapPurchaseOutcome(nativeResult);
+        if (mapped.status === 'purchased') {
+          setMembershipActivationNotice({
+            productId,
+            planLabel: null,
+            activatedAt: new Date().toISOString(),
+          });
+        }
         logEvent('membership_purchase_result', {
           screen: 'SubscriptionContext',
           extra: {
@@ -690,6 +697,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     try {
       const nativeResult = await restoreStorePurchases();
       const mapped = await mapPurchaseOutcome(nativeResult);
+      if (mapped.status === 'purchased') {
+        setMembershipActivationNotice((previous) => ({
+          productId: previous?.productId ?? statusRef.current?.subscription?.productId ?? null,
+          planLabel: previous?.planLabel ?? null,
+          activatedAt: new Date().toISOString(),
+        }));
+      }
       logEvent('membership_restore_result', {
         screen: 'SubscriptionContext',
         extra: {

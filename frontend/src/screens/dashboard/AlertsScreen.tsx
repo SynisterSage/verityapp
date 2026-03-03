@@ -271,6 +271,7 @@ const loadMemberNames = useCallback(async () => {
       setAlerts([]);
       setCallNumberMap({});
       setLoading(false);
+      setRefreshing(false);
       return;
     }
     if (!silent) {
@@ -382,6 +383,7 @@ const loadMemberNames = useCallback(async () => {
     } catch {
       setAlerts([]);
     } finally {
+      setRefreshing(false);
       if (!silent) {
         setLoading(false);
       }
