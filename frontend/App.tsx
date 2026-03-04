@@ -903,11 +903,6 @@ function RootNavigator() {
               component={SupportResourceScreen}
               options={{ headerShown: false, presentation: 'modal' }}
             />
-            <RootStack.Screen
-              name="ActiveCallModal"
-              component={ActiveCallScreen}
-              options={{ headerShown: false, presentation: 'modal' }}
-            />
           </>
         ) : (
           <>
@@ -956,11 +951,6 @@ function RootNavigator() {
               component={CircleActivityScreen}
               options={{ headerShown: false, presentation: 'modal' }}
             />
-            <RootStack.Screen
-              name="ActiveCallModal"
-              component={ActiveCallScreen}
-              options={{ headerShown: false, presentation: 'modal' }}
-            />
           </>
         )
       ) : (
@@ -1006,6 +996,11 @@ function RootNavigator() {
       <RootStack.Screen
         name="WhyChooseVerity"
         component={WhyChooseVerityScreen}
+        options={{ headerShown: false, presentation: 'modal' }}
+      />
+      <RootStack.Screen
+        name="ActiveCallModal"
+        component={ActiveCallScreen}
         options={{ headerShown: false, presentation: 'modal' }}
       />
     </RootStack.Navigator>

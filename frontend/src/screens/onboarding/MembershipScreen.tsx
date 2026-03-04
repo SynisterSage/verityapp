@@ -224,6 +224,7 @@ export default function MembershipScreen() {
   const exitCardScale = useRef(new Animated.Value(0.985)).current;
   const planScaleByIdRef = useRef<Record<string, Animated.Value>>({});
   const hasLoggedMembershipView = useRef(false);
+  const hasAutoCompletedActivationRef = useRef(false);
   const showInviteCodeAction = status?.canJoinWithInviteCode !== false;
   const plansUnavailable = !isLoadingProducts && products.length === 0;
 
@@ -252,6 +253,37 @@ export default function MembershipScreen() {
       screen: 'MembershipScreen',
     });
   }, []);
+
+  useEffect(() => {
+    if (hasAutoCompletedActivationRef.current) {
+      return;
+    }
+    if (!status?.hasActiveSubscription || isProcessingPurchase) {
+      return;
+    }
+
+    hasAutoCompletedActivationRef.current = true;
+    const resolvedProductId =
+      status.subscription?.productId ??
+      selectedProductId ??
+      selectedDefaultProductId;
+    const resolvedPlanLabel =
+      planOptions.find((plan) => plan.productId === resolvedProductId)?.title ?? null;
+    showMembershipActivationNotice({
+      productId: resolvedProductId ?? null,
+      planLabel: resolvedPlanLabel,
+    });
+    navigation.replace('MembershipActivated');
+  }, [
+    isProcessingPurchase,
+    navigation,
+    planOptions,
+    selectedProductId,
+    selectedDefaultProductId,
+    showMembershipActivationNotice,
+    status?.hasActiveSubscription,
+    status?.subscription?.productId,
+  ]);
 
   const selectedPlan =
     planOptions.find((plan) => plan.productId === selectedProductId) ??
