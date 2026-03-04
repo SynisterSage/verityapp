@@ -25,6 +25,7 @@ export type RootStackParamList = {
   AppTabs: NavigatorScreenParams<TabParamList> | undefined;
   CallDetailModal: { callId: string; compact?: boolean };
   TrustedCallDetail: { alertId: string };
+  WhatsNew: undefined;
   CircleActivityDetail: { alertId: string };
   SupportPortal: { initialResource?: SupportResourceType } | undefined;
   SupportModal: { ticketId?: string | null; profileId?: string | null; newTicket?: boolean; autoEnd?: boolean };
