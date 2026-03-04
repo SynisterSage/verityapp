@@ -13,6 +13,7 @@ type AlertLike = {
 };
 
 const PUSH_RATE_LIMIT_MS = 60_000;
+const RATE_LIMIT_BYPASS_ALERT_TYPES = new Set<string>(['trusted', 'fraud', 'call_review']);
 
 const CIRCLE_ALERT_TYPES = new Set<string>([
   'circle_invite',
@@ -147,21 +148,32 @@ async function isRateLimited(profileId: string, currentAlertId: string) {
   return Boolean(data?.length);
 }
 
+function shouldBypassRateLimit(alertType: string, callId?: string | null) {
+  if (callId) {
+    return true;
+  }
+  return RATE_LIMIT_BYPASS_ALERT_TYPES.has(alertType);
+}
+
 export async function dispatchAlertPush(alert: AlertLike) {
   if (!alert?.id || !alert?.profile_id || !alert?.alert_type) {
     return;
   }
 
-  const rateLimited = await isRateLimited(alert.profile_id, alert.id);
-  if (rateLimited) {
-    logger.info(
-      `[push-dispatch] skipped rate_limited profile=${alert.profile_id} alert=${alert.id} type=${alert.alert_type}`
-    );
-    return;
-  }
-
   const normalizedAlertType = normalizeAlertType(alert.alert_type);
   const callId = alert.call_id ?? undefined;
+  const bypassRateLimit = shouldBypassRateLimit(normalizedAlertType, callId);
+
+  if (!bypassRateLimit) {
+    const rateLimited = await isRateLimited(alert.profile_id, alert.id);
+    if (rateLimited) {
+      logger.info(
+        `[push-dispatch] skipped rate_limited profile=${alert.profile_id} alert=${alert.id} type=${alert.alert_type}`
+      );
+      return;
+    }
+  }
+
   const routeTarget = buildPushRoute(normalizedAlertType, callId);
   const content = buildPushContent(alert);
 

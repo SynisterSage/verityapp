@@ -267,6 +267,13 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
   const { defaultPushEnabled, recipients } = await fetchPushRecipientsForProfile(profileId);
   const alertType = normalizeAlertType(payload.data?.alertType);
 
+  if (recipients.length === 0) {
+    logger.info(
+      `[push-notify] skipped no_active_tokens profile=${profileId} alertType=${alertType || 'unknown'}`
+    );
+    return;
+  }
+
   const validRecipients = recipients.filter((recipient) =>
     canReceivePushForAlertType({
       alertType,
@@ -276,6 +283,9 @@ export async function notifyProfileForAlert(profileId: string, payload: AlertPus
   );
 
   if (validRecipients.length === 0) {
+    logger.info(
+      `[push-notify] skipped disabled_by_preferences profile=${profileId} alertType=${alertType || 'unknown'} tokens=${recipients.length}`
+    );
     return;
   }
 

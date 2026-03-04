@@ -105,7 +105,7 @@ type ProfileContextValue = {
   twilioClientError: string | null;
   twilioClientHeartbeatActive: boolean;
   isTwilioClientReady: boolean;
-  refreshTwilioClientSession: () => Promise<void>;
+  refreshTwilioClientSession: (options?: { force?: boolean }) => Promise<void>;
 };
 
 const ProfileContext = createContext<ProfileContextValue | undefined>(undefined);
@@ -207,10 +207,11 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     refreshProfiles();
   }, [userId, refreshProfiles]);
 
-  const refreshTwilioClientToken = useCallback(async (profileId: string) => {
+  const refreshTwilioClientToken = useCallback(
+    async (profileId: string, options?: { force?: boolean }) => {
     const MIN_REFRESH_INTERVAL_MS = 45_000;
     const now = Date.now();
-    if (now - lastTokenRefreshAtRef.current < MIN_REFRESH_INTERVAL_MS) {
+    if (!options?.force && now - lastTokenRefreshAtRef.current < MIN_REFRESH_INTERVAL_MS) {
       return;
     }
     if (tokenRefreshInFlightRef.current) {
@@ -255,13 +256,15 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
     } finally {
       tokenRefreshInFlightRef.current = null;
     }
-  }, []);
+    },
+    []
+  );
 
-  const refreshTwilioClientSession = useCallback(async () => {
+  const refreshTwilioClientSession = useCallback(async (options?: { force?: boolean }) => {
     if (!activeProfile?.id) {
       return;
     }
-    await refreshTwilioClientToken(activeProfile.id);
+    await refreshTwilioClientToken(activeProfile.id, options);
   }, [activeProfile?.id, refreshTwilioClientToken]);
 
   const syncVoipTokenToBackend = useCallback(async () => {
@@ -508,7 +511,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       if (session && activeProfile?.id) {
         try {
           console.info('[VoIPPush] Immediately refreshing Twilio session for incoming call');
-          await refreshTwilioClientSession();
+          await refreshTwilioClientSession({ force: true });
           pendingVoipRefreshRef.current = false;
         } catch (error) {
           console.warn('[VoIPPush] Immediate Twilio refresh failed; will retry when profile is ready', error);
@@ -608,7 +611,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    refreshTwilioClientSession()
+    refreshTwilioClientSession({ force: true })
       .then(() => {
         pendingVoipRefreshRef.current = false;
       })
