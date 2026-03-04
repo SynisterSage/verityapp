@@ -16,6 +16,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import type { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../context/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { logEvent } from '../../services/sentry';
@@ -140,6 +141,7 @@ const sourceLinks = [
 export default function WhyChooseVerityScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'WhyChooseVerity'>>();
   const insets = useSafeAreaInsets();
+  const { session } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const hasLoggedView = useRef(false);
@@ -282,20 +284,24 @@ export default function WhyChooseVerityScreen() {
         <View style={styles.supportCard}>
           <Text style={styles.supportTitle}>Need help before purchasing?</Text>
           <Text style={styles.supportCopy}>
-            Open billing and support directly from the app, or email our team.
+            {session
+              ? 'Open billing and support directly from the app, or email our team.'
+              : 'Email our team and we can help with plans, setup, and account questions.'}
           </Text>
           <View style={styles.supportActionsRow}>
+            {session ? (
+              <Pressable
+                style={styles.supportPrimaryButton}
+                onPress={() => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+                  navigation.navigate('SupportPortal');
+                }}
+              >
+                <Text style={styles.supportPrimaryText}>Open Support Portal</Text>
+              </Pressable>
+            ) : null}
             <Pressable
-              style={styles.supportPrimaryButton}
-              onPress={() => {
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-                navigation.navigate('SupportPortal');
-              }}
-            >
-              <Text style={styles.supportPrimaryText}>Open Support Portal</Text>
-            </Pressable>
-            <Pressable
-              style={styles.supportSecondaryButton}
+              style={[styles.supportSecondaryButton, !session && styles.supportSecondaryButtonFull]}
               onPress={() => {
                 void openExternalLink('mailto:support@verityprotect.com', 'Email Support');
               }}
@@ -613,6 +619,9 @@ const createStyles = (theme: AppTheme) =>
       justifyContent: 'center',
       paddingHorizontal: 12,
       paddingVertical: 10,
+    },
+    supportSecondaryButtonFull: {
+      flex: 1,
     },
     supportSecondaryText: {
       fontSize: 12.5,

@@ -23,7 +23,8 @@ import { registerProfileDeviceToken } from '../services/notifications';
 import { logError, logEvent } from '../services/sentry';
 import { initializeVoIPPush, updateVoIPPushToken } from '../services/voipPush';
 import { setPlaceholderCallUUID, markPlaceholderCallAnswered } from '../services/voipPlaceholderCall';
-import { rememberIncomingCallMetadata } from '../services/incomingCallMetadata';
+import { clearIncomingCallMetadata, rememberIncomingCallMetadata } from '../services/incomingCallMetadata';
+import { endLiveCallActivity } from '../native/LiveCallActivity';
 import type { VoIPPushPayload } from '../types/voip-push';
 import { navigateToActiveCall } from '../navigation/rootNavigator';
 
@@ -540,7 +541,28 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         callSid: payload.callSid ?? null,
         source: payload.source ?? null,
       });
-      // The call state will be handled by TwilioVoiceManager
+      if (payload.source === 'placeholder_handoff') {
+        return;
+      }
+      if (payload.callSid) {
+        clearIncomingCallMetadata(payload.callSid);
+      }
+      // Ensure stale lock-screen live activity is terminated even when this
+      // end event is replayed before TwilioVoiceClientManager listeners attach.
+      void endLiveCallActivity({
+        callSid: payload.callSid,
+        status: 'Ended',
+        label: 'Protected Call',
+        callerName: 'Incoming Call',
+        isTrusted: false,
+        connectedAtEpochSeconds: null,
+      }).catch((error) => {
+        console.warn('[VoIPPush] Failed to end live activity from call end event', {
+          callUUID: payload.callUUID,
+          callSid: payload.callSid ?? null,
+          message: error instanceof Error ? error.message : String(error),
+        });
+      });
     };
 
     const cleanup = initializeVoIPPush({

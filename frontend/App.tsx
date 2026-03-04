@@ -801,6 +801,11 @@ function RootNavigator() {
               options={{ headerShown: false }}
             />
             <RootStack.Screen
+              name="MembershipActivated"
+              component={MembershipActivatedScreen}
+              options={{ headerShown: false }}
+            />
+            <RootStack.Screen
               name="OnboardingInviteCode"
               component={OnboardingInviteCodeScreen}
               options={{ headerShown: false }}
@@ -1658,7 +1663,7 @@ function NavigationHost() {
   const showSplashOverlay = splashVisible || !navigationReady;
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: theme.colors.bg }}>
       <NavigationContainer
         theme={navTheme}
         ref={rootNavigationRef}
@@ -1688,6 +1693,8 @@ function NavigationHost() {
 }
 
 function AppContent() {
+  const { theme } = useTheme();
+
   useEffect(() => {
     if (Platform.OS !== 'android') {
       return;
@@ -1722,7 +1729,7 @@ function AppContent() {
           <InviteLinkHandler />
           <TwilioVoiceClientManager />
           <SafeAreaProvider initialMetrics={initialWindowMetrics ?? undefined}>
-            <GestureHandlerRootView style={{ flex: 1 }}>
+            <GestureHandlerRootView style={{ flex: 1, backgroundColor: theme.colors.bg }}>
               <NavigationHost />
               <AuthCallbackHandler />
             </GestureHandlerRootView>

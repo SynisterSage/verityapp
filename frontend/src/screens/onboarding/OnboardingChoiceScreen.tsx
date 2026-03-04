@@ -8,6 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../navigation/types';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import { useTheme } from '../../context/ThemeContext';
+import { useSubscription } from '../../context/SubscriptionContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
 import { logEvent } from '../../services/sentry';
@@ -38,11 +39,19 @@ export default function OnboardingChoiceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'OnboardingChoice'>>();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { membershipActivationNotice } = useSubscription();
   const styles = useMemo(() => createChoiceStyles(theme), [theme]);
 
   useEffect(() => {
     logEvent('onboarding_started', { screen: 'OnboardingChoice' });
   }, []);
+
+  useEffect(() => {
+    if (!membershipActivationNotice) {
+      return;
+    }
+    navigation.replace('MembershipActivated');
+  }, [membershipActivationNotice, navigation]);
 
   const handlePress = (target: OnboardingChoiceTarget) => {
     logEvent('onboarding_choice_selected', {
