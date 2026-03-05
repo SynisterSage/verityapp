@@ -17,6 +17,26 @@ import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 
+function formatUsPhoneNumber(raw?: string | null) {
+  if (!raw) {
+    return '';
+  }
+
+  const digits = raw.replace(/\D/g, '');
+  const normalizedDigits =
+    digits.length === 10 ? `1${digits}` : digits.length === 11 && digits.startsWith('1') ? digits : '';
+  if (!normalizedDigits) {
+    return formatPhoneNumber(raw, raw);
+  }
+
+  const national = normalizedDigits.slice(1);
+  const area = national.slice(0, 3);
+  const prefix = national.slice(3, 6);
+  const line = national.slice(6, 10);
+
+  return `+1 (${area}) ${prefix}-${line}`;
+}
+
 export default function TestCallScreen({ navigation }: { navigation: any }) {
   const { activeProfile, passcodeDraft, setActiveProfile, setRedirectToSettings } =
     useProfile();
@@ -28,6 +48,8 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
   const twilioNumber = activeProfile?.twilio_virtual_number ?? '';
   const redirectNumber = activeProfile?.fallback_phone_number ?? '';
   const passcode = (activeProfile as any)?.safety_pin ?? passcodeDraft ?? '';
+  const displayTwilioNumber = twilioNumber ? formatUsPhoneNumber(twilioNumber) : '';
+  const displayRedirectNumber = redirectNumber ? formatUsPhoneNumber(redirectNumber) : '';
 
   const finishOnboarding = () => {
     setRedirectToSettings(false);
@@ -132,7 +154,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Verity Number</Text>
             <Text style={styles.infoValue}>
-              {twilioNumber || 'Configure in settings'}
+              {displayTwilioNumber || 'Configure in settings'}
             </Text>
           </View>
           <View style={styles.copyIcon}>
@@ -165,7 +187,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
               </Pressable>
             </View>
             <Text style={styles.infoValue}>
-              {redirectNumber ? formatPhoneNumber(redirectNumber, redirectNumber) : 'Not set'}
+              {displayRedirectNumber || 'Not set'}
             </Text>
           </View>
           <View style={styles.copyIcon}>

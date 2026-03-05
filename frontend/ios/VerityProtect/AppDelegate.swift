@@ -1,6 +1,7 @@
 import Expo
 import React
 import ReactAppDependencyProvider
+import UIKit
 
 @UIApplicationMain
 public class AppDelegate: ExpoAppDelegate {
@@ -23,6 +24,7 @@ public class AppDelegate: ExpoAppDelegate {
 
 #if os(iOS) || os(tvOS)
     window = UIWindow(frame: UIScreen.main.bounds)
+    window?.backgroundColor = UIColor(named: "LaunchBackground") ?? UIColor.systemBackground
     factory.startReactNative(
       withModuleName: "main",
       in: window,
