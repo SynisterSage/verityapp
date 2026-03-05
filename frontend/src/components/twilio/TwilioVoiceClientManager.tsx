@@ -27,6 +27,7 @@ import {
   clearIncomingCallMetadata,
   getIncomingCallMetadata,
 } from '../../services/incomingCallMetadata';
+import { consumeManualHangupIntent } from '../../services/manualHangupIntent';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 
 const { VoIPPushModule } = NativeModules;
@@ -146,9 +147,13 @@ export default function TwilioVoiceClientManager() {
       }
     >
   >(new Map());
+  const pendingLiveActivityEndTimerByCallSidRef = useRef<
+    Map<string, ReturnType<typeof setTimeout>>
+  >(new Map());
   const isInitialMountRef = useRef(true);
   const REFRESH_MIN_INTERVAL_MS = 120_000;
   const INIT_MIN_INTERVAL_MS = 15_000;
+  const MANUAL_HANGUP_ACTIVITY_END_DELAY_MS = 1800;
 
   const buildLiveActivityPayload = (args: {
     callSid: string;
@@ -261,6 +266,15 @@ export default function TwilioVoiceClientManager() {
     const currentActiveCallSid = activeCallSidRef.current;
     const targetCallSid = callSid ?? currentActiveCallSid;
     if (targetCallSid) {
+      const pendingEndTimer = pendingLiveActivityEndTimerByCallSidRef.current.get(targetCallSid);
+      if (pendingEndTimer) {
+        const shouldDismiss = currentActiveCallSid === targetCallSid;
+        if (shouldDismiss) {
+          activeCallSidRef.current = null;
+          dismissActiveCall();
+        }
+        return;
+      }
       connectedAtByCallSidRef.current.delete(targetCallSid);
       clearIncomingCallMetadata(targetCallSid);
       const endPayload = {
@@ -271,16 +285,34 @@ export default function TwilioVoiceClientManager() {
         }),
         callSid: targetCallSid,
       };
-      endLiveCallActivity(endPayload)
-        .catch((err) => {
-          console.warn('[twilio-voice] failed ending live activity', {
+      const shouldShowEndedPreview = consumeManualHangupIntent(targetCallSid);
+      const finalizeLiveActivity = () => {
+        endLiveCallActivity(endPayload)
+          .catch((err) => {
+            console.warn('[twilio-voice] failed ending live activity', {
+              callSid: targetCallSid,
+              message: err instanceof Error ? err.message : String(err),
+            });
+          })
+          .finally(() => {
+            livePayloadArgsByCallSidRef.current.delete(targetCallSid);
+          });
+      };
+      if (shouldShowEndedPreview) {
+        updateLiveCallActivity(endPayload).catch((err) => {
+          console.warn('[twilio-voice] failed updating ended preview live activity', {
             callSid: targetCallSid,
             message: err instanceof Error ? err.message : String(err),
           });
-        })
-        .finally(() => {
-          livePayloadArgsByCallSidRef.current.delete(targetCallSid);
         });
+        const timerId = setTimeout(() => {
+          pendingLiveActivityEndTimerByCallSidRef.current.delete(targetCallSid);
+          finalizeLiveActivity();
+        }, MANUAL_HANGUP_ACTIVITY_END_DELAY_MS);
+        pendingLiveActivityEndTimerByCallSidRef.current.set(targetCallSid, timerId);
+      } else {
+        finalizeLiveActivity();
+      }
     }
     const shouldDismiss = !targetCallSid || currentActiveCallSid === targetCallSid;
     if (shouldDismiss) {
@@ -288,6 +320,16 @@ export default function TwilioVoiceClientManager() {
       dismissActiveCall();
     }
   };
+
+  useEffect(
+    () => () => {
+      pendingLiveActivityEndTimerByCallSidRef.current.forEach((timerId) => {
+        clearTimeout(timerId);
+      });
+      pendingLiveActivityEndTimerByCallSidRef.current.clear();
+    },
+    []
+  );
 
   const getNativeCallSnapshot = async () => {
     const [activeCallResult, inviteResult] = await Promise.allSettled([
@@ -781,6 +823,12 @@ export default function TwilioVoiceClientManager() {
       reportLifecycle('ended', data, callSid);
       clearActiveCall(callSid);
     };
+    const handleCallRejected = (data: unknown) => {
+      console.info('TwilioVoice call rejected', data);
+      const callSid = activeCallSidRef.current;
+      reportLifecycle('ended', data, callSid, { reason: 'call_rejected' });
+      clearActiveCall(callSid);
+    };
     const handleRinging = (data: unknown) => {
       console.info('TwilioVoice ringing', data);
       const parsed = parseTwilioEventData(data);
@@ -816,6 +864,7 @@ export default function TwilioVoiceClientManager() {
     registerEvent('callStateConnectFailure', handleConnectFailure);
     registerEvent('connectionDidConnect', handleConnect);
     registerEvent('callInviteCancelled', handleInviteCancelled);
+    registerEvent('callRejected', handleCallRejected);
     registerEvent('callStateRinging', handleRinging);
 
     return () => {

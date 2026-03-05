@@ -185,7 +185,7 @@ export default function WhyChooseVerityScreen() {
             navigation.goBack();
           }}
         >
-          <Ionicons name="chevron-back" size={17} color={theme.colors.text} style={styles.backIcon} />
+          <Ionicons name="chevron-down" size={17} color={theme.colors.text} style={styles.backIcon} />
         </Pressable>
         <Text style={styles.headerTitle}>Why Choose Verity</Text>
         <View style={styles.headerSpacer} />

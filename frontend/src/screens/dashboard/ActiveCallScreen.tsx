@@ -20,6 +20,7 @@ import type { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../context/ThemeContext';
 import { useProfile } from '../../context/ProfileContext';
 import { authorizedFetch } from '../../services/backend';
+import { markManualHangupIntent } from '../../services/manualHangupIntent';
 import { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 
@@ -334,6 +335,7 @@ export default function ActiveCallScreen() {
 
   const endCall = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => null);
+    markManualHangupIntent(callSid);
     TwilioVoice.disconnect();
   };
 
