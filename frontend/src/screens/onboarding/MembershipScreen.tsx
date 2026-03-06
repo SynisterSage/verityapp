@@ -639,6 +639,7 @@ export default function MembershipScreen() {
               name={isBillingExpanded ? 'chevron-up' : 'chevron-down'}
               size={16}
               color={theme.colors.textMuted}
+              style={styles.billingChevronIcon}
             />
           </Pressable>
           {isBillingExpanded ? (
@@ -1096,6 +1097,9 @@ const createMembershipStyles = (theme: AppTheme) =>
       fontSize: 13,
       lineHeight: 18,
       color: theme.colors.textMuted,
+    },
+    billingChevronIcon: {
+      marginTop: 1,
     },
     billingCopy: {
       fontSize: 13,

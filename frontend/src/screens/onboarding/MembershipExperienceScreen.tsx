@@ -566,7 +566,7 @@ const createStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.surface,
     },
     backIcon: {
-      marginTop: -1,
+      marginTop: 1,
     },
     headerTitle: {
       fontSize: 16,

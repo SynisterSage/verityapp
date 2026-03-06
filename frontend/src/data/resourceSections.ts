@@ -15,6 +15,30 @@ export const SYSTEM_BASICS_CONTENT: ResourceSection[] = [
       'Verity Protect brings your trusted circle, ticket history, automation, and call monitoring into one place. You never have to dig through different apps; everything happens inside the same interface so you can act quickly.',
   },
   {
+    id: 'verity-number-basics',
+    title: 'Your Verity number',
+    body:
+      'Your Verity number is the private screening line linked to your profile. Calls route through this line first so Verity can screen risk before the call reaches you.',
+    bullets: [
+      'Your Verity number is assigned during setup and managed by the app.',
+      'When call forwarding is enabled, incoming calls go to your Verity number for screening.',
+      'After screening, Verity routes approved calls back to your protected phone line.',
+      'You can view your assigned Verity number in your profile details.',
+    ],
+  },
+  {
+    id: 'reliable-fallback-basics',
+    title: 'Reliable fallback number (optional)',
+    body:
+      'A reliable fallback number is optional, but helpful. If your app cannot connect in time, Verity can ring this number so trusted calls still have a backup route.',
+    bullets: [
+      'You can set or update it in Settings → Account.',
+      'Use a direct phone number that can answer calls right away.',
+      'Do not use a number that forwards back to Verity, or calls can loop.',
+      'If you change phones or carriers, update the fallback number right away.',
+    ],
+  },
+  {
     id: 'profile-setup',
     title: 'Profile setup, fallback number, and call flow',
     body:
@@ -227,6 +251,17 @@ export const PRIVACY_CONTENT: ResourceSection[] = [
 ];
 
 export const FAQ_CONTENT: ResourceSection[] = [
+  {
+    id: 'faq-verity-number',
+    title: 'What is my Verity number?',
+    body:
+      'It is your assigned screening number. Verity uses it to process forwarded calls, check risk, and route the call back to your protected line.',
+    bullets: [
+      'It is not a public replacement for your normal phone number.',
+      'You can find it in your profile/account details.',
+      'Keep call forwarding pointed to this number for screening to work.',
+    ],
+  },
   {
     id: 'faq-fallback',
     title: 'How does call fallback work?',
