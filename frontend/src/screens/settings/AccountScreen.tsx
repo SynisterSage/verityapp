@@ -22,6 +22,7 @@ import type { AppTheme } from '../../theme/tokens';
 
 import SettingsHeader from '../../components/common/SettingsHeader';
 import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
+import VerityNumberInfoModal from '../../components/common/VerityNumberInfoModal';
 import { deleteProfile } from '../../services/profile';
 import { authorizedFetch } from '../../services/backend';
 import { useAuth } from '../../context/AuthContext';
@@ -108,6 +109,7 @@ export default function AccountScreen() {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [safetyMessage, setSafetyMessage] = useState('');
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
+  const [showVerityNumberInfoModal, setShowVerityNumberInfoModal] = useState(false);
   const [numberCopied, setNumberCopied] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
   const lastFallbackPhoneKey = useRef<string | null>(null);
@@ -433,7 +435,19 @@ export default function AccountScreen() {
               <Ionicons name={'keypad-outline' as any} size={26} color={theme.colors.text} />
             </View>
             <View style={styles.activeInfo}>
-              <Text style={styles.activeLabel}>Verity phone number</Text>
+              <View style={styles.activeLabelRow}>
+                <Text style={styles.activeLabel}>Verity phone number</Text>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.labelHelpButton,
+                    pressed && styles.labelHelpButtonPressed,
+                  ]}
+                  onPress={() => setShowVerityNumberInfoModal(true)}
+                  hitSlop={8}
+                >
+                  <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
+                </Pressable>
+              </View>
               <Text style={[styles.activeNumber, !hasTwilioNumber && styles.missingValue]}>
                 {formattedTwilio}
               </Text>
@@ -586,6 +600,13 @@ export default function AccountScreen() {
           onClose={() => setShowFallbackInfoModal(false)}
           theme={theme}
           mode={mode}
+        />
+        <VerityNumberInfoModal
+          visible={showVerityNumberInfoModal}
+          onClose={() => setShowVerityNumberInfoModal(false)}
+          theme={theme}
+          mode={mode}
+          context="settings"
         />
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -808,11 +829,17 @@ const createAccountStyles = (theme: AppTheme) =>
     activeInfo: {
       flex: 1,
     },
+    activeLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-start',
+      gap: 8,
+      marginBottom: 4,
+    },
     activeLabel: {
       fontSize: 12,
       letterSpacing: 0.4,
       color: theme.colors.textMuted,
-      marginBottom: 4,
     },
     activeNumber: {
       color: theme.colors.text,

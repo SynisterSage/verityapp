@@ -4,6 +4,7 @@ import {
   AppState,
   AppStateStatus,
   Linking,
+  Modal,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -31,6 +32,10 @@ import NeedAssistanceCard from '../../components/home/NeedAssistanceCard';
 import DashboardHeader from '../../components/common/DashboardHeader';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
 import { withOpacity } from '../../utils/color';
+import {
+  getSeenPinChangeAlertId,
+  markPinChangeAlertSeen,
+} from '../../utils/pinChangeNotice';
 import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
 import { useSupportContext } from '../../context/SupportContext';
@@ -93,10 +98,31 @@ type StatTile = {
   valueAnim?: Animated.Value;
 };
 
+type PinChangeNotice = {
+  alertId: string;
+  createdAt: string;
+  actorLabel: string;
+};
+
+function formatPinChangeTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return 'an unknown time';
+  }
+  return date.toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const { activeProfile } = useProfile();
+  const sessionUserId = session?.user?.id ?? null;
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { unreadAgentCount, assistantOnline } = useSupportContext();
@@ -115,6 +141,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [alertsToday, setAlertsToday] = useState<number | null>(null);
   const [alertsThisMonth, setAlertsThisMonth] = useState<number | null>(null);
   const [alertPeriod, setAlertPeriod] = useState<'day' | 'week' | 'month'>('week');
+  const [pinChangeNotice, setPinChangeNotice] = useState<PinChangeNotice | null>(null);
+  const [showPinChangeModal, setShowPinChangeModal] = useState(false);
+  const pinChangeModalAnim = useRef(new Animated.Value(0)).current;
+  const pinChangeCheckInFlightRef = useRef(false);
 
   useEffect(() => {
     AsyncStorage.getItem('home:alertPeriod').then((val) => {
@@ -409,6 +439,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     setAlertsToday(null);
     setAlertsThisMonth(null);
     setBlockedCount(null);
+    setPinChangeNotice(null);
+    setShowPinChangeModal(false);
     setHasInitialLoadCompleted(false);
     loadStats();
   }, [activeProfile?.id]);
@@ -435,6 +467,97 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     const sub = AppState.addEventListener('change', handleAppStateChange);
     return () => sub.remove();
   }, []);
+
+  const dismissPinChangeModal = useCallback(async () => {
+    const profileId = activeProfile?.id;
+    if (profileId && sessionUserId && pinChangeNotice?.alertId) {
+      await markPinChangeAlertSeen(profileId, sessionUserId, pinChangeNotice.alertId);
+    }
+    setShowPinChangeModal(false);
+  }, [activeProfile?.id, pinChangeNotice?.alertId, sessionUserId]);
+
+  const handlePinChangeSupportPress = useCallback(async () => {
+    await dismissPinChangeModal();
+    navigateToSupportPortal();
+  }, [dismissPinChangeModal]);
+
+  useEffect(() => {
+    if (!showPinChangeModal) {
+      pinChangeModalAnim.setValue(0);
+      return;
+    }
+    pinChangeModalAnim.setValue(0);
+    Animated.spring(pinChangeModalAnim, {
+      toValue: 1,
+      damping: 20,
+      stiffness: 240,
+      mass: 0.45,
+      useNativeDriver: true,
+    }).start();
+  }, [pinChangeModalAnim, showPinChangeModal]);
+
+  useEffect(() => {
+    const profileId = activeProfile?.id;
+    if (!profileId || !sessionUserId || !isAppActive) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadLatestPinChangeNotice = async () => {
+      if (pinChangeCheckInFlightRef.current) {
+        return;
+      }
+      pinChangeCheckInFlightRef.current = true;
+      try {
+        const { data, error } = await supabase
+          .from('alerts')
+          .select('id, created_at, payload')
+          .eq('profile_id', profileId)
+          .eq('alert_type', 'pin_change')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (cancelled || error) {
+          return;
+        }
+        const latest = data?.[0] as
+          | { id: string; created_at: string; payload?: Record<string, unknown> | null }
+          | undefined;
+        if (!latest) {
+          return;
+        }
+        const payload = (latest.payload ?? {}) as Record<string, unknown>;
+        const actorUserId =
+          typeof payload.actor_user_id === 'string' ? payload.actor_user_id : null;
+        if (actorUserId === sessionUserId) {
+          return;
+        }
+        const seenAlertId = await getSeenPinChangeAlertId(profileId, sessionUserId);
+        if (cancelled || seenAlertId === latest.id) {
+          return;
+        }
+        const actorLabel =
+          typeof payload.actor_label === 'string' && payload.actor_label.trim().length > 0
+            ? payload.actor_label.trim()
+            : 'A circle member';
+        setPinChangeNotice({
+          alertId: latest.id,
+          createdAt: latest.created_at,
+          actorLabel,
+        });
+        setShowPinChangeModal(true);
+      } catch (error) {
+        console.warn('[home] Failed to load latest pin-change notice', error);
+      } finally {
+        pinChangeCheckInFlightRef.current = false;
+      }
+    };
+
+    void loadLatestPinChangeNotice();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile?.id, isAppActive, sessionUserId]);
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -606,6 +729,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       ] as const,
     [theme.colors.bg]
   );
+  const pinChangeModalTranslateY = pinChangeModalAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [24, 0],
+  });
+  const pinChangeNoticeTimestamp = pinChangeNotice
+    ? formatPinChangeTimestamp(pinChangeNotice.createdAt)
+    : '';
 
   const handleViewAllPress = () => {
     triggerLightHaptic();
@@ -914,6 +1044,72 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         )}
         </ScrollView>
       </View>
+      {pinChangeNotice ? (
+        <Modal
+          transparent
+          visible={showPinChangeModal}
+          animationType="none"
+          onRequestClose={() => {
+            void dismissPinChangeModal();
+          }}
+        >
+          <View style={styles.pinNoticeOverlay}>
+            <Pressable
+              style={styles.pinNoticeBackdrop}
+              onPress={() => {
+                void dismissPinChangeModal();
+              }}
+            />
+            <Animated.View
+              style={[
+                styles.pinNoticeCard,
+                {
+                  opacity: pinChangeModalAnim,
+                  transform: [{ translateY: pinChangeModalTranslateY }],
+                },
+              ]}
+            >
+              <View style={styles.pinNoticeIconWrap}>
+                <Ionicons name="keypad-outline" size={18} color={theme.colors.warning} />
+              </View>
+              <Text style={styles.pinNoticeTitle}>Safety PIN changed</Text>
+              <Text style={styles.pinNoticeBody}>
+                {pinChangeNotice.actorLabel} changed the Safety PIN on {pinChangeNoticeTimestamp}.
+                Contact them first if a caller cannot get through.
+              </Text>
+              <Text style={styles.pinNoticeSupportCopy}>
+                Lost PIN reset requests go through support identity checks and take at least 1 hour.
+              </Text>
+              <View style={styles.pinNoticeActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.pinNoticeButton,
+                    styles.pinNoticeButtonSecondary,
+                    pressed && styles.pinNoticeButtonPressed,
+                  ]}
+                  onPress={() => {
+                    void handlePinChangeSupportPress();
+                  }}
+                >
+                  <Text style={styles.pinNoticeButtonSecondaryText}>Contact support</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.pinNoticeButton,
+                    styles.pinNoticeButtonPrimary,
+                    pressed && styles.pinNoticeButtonPressed,
+                  ]}
+                  onPress={() => {
+                    void dismissPinChangeModal();
+                  }}
+                >
+                  <Text style={styles.pinNoticeButtonPrimaryText}>Got it</Text>
+                </Pressable>
+              </View>
+            </Animated.View>
+          </View>
+        </Modal>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -939,6 +1135,86 @@ const createStyles = (theme: AppTheme) =>
     },
     content: {
       paddingTop: 12,
+    },
+    pinNoticeOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      justifyContent: 'flex-end',
+      paddingHorizontal: 24,
+      paddingBottom: 28,
+      backgroundColor: withOpacity(theme.colors.text, 0.34),
+    },
+    pinNoticeBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    pinNoticeCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      padding: 18,
+      gap: 10,
+      shadowColor: theme.colors.text,
+      shadowOpacity: 0.14,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 8,
+    },
+    pinNoticeIconWrap: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.warning, 0.16),
+    },
+    pinNoticeTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    pinNoticeBody: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.text,
+    },
+    pinNoticeSupportCopy: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: theme.colors.textMuted,
+    },
+    pinNoticeActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    pinNoticeButton: {
+      flex: 1,
+      borderRadius: 14,
+      paddingVertical: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+    },
+    pinNoticeButtonSecondary: {
+      backgroundColor: theme.colors.surfaceAlt,
+      borderColor: theme.colors.border,
+    },
+    pinNoticeButtonPrimary: {
+      backgroundColor: theme.colors.accent,
+      borderColor: theme.colors.accent,
+    },
+    pinNoticeButtonPressed: {
+      opacity: 0.88,
+    },
+    pinNoticeButtonSecondaryText: {
+      color: theme.colors.text,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    pinNoticeButtonPrimaryText: {
+      color: theme.colors.surface,
+      fontSize: 14,
+      fontWeight: '700',
     },
     notifBanner: {
       flexDirection: 'row',

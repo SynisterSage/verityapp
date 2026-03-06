@@ -31,6 +31,7 @@ import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { logError, logEvent } from '../../services/sentry';
+import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 
 type ModalAction = 'password' | 'pin' | null;
 
@@ -143,7 +144,7 @@ export default function SecurityScreen() {
 
   const handleSavePress = () => {
     if (!canManageProfile) {
-      setError('Only caretakers can update account security.');
+      setError('Only the owner or a caretaker can update account security.');
       return;
     }
     if (!currentPassword || !newPassword || !confirmPassword) {
@@ -204,7 +205,7 @@ export default function SecurityScreen() {
 
   const handleChangePinPress = () => {
     if (!canManageProfile) {
-      setChangePinError('Only caretakers can update the passcode.');
+      setChangePinError('Only the owner or a caretaker can update the passcode.');
       return;
     }
     setModalAction('pin');
@@ -306,6 +307,10 @@ export default function SecurityScreen() {
     Alert.alert('Unable to open settings', 'Please visit myaccount.google.com manually.');
   };
 
+  const handleSupportPinReset = () => {
+    navigateToSupportPortal();
+  };
+
   return (
     <SafeAreaView style={styles.screen} edges={[]}>
       <SettingsHeader title="Sign-in Safety" subtitle="Manage how you access Verity" />
@@ -391,7 +396,7 @@ export default function SecurityScreen() {
         <View style={styles.pinHeader}>
           <Text style={styles.cardLabel}>Change Safety PIN</Text>
           <Text style={[styles.cardHelper, styles.pinHelper]}>
-            Update the six-digit PIN that allows untrusted contacts to reach you.
+            Update the six-digit PIN that callers use when they are not on your trusted list.
           </Text>
         </View>
         {pinChangeSuccess ? (
@@ -409,9 +414,28 @@ export default function SecurityScreen() {
           <Text style={styles.secondaryText}>Change passcode</Text>
           <Ionicons name="lock-closed-outline" size={18} color={theme.colors.text} />
         </TouchableOpacity>
-        {!canManageProfile ? (
-          <Text style={styles.cardHelper}>Only caretakers can update the passcode.</Text>
-        ) : null}
+        <TouchableOpacity
+          style={[
+            styles.secondaryButton,
+            styles.supportResetButton,
+            !canManageProfile && styles.secondaryButtonDisabled,
+          ]}
+          onPress={handleSupportPinReset}
+          disabled={!canManageProfile}
+        >
+          <Text style={styles.secondaryText}>Request support reset</Text>
+          <Ionicons name="chatbubble-ellipses-outline" size={18} color={theme.colors.text} />
+        </TouchableOpacity>
+        {canManageProfile ? (
+          <Text style={styles.cardHelper}>
+            Lost PIN resets are handled by support with manual verification and take at least 1 hour.
+          </Text>
+        ) : (
+          <Text style={styles.cardHelper}>
+            Family members are read-only for PIN controls. Contact the owner or a caretaker to make
+            changes.
+          </Text>
+        )}
         <Text style={styles.lastUpdateText}>Last updated {formatDateTime(lastPinUpdate)}</Text>
       </View>
     </ScrollView>
@@ -617,6 +641,9 @@ const createSecurityStyles = (theme: AppTheme) =>
     },
     secondaryButtonDisabled: {
       opacity: 0.55,
+    },
+    supportResetButton: {
+      marginTop: 8,
     },
     secondaryText: {
       fontSize: 16,

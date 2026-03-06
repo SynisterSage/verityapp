@@ -8,7 +8,6 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import Slider from '@react-native-community/slider';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
@@ -21,14 +20,10 @@ import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
 import LiveFeaturesSection from '../../components/notifications/LiveFeaturesSection';
+import ScreeningLevelInfoModal from '../../components/common/ScreeningLevelInfoModal';
 
 type NotificationPreset = 'simple' | 'detailed';
-
-const LEVELS = [
-  { label: 'Standard', breakpoint: 39 },
-  { label: 'Strict', breakpoint: 74 },
-  { label: 'Maximum', breakpoint: 100 },
-];
+type ScreeningChoiceKey = 'more' | 'balanced' | 'fewer';
 
 function isLegacyAlertPrefsError(err: unknown) {
   const message = err instanceof Error ? err.message : String(err ?? '');
@@ -58,13 +53,49 @@ const PRESET_COPY: Record<
   },
 };
 
+const SCREENING_CHOICES: Array<{
+  key: ScreeningChoiceKey;
+  label: string;
+  description: string;
+  threshold: number;
+}> = [
+  {
+    key: 'more',
+    label: 'More alerts',
+    description: 'Catch more suspicious calls. You may see more warnings.',
+    threshold: 40,
+  },
+  {
+    key: 'balanced',
+    label: 'Balanced (Recommended)',
+    description: 'A good balance between protection and noise.',
+    threshold: 60,
+  },
+  {
+    key: 'fewer',
+    label: 'Fewer alerts',
+    description: 'Only flag higher-risk calls. You may miss lower-risk warnings.',
+    threshold: 80,
+  },
+];
+
+function getScreeningChoiceFromThreshold(value: number): ScreeningChoiceKey {
+  if (value <= 49) return 'more';
+  if (value <= 69) return 'balanced';
+  return 'fewer';
+}
+
+function getThresholdForScreeningChoice(choice: ScreeningChoiceKey) {
+  return SCREENING_CHOICES.find((item) => item.key === choice)?.threshold ?? 60;
+}
+
 export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
   const { activeProfile, setActiveProfile } = useProfile();
   const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
+  const { theme, mode } = useTheme();
   const styles = useMemo(() => createAlertPrefsStyles(theme), [theme]);
 
-  const [threshold, setThreshold] = useState(activeProfile?.alert_threshold_score ?? 90);
+  const [threshold, setThreshold] = useState(activeProfile?.alert_threshold_score ?? 60);
   const [pushTrustedActivity, setPushTrustedActivity] = useState(
     activeProfile?.enable_push_trusted_activity ?? true
   );
@@ -74,12 +105,15 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
   const [weeklyEmailReports, setWeeklyEmailReports] = useState(
     activeProfile?.enable_email_weekly_reports ?? true
   );
+  const [screeningChoice, setScreeningChoice] = useState<ScreeningChoiceKey>(() =>
+    getScreeningChoiceFromThreshold(activeProfile?.alert_threshold_score ?? 60)
+  );
   const [preset, setPreset] = useState<NotificationPreset>(() =>
     derivePreset(activeProfile?.enable_push_trusted_activity, activeProfile?.enable_push_circle_activity)
   );
   const [error, setError] = useState('');
-  const [levelLabel, setLevelLabel] = useState(() => getLevelLabel(threshold));
   const [useLegacyAlertPrefsApi, setUseLegacyAlertPrefsApi] = useState(false);
+  const [showScreeningInfoModal, setShowScreeningInfoModal] = useState(false);
 
   const initializedProfileIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -88,26 +122,31 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
     initializedProfileIdRef.current = activeProfile.id;
     const trusted = activeProfile.enable_push_trusted_activity ?? true;
     const circle = activeProfile.enable_push_circle_activity ?? true;
-    setThreshold(activeProfile.alert_threshold_score ?? 90);
+    const nextThreshold = activeProfile.alert_threshold_score ?? 60;
+    setThreshold(nextThreshold);
+    setScreeningChoice(getScreeningChoiceFromThreshold(nextThreshold));
     setPushTrustedActivity(trusted);
     setPushCircleActivity(circle);
     setWeeklyEmailReports(activeProfile.enable_email_weekly_reports ?? true);
     setPreset(derivePreset(trusted, circle));
   }, [activeProfile]);
 
-  useEffect(() => {
-    const nextLabel = getLevelLabel(threshold);
-    if (nextLabel !== levelLabel) {
-      Haptics.selectionAsync().catch(() => null);
-      setLevelLabel(nextLabel);
-    }
-  }, [threshold, levelLabel]);
-
   const applyPreset = useCallback((nextPreset: NotificationPreset) => {
     const config = PRESET_COPY[nextPreset];
     setPreset(nextPreset);
     setPushTrustedActivity(config.trusted);
     setPushCircleActivity(config.circle);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+  }, []);
+
+  const selectedScreeningLabel = useMemo(
+    () => SCREENING_CHOICES.find((item) => item.key === screeningChoice)?.label ?? 'Balanced',
+    [screeningChoice]
+  );
+
+  const selectScreeningChoice = useCallback((choice: ScreeningChoiceKey) => {
+    setScreeningChoice(choice);
+    setThreshold(getThresholdForScreeningChoice(choice));
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
   }, []);
 
@@ -217,23 +256,42 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
 
         <View style={styles.sensitivityCard}>
           <View style={styles.sensitivityHeader}>
-            <Text style={styles.sensitivityLabel}>CALL SCREENING LEVEL</Text>
-            <Text style={styles.sensitivityValue}>{levelLabel}</Text>
+            <View style={styles.sensitivityLabelRow}>
+              <Text style={styles.sensitivityLabel}>CALL SCREENING LEVEL</Text>
+              <Pressable
+                style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
+                onPress={() => setShowScreeningInfoModal(true)}
+                hitSlop={8}
+              >
+                <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
+            <Text style={styles.sensitivityValue}>{selectedScreeningLabel}</Text>
           </View>
-          <Slider
-            style={styles.slider}
-            value={threshold}
-            minimumValue={1}
-            maximumValue={100}
-            step={1}
-            minimumTrackTintColor={theme.colors.accent}
-            maximumTrackTintColor={withOpacity(theme.colors.textMuted, 0.25)}
-            thumbTintColor={theme.colors.accent}
-            onValueChange={setThreshold}
-          />
-          <View style={styles.sliderLabels}>
-            <Text style={styles.sliderLabel}>Lower</Text>
-            <Text style={styles.sliderLabel}>Higher</Text>
+          <View style={styles.screeningChoices}>
+            {SCREENING_CHOICES.map((choice) => {
+              const isActive = screeningChoice === choice.key;
+              return (
+                <Pressable
+                  key={choice.key}
+                  onPress={() => selectScreeningChoice(choice.key)}
+                  style={[
+                    styles.screeningChoiceCard,
+                    isActive ? styles.screeningChoiceCardActive : styles.screeningChoiceCardInactive,
+                  ]}
+                >
+                  <View style={styles.screeningChoiceTextWrap}>
+                    <Text style={styles.screeningChoiceTitle}>{choice.label}</Text>
+                    <Text style={styles.screeningChoiceDescription}>{choice.description}</Text>
+                  </View>
+                  <Ionicons
+                    name={isActive ? 'checkmark-circle' : 'ellipse-outline'}
+                    size={20}
+                    color={isActive ? theme.colors.accent : theme.colors.textMuted}
+                  />
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 
@@ -361,6 +419,12 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         <HowItWorksCard caption="HOW IT WORKS" items={helperItems} />
       </ScrollView>
+      <ScreeningLevelInfoModal
+        visible={showScreeningInfoModal}
+        onClose={() => setShowScreeningInfoModal(false)}
+        theme={theme}
+        mode={mode}
+      />
 
       <ActionFooter
         primaryLabel="Continue"
@@ -377,12 +441,6 @@ function derivePreset(trusted?: boolean | null, circle?: boolean | null): Notifi
     return 'detailed';
   }
   return trusted || circle ? 'detailed' : 'simple';
-}
-
-function getLevelLabel(value: number) {
-  if (value <= LEVELS[0].breakpoint) return LEVELS[0].label;
-  if (value <= LEVELS[1].breakpoint) return LEVELS[1].label;
-  return LEVELS[2].label;
 }
 
 const createAlertPrefsStyles = (theme: AppTheme) =>
@@ -425,29 +483,71 @@ const createAlertPrefsStyles = (theme: AppTheme) =>
       alignItems: 'center',
       marginBottom: 10,
     },
+    sensitivityLabelRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     sensitivityLabel: {
       fontSize: 10,
       letterSpacing: 1.2,
       fontWeight: '800',
       color: theme.colors.textMuted,
     },
+    labelHelpButton: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.border, 0.6),
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.surface, 0.55),
+    },
+    labelHelpButtonPressed: {
+      opacity: 0.72,
+    },
     sensitivityValue: {
       fontSize: 14,
       fontWeight: '700',
       color: theme.colors.accent,
     },
-    slider: {
-      width: '100%',
-      height: 38,
+    screeningChoices: {
+      gap: 10,
+      marginTop: 4,
     },
-    sliderLabels: {
+    screeningChoiceCard: {
+      borderRadius: 18,
+      borderWidth: 1,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
       flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'space-between',
+      minHeight: 76,
     },
-    sliderLabel: {
-      fontSize: 11,
-      letterSpacing: 1,
-      color: theme.colors.textDim,
+    screeningChoiceCardActive: {
+      borderColor: theme.colors.accent,
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+    },
+    screeningChoiceCardInactive: {
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    screeningChoiceTextWrap: {
+      flex: 1,
+      paddingRight: 10,
+    },
+    screeningChoiceTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    screeningChoiceDescription: {
+      marginTop: 3,
+      fontSize: 12,
+      lineHeight: 17,
+      color: theme.colors.textMuted,
       fontWeight: '600',
     },
     presetSection: {

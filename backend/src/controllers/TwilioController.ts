@@ -1059,7 +1059,7 @@ async function recordingReady(req: Request, res: Response) {
     const fraudThreshold =
       typeof profile.alert_threshold_score === 'number'
         ? profile.alert_threshold_score
-        : Number(process.env.FRAUD_SCORE_THRESHOLD ?? 90);
+        : Number(process.env.FRAUD_SCORE_THRESHOLD ?? 60);
     const fraudResult = text
       ? analyzeTranscript(text, {
           callerCountry: callerMeta.country ?? null,

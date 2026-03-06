@@ -20,6 +20,7 @@ import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
+import VerityNumberInfoModal from '../../components/common/VerityNumberInfoModal';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
@@ -79,6 +80,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCallFlowModal, setShowCallFlowModal] = useState(false);
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
+  const [showVerityNumberInfoModal, setShowVerityNumberInfoModal] = useState(false);
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createProfileStyles(theme, mode), [theme, mode]);
   const placeholderColor = withOpacity(theme.colors.textMuted, 0.7);
@@ -312,7 +314,16 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           />
         </View>
 
-        <Text style={styles.inputLabel}>Verity number</Text>
+        <View style={styles.inputLabelRow}>
+          <Text style={styles.inputLabel}>Verity number</Text>
+          <Pressable
+            style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
+            onPress={() => setShowVerityNumberInfoModal(true)}
+            hitSlop={8}
+          >
+            <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
+          </Pressable>
+        </View>
         {!assignedNumber ? (
           <Pressable
             style={({ pressed }) => [
@@ -458,6 +469,13 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           onClose={() => setShowFallbackInfoModal(false)}
           theme={theme}
           mode={mode}
+        />
+        <VerityNumberInfoModal
+          visible={showVerityNumberInfoModal}
+          onClose={() => setShowVerityNumberInfoModal(false)}
+          theme={theme}
+          mode={mode}
+          context="onboarding"
         />
       </SafeAreaView>
     </View>
