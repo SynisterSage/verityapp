@@ -1,5 +1,6 @@
 import {
   Animated,
+  Easing,
   View,
   TouchableOpacity,
   StyleSheet,
@@ -37,11 +38,31 @@ export default function BottomDock({
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const bottomPadding = Math.max(insets.bottom, 16);
+  const containerHeight = 96 + bottomPadding;
   const focusedRoute = state.routes[state.index];
   const nestedState = focusedRoute?.state as { index?: number } | undefined;
-  if (nestedState && typeof nestedState.index === 'number' && nestedState.index > 0) {
-    return null;
-  }
+  const isHidden = Boolean(
+    nestedState && typeof nestedState.index === 'number' && nestedState.index > 0
+  );
+
+  const dockVisibilityAnim = useRef(new Animated.Value(isHidden ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(dockVisibilityAnim, {
+      toValue: isHidden ? 1 : 0,
+      duration: 220,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [dockVisibilityAnim, isHidden]);
+
+  const dockTranslateY = dockVisibilityAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, containerHeight + 14],
+  });
+  const dockOpacity = dockVisibilityAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 0],
+  });
 
   const scaleValuesRef = useRef<Animated.Value[]>([]);
   if (scaleValuesRef.current.length !== state.routes.length) {
@@ -64,14 +85,17 @@ export default function BottomDock({
   const { unhandledCount } = useAlertContext();
 
   return (
-    <View
+    <Animated.View
+      pointerEvents={isHidden ? 'none' : 'auto'}
       style={[
         styles.container,
         {
-          height: 96 + bottomPadding,
+          height: containerHeight,
           paddingBottom: bottomPadding,
           backgroundColor: containerBackground,
           borderTopColor: borderColor,
+          transform: [{ translateY: dockTranslateY }],
+          opacity: dockOpacity,
         },
         containerStyle,
       ]}
@@ -147,7 +171,7 @@ export default function BottomDock({
           );
         })}
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

@@ -21,6 +21,7 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
 import VerityNumberInfoModal from '../../components/common/VerityNumberInfoModal';
+import RecipientPhoneInfoModal from '../../components/common/RecipientPhoneInfoModal';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
@@ -81,6 +82,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [showCallFlowModal, setShowCallFlowModal] = useState(false);
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
   const [showVerityNumberInfoModal, setShowVerityNumberInfoModal] = useState(false);
+  const [showRecipientPhoneInfoModal, setShowRecipientPhoneInfoModal] = useState(false);
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createProfileStyles(theme, mode), [theme, mode]);
   const placeholderColor = withOpacity(theme.colors.textMuted, 0.7);
@@ -273,7 +275,16 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           />
         </View>
 
-        <Text style={styles.inputLabel}>Mobile number</Text>
+        <View style={styles.inputLabelRow}>
+          <Text style={styles.inputLabel}>Recipient phone</Text>
+          <Pressable
+            style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
+            onPress={() => setShowRecipientPhoneInfoModal(true)}
+            hitSlop={8}
+          >
+            <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
+          </Pressable>
+        </View>
         <View style={styles.inputContainer}>
           <Ionicons name="call-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
           <Text style={styles.prefix}>+1</Text>
@@ -291,7 +302,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         </View>
 
         <View style={styles.inputLabelRow}>
-          <Text style={styles.inputLabel}>Reliable fallback number</Text>
+          <Text style={styles.inputLabel}>Reliable fallback number (optional)</Text>
           <Pressable
             style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
             onPress={() => setShowFallbackInfoModal(true)}
@@ -313,6 +324,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
             returnKeyType="done"
           />
         </View>
+        <Text style={styles.fallbackHint}>Optional. Used only if in-app calling is unavailable.</Text>
 
         <View style={styles.inputLabelRow}>
           <Text style={styles.inputLabel}>Verity number</Text>
@@ -477,6 +489,12 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           mode={mode}
           context="onboarding"
         />
+        <RecipientPhoneInfoModal
+          visible={showRecipientPhoneInfoModal}
+          onClose={() => setShowRecipientPhoneInfoModal(false)}
+          theme={theme}
+          mode={mode}
+        />
       </SafeAreaView>
     </View>
   );
@@ -523,6 +541,13 @@ const createProfileStyles = (theme: AppTheme, mode?: string) =>
       letterSpacing: 0.6,
       color: theme.colors.textMuted,
       marginBottom: 4,
+    },
+    fallbackHint: {
+      marginTop: -8,
+      marginBottom: 2,
+      fontSize: 12,
+      color: theme.colors.textDim,
+      lineHeight: 16,
     },
     inputLabelRow: {
       flexDirection: 'row',

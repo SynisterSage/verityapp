@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -23,6 +24,7 @@ import type { AppTheme } from '../../theme/tokens';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
 import VerityNumberInfoModal from '../../components/common/VerityNumberInfoModal';
+import RecipientPhoneInfoModal from '../../components/common/RecipientPhoneInfoModal';
 import { deleteProfile } from '../../services/profile';
 import { authorizedFetch } from '../../services/backend';
 import { useAuth } from '../../context/AuthContext';
@@ -92,7 +94,7 @@ const SAFETY_ACTIONS: Array<{
 
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
-  const { signOut, session } = useAuth();
+  const { signOut, session, markSignOutIntentional } = useAuth();
   const { activeProfile, setActiveProfile, canManageProfile, refreshProfiles } = useProfile();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createAccountStyles(theme), [theme]);
@@ -108,8 +110,11 @@ export default function AccountScreen() {
   const [isPinVerifying, setIsPinVerifying] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [safetyMessage, setSafetyMessage] = useState('');
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [pendingDeletePin, setPendingDeletePin] = useState('');
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
   const [showVerityNumberInfoModal, setShowVerityNumberInfoModal] = useState(false);
+  const [showRecipientPhoneInfoModal, setShowRecipientPhoneInfoModal] = useState(false);
   const [numberCopied, setNumberCopied] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
   const lastFallbackPhoneKey = useRef<string | null>(null);
@@ -245,6 +250,7 @@ export default function AccountScreen() {
     if (!activeProfile) return;
     setIsPinVerifying(true);
     try {
+      markSignOutIntentional();
       await deleteProfile(activeProfile.id, pin);
       await refreshProfiles();
       await signOut();
@@ -256,31 +262,23 @@ export default function AccountScreen() {
   };
 
   const promptDeleteAccount = (pin: string) => {
-    Alert.alert(
-      'Delete profile?',
-      'This will delete all calls, alerts, and settings for this profile.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Continue',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Are you absolutely sure?',
-              'Everything will be lost. This cannot be undone.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete profile',
-                  style: 'destructive',
-                  onPress: () => runDeleteAccount(pin),
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+    setPendingDeletePin(pin);
+    setShowDeleteConfirmModal(true);
+  };
+
+  const handleManageSubscription = async () => {
+    const targets = [
+      'itms-apps://apps.apple.com/account/subscriptions',
+      'https://apps.apple.com/account/subscriptions',
+    ];
+    for (const url of targets) {
+      try {
+        await Linking.openURL(url);
+        return;
+      } catch {
+        continue;
+      }
+    }
   };
 
   const handlePinSubmit = async () => {
@@ -371,7 +369,16 @@ export default function AccountScreen() {
               placeholderTextColor={theme.colors.textDim}
               editable={!isReadOnly}
             />
-            <Text style={styles.inputLabel}>Recipient phone</Text>
+            <View style={styles.inputLabelRow}>
+              <Text style={styles.inputLabel}>Recipient phone</Text>
+              <Pressable
+                style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
+                onPress={() => setShowRecipientPhoneInfoModal(true)}
+                hitSlop={8}
+              >
+                <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
             <View style={[styles.inputWithPrefix, isReadOnly && styles.inputDisabled]}>
               <Text style={styles.prefixText}>+1</Text>
               <TextInput
@@ -386,7 +393,7 @@ export default function AccountScreen() {
               />
             </View>
             <View style={styles.inputLabelRow}>
-              <Text style={styles.inputLabel}>Reliable fallback number</Text>
+              <Text style={styles.inputLabel}>Reliable fallback number (optional)</Text>
               <Pressable
                 style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
                 onPress={() => setShowFallbackInfoModal(true)}
@@ -556,7 +563,7 @@ export default function AccountScreen() {
             <BlurView intensity={65} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.modalBlur} />
               </Pressable>
               <View style={styles.pinModal}>
-                <Text style={styles.pinTitle}>Confirm delete</Text>
+                <Text style={styles.pinTitle}>Confirm Delete account</Text>
                 <Text style={styles.pinSubtitle}>Enter your six-digit passcode to continue.</Text>
                 <TextInput
                   value={pinValue}
@@ -595,6 +602,82 @@ export default function AccountScreen() {
             </View>
           </Modal>
         ) : null}
+        {showDeleteConfirmModal ? (
+          <Modal
+            visible
+            transparent
+            animationType="fade"
+            onRequestClose={() => {
+              setShowDeleteConfirmModal(false);
+              setPendingDeletePin('');
+            }}
+          >
+            <View style={styles.modalOverlay}>
+              <Pressable
+                style={styles.modalBackdrop}
+                onPress={() => {
+                  setShowDeleteConfirmModal(false);
+                  setPendingDeletePin('');
+                }}
+              >
+                <BlurView
+                  intensity={65}
+                  tint={mode === 'dark' ? 'dark' : 'light'}
+                  style={styles.modalBlur}
+                />
+              </Pressable>
+              <View style={styles.deleteModal}>
+                <View style={styles.deleteIconWrap}>
+                  <Ionicons name="trash-outline" size={26} color={theme.colors.danger} />
+                </View>
+                <Text style={styles.deleteTitle}>Delete your account?</Text>
+                <Text style={styles.deleteBody}>
+                  This permanently removes your account, all calls, alerts, and settings. This cannot be undone.
+                </Text>
+                <View style={styles.deleteWarningCard}>
+                  <Ionicons name="warning-outline" size={16} color={theme.colors.warning} style={{ marginTop: 1 }} />
+                  <Text style={styles.deleteWarningText}>
+                    Your Verity membership will{' '}
+                    <Text style={styles.deleteWarningBold}>keep billing through Apple</Text>
+                    {' '}even after deletion. Cancel your subscription first.
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.manageSubButton}
+                  onPress={handleManageSubscription}
+                >
+                  <Ionicons name="card-outline" size={15} color={theme.colors.accent} />
+                  <Text style={styles.manageSubButtonText}>Manage subscription in App Store</Text>
+                  <Ionicons name="open-outline" size={13} color={theme.colors.textMuted} />
+                </Pressable>
+                <View style={styles.deleteActions}>
+                  <Pressable
+                    style={styles.modalButton}
+                    onPress={() => {
+                      setShowDeleteConfirmModal(false);
+                      setPendingDeletePin('');
+                    }}
+                  >
+                    <Text style={styles.modalButtonLabel}>Cancel</Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.modalButton, styles.deleteConfirmButton]}
+                    onPress={() => {
+                      const pinToDelete = pendingDeletePin;
+                      setShowDeleteConfirmModal(false);
+                      setPendingDeletePin('');
+                      runDeleteAccount(pinToDelete);
+                    }}
+                  >
+                    <Text style={[styles.modalButtonLabel, styles.deleteConfirmButtonLabel]}>
+                      Delete account
+                    </Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          </Modal>
+        ) : null}
         <ReliableFallbackInfoModal
           visible={showFallbackInfoModal}
           onClose={() => setShowFallbackInfoModal(false)}
@@ -607,6 +690,12 @@ export default function AccountScreen() {
           theme={theme}
           mode={mode}
           context="settings"
+        />
+        <RecipientPhoneInfoModal
+          visible={showRecipientPhoneInfoModal}
+          onClose={() => setShowRecipientPhoneInfoModal(false)}
+          theme={theme}
+          mode={mode}
         />
       </SafeAreaView>
     </KeyboardAvoidingView>
@@ -930,6 +1019,82 @@ const createAccountStyles = (theme: AppTheme) =>
     },
     modalButtonLabelPrimary: {
       color: theme.colors.surface,
+    },
+    deleteModal: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      padding: 24,
+      width: '100%',
+      maxWidth: 360,
+      gap: 14,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    deleteIconWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 16,
+      backgroundColor: withOpacity(theme.colors.danger, 0.1),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deleteTitle: {
+      color: theme.colors.text,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    deleteBody: {
+      color: theme.colors.textMuted,
+      fontSize: 14,
+      lineHeight: 20,
+    },
+    deleteWarningCard: {
+      flexDirection: 'row',
+      gap: 10,
+      backgroundColor: theme.colors.surfaceAlt,
+      borderRadius: 14,
+      padding: 14,
+      alignItems: 'flex-start',
+    },
+    deleteWarningText: {
+      flex: 1,
+      fontSize: 13,
+      color: theme.colors.textMuted,
+      lineHeight: 18,
+    },
+    deleteWarningBold: {
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    manageSubButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.colors.surfaceAlt,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    manageSubButtonText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.accent,
+    },
+    deleteActions: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 2,
+    },
+    deleteConfirmButton: {
+      borderColor: withOpacity(theme.colors.danger, 0.4),
+      backgroundColor: withOpacity(theme.colors.danger, 0.1),
+    },
+    deleteConfirmButtonLabel: {
+      color: theme.colors.danger,
     },
     pinTitle: {
       color: theme.colors.text,

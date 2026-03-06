@@ -29,24 +29,28 @@ type ScreeningChoiceKey = 'more' | 'balanced' | 'fewer';
 const SCREENING_CHOICES: Array<{
   key: ScreeningChoiceKey;
   label: string;
+  headerLabel: string;
   description: string;
   threshold: number;
 }> = [
   {
     key: 'more',
     label: 'More alerts',
+    headerLabel: 'More alerts',
     description: 'Catch more suspicious calls. You may see more warnings.',
     threshold: 40,
   },
   {
     key: 'balanced',
     label: 'Balanced (Recommended)',
+    headerLabel: 'Balanced',
     description: 'A good balance between protection and noise.',
     threshold: 60,
   },
   {
     key: 'fewer',
     label: 'Fewer alerts',
+    headerLabel: 'Fewer alerts',
     description: 'Only flag higher-risk calls. You may miss lower-risk warnings.',
     threshold: 80,
   },
@@ -129,7 +133,7 @@ export default function NotificationsScreen() {
   }, [activeProfile]);
 
   const selectedScreeningLabel = useMemo(
-    () => SCREENING_CHOICES.find((item) => item.key === screeningChoice)?.label ?? 'Balanced',
+    () => SCREENING_CHOICES.find((item) => item.key === screeningChoice)?.headerLabel ?? 'Balanced',
     [screeningChoice]
   );
 
@@ -366,7 +370,9 @@ export default function NotificationsScreen() {
                 <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
               </Pressable>
             </View>
-            <Text style={styles.sensitivityValue}>{selectedScreeningLabel}</Text>
+            <Text style={styles.sensitivityValue} numberOfLines={1} ellipsizeMode="tail">
+              {selectedScreeningLabel}
+            </Text>
           </View>
           <View style={styles.screeningChoices}>
             {SCREENING_CHOICES.map((choice) => {
@@ -528,6 +534,9 @@ const createNotificationStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+      flexShrink: 1,
+      minWidth: 0,
+      paddingRight: 10,
     },
     sensitivityLabel: {
       fontSize: 10,
@@ -552,6 +561,10 @@ const createNotificationStyles = (theme: AppTheme) =>
       fontSize: 14,
       fontWeight: '700',
       color: theme.colors.accent,
+      textAlign: 'right',
+      flexShrink: 1,
+      minWidth: 0,
+      maxWidth: '52%',
     },
     screeningChoices: {
       gap: 10,

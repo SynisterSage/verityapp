@@ -255,23 +255,25 @@ home: [
           ]}
           onPress={handleCopyFallback}
         >
-          <View style={[styles.numberIcon, { backgroundColor: theme.colors.warning ?? theme.colors.accent }]}>
+          <View style={[styles.numberIcon, { backgroundColor: theme.colors.accent }]}>
             <Ionicons name="swap-horizontal-outline" size={18} color={theme.colors.surface} />
           </View>
           <View style={styles.numberText}>
-            <Text style={styles.numberLabel}>Reliable fallback number</Text>
-            <Text style={[styles.numberValue, !fallbackNumber && styles.missingValue]} numberOfLines={1}>
-              {fallbackNumber ? formatPhoneNumber(fallbackNumber, fallbackNumber) : 'Not set'}
+            <Text style={styles.numberLabel}>Reliable fallback number (optional)</Text>
+            <Text style={styles.numberValue} numberOfLines={1}>
+              {fallbackNumber ? formatPhoneNumber(fallbackNumber, fallbackNumber) : 'Optional (not set)'}
             </Text>
             <Text style={styles.numberHint}>
-              {fallbackNumber ? 'Used if app calling is unavailable. Tap to copy.' : 'Set this in Profile setup or Settings → Account.'}
+              {fallbackNumber
+                ? 'Used if app calling is unavailable. Tap to copy.'
+                : 'Optional. Add now or later in Profile setup or Settings → Account.'}
             </Text>
           </View>
           <View style={styles.copyCircle}>
             <Ionicons
-              name={fallbackNumber ? 'copy' : 'alert-circle-outline'}
+              name={fallbackNumber ? 'copy' : 'information-circle-outline'}
               size={18}
-              color={fallbackNumber ? theme.colors.textMuted : theme.colors.warning ?? theme.colors.textMuted}
+              color={theme.colors.textMuted}
             />
           </View>
         </Pressable>

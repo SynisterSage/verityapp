@@ -6,105 +6,43 @@ import { Ionicons } from '@expo/vector-icons';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 
-type VerityNumberInfoModalProps = {
+type RecipientPhoneInfoModalProps = {
   visible: boolean;
   onClose: () => void;
   theme: AppTheme;
   mode?: 'light' | 'dark' | string;
-  context: 'onboarding' | 'settings' | 'testCall';
 };
 
-type ContentRow = {
-  icon: keyof typeof Ionicons.glyphMap;
-  color: (theme: AppTheme) => string;
-  text: string;
+const CONTENT = {
+  title: 'Recipient phone number',
+  body: 'This is the phone number you want Verity to protect.',
+  rows: [
+    {
+      icon: 'call-outline' as const,
+      color: (theme: AppTheme) => theme.colors.accent,
+      text: 'It can be your number or the number of the person you care for.',
+    },
+    {
+      icon: 'phone-portrait-outline' as const,
+      color: (theme: AppTheme) => theme.colors.success,
+      text: 'It can be a mobile number or a landline.',
+    },
+    {
+      icon: 'shield-checkmark-outline' as const,
+      color: (theme: AppTheme) => theme.colors.textMuted,
+      text: 'Calls are protected after forwarding is set to the Verity number.',
+    },
+  ],
+  buttonLabel: 'Got it',
 };
 
-type ModalContent = {
-  title: string;
-  body: string;
-  rows: ContentRow[];
-  buttonLabel: string;
-};
-
-const CONTENT: Record<VerityNumberInfoModalProps['context'], ModalContent> = {
-  onboarding: {
-    title: 'Your Verity number',
-    body: 'This is your protected routing number. Calls sent here are screened before they reach you.',
-    rows: [
-      {
-        icon: 'swap-horizontal-outline',
-        color: (theme) => theme.colors.accent,
-        text: 'Use this number when turning on call forwarding with your carrier.',
-      },
-      {
-        icon: 'shield-checkmark-outline',
-        color: (theme) => theme.colors.success,
-        text: 'After screening, Verity rings your app first, then your fallback number if needed.',
-      },
-      {
-        icon: 'navigate-outline',
-        color: (theme) => theme.colors.textMuted,
-        text: 'Later in onboarding, we walk you through this forwarding setup step by step.',
-      },
-    ],
-    buttonLabel: 'Got it',
-  },
-  settings: {
-    title: 'Verity number details',
-    body: "This profile's active protection line. Keep forwarding pointed here so screening stays on.",
-    rows: [
-      {
-        icon: 'copy-outline',
-        color: (theme) => theme.colors.accent,
-        text: 'Use Copy to paste this number into your phone forwarding settings.',
-      },
-      {
-        icon: 'shield-checkmark-outline',
-        color: (theme) => theme.colors.success,
-        text: 'Calls are screened on this line before they route to your app or fallback path.',
-      },
-      {
-        icon: 'alert-circle-outline',
-        color: (theme) => theme.colors.warning ?? theme.colors.textMuted,
-        text: 'If status shows Missing, protection is not active for this profile yet.',
-      },
-    ],
-    buttonLabel: 'Got it',
-  },
-  testCall: {
-    title: 'Your Verity number',
-    body: 'This is the number to use when testing and forwarding your calls.',
-    rows: [
-      {
-        icon: 'call-outline',
-        color: (theme) => theme.colors.accent,
-        text: 'Call this number from another phone to test your setup.',
-      },
-      {
-        icon: 'swap-horizontal-outline',
-        color: (theme) => theme.colors.success,
-        text: 'Keep call forwarding pointed here so screening stays active.',
-      },
-      {
-        icon: 'copy-outline',
-        color: (theme) => theme.colors.textMuted,
-        text: 'Use Copy to paste it into your iPhone call forwarding settings.',
-      },
-    ],
-    buttonLabel: 'Got it',
-  },
-};
-
-export default function VerityNumberInfoModal({
+export default function RecipientPhoneInfoModal({
   visible,
   onClose,
   theme,
   mode,
-  context,
-}: VerityNumberInfoModalProps) {
+}: RecipientPhoneInfoModalProps) {
   const styles = useMemo(() => createStyles(theme, mode), [mode, theme]);
-  const content = CONTENT[context];
   const [isMounted, setIsMounted] = useState(visible);
   const backdropOpacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
   const cardOpacity = useRef(new Animated.Value(visible ? 1 : 0)).current;
@@ -198,16 +136,16 @@ export default function VerityNumberInfoModal({
           ]}
         >
           <View style={styles.card}>
-            <Text style={styles.title}>{content.title}</Text>
-            <Text style={styles.body}>{content.body}</Text>
-            {content.rows.map((row) => (
+            <Text style={styles.title}>{CONTENT.title}</Text>
+            <Text style={styles.body}>{CONTENT.body}</Text>
+            {CONTENT.rows.map((row) => (
               <View key={row.text} style={styles.row}>
                 <Ionicons name={row.icon} size={17} color={row.color(theme)} />
                 <Text style={styles.rowText}>{row.text}</Text>
               </View>
             ))}
             <Pressable style={styles.button} onPress={onClose}>
-              <Text style={styles.buttonText}>{content.buttonLabel}</Text>
+              <Text style={styles.buttonText}>{CONTENT.buttonLabel}</Text>
             </Pressable>
           </View>
         </Animated.View>

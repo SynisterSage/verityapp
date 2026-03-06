@@ -139,9 +139,6 @@ export default function HowItWorksScreen() {
         contentContainerStyle={{ padding: 16, paddingBottom: Math.max(insets.bottom, 32) }}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={[styles.intro, { color: theme.colors.textMuted }]}>
-          Tap a topic to learn how Verity Protect works.
-        </Text>
         {CHAPTERS.map((chapter) => (
           <ChapterCard key={chapter.id} chapter={chapter} />
         ))}
@@ -152,10 +149,6 @@ export default function HowItWorksScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  intro: {
-    fontSize: 13,
-    marginBottom: 14,
-  },
   card: {
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
@@ -223,4 +216,3 @@ const styles = StyleSheet.create({
     lineHeight: 19,
   },
 });
-

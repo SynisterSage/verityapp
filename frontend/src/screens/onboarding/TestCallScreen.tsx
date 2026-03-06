@@ -13,6 +13,8 @@ import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
+import VerityNumberInfoModal from '../../components/common/VerityNumberInfoModal';
+import SafetyPinInfoModal from '../../components/common/SafetyPinInfoModal';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { formatPhoneNumber } from '../../utils/formatPhoneNumber';
@@ -44,6 +46,8 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
   const styles = useMemo(() => createTestCallStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
+  const [showVerityNumberInfoModal, setShowVerityNumberInfoModal] = useState(false);
+  const [showSafetyPinInfoModal, setShowSafetyPinInfoModal] = useState(false);
 
   const twilioNumber = activeProfile?.twilio_virtual_number ?? '';
   const redirectNumber = activeProfile?.fallback_phone_number ?? '';
@@ -152,7 +156,19 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
             <Ionicons name="call" size={20} color={theme.colors.surface} />
           </View>
           <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Verity Number</Text>
+            <View style={styles.infoLabelRow}>
+              <Text style={styles.infoLabel}>Verity number</Text>
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation();
+                  setShowVerityNumberInfoModal(true);
+                }}
+                hitSlop={8}
+                style={({ pressed }) => [styles.infoHelpButton, pressed && styles.infoHelpButtonPressed]}
+              >
+                <Ionicons name="help-circle-outline" size={14} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
             <Text style={styles.infoValue}>
               {displayTwilioNumber || 'Configure in settings'}
             </Text>
@@ -169,12 +185,12 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
           ]}
           onPress={handleCopyRedirectNumber}
         >
-          <View style={[styles.iconCircle, { backgroundColor: theme.colors.warning ?? theme.colors.accent }]}>
+          <View style={[styles.iconCircle, { backgroundColor: theme.colors.accent }]}>
             <Ionicons name="swap-horizontal-outline" size={20} color={theme.colors.surface} />
           </View>
           <View style={styles.infoContent}>
             <View style={styles.infoLabelRow}>
-              <Text style={styles.infoLabel}>Fallback number</Text>
+              <Text style={styles.infoLabel}>Fallback number (optional)</Text>
               <Pressable
                 onPress={(event) => {
                   event.stopPropagation();
@@ -187,7 +203,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
               </Pressable>
             </View>
             <Text style={styles.infoValue}>
-              {displayRedirectNumber || 'Not set'}
+              {displayRedirectNumber || 'Optional (not set)'}
             </Text>
           </View>
           <View style={styles.copyIcon}>
@@ -206,7 +222,19 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
             <Ionicons name="keypad" size={20} color={theme.colors.surface} />
           </View>
           <View style={styles.infoContent}>
-            <Text style={styles.infoLabel}>Safety PIN</Text>
+            <View style={styles.infoLabelRow}>
+              <Text style={styles.infoLabel}>Safety PIN</Text>
+              <Pressable
+                onPress={(event) => {
+                  event.stopPropagation();
+                  setShowSafetyPinInfoModal(true);
+                }}
+                hitSlop={8}
+                style={({ pressed }) => [styles.infoHelpButton, pressed && styles.infoHelpButtonPressed]}
+              >
+                <Ionicons name="help-circle-outline" size={14} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
             <Text style={styles.infoValue}>
               {passcode || 'Not set'}
             </Text>
@@ -228,6 +256,19 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
       <ReliableFallbackInfoModal
         visible={showFallbackInfoModal}
         onClose={() => setShowFallbackInfoModal(false)}
+        theme={theme}
+        mode={mode}
+      />
+      <VerityNumberInfoModal
+        visible={showVerityNumberInfoModal}
+        onClose={() => setShowVerityNumberInfoModal(false)}
+        theme={theme}
+        mode={mode}
+        context="testCall"
+      />
+      <SafetyPinInfoModal
+        visible={showSafetyPinInfoModal}
+        onClose={() => setShowSafetyPinInfoModal(false)}
         theme={theme}
         mode={mode}
       />
@@ -300,11 +341,14 @@ const createTestCallStyles = (theme: AppTheme) =>
       letterSpacing: 0.6,
       color: theme.colors.textMuted,
       textTransform: 'uppercase',
+      flexShrink: 1,
     },
     infoLabelRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
+      flexShrink: 1,
+      minWidth: 0,
     },
     infoHelpButton: {
       width: 22,

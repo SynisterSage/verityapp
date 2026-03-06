@@ -113,13 +113,13 @@ export default function ReliableFallbackInfoModal({
           ]}
         >
           <View style={styles.card}>
-          <Text style={styles.title}>Reliable fallback number</Text>
+          <Text style={styles.title}>Reliable fallback number (optional)</Text>
           <Text style={styles.body}>
-            Verity always tries your in-app call first. This number is only used as a last resort.
+            Verity always tries your in-app call first. This optional number is only used as a last resort.
           </Text>
           <View style={styles.row}>
             <Ionicons name="call-outline" size={17} color={theme.colors.accent} />
-            <Text style={styles.rowText}>If the app cannot connect, Verity dials this fallback number.</Text>
+            <Text style={styles.rowText}>If the app cannot connect, Verity can dial this fallback number.</Text>
           </View>
           <View style={styles.row}>
             <Ionicons name="warning-outline" size={17} color={theme.colors.warning ?? theme.colors.textMuted} />
@@ -127,7 +127,7 @@ export default function ReliableFallbackInfoModal({
           </View>
           <View style={styles.row}>
             <Ionicons name="checkmark-circle-outline" size={17} color={theme.colors.success} />
-            <Text style={styles.rowText}>If this field is empty, Verity does not run a fallback phone dial.</Text>
+            <Text style={styles.rowText}>Not required. Leave this empty and add it later in Settings, then Account.</Text>
           </View>
           <Pressable style={styles.button} onPress={onClose}>
             <Text style={styles.buttonText}>Got it</Text>
