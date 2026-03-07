@@ -42,6 +42,10 @@ type ActionFooterProps = {
   onSubHelperPrimaryPress?: () => void;
   subHelperSecondaryLabel?: string;
   onSubHelperSecondaryPress?: () => void;
+  legalPrivacyLabel?: string;
+  onLegalPrivacyPress?: () => void;
+  legalTermsLabel?: string;
+  onLegalTermsPress?: () => void;
   style?: ViewStyle;
   onLayout?: (event: LayoutChangeEvent) => void;
 };
@@ -76,6 +80,10 @@ export default function ActionFooter({
   onSubHelperPrimaryPress,
   subHelperSecondaryLabel,
   onSubHelperSecondaryPress,
+  legalPrivacyLabel,
+  onLegalPrivacyPress,
+  legalTermsLabel,
+  onLegalTermsPress,
   style,
   onLayout,
 }: ActionFooterProps) {
@@ -308,6 +316,39 @@ export default function ActionFooter({
           ) : null}
         </View>
       ) : null}
+
+      {legalPrivacyLabel && onLegalPrivacyPress && legalTermsLabel && onLegalTermsPress ? (
+        <View style={styles.legalRow}>
+          <TouchableOpacity onPress={onLegalPrivacyPress}>
+            <Text
+              style={[
+                styles.legalLink,
+                { color: theme.colors.accent, fontFamily: theme.typography.fontFamily },
+              ]}
+            >
+              {legalPrivacyLabel}
+            </Text>
+          </TouchableOpacity>
+          <Text
+            style={[
+              styles.legalSeparator,
+              { color: theme.colors.textMuted, fontFamily: theme.typography.fontFamily },
+            ]}
+          >
+            •
+          </Text>
+          <TouchableOpacity onPress={onLegalTermsPress}>
+            <Text
+              style={[
+                styles.legalLink,
+                { color: theme.colors.accent, fontFamily: theme.typography.fontFamily },
+              ]}
+            >
+              {legalTermsLabel}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -405,5 +446,22 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     lineHeight: 18,
+  },
+  legalRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 8,
+  },
+  legalSeparator: {
+    fontSize: 12,
+    marginHorizontal: 7,
+  },
+  legalLink: {
+    fontSize: 12,
+    fontWeight: '600',
+    lineHeight: 17,
+    textDecorationLine: 'underline',
   },
 });

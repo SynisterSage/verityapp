@@ -19,6 +19,7 @@ import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { navigateToSupportPortal } from '../../navigation/rootNavigator';
 import { logEvent } from '../../services/sentry';
+import { FALLBACK_LEGAL_VERSIONS } from '../../services/legal';
 
 type BillingFeedbackTone = 'success' | 'info' | 'error';
 
@@ -445,6 +446,25 @@ export default function MembershipBillingScreen() {
             <Text style={styles.errorText}>{productsError}</Text>
           ) : null}
           <Text style={styles.footnote}>Verity Protect never stores your payment card details.</Text>
+          <View style={styles.legalLinksRow}>
+            <Pressable
+              onPress={() => {
+                void Linking.openURL(FALLBACK_LEGAL_VERSIONS.privacyUrl).catch(() => null);
+              }}
+              hitSlop={6}
+            >
+              <Text style={styles.legalLinkText}>Privacy Policy</Text>
+            </Pressable>
+            <Text style={styles.legalDivider}>•</Text>
+            <Pressable
+              onPress={() => {
+                void Linking.openURL(FALLBACK_LEGAL_VERSIONS.termsUrl).catch(() => null);
+              }}
+              hitSlop={6}
+            >
+              <Text style={styles.legalLinkText}>Terms of Use</Text>
+            </Pressable>
+          </View>
         </View>
 
         {feedback ? (
@@ -700,6 +720,25 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
       fontSize: 12,
       lineHeight: 17,
       fontWeight: '500',
+    },
+    legalLinksRow: {
+      marginTop: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+    },
+    legalDivider: {
+      color: withOpacity(theme.colors.textMuted, 0.8),
+      fontSize: 12,
+      marginHorizontal: 7,
+    },
+    legalLinkText: {
+      color: theme.colors.accent,
+      fontSize: 12,
+      fontWeight: '600',
+      lineHeight: 17,
+      textDecorationLine: 'underline',
     },
     // ── Feedback ─────────────────────────────────────────
     feedbackCard: {

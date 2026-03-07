@@ -629,7 +629,7 @@ export default function DataPrivacyScreen() {
                   styles.legalButton,
                   { opacity: pressed ? 0.7 : 1 },
                 ]}
-                onPress={() => handleOpenUrl('https://verityprotect.com/privacy')}
+                onPress={() => handleOpenUrl('https://www.verityprotect.com/privacy')}
               >
                 <Text style={styles.legalButtonText}>Privacy policy</Text>
               </Pressable>
@@ -638,7 +638,7 @@ export default function DataPrivacyScreen() {
                   styles.legalButton,
                   { opacity: pressed ? 0.7 : 1 },
                 ]}
-                onPress={() => handleOpenUrl('https://verityprotect.com/terms')}
+                onPress={() => handleOpenUrl('https://www.verityprotect.com/terms')}
               >
                 <Text style={styles.legalButtonText}>Terms of service</Text>
               </Pressable>

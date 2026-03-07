@@ -10,8 +10,8 @@ export type LegalVersions = {
 export const FALLBACK_LEGAL_VERSIONS: LegalVersions = {
   termsVersion: '2026-02-20',
   privacyVersion: '2026-02-20',
-  termsUrl: 'https://verityprotect.com/terms',
-  privacyUrl: 'https://verityprotect.com/privacy',
+  termsUrl: 'https://www.verityprotect.com/terms',
+  privacyUrl: 'https://www.verityprotect.com/privacy',
 };
 
 function getBaseUrl() {

@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { logEvent } from '../../services/sentry';
 import { MEMBERSHIP_SIGNOUT_NOTE_KEY } from '../../utils/membership';
+import { FALLBACK_LEGAL_VERSIONS } from '../../services/legal';
 
 export default function SignInScreen({ navigation }: { navigation: any }) {
   const { signIn, signInWithGoogle, signInWithApple, sendPasswordReset } = useAuth();
@@ -352,6 +353,14 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
         onSubHelperSecondaryPress={() => {
           logEvent('signin_why_choose_opened', { screen: 'SignIn' });
           navigation.navigate('WhyChooseVerity');
+        }}
+        legalPrivacyLabel="Privacy Policy"
+        onLegalPrivacyPress={() => {
+          void Linking.openURL(FALLBACK_LEGAL_VERSIONS.privacyUrl).catch(() => null);
+        }}
+        legalTermsLabel="Terms of Use"
+        onLegalTermsPress={() => {
+          void Linking.openURL(FALLBACK_LEGAL_VERSIONS.termsUrl).catch(() => null);
         }}
       />
     </SafeAreaView>

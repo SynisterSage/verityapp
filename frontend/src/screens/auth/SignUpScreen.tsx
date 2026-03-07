@@ -663,6 +663,14 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
           logEvent('signup_why_choose_opened', { screen: 'SignUp' });
           navigation.navigate('WhyChooseVerity');
         }}
+        legalPrivacyLabel="Privacy Policy"
+        onLegalPrivacyPress={() => {
+          void Linking.openURL(legalVersions.privacyUrl).catch(() => null);
+        }}
+        legalTermsLabel="Terms of Use"
+        onLegalTermsPress={() => {
+          void Linking.openURL(legalVersions.termsUrl).catch(() => null);
+        }}
       />
       {isSocialHandoffLoading ? (
         <View style={[styles.handoffOverlay, { backgroundColor: withOpacity(theme.colors.bg, 0.96) }]}>
