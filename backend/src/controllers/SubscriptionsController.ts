@@ -11,6 +11,8 @@ import {
   type UserSubscriptionRow,
 } from '@src/services/subscriptionAccess';
 import supabaseAdmin from '@src/services/supabase';
+import { deriveTrialLifecycleUpdate } from '@src/services/trialLifecycle';
+import { restoreOrAssignNumbersForUser } from '@src/services/twilioNumberPool';
 
 const DEFAULT_PRODUCT_IDS = ['verityprotect_monthly', 'verityprotect_annual'];
 const ALLOWED_PRODUCT_IDS = new Set(
@@ -65,6 +67,12 @@ function serializeSubscription(row: UserSubscriptionRow | null) {
     expiresAt: row.expires_at,
     verificationEnvironment: row.verification_environment,
     receiptStatus: row.latest_receipt_status,
+    trialStartedAt: row.trial_started_at,
+    trialEndsAt: row.trial_ends_at,
+    trialConvertedAt: row.trial_converted_at,
+    trialReclaimedAt: row.trial_reclaimed_at,
+    trialPurgeAfterAt: row.trial_purge_after_at,
+    trialPurgedAt: row.trial_purged_at,
     lastVerifiedAt: row.last_verified_at,
   };
 }
@@ -92,6 +100,13 @@ function toLogMessage(context: string, error: unknown) {
   return `[${context}] unknown_error`;
 }
 
+function parseTrialSignal(value: unknown): boolean | null {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  return null;
+}
+
 async function status(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
@@ -103,6 +118,14 @@ async function status(req: Request, res: Response) {
       getSubscriptionAccessSnapshot(userId),
       getUserSubscription(userId),
     ]);
+
+    if (access.hasActiveSubscription && subscription?.trial_reclaimed_at) {
+      try {
+        await restoreOrAssignNumbersForUser(userId);
+      } catch (restoreError) {
+        logger.warn(toLogMessage('subscriptions.verify.restore_numbers', restoreError));
+      }
+    }
 
     return res.status(HTTP_STATUS_CODES.Ok).json({
       hasActiveSubscription: access.hasActiveSubscription,
@@ -150,6 +173,8 @@ async function verify(req: Request, res: Response) {
       .status(HTTP_STATUS_CODES.BadRequest)
       .json({ error: 'receiptData or transactionId is required' });
   }
+
+  const existing = await getUserSubscription(userId);
 
   try {
     let verification:
@@ -202,6 +227,26 @@ async function verify(req: Request, res: Response) {
       ? 'active'
       : normalizeSubscriptionStatus(verifiedSubscription?.status ?? null, 'inactive');
     const source = hasServerActiveSubscription ? 'app_store_server_api' : 'app_store';
+    const nowIso = new Date().toISOString();
+    const resolvedProductId =
+      serverTransaction?.productId ?? verifiedSubscription?.productId ?? productId ?? existing?.product_id ?? null;
+    const resolvedPurchasedAt =
+      serverTransaction?.purchaseDate ?? verifiedSubscription?.purchasedAt ?? existing?.purchased_at ?? null;
+    const resolvedExpiresAt =
+      serverTransaction?.expiresDate ?? verifiedSubscription?.expiresAt ?? existing?.expires_at ?? null;
+    const trialSignal =
+      parseTrialSignal(verifiedSubscription?.isTrialPeriod) ??
+      parseTrialSignal(serverTransaction?.isTrialPeriod);
+    const trialLifecycle = deriveTrialLifecycleUpdate({
+      existing,
+      productId: resolvedProductId,
+      status: nextStatus,
+      isActive,
+      purchasedAt: resolvedPurchasedAt,
+      expiresAt: resolvedExpiresAt,
+      isTrialSignal: trialSignal,
+      nowIso,
+    });
 
     const { error: upsertError } = await supabaseAdmin
       .from('user_subscriptions')
@@ -212,7 +257,7 @@ async function verify(req: Request, res: Response) {
           source,
           status: nextStatus,
           is_active: isActive,
-          product_id: serverTransaction?.productId ?? verifiedSubscription?.productId ?? productId ?? null,
+          product_id: resolvedProductId,
           transaction_id:
             serverTransaction?.transactionId ??
             verifiedSubscription?.transactionId ??
@@ -222,18 +267,21 @@ async function verify(req: Request, res: Response) {
             verifiedSubscription?.originalTransactionId ??
             originalTransactionId ??
             null,
-          purchased_at: serverTransaction?.purchaseDate ?? verifiedSubscription?.purchasedAt ?? null,
-          expires_at: serverTransaction?.expiresDate ?? verifiedSubscription?.expiresAt ?? null,
+          purchased_at: resolvedPurchasedAt,
+          expires_at: resolvedExpiresAt,
           verification_environment: serverTransaction?.environment ?? verification.environment ?? null,
           latest_receipt_status: verification.status,
           latest_receipt_data: verification.latestReceiptData ?? normalizedReceiptData,
           metadata: {
+            ...(existing?.metadata ?? {}),
             verifyRequestProductId: productId ?? null,
             verifyRequestTransactionId: normalizedTransactionId,
             verifyRequestOriginalTransactionId: originalTransactionId ?? null,
             hasVerifiedSubscription: Boolean(verifiedSubscription),
             hasServerTransaction: Boolean(serverTransaction),
             serverTransactionLookupFailed,
+            receiptTrialSignal: verifiedSubscription?.isTrialPeriod ?? null,
+            serverTrialSignal: serverTransaction?.isTrialPeriod ?? null,
             verificationMethod:
               hasServerActiveSubscription || Boolean(serverTransaction)
                 ? 'app_store_server_api'
@@ -241,7 +289,8 @@ async function verify(req: Request, res: Response) {
                   ? 'verify_receipt'
                   : 'none',
           },
-          last_verified_at: new Date().toISOString(),
+          ...trialLifecycle,
+          last_verified_at: nowIso,
         },
         { onConflict: 'user_id' }
       );
@@ -275,13 +324,26 @@ async function verify(req: Request, res: Response) {
       try {
         const serverTransaction = await getAppStoreServerTransactionById(normalizedTransactionId);
         if (serverTransaction && (!serverTransaction.productId || isAllowedProductId(serverTransaction.productId))) {
+          const nowIso = new Date().toISOString();
+          const nextStatus = normalizeSubscriptionStatus(serverTransaction.status, 'unknown');
+          const isActive = Boolean(serverTransaction.isActive);
+          const trialLifecycle = deriveTrialLifecycleUpdate({
+            existing,
+            productId: serverTransaction.productId ?? productId ?? existing?.product_id ?? null,
+            status: nextStatus,
+            isActive,
+            purchasedAt: serverTransaction.purchaseDate ?? existing?.purchased_at ?? null,
+            expiresAt: serverTransaction.expiresDate ?? existing?.expires_at ?? null,
+            isTrialSignal: parseTrialSignal(serverTransaction.isTrialPeriod),
+            nowIso,
+          });
           const { error: upsertError } = await supabaseAdmin.from('user_subscriptions').upsert(
             {
               user_id: userId,
               platform: typeof platform === 'string' && platform.trim() ? platform.trim() : 'ios',
               source: 'app_store_server_api',
-              status: normalizeSubscriptionStatus(serverTransaction.status, 'unknown'),
-              is_active: Boolean(serverTransaction.isActive),
+              status: nextStatus,
+              is_active: isActive,
               product_id: serverTransaction.productId ?? productId ?? null,
               transaction_id: serverTransaction.transactionId ?? normalizedTransactionId,
               original_transaction_id:
@@ -292,14 +354,17 @@ async function verify(req: Request, res: Response) {
               latest_receipt_status: null,
               latest_receipt_data: normalizedReceiptData,
               metadata: {
+                ...(existing?.metadata ?? {}),
                 verifyRequestProductId: productId ?? null,
                 verifyRequestTransactionId: normalizedTransactionId,
                 verifyRequestOriginalTransactionId: originalTransactionId ?? null,
                 hasVerifiedSubscription: false,
                 hasServerTransaction: true,
+                serverTrialSignal: serverTransaction.isTrialPeriod ?? null,
                 verificationMethod: 'app_store_server_api_fallback_after_error',
               },
-              last_verified_at: new Date().toISOString(),
+              ...trialLifecycle,
+              last_verified_at: nowIso,
             },
             { onConflict: 'user_id' }
           );
@@ -315,6 +380,14 @@ async function verify(req: Request, res: Response) {
             getSubscriptionAccessSnapshot(userId),
             getUserSubscription(userId),
           ]);
+
+          if (access.hasActiveSubscription && subscription?.trial_reclaimed_at) {
+            try {
+              await restoreOrAssignNumbersForUser(userId);
+            } catch (restoreError) {
+              logger.warn(toLogMessage('subscriptions.verify.fallback_restore_numbers', restoreError));
+            }
+          }
 
           return res.status(HTTP_STATUS_CODES.Ok).json({
             verified: Boolean(serverTransaction.isActive),
@@ -404,7 +477,20 @@ async function syncEntitlement(req: Request, res: Response) {
     : existing?.source ?? 'storekit_local_entitlement';
   const nextIsActive = serverTransaction
     ? Boolean(serverTransaction.isActive)
-    : Boolean(existing?.is_active); // never trust client-supplied expiresAt — preserve existing state on API failure
+    : entitlementIsActiveByClaim || Boolean(existing?.is_active);
+  const resolvedProductId = serverTransaction?.productId ?? productId ?? existing?.product_id ?? null;
+  const resolvedPurchasedAt = serverTransaction?.purchaseDate ?? purchasedAt ?? existing?.purchased_at ?? null;
+  const resolvedExpiresAt = serverTransaction?.expiresDate ?? expiresAt ?? existing?.expires_at ?? null;
+  const trialLifecycle = deriveTrialLifecycleUpdate({
+    existing,
+    productId: resolvedProductId,
+    status: nextStatus,
+    isActive: nextIsActive,
+    purchasedAt: resolvedPurchasedAt,
+    expiresAt: resolvedExpiresAt,
+    isTrialSignal: parseTrialSignal(serverTransaction?.isTrialPeriod),
+    nowIso,
+  });
 
   const { error: upsertError } = await supabaseAdmin.from('user_subscriptions').upsert(
     {
@@ -413,12 +499,12 @@ async function syncEntitlement(req: Request, res: Response) {
       source: nextSource,
       status: nextStatus,
       is_active: nextIsActive,
-      product_id: serverTransaction?.productId ?? productId ?? null,
+      product_id: resolvedProductId,
       transaction_id: serverTransaction?.transactionId ?? normalizedTransactionId,
       original_transaction_id:
         serverTransaction?.originalTransactionId ?? originalTransactionId ?? null,
-      purchased_at: serverTransaction?.purchaseDate ?? purchasedAt ?? null,
-      expires_at: serverTransaction?.expiresDate ?? expiresAt ?? null,
+      purchased_at: resolvedPurchasedAt,
+      expires_at: resolvedExpiresAt,
       verification_environment: serverTransaction?.environment ?? existing?.verification_environment ?? null,
       latest_receipt_status: existing?.latest_receipt_status ?? null,
       latest_receipt_data: existing?.latest_receipt_data ?? null,
@@ -433,6 +519,9 @@ async function syncEntitlement(req: Request, res: Response) {
               purchaseDate: serverTransaction.purchaseDate,
               expiresDate: serverTransaction.expiresDate,
               revocationDate: serverTransaction.revocationDate,
+              offerType: serverTransaction.offerType,
+              offerIdentifier: serverTransaction.offerIdentifier,
+              isTrialPeriod: serverTransaction.isTrialPeriod,
               status: serverTransaction.status,
               isActive: serverTransaction.isActive,
               checkedAt: nowIso,
@@ -450,6 +539,7 @@ async function syncEntitlement(req: Request, res: Response) {
           appStoreServerApiLookupFailed: serverTransactionLookupFailed,
         },
       },
+      ...trialLifecycle,
       last_verified_at: nowIso,
     },
     { onConflict: 'user_id' }
@@ -466,6 +556,14 @@ async function syncEntitlement(req: Request, res: Response) {
     getSubscriptionAccessSnapshot(userId),
     getUserSubscription(userId),
   ]);
+
+  if (access.hasActiveSubscription && subscription?.trial_reclaimed_at) {
+    try {
+      await restoreOrAssignNumbersForUser(userId);
+    } catch (restoreError) {
+      logger.warn(toLogMessage('subscriptions.sync_entitlement.restore_numbers', restoreError));
+    }
+  }
 
   return res.status(HTTP_STATUS_CODES.Ok).json({
     hasActiveSubscription: access.hasActiveSubscription,

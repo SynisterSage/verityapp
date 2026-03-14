@@ -9,6 +9,12 @@ export type StoreProduct = {
   currencyCode?: string | null;
   subscriptionPeriodUnit?: 'day' | 'week' | 'month' | 'year' | null;
   subscriptionPeriodCount?: number | null;
+  introOfferType?: 'free' | 'pay_as_you_go' | 'pay_up_front' | null;
+  introOfferPeriodUnit?: 'day' | 'week' | 'month' | 'year' | null;
+  introOfferPeriodCount?: number | null;
+  introOfferCycles?: number | null;
+  introOfferDisplayPrice?: string | null;
+  hasFreeTrial?: boolean | null;
 };
 
 export type PurchaseResult = {

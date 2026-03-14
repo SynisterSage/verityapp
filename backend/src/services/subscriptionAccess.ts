@@ -15,6 +15,12 @@ export type UserSubscriptionRow = {
   latest_receipt_status: number | null;
   latest_receipt_data: string | null;
   metadata: Record<string, unknown> | null;
+  trial_started_at: string | null;
+  trial_ends_at: string | null;
+  trial_converted_at: string | null;
+  trial_reclaimed_at: string | null;
+  trial_purge_after_at: string | null;
+  trial_purged_at: string | null;
   last_verified_at: string;
   created_at: string;
   updated_at: string;
@@ -61,7 +67,7 @@ export async function getUserSubscription(userId: string) {
   const { data, error } = await supabaseAdmin
     .from('user_subscriptions')
     .select(
-      'user_id, platform, source, status, is_active, product_id, transaction_id, original_transaction_id, purchased_at, expires_at, verification_environment, latest_receipt_status, latest_receipt_data, metadata, last_verified_at, created_at, updated_at'
+      'user_id, platform, source, status, is_active, product_id, transaction_id, original_transaction_id, purchased_at, expires_at, verification_environment, latest_receipt_status, latest_receipt_data, metadata, trial_started_at, trial_ends_at, trial_converted_at, trial_reclaimed_at, trial_purge_after_at, trial_purged_at, last_verified_at, created_at, updated_at'
     )
     .eq('user_id', userId)
     .maybeSingle();

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
+  Easing,
   Linking,
   Modal,
   Pressable,
@@ -13,6 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { BlurView } from 'expo-blur';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,6 +35,8 @@ type PlanOption = {
   price: string;
   detail: string;
   badge?: string;
+  hasFreeTrial?: boolean;
+  trialLabel?: string | null;
 };
 
 type MembershipFeedback = {
@@ -48,7 +52,9 @@ const fallbackPlans: PlanOption[] = [
     productId: 'verityprotect_monthly',
     title: 'Monthly',
     price: '$9.99 / month',
-    detail: 'Flexible, cancel anytime',
+    detail: '7-day free trial, then $9.99/month',
+    hasFreeTrial: true,
+    trialLabel: '7-day free trial',
   },
   {
     productId: 'verityprotect_annual',
@@ -64,6 +70,9 @@ function toPlanOption(product: {
   displayName: string;
   displayPrice: string;
   subscriptionPeriodUnit?: string | null;
+  hasFreeTrial?: boolean | null;
+  introOfferPeriodUnit?: string | null;
+  introOfferPeriodCount?: number | null;
 }): PlanOption {
   const normalizedUnit = (product.subscriptionPeriodUnit ?? '').toLowerCase();
   const suffix =
@@ -73,15 +82,38 @@ function toPlanOption(product: {
         ? ' / month'
         : '';
 
+  const introPeriodCount =
+    typeof product.introOfferPeriodCount === 'number' && Number.isFinite(product.introOfferPeriodCount)
+      ? product.introOfferPeriodCount
+      : null;
+  const introPeriodUnit = (product.introOfferPeriodUnit ?? '').toLowerCase();
+  const normalizedIntroUnit =
+    introPeriodUnit === 'day' || introPeriodUnit === 'week' || introPeriodUnit === 'month' || introPeriodUnit === 'year'
+      ? introPeriodUnit
+      : null;
+  const hasFreeTrial = Boolean(product.hasFreeTrial);
+  const trialDurationLabel =
+    hasFreeTrial && introPeriodCount && normalizedIntroUnit
+      ? `${introPeriodCount}-${normalizedIntroUnit} free trial`
+      : hasFreeTrial
+        ? 'Free trial'
+        : null;
+
+  const isAnnual = product.productId === 'verityprotect_annual';
+  const detail = isAnnual
+    ? 'Save 17% vs monthly'
+    : hasFreeTrial
+      ? `${trialDurationLabel ?? 'Free trial'}, then ${product.displayPrice}/month`
+      : 'Flexible, cancel anytime';
+
   return {
     productId: product.productId,
-    title: product.displayName || (product.productId.includes('annual') ? 'Annual' : 'Monthly'),
+    title: product.displayName || (isAnnual ? 'Annual' : 'Monthly'),
     price: `${product.displayPrice}${suffix}`,
-    detail:
-      product.productId === 'verityprotect_annual'
-        ? 'Save 17% vs monthly'
-        : 'Flexible, cancel anytime',
-    badge: product.productId === 'verityprotect_annual' ? 'Best Value' : undefined,
+    detail,
+    badge: isAnnual ? 'Best Value' : undefined,
+    hasFreeTrial,
+    trialLabel: trialDurationLabel,
   };
 }
 
@@ -181,8 +213,8 @@ function toRestoreFeedback(result: { message?: string }): MembershipFeedback {
 export default function MembershipScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'Membership'>>();
   const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
-  const styles = useMemo(() => createMembershipStyles(theme), [theme]);
+  const { theme, mode } = useTheme();
+  const styles = useMemo(() => createMembershipStyles(theme, mode), [mode, theme]);
   const { signOut } = useAuth();
 
   const {
@@ -222,6 +254,9 @@ export default function MembershipScreen() {
   const exitCardOpacity = useRef(new Animated.Value(0)).current;
   const exitCardTranslateY = useRef(new Animated.Value(10)).current;
   const exitCardScale = useRef(new Animated.Value(0.985)).current;
+  const trialCtaScale = useRef(new Animated.Value(1)).current;
+  const feedbackCardOpacity = useRef(new Animated.Value(0)).current;
+  const feedbackCardTranslateY = useRef(new Animated.Value(8)).current;
   const planScaleByIdRef = useRef<Record<string, Animated.Value>>({});
   const hasLoggedMembershipView = useRef(false);
   const hasAutoCompletedActivationRef = useRef(false);
@@ -290,6 +325,86 @@ export default function MembershipScreen() {
     planOptions[0] ??
     fallbackPlans[0];
 
+  const selectedPlanHasFreeTrial = Boolean(selectedPlan?.hasFreeTrial);
+  const trialInfoRows = useMemo(
+    () => [
+      {
+        id: 'trial',
+        title: '7-day free trial',
+        detail: selectedPlanHasFreeTrial
+          ? 'The monthly plan starts with 7 days of protection before Apple charges your account. Cancel at least 24 hours before the trial ends to avoid a charge.'
+          : 'Switch to the monthly plan to unlock a 7-day trial before any charge hits your Apple account.',
+      },
+      {
+        id: 'billing',
+        title: 'Billing through Apple',
+        detail: 'Charges and renewals happen inside Apple subscriptions. Renewals include a 3-day grace period before service pauses, and you manage the plan in iPhone settings.',
+      },
+      {
+        id: 'reminder',
+        title: 'Reminder before renewal',
+        detail: 'When two days or less remain we show a reminder inside the app (and send a push if enabled) so your call screening keeps running without surprises.',
+      },
+    ],
+    [selectedPlanHasFreeTrial]
+  );
+
+  useEffect(() => {
+    if (!selectedPlan?.hasFreeTrial || isProcessingPurchase || isLoadingProducts || plansUnavailable) {
+      trialCtaScale.stopAnimation();
+      trialCtaScale.setValue(1);
+      return;
+    }
+
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(trialCtaScale, {
+          toValue: 1.018,
+          duration: 550,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(trialCtaScale, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.delay(1900),
+      ])
+    );
+    pulse.start();
+
+    return () => {
+      pulse.stop();
+      trialCtaScale.stopAnimation();
+      trialCtaScale.setValue(1);
+    };
+  }, [isLoadingProducts, isProcessingPurchase, plansUnavailable, selectedPlan?.hasFreeTrial, trialCtaScale]);
+
+  useEffect(() => {
+    if (!feedback && !statusError) {
+      feedbackCardOpacity.setValue(0);
+      feedbackCardTranslateY.setValue(8);
+      return;
+    }
+
+    Animated.parallel([
+      Animated.timing(feedbackCardOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(feedbackCardTranslateY, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [feedback, statusError, feedbackCardOpacity, feedbackCardTranslateY]);
+
   const getPlanScale = (productId: string) => {
     if (!planScaleByIdRef.current[productId]) {
       planScaleByIdRef.current[productId] = new Animated.Value(1);
@@ -328,7 +443,7 @@ export default function MembershipScreen() {
     setFeedback(null);
     logEvent('membership_continue_pressed', {
       screen: 'MembershipScreen',
-      extra: { productId: selectedPlan.productId },
+      extra: { productId: selectedPlan.productId, hasFreeTrial: Boolean(selectedPlan.hasFreeTrial) },
     });
     const result = await purchase(selectedPlan.productId);
     if (result.status === 'purchased') {
@@ -339,12 +454,23 @@ export default function MembershipScreen() {
       navigation.replace('MembershipActivated');
       logEvent('membership_purchase_success', {
         screen: 'MembershipScreen',
-        extra: { productId: selectedPlan.productId },
+        extra: { productId: selectedPlan.productId, hasFreeTrial: Boolean(selectedPlan.hasFreeTrial) },
       });
+      if (selectedPlan.hasFreeTrial) {
+        logEvent('membership_trial_started', {
+          screen: 'MembershipScreen',
+          extra: { productId: selectedPlan.productId },
+        });
+      }
       return;
     }
     const nextFeedback = toPurchaseFeedback(result);
     setFeedback(nextFeedback);
+    void Haptics.notificationAsync(
+      nextFeedback.tone === 'error'
+        ? Haptics.NotificationFeedbackType.Error
+        : Haptics.NotificationFeedbackType.Warning
+    ).catch(() => null);
     logEvent('membership_purchase_feedback_shown', {
       screen: 'MembershipScreen',
       extra: { kind: nextFeedback.kind, status: result.status },
@@ -367,7 +493,13 @@ export default function MembershipScreen() {
       navigation.replace('MembershipActivated');
       return;
     }
-    setFeedback(toRestoreFeedback(result));
+    const nextFeedback = toRestoreFeedback(result);
+    setFeedback(nextFeedback);
+    void Haptics.notificationAsync(
+      nextFeedback.tone === 'error'
+        ? Haptics.NotificationFeedbackType.Error
+        : Haptics.NotificationFeedbackType.Warning
+    ).catch(() => null);
   };
 
   const handleManageInStore = async () => {
@@ -495,6 +627,33 @@ export default function MembershipScreen() {
           ))}
         </View>
 
+        <View style={styles.trialInfoCard}>
+          <View style={styles.trialInfoHeader}>
+            <View style={styles.trialInfoIconWrap}>
+              <Ionicons name="sparkles-outline" size={20} color={theme.colors.accent} />
+            </View>
+            <View>
+              <Text style={styles.trialInfoTitle}>Trial & billing</Text>
+              <Text style={styles.trialInfoSubtitle}>
+                We keep every charge transparent so your family stays protected without surprises.
+              </Text>
+            </View>
+          </View>
+          <View style={styles.trialInfoBody}>
+            {trialInfoRows.map((row) => (
+              <View key={row.id} style={styles.trialInfoRow}>
+                <View style={styles.trialInfoBullet}>
+                  <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
+                </View>
+                <View style={styles.trialInfoTextWrap}>
+                  <Text style={styles.trialInfoRowTitle}>{row.title}</Text>
+                  <Text style={styles.trialInfoRowDetail}>{row.detail}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.planSection}>
           <Text style={styles.planSectionTitle}>Choose your plan</Text>
           {planOptions.map((plan) => {
@@ -525,7 +684,20 @@ export default function MembershipScreen() {
                           <Text style={styles.planSavingsText}>{plan.detail}</Text>
                         </View>
                       ) : (
-                        <Text style={styles.planDetail}>{plan.detail}</Text>
+                        <>
+                          {plan.hasFreeTrial && plan.trialLabel ? (
+                            <View style={styles.planTrialPill}>
+                              <Ionicons
+                                name="flash-outline"
+                                size={11}
+                                color={theme.colors.accent}
+                                style={{ marginTop: 1 }}
+                              />
+                              <Text style={styles.planTrialText}>{plan.trialLabel}</Text>
+                            </View>
+                          ) : null}
+                          <Text style={styles.planDetail}>{plan.detail}</Text>
+                        </>
                       )}
                     </View>
                     <View style={styles.planPriceWrap}>
@@ -686,8 +858,9 @@ export default function MembershipScreen() {
 
         <View style={styles.legalFooter}>
           <Text style={styles.legalText}>
-            Payment charged to your Apple Account at confirmation. Subscription auto-renews unless
-            cancelled at least 24 hours before the end of the current period.{' '}
+            {selectedPlan?.hasFreeTrial
+              ? 'No charge during the free trial. When the trial ends, your Apple Account is charged unless cancelled at least 24 hours before renewal.'
+              : 'Payment charged to your Apple Account at confirmation. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period.'}{' '}
             <Text
               style={styles.legalLink}
               onPress={() => Linking.openURL(legalVersions.privacyUrl).catch(() => null)}
@@ -705,10 +878,14 @@ export default function MembershipScreen() {
         </View>
 
         {(statusError || feedback) ? (
-          <View
+          <Animated.View
             style={[
               styles.feedbackCard,
               feedback?.tone === 'info' ? styles.feedbackCardInfo : styles.feedbackCardError,
+              {
+                opacity: feedbackCardOpacity,
+                transform: [{ translateY: feedbackCardTranslateY }],
+              },
             ]}
           >
             <Text style={styles.feedbackTitle}>
@@ -722,7 +899,7 @@ export default function MembershipScreen() {
                 <Text style={styles.feedbackActionText}>Reload plans</Text>
               </Pressable>
             ) : null}
-          </View>
+          </Animated.View>
         ) : null}
       </ScrollView>
 
@@ -746,19 +923,25 @@ export default function MembershipScreen() {
           </Pressable>
         ) : null}
 
-        <Pressable
-          style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
-          onPress={handlePurchase}
-          disabled={isProcessingPurchase || isLoadingProducts || plansUnavailable}
-        >
-          {isProcessingPurchase || isLoadingProducts ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.primaryButtonText}>Start Protection</Text>
-          )}
-        </Pressable>
+        <Animated.View style={{ transform: [{ scale: trialCtaScale }] }}>
+          <Pressable
+            style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
+            onPress={handlePurchase}
+            disabled={isProcessingPurchase || isLoadingProducts || plansUnavailable}
+          >
+            {isProcessingPurchase || isLoadingProducts ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.primaryButtonText}>
+                {selectedPlan?.hasFreeTrial ? 'Start Free Trial' : 'Start Protection'}
+              </Text>
+            )}
+          </Pressable>
+        </Animated.View>
         <Text style={styles.trustStrip}>
-          Secure billing via Apple • Cancel anytime • 3-day grace period
+          {selectedPlan?.hasFreeTrial
+            ? '7-day free trial • Secure billing via Apple • Cancel anytime'
+            : 'Secure billing via Apple • Cancel anytime • 3-day grace period'}
         </Text>
       </View>
 
@@ -770,7 +953,10 @@ export default function MembershipScreen() {
       >
         <View style={styles.exitModalRoot}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closeExitModal}>
-            <Animated.View style={[styles.exitModalBackdrop, { opacity: exitBackdropOpacity }]} />
+            <Animated.View style={[styles.exitModalBackdropAnimatedLayer, { opacity: exitBackdropOpacity }]}>
+              <BlurView intensity={65} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.exitModalBackdropBlur} />
+              <View style={styles.exitModalBackdropScrim} />
+            </Animated.View>
           </Pressable>
           <Animated.View
             style={[
@@ -820,7 +1006,7 @@ export default function MembershipScreen() {
   );
 }
 
-const createMembershipStyles = (theme: AppTheme) =>
+const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | string) =>
   StyleSheet.create({
     screen: {
       flex: 1,
@@ -910,6 +1096,70 @@ const createMembershipStyles = (theme: AppTheme) =>
       fontSize: 14,
       color: theme.colors.textMuted,
     },
+    trialInfoCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      padding: 18,
+      gap: 12,
+    },
+    trialInfoHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    trialInfoIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.18),
+    },
+    trialInfoTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    trialInfoSubtitle: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '500',
+    },
+    trialInfoBody: {
+      gap: 12,
+    },
+    trialInfoRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+    },
+    trialInfoBullet: {
+      width: 26,
+      height: 26,
+      borderRadius: 10,
+      backgroundColor: withOpacity(theme.colors.accent, 0.18),
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 2,
+    },
+    trialInfoTextWrap: {
+      flex: 1,
+      gap: 4,
+    },
+    trialInfoRowTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    trialInfoRowDetail: {
+      fontSize: 13,
+      color: theme.colors.textMuted,
+      lineHeight: 18,
+      fontWeight: '500',
+    },
     planSection: {
       gap: 10,
     },
@@ -936,6 +1186,11 @@ const createMembershipStyles = (theme: AppTheme) =>
     planCardSelected: {
       borderColor: withOpacity(theme.colors.accent, 0.8),
       backgroundColor: withOpacity(theme.colors.accent, 0.09),
+      shadowColor: theme.colors.accent,
+      shadowOpacity: 0.16,
+      shadowRadius: 16,
+      shadowOffset: { width: 0, height: 6 },
+      elevation: 6,
     },
     planMainRow: {
       flexDirection: 'row',
@@ -977,6 +1232,22 @@ const createMembershipStyles = (theme: AppTheme) =>
       paddingHorizontal: 8,
       paddingVertical: 3,
       backgroundColor: withOpacity(theme.colors.accent, 0.12),
+    },
+    planTrialPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      alignSelf: 'flex-start',
+      borderRadius: 20,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+    },
+    planTrialText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.colors.accent,
+      letterSpacing: 0.2,
     },
     planSavingsText: {
       fontSize: 12,
@@ -1037,7 +1308,9 @@ const createMembershipStyles = (theme: AppTheme) =>
       flex: 1,
       minHeight: 52,
       borderRadius: 16,
-      backgroundColor: theme.colors.accent,
+      backgroundColor: theme.colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, 0.38),
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1051,7 +1324,7 @@ const createMembershipStyles = (theme: AppTheme) =>
     inlineButtonText: {
       fontSize: 13,
       fontWeight: '700',
-      color: '#FFFFFF',
+      color: theme.colors.accent,
       textAlign: 'center',
     },
     inlineButtonSecondary: {
@@ -1232,10 +1505,15 @@ const createMembershipStyles = (theme: AppTheme) =>
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.accent,
+      shadowColor: theme.colors.accent,
+      shadowOpacity: 0.24,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 10,
     },
     primaryButtonPressed: {
-      opacity: 0.9,
-      transform: [{ scale: 0.99 }],
+      opacity: 0.95,
+      transform: [{ scale: 0.985 }],
     },
     primaryButtonText: {
       fontSize: 16,
@@ -1298,9 +1576,16 @@ const createMembershipStyles = (theme: AppTheme) =>
       justifyContent: 'center',
       paddingHorizontal: 28,
     },
-    exitModalBackdrop: {
+    exitModalBackdropAnimatedLayer: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: withOpacity(theme.colors.bg, 0.72),
+    },
+    exitModalBackdropBlur: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    exitModalBackdropScrim: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor:
+        mode === 'dark' ? withOpacity(theme.colors.bg, 0.56) : withOpacity(theme.colors.text, 0.24),
     },
     exitModalCard: {
       width: '100%',
@@ -1313,7 +1598,7 @@ const createMembershipStyles = (theme: AppTheme) =>
       paddingVertical: 18,
       gap: 10,
       shadowColor: '#000',
-      shadowOpacity: 0.24,
+      shadowOpacity: mode === 'dark' ? 0.34 : 0.2,
       shadowRadius: 24,
       shadowOffset: { width: 0, height: 10 },
       elevation: 12,

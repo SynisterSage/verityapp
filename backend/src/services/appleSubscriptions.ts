@@ -21,6 +21,8 @@ type AppleReceiptTransaction = {
   expires_date_ms?: string;
   cancellation_date_ms?: string;
   is_in_billing_retry_period?: string;
+  is_trial_period?: string;
+  is_in_intro_offer_period?: string;
   web_order_line_item_id?: string;
 };
 
@@ -43,6 +45,8 @@ export type VerifiedAppleSubscription = {
   canceledAt: string | null;
   isActive: boolean;
   isInBillingRetryPeriod: boolean;
+  isTrialPeriod: boolean;
+  isInIntroOfferPeriod: boolean;
   status: 'active' | 'expired' | 'cancelled' | 'billing_retry';
   raw: AppleReceiptTransaction;
 };
@@ -82,6 +86,14 @@ function isAllowedProduct(productId?: string | null) {
   return ALLOWED_PRODUCT_IDS.has(productId);
 }
 
+function parseAppleBool(value?: string | null) {
+  if (!value) {
+    return false;
+  }
+  const normalized = value.trim().toLowerCase();
+  return normalized === '1' || normalized === 'true';
+}
+
 function normalizeSubscription(transaction: AppleReceiptTransaction): VerifiedAppleSubscription | null {
   const productId = typeof transaction.product_id === 'string' ? transaction.product_id.trim() : '';
   if (!productId || !isAllowedProduct(productId)) {
@@ -93,6 +105,8 @@ function normalizeSubscription(transaction: AppleReceiptTransaction): VerifiedAp
   const canceledAtMs = parseMillis(transaction.cancellation_date_ms);
   const isCanceled = Boolean(canceledAtMs);
   const isInBillingRetryPeriod = transaction.is_in_billing_retry_period === '1';
+  const isTrialPeriod = parseAppleBool(transaction.is_trial_period);
+  const isInIntroOfferPeriod = parseAppleBool(transaction.is_in_intro_offer_period);
   const isExpired = !expiresAtMs || expiresAtMs <= Date.now();
   const isActive = !isCanceled && Boolean(expiresAtMs && expiresAtMs > Date.now());
 
@@ -116,6 +130,8 @@ function normalizeSubscription(transaction: AppleReceiptTransaction): VerifiedAp
     canceledAt: toIsoString(canceledAtMs),
     isActive,
     isInBillingRetryPeriod,
+    isTrialPeriod,
+    isInIntroOfferPeriod,
     status,
     raw: transaction,
   };

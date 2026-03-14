@@ -36,6 +36,12 @@ type SubscriptionRecord = {
   expiresAt: string | null;
   verificationEnvironment: string | null;
   receiptStatus: number | null;
+  trialStartedAt: string | null;
+  trialEndsAt: string | null;
+  trialConvertedAt: string | null;
+  trialReclaimedAt: string | null;
+  trialPurgeAfterAt: string | null;
+  trialPurgedAt: string | null;
   lastVerifiedAt: string | null;
 } | null;
 
@@ -133,6 +139,12 @@ function buildActiveSnapshot(
       expiresAt: entitlement.expiresAt ?? base?.subscription?.expiresAt ?? null,
       verificationEnvironment: base?.subscription?.verificationEnvironment ?? null,
       receiptStatus: base?.subscription?.receiptStatus ?? null,
+      trialStartedAt: base?.subscription?.trialStartedAt ?? null,
+      trialEndsAt: base?.subscription?.trialEndsAt ?? null,
+      trialConvertedAt: base?.subscription?.trialConvertedAt ?? null,
+      trialReclaimedAt: base?.subscription?.trialReclaimedAt ?? null,
+      trialPurgeAfterAt: base?.subscription?.trialPurgeAfterAt ?? null,
+      trialPurgedAt: base?.subscription?.trialPurgedAt ?? null,
       lastVerifiedAt: nowIso,
     },
   };

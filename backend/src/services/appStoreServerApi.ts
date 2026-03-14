@@ -24,6 +24,9 @@ export type AppStoreServerTransaction = {
   purchaseDate: string | null;
   expiresDate: string | null;
   revocationDate: string | null;
+  offerType: number | null;
+  offerIdentifier: string | null;
+  isTrialPeriod: boolean | null;
   isActive: boolean;
   status: 'active' | 'expired' | 'cancelled';
 };
@@ -125,6 +128,8 @@ type SignedTransactionPayload = {
   purchaseDate?: number;
   expiresDate?: number;
   revocationDate?: number;
+  offerType?: number;
+  offerIdentifier?: string;
 };
 
 function toIso(value?: number) {
@@ -160,6 +165,9 @@ function mapSignedTransaction(payload: SignedTransactionPayload): AppStoreServer
     purchaseDate: toIso(payload.purchaseDate),
     expiresDate: toIso(payload.expiresDate),
     revocationDate: toIso(payload.revocationDate),
+    offerType: typeof payload.offerType === 'number' ? payload.offerType : null,
+    offerIdentifier: typeof payload.offerIdentifier === 'string' ? payload.offerIdentifier : null,
+    isTrialPeriod: typeof payload.offerType === 'number' ? payload.offerType === 1 : null,
     isActive,
     status,
   };

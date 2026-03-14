@@ -7,6 +7,8 @@ const ACTIVITY_PUSH_SOUND = 'activity-notification.wav';
 const ACTIVITY_PUSH_CHANNEL_ID = 'activity-alerts';
 const SUPPORT_PUSH_SOUND = 'support-notification.wav';
 const SUPPORT_PUSH_CHANNEL_ID = 'support-updates';
+const TRIAL_PUSH_SOUND = 'activity-notification.wav';
+const TRIAL_PUSH_CHANNEL_ID = 'activity-alerts';
 const CIRCLE_ALERT_TYPES = new Set<string>([
   'circle_invite',
   'pin_change',
@@ -47,6 +49,13 @@ type SupportReplyPushPayload = {
   body: string;
   ticketId?: string;
   messageId?: string;
+  data?: Record<string, string>;
+};
+
+type TrialReminderPushPayload = {
+  title: string;
+  body: string;
+  nudgeKey: string;
   data?: Record<string, string>;
 };
 
@@ -133,6 +142,17 @@ function isMissingUserIdColumnError(error: unknown) {
     message.includes("Could not find the 'user_id' column of 'profile_device_tokens'") ||
     message.includes('profile_device_tokens.user_id')
   );
+}
+
+function dedupeTokens(tokens: Array<{ id: string; expo_push_token: string }>) {
+  const seen = new Set<string>();
+  return tokens.filter((token) => {
+    if (!token.expo_push_token || seen.has(token.expo_push_token)) {
+      return false;
+    }
+    seen.add(token.expo_push_token);
+    return true;
+  });
 }
 
 function normalizePushData(data?: Record<string, string>) {
@@ -344,4 +364,85 @@ export async function notifyProfileForSupportReply(
   }));
 
   await deactivateInvalidTokens(validRecipients, messages);
+}
+
+export async function notifyUserForTrialReminder(userId: string, payload: TrialReminderPushPayload) {
+  let tokenRows: Array<{ id: string; expo_push_token: string }> = [];
+
+  const { data: userTokens, error: userTokenError } = await supabaseAdmin
+    .from('profile_device_tokens')
+    .select('id, expo_push_token')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+
+  if (userTokenError && !isMissingUserIdColumnError(userTokenError)) {
+    logger.err(
+      `[push-notify] failed loading trial reminder tokens user=${userId} message=${userTokenError.message}`
+    );
+    return;
+  }
+
+  if (!userTokenError) {
+    tokenRows = (userTokens ?? [])
+      .filter((row) => typeof row.expo_push_token === 'string' && row.expo_push_token.trim().length > 0)
+      .map((row) => ({ id: row.id, expo_push_token: row.expo_push_token }));
+  }
+
+  if (tokenRows.length === 0) {
+    const { data: ownedProfiles, error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('caretaker_id', userId);
+
+    if (profilesError) {
+      logger.err(
+        `[push-notify] failed loading owned profiles for trial reminder user=${userId} message=${profilesError.message}`
+      );
+      return;
+    }
+
+    const profileIds = (ownedProfiles ?? []).map((row) => row.id).filter(Boolean);
+    if (profileIds.length === 0) {
+      return;
+    }
+
+    const { data: fallbackTokens, error: fallbackTokenError } = await supabaseAdmin
+      .from('profile_device_tokens')
+      .select('id, expo_push_token')
+      .in('profile_id', profileIds)
+      .eq('is_active', true);
+
+    if (fallbackTokenError) {
+      logger.err(
+        `[push-notify] failed loading fallback trial reminder tokens user=${userId} message=${fallbackTokenError.message}`
+      );
+      return;
+    }
+
+    tokenRows = (fallbackTokens ?? [])
+      .filter((row) => typeof row.expo_push_token === 'string' && row.expo_push_token.trim().length > 0)
+      .map((row) => ({ id: row.id, expo_push_token: row.expo_push_token }));
+  }
+
+  const dedupedRecipients = dedupeTokens(tokenRows);
+  if (dedupedRecipients.length === 0) {
+    return;
+  }
+
+  const messages: ExpoPushMessage[] = dedupedRecipients.map((recipient) => ({
+    to: recipient.expo_push_token,
+    title: payload.title,
+    body: payload.body,
+    sound: TRIAL_PUSH_SOUND,
+    channelId: TRIAL_PUSH_CHANNEL_ID,
+    data: {
+      routeTarget: 'membership_billing',
+      route_target: 'membership_billing',
+      nudgeKey: payload.nudgeKey,
+      nudge_key: payload.nudgeKey,
+      ...normalizePushData(payload.data),
+    },
+  }));
+
+  await deactivateInvalidTokens(dedupedRecipients, messages);
 }

@@ -122,6 +122,21 @@ function mapProductIdLabel(productId?: string | null) {
   return toTitleCase(productId);
 }
 
+function formatTrialDaysLeft(trialEndsAt: string | null | undefined, nowMs: number) {
+  if (!trialEndsAt) {
+    return null;
+  }
+  const endsAtMs = Date.parse(trialEndsAt);
+  if (!Number.isFinite(endsAtMs)) {
+    return null;
+  }
+  const msLeft = endsAtMs - nowMs;
+  if (msLeft < 0) {
+    return 0;
+  }
+  return Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+}
+
 export default function MembershipBillingScreen() {
   const insets = useSafeAreaInsets();
   const { theme, mode } = useTheme();
@@ -130,6 +145,7 @@ export default function MembershipBillingScreen() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isReloadingPlans, setIsReloadingPlans] = useState(false);
   const [isOpeningManage, setIsOpeningManage] = useState(false);
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const {
     status,
@@ -146,6 +162,11 @@ export default function MembershipBillingScreen() {
   const subscription = status?.subscription ?? null;
   const hasActiveSubscription = Boolean(status?.hasActiveSubscription);
   const hasProductsLoaded = products.length > 0;
+
+  useEffect(() => {
+    const interval = setInterval(() => setNowMs(Date.now()), 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (hasProductsLoaded || isLoadingProducts) {
@@ -180,6 +201,24 @@ export default function MembershipBillingScreen() {
 
   const statusTone = hasActiveSubscription ? 'active' : 'inactive';
   const inviteBypassEnabled = status?.canJoinWithInviteCode !== false;
+  const trialDaysLeft = formatTrialDaysLeft(subscription?.trialEndsAt, nowMs);
+  const hasTrialConverted = Boolean(subscription?.trialConvertedAt);
+  const showTrialStatusCard =
+    Boolean(hasActiveSubscription) &&
+    !hasTrialConverted &&
+    typeof trialDaysLeft === 'number' &&
+    trialDaysLeft <= 7;
+
+  const trialStatusTitle =
+    trialDaysLeft === 0
+      ? 'Trial ends today'
+      : trialDaysLeft === 1
+        ? '1 day left in your trial'
+        : `${trialDaysLeft ?? 0} days left in your trial`;
+  const trialStatusDetail =
+    trialDaysLeft === 0
+      ? 'Keep your verified number and call screening active without interruption.'
+      : 'You can manage or cancel anytime in App Store subscriptions.';
 
   const handleManageMembership = useCallback(async () => {
     if (isOpeningManage) {
@@ -356,6 +395,33 @@ export default function MembershipBillingScreen() {
           ) : null}
         </View>
 
+        {showTrialStatusCard ? (
+          <>
+            <Text style={styles.sectionLabel}>Trial status</Text>
+            <View style={[styles.card, styles.trialCard]}>
+              <View style={styles.trialHeader}>
+                <View style={styles.trialIconWrap}>
+                  <Ionicons name="hourglass-outline" size={20} color={theme.colors.accent} />
+                </View>
+                <View style={styles.trialHeaderText}>
+                  <Text style={styles.trialTitle}>{trialStatusTitle}</Text>
+                  <Text style={styles.trialDetail}>{trialStatusDetail}</Text>
+                </View>
+              </View>
+              <Pressable
+                style={({ pressed }) => [
+                  styles.trialPrimaryButton,
+                  pressed ? styles.trialPrimaryButtonPressed : undefined,
+                ]}
+                onPress={handleManageMembership}
+              >
+                <Ionicons name="card-outline" size={15} color="#fff" />
+                <Text style={styles.trialPrimaryButtonText}>Review membership options</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : null}
+
         <Text style={styles.sectionLabel}>Billing actions</Text>
         <View style={styles.card}>
           {renderActionRow(
@@ -442,6 +508,9 @@ export default function MembershipBillingScreen() {
             Secure billing via Apple. Cancel anytime. Both plans include a 3-day grace period for renewals
             before service pauses.
           </Text>
+          <Text style={styles.bodyText}>
+            The monthly plan starts with a 7-day free trial, and we surface an in-app reminder when two days remain so you can keep the number or cancel without surprise.
+          </Text>
           {!hasProductsLoaded && productsError ? (
             <Text style={styles.errorText}>{productsError}</Text>
           ) : null}
@@ -511,6 +580,57 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
       borderColor: theme.colors.border,
       padding: 18,
       gap: 12,
+    },
+    trialCard: {
+      borderColor: withOpacity(theme.colors.accent, 0.35),
+      backgroundColor: withOpacity(theme.colors.accent, 0.08),
+    },
+    trialHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    trialIconWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.14),
+    },
+    trialHeaderText: {
+      flex: 1,
+      gap: 2,
+    },
+    trialTitle: {
+      color: theme.colors.text,
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: -0.2,
+    },
+    trialDetail: {
+      color: theme.colors.textMuted,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '500',
+    },
+    trialPrimaryButton: {
+      marginTop: 2,
+      minHeight: 44,
+      borderRadius: 13,
+      backgroundColor: theme.colors.accent,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+    },
+    trialPrimaryButtonPressed: {
+      opacity: 0.86,
+    },
+    trialPrimaryButtonText: {
+      color: '#fff',
+      fontSize: 13,
+      fontWeight: '700',
     },
     // ── Membership hero ──────────────────────────────────
     membershipHero: {

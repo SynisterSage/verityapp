@@ -3,6 +3,8 @@ import logger from 'jet-logger';
 import ENV from '@src/common/constants/ENV';
 import server from './server';
 import { startRetentionCleanupScheduler } from '@src/services/retentionCleanup';
+import { startTrialLifecycleCleanupScheduler } from '@src/services/trialLifecycleCleanup';
+import { startTrialReminderPushScheduler } from '@src/services/trialReminderPush';
 
 
 /******************************************************************************
@@ -21,5 +23,7 @@ server.listen(normalizedPort, (err?: Error) => {
   } else {
     logger.info(SERVER_START_MSG);
     startRetentionCleanupScheduler();
+    startTrialLifecycleCleanupScheduler();
+    startTrialReminderPushScheduler();
   }
 });

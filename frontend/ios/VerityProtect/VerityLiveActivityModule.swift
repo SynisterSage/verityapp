@@ -440,6 +440,33 @@ private func mapProduct(_ product: Product) -> [String: Any] {
     periodUnit = nil
   }
 
+  let introOffer = product.subscription?.introductoryOffer
+  let introPeriodUnit: String?
+  switch introOffer?.period.unit {
+  case .day:
+    introPeriodUnit = "day"
+  case .week:
+    introPeriodUnit = "week"
+  case .month:
+    introPeriodUnit = "month"
+  case .year:
+    introPeriodUnit = "year"
+  default:
+    introPeriodUnit = nil
+  }
+
+  let introOfferType: String?
+  switch introOffer?.paymentMode {
+  case .freeTrial:
+    introOfferType = "free"
+  case .payAsYouGo:
+    introOfferType = "pay_as_you_go"
+  case .payUpFront:
+    introOfferType = "pay_up_front"
+  default:
+    introOfferType = nil
+  }
+
   return [
     "productId": product.id,
     "displayName": product.displayName,
@@ -449,6 +476,12 @@ private func mapProduct(_ product: Product) -> [String: Any] {
     "currencyCode": bridgeValue(product.priceFormatStyle.currencyCode),
     "subscriptionPeriodUnit": bridgeValue(periodUnit),
     "subscriptionPeriodCount": bridgeValue(product.subscription?.subscriptionPeriod.value),
+    "introOfferType": bridgeValue(introOfferType),
+    "introOfferPeriodUnit": bridgeValue(introPeriodUnit),
+    "introOfferPeriodCount": bridgeValue(introOffer?.period.value),
+    "introOfferCycles": bridgeValue(introOffer?.periodCount),
+    "introOfferDisplayPrice": bridgeValue(introOffer?.displayPrice),
+    "hasFreeTrial": bridgeValue(introOffer?.paymentMode == .freeTrial),
   ]
 }
 

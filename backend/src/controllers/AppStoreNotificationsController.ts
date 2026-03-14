@@ -4,6 +4,8 @@ import logger from 'jet-logger';
 
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import supabaseAdmin from '@src/services/supabase';
+import { deriveTrialLifecycleUpdate } from '@src/services/trialLifecycle';
+import { restoreOrAssignNumbersForUser } from '@src/services/twilioNumberPool';
 
 type AppStoreNotificationBody = {
   signedPayload?: string;
@@ -143,7 +145,9 @@ async function receive(req: Request, res: Response) {
     // Look up user by original_transaction_id
     const { data: existingSubscription, error: lookupError } = await supabaseAdmin
       .from('user_subscriptions')
-      .select('user_id, product_id, status, is_active, metadata')
+      .select(
+        'user_id, product_id, status, is_active, metadata, trial_started_at, trial_ends_at, trial_converted_at, trial_reclaimed_at, trial_purge_after_at, trial_purged_at'
+      )
       .eq('original_transaction_id', originalTransactionId)
       .maybeSingle();
 
@@ -164,6 +168,19 @@ async function receive(req: Request, res: Response) {
       revocationDate: transactionInfo.revocationDate ?? undefined,
     });
     const nowIso = new Date().toISOString();
+    const trialSignal = typeof (transactionInfo as { offerType?: unknown }).offerType === 'number'
+      ? (transactionInfo as { offerType: number }).offerType === 1
+      : null;
+    const trialLifecycle = deriveTrialLifecycleUpdate({
+      existing: existingSubscription,
+      productId: transactionInfo.productId ?? existingSubscription.product_id,
+      status,
+      isActive,
+      purchasedAt: toIso(transactionInfo.purchaseDate),
+      expiresAt: toIso(transactionInfo.expiresDate),
+      isTrialSignal: trialSignal,
+      nowIso,
+    });
 
     const { error: updateError } = await supabaseAdmin
       .from('user_subscriptions')
@@ -187,6 +204,7 @@ async function receive(req: Request, res: Response) {
             receivedAt: nowIso,
           },
         },
+        ...trialLifecycle,
       })
       .eq('user_id', existingSubscription.user_id);
 
@@ -198,6 +216,16 @@ async function receive(req: Request, res: Response) {
     logger.info(
       `[AppleASN] updated subscription status=${status} isActive=${isActive} for originalTransactionId ending ...${originalTransactionId.slice(-6)}`
     );
+
+    if (isActive && existingSubscription.trial_reclaimed_at) {
+      try {
+        await restoreOrAssignNumbersForUser(existingSubscription.user_id);
+      } catch (restoreError) {
+        const restoreMessage =
+          restoreError instanceof Error ? restoreError.message : 'unknown_restore_error';
+        logger.warn(`[AppleASN] restore numbers skipped: ${restoreMessage}`);
+      }
+    }
 
     return res.status(HTTP_STATUS_CODES.Ok).json({ received: true, processed: true });
   } catch (error) {

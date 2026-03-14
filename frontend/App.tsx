@@ -72,6 +72,7 @@ import OnboardingTrustedContactsScreen from './src/screens/onboarding/Onboarding
 import OnboardingCallForwardingScreen from './src/screens/onboarding/OnboardingCallForwardingScreen';
 import BottomDock from './src/components/navigation/BottomDock';
 import SplashScreen from './src/components/common/SplashScreen';
+import TrialReminderModal from './src/components/common/TrialReminderModal';
 import OnboardingChoiceScreen from './src/screens/onboarding/OnboardingChoiceScreen';
 import OnboardingInviteCodeScreen from './src/screens/onboarding/OnboardingInviteCodeScreen';
 import OnboardingSuccessScreen from './src/screens/onboarding/OnboardingSuccessScreen';
@@ -111,7 +112,8 @@ type PendingNotificationData = {
     | 'trusted_call_detail'
     | 'circle_activity'
     | 'alerts'
-    | 'support_portal';
+    | 'support_portal'
+    | 'membership_billing';
   alertType?: string;
 };
 
@@ -121,6 +123,7 @@ const SUPPORT_PUSH_CHANNEL_ID = 'support-updates';
 const SUPPORT_PUSH_SOUND = 'support-notification.wav';
 const CALL_DETAIL_ALERT_TYPES = new Set<string>(['fraud', 'safe', 'call_review']);
 const PENDING_INVITE_ID_KEY = 'app:pending-invite-id';
+const TRIAL_REMINDER_MODAL_LAST_SHOWN_AT_KEY = 'trial:reminder:last-shown-at';
 
 function normalizeInviteIdentifier(value: string | null | undefined) {
   const trimmed = typeof value === 'string' ? value.trim() : '';
@@ -243,6 +246,16 @@ function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'
     normalized === 'support-portal'
   ) {
     return 'support_portal';
+  }
+  if (
+    normalized === 'membership_billing' ||
+    normalized === 'membershipbilling' ||
+    normalized === 'membership-billing' ||
+    normalized === 'billing' ||
+    normalized === 'subscription' ||
+    normalized === 'subscriptions'
+  ) {
+    return 'membership_billing';
   }
   return undefined;
 }
@@ -464,6 +477,14 @@ function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
     firstSegment === 'support-chat'
   ) {
     return { routeTarget: 'support_portal' };
+  }
+  if (
+    firstSegment === 'billing' ||
+    firstSegment === 'membership' ||
+    firstSegment === 'subscription' ||
+    firstSegment === 'subscriptions'
+  ) {
+    return { routeTarget: 'membership_billing' };
   }
   if (
     firstSegment === 'call' ||
@@ -1292,6 +1313,7 @@ function NavigationHost() {
     return () => clearTimeout(t);
   }, [sessionExpired, session]);
   const {
+    status: subscriptionStatus,
     isLoadingStatus: subscriptionLoading,
     hasResolvedStatus: hasResolvedSubscriptionStatus,
   } = useSubscription();
@@ -1308,6 +1330,99 @@ function NavigationHost() {
   const notificationListenerRef = useRef<Notifications.Subscription | null>(null);
   const isResolvingNotificationRef = useRef(false);
   const notificationRetryCountRef = useRef<Record<string, number>>({});
+  const [showTrialReminder, setShowTrialReminder] = useState(false);
+  const [trialReminderDaysLeft, setTrialReminderDaysLeft] = useState(0);
+  const trialReminderStorageKey = useMemo(() => {
+    const userId = session?.user?.id?.trim();
+    if (!userId) {
+      return TRIAL_REMINDER_MODAL_LAST_SHOWN_AT_KEY;
+    }
+    return `${TRIAL_REMINDER_MODAL_LAST_SHOWN_AT_KEY}:${userId}`;
+  }, [session?.user?.id]);
+
+  const trialReminderEligibility = useMemo(() => {
+    const subscription = subscriptionStatus?.subscription;
+    if (!subscriptionStatus?.hasActiveSubscription || !subscription) {
+      return { eligible: false, daysLeft: null as number | null };
+    }
+    if (!subscription.trialEndsAt || subscription.trialConvertedAt) {
+      return { eligible: false, daysLeft: null as number | null };
+    }
+    const trialEndsAt = Date.parse(subscription.trialEndsAt);
+    if (!Number.isFinite(trialEndsAt)) {
+      return { eligible: false, daysLeft: null as number | null };
+    }
+    const msLeft = trialEndsAt - Date.now();
+    if (msLeft < 0) {
+      return { eligible: false, daysLeft: null as number | null };
+    }
+    const daysLeft = Math.max(0, Math.ceil(msLeft / (24 * 60 * 60 * 1000)));
+    if (daysLeft > 2) {
+      return { eligible: false, daysLeft: null as number | null };
+    }
+    return { eligible: true, daysLeft };
+  }, [subscriptionStatus]);
+
+  useEffect(() => {
+    if (
+      !session ||
+      !onboardingComplete ||
+      !hasResolvedSubscriptionStatus ||
+      subscriptionLoading ||
+      !trialReminderEligibility.eligible
+    ) {
+      setShowTrialReminder(false);
+      return;
+    }
+
+    let isCancelled = false;
+    const maybeShow = async () => {
+      try {
+        const lastShownRaw = await AsyncStorage.getItem(trialReminderStorageKey);
+        const lastShownMs = Number(lastShownRaw);
+        if (Number.isFinite(lastShownMs) && Date.now() - lastShownMs < 24 * 60 * 60 * 1000) {
+          return;
+        }
+      } catch {
+        // best effort
+      }
+
+      if (isCancelled) {
+        return;
+      }
+      setTrialReminderDaysLeft(trialReminderEligibility.daysLeft ?? 0);
+      setShowTrialReminder(true);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => null);
+    };
+
+    void maybeShow();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    hasResolvedSubscriptionStatus,
+    onboardingComplete,
+    session,
+    subscriptionLoading,
+    trialReminderEligibility.daysLeft,
+    trialReminderEligibility.eligible,
+    trialReminderStorageKey,
+  ]);
+
+  const dismissTrialReminder = useCallback(() => {
+    setShowTrialReminder(false);
+    void AsyncStorage.setItem(trialReminderStorageKey, String(Date.now())).catch(() => null);
+  }, [trialReminderStorageKey]);
+
+  const handleTrialReminderManage = useCallback(() => {
+    dismissTrialReminder();
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    rootNavigationRef.current?.navigate('AppTabs', {
+      screen: 'SettingsTab',
+      params: { screen: 'MembershipBilling' },
+    });
+  }, [dismissTrialReminder]);
 
   const resolveAlertRoutingContext = useCallback(async (alertId: string) => {
     const normalizedAlertId = alertId.trim();
@@ -1419,7 +1534,11 @@ function NavigationHost() {
         }
       }
 
-      if (!onboardingComplete && payload.routeTarget !== 'support_portal') {
+      if (
+        !onboardingComplete &&
+        payload.routeTarget !== 'support_portal' &&
+        payload.routeTarget !== 'membership_billing'
+      ) {
         return;
       }
 
@@ -1496,6 +1615,15 @@ function NavigationHost() {
       }
       if (payload.routeTarget === 'support_portal') {
         rootNavigationRef.current.navigate('SupportPortal');
+        return;
+      }
+      if (payload.routeTarget === 'membership_billing') {
+        rootNavigationRef.current.navigate('AppTabs', {
+          screen: 'SettingsTab',
+          params: {
+            screen: 'MembershipBilling',
+          },
+        });
         return;
       }
       if (payload.alertId || payload.routeTarget === 'alerts' || payload.alertType) {
@@ -1687,6 +1815,14 @@ function NavigationHost() {
         theme={theme}
         mode={mode}
         onDismiss={clearSessionExpired}
+      />
+      <TrialReminderModal
+        visible={showTrialReminder}
+        daysLeft={trialReminderDaysLeft}
+        theme={theme}
+        mode={mode}
+        onManage={handleTrialReminderManage}
+        onLater={dismissTrialReminder}
       />
     </View>
   );
