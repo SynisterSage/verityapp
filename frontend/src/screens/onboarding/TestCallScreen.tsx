@@ -190,7 +190,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
           </View>
           <View style={styles.infoContent}>
             <View style={styles.infoLabelRow}>
-              <Text style={styles.infoLabel}>Fallback number (optional)</Text>
+              <Text style={styles.infoLabel}>Fallback number</Text>
               <Pressable
                 onPress={(event) => {
                   event.stopPropagation();

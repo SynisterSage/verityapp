@@ -53,7 +53,7 @@ const fallbackPlans: PlanOption[] = [
     productId: 'verityprotect_monthly',
     title: 'Monthly',
     price: '$9.99 / month',
-    detail: 'then $9.99/month',
+    detail: '$9.99 a month',
     hasFreeTrial: true,
     trialLabel: '7-day free trial',
   },
@@ -103,9 +103,7 @@ function toPlanOption(product: {
   const isAnnual = product.productId === 'verityprotect_annual';
   const detail = isAnnual
     ? 'Save 17% vs monthly'
-    : hasFreeTrial
-      ? `${trialDurationLabel ?? 'Free trial'}, then ${product.displayPrice}/month`
-      : 'Flexible, cancel anytime';
+    : `${product.displayPrice} a month`;
 
   return {
     productId: product.productId,
