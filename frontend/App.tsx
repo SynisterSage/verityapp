@@ -31,6 +31,7 @@ import { SupportProvider } from './src/context/SupportContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { authorizedFetch } from './src/services/backend';
 import { supabase } from './src/services/supabase';
+import { getPublicEnv } from './src/services/publicConfig';
 import SignInScreen from './src/screens/auth/SignInScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
 import ConfirmEmailScreen from './src/screens/auth/ConfirmEmailScreen';
@@ -1890,8 +1891,11 @@ export default function App() {
   );
 
   if (!posthogClient) {
+    console.warn('[PostHog] client missing; env key:', getPublicEnv('EXPO_PUBLIC_POSTHOG_KEY'));
     return content;
   }
+
+  posthogClient.capture('posthog_initialized');
 
   return (
     <PostHogProvider client={posthogClient}>

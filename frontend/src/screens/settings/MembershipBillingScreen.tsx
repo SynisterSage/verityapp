@@ -226,6 +226,8 @@ export default function MembershipBillingScreen() {
     trialEndsLabel !== '—'
       ? `Trial end: ${trialEndsLabel}. Cancel at least 24 hours before end to avoid a charge.`
       : 'Cancel at least 24 hours before trial end to avoid a charge.';
+  const trialReminderNote =
+    'We will also send you an email reminder before the trial ends so you can renew or cancel with plenty of time.';
 
   const handleManageMembership = useCallback(async () => {
     if (isOpeningManage) {
@@ -411,12 +413,13 @@ export default function MembershipBillingScreen() {
                 <View style={styles.trialIconWrap}>
                   <Ionicons name="hourglass-outline" size={20} color={theme.colors.accent} />
                 </View>
-                <View style={styles.trialHeaderText}>
-                  <Text style={styles.trialTitle}>{trialStatusTitle}</Text>
-                  <Text style={styles.trialDetail}>{trialStatusDetail}</Text>
-                  <Text style={styles.trialMetaText}>{trialStatusMeta}</Text>
-                </View>
+              <View style={styles.trialHeaderText}>
+                <Text style={styles.trialTitle}>{trialStatusTitle}</Text>
+                <Text style={styles.trialDetail}>{trialStatusDetail}</Text>
+                <Text style={styles.trialMetaText}>{trialStatusMeta}</Text>
+                <Text style={styles.trialReminderNote}>{trialReminderNote}</Text>
               </View>
+            </View>
               <Pressable
                 style={({ pressed }) => [
                   styles.trialPrimaryButton,
@@ -632,6 +635,13 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
       lineHeight: 17,
       fontWeight: '500',
       marginTop: 2,
+    },
+    trialReminderNote: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      lineHeight: 17,
+      fontWeight: '500',
+      marginTop: 4,
     },
     trialPrimaryButton: {
       marginTop: 2,

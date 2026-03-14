@@ -344,7 +344,8 @@ export default function MembershipScreen() {
       {
         id: 'reminder',
         title: 'Reminder before renewal',
-        detail: 'When two days or less remain we show a reminder inside the app (and send a push if enabled) so your call screening keeps running without surprises.',
+        detail:
+          'When two days or less remain we show a reminder inside the app, send a push if enabled, and email a heads-up so your call screening keeps running without surprises.',
       },
     ],
     [selectedPlanHasFreeTrial]
@@ -1491,10 +1492,10 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
     },
     notNowRow: {
       alignSelf: 'center',
-      paddingHorizontal: 8,
-      paddingVertical: 6,
-      marginTop: -2,
-      marginBottom: 2,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      marginTop: 6,
+      marginBottom: 0,
     },
     notNowText: {
       fontSize: 13,

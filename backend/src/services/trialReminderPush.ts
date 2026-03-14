@@ -2,6 +2,7 @@ import logger from 'jet-logger';
 
 import supabaseAdmin from '@src/services/supabase';
 import { notifyUserForTrialReminder } from '@src/services/pushNotifications';
+import { reserveTrialNudgeEvent } from '@src/services/trialNudgeEvents';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -135,29 +136,6 @@ function buildTrialNudge(row: TrialSubscriptionRow, nowMs: number): TrialNudge |
   return null;
 }
 
-async function reserveNudgeEvent(args: {
-  userId: string;
-  nudgeKey: string;
-  metadata: Record<string, unknown>;
-}) {
-  const { error } = await supabaseAdmin.from('trial_nudge_events').insert({
-    user_id: args.userId,
-    nudge_key: args.nudgeKey,
-    channel: 'push',
-    metadata: args.metadata,
-  });
-
-  if (!error) {
-    return true;
-  }
-
-  if (error.code === '23505') {
-    return false;
-  }
-
-  throw new Error(`Failed to reserve trial nudge event: ${error.message}`);
-}
-
 export async function runTrialReminderPushCycle(
   partialConfig: Partial<Pick<TrialReminderConfig, 'dryRun'>> = {}
 ): Promise<TrialReminderSummary> {
@@ -195,9 +173,10 @@ export async function runTrialReminderPushCycle(
       continue;
     }
 
-    const reserved = await reserveNudgeEvent({
+    const reserved = await reserveTrialNudgeEvent({
       userId: row.user_id,
       nudgeKey: nudge.nudgeKey,
+      channel: 'push',
       metadata: {
         status: row.status,
         isActive: row.is_active,
