@@ -21,6 +21,7 @@ import {
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PostHogProvider } from 'posthog-react-native';
 
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { ProfileProvider, useProfile } from './src/context/ProfileContext';
@@ -91,6 +92,7 @@ import { rootNavigationRef } from './src/navigation/rootNavigator';
 import { consumePendingSiriRoute as consumePendingSiriRouteNative } from './src/native/WidgetSnapshot';
 import TwilioVoiceClientManager from './src/components/twilio/TwilioVoiceClientManager';
 import { logEvent } from './src/services/sentry';
+import { getPostHogClient } from './src/services/posthog';
 import type { AppTheme } from './src/theme/tokens';
 import { withOpacity } from './src/utils/color';
 import { Ionicons } from '@expo/vector-icons';
@@ -1877,11 +1879,23 @@ function AppContent() {
 }
 
 export default function App() {
-  return (
+  const posthogClient = useMemo(() => getPostHogClient(), []);
+
+  const content = (
     <ThemeProvider>
       <AuthProvider>
         <AppContent />
       </AuthProvider>
     </ThemeProvider>
+  );
+
+  if (!posthogClient) {
+    return content;
+  }
+
+  return (
+    <PostHogProvider client={posthogClient}>
+      {content}
+    </PostHogProvider>
   );
 }

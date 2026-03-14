@@ -56,7 +56,8 @@
             "./assets/sounds/support-notification.wav"
           ]
         }
-      ]
+      ],
+      "expo-localization"
     ],
     "extra": {
       "EXPO_PUBLIC_API_URL": "https://api.verityprotect.com/api/v1",
