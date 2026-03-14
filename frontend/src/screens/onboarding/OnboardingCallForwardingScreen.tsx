@@ -259,7 +259,7 @@ home: [
             <Ionicons name="swap-horizontal-outline" size={18} color={theme.colors.surface} />
           </View>
           <View style={styles.numberText}>
-            <Text style={styles.numberLabel}>Reliable fallback number (optional)</Text>
+            <Text style={styles.numberLabel}>Fallback number</Text>
             <Text style={styles.numberValue} numberOfLines={1}>
               {fallbackNumber ? formatPhoneNumber(fallbackNumber, fallbackNumber) : 'Optional (not set)'}
             </Text>

@@ -11,6 +11,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 
 import SettingsHeader from '../../components/common/SettingsHeader';
 import { useTheme } from '../../context/ThemeContext';
@@ -139,6 +140,7 @@ function formatTrialDaysLeft(trialEndsAt: string | null | undefined, nowMs: numb
 
 export default function MembershipBillingScreen() {
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createMembershipBillingStyles(theme, mode), [theme, mode]);
   const [feedback, setFeedback] = useState<BillingFeedback | null>(null);
@@ -215,10 +217,15 @@ export default function MembershipBillingScreen() {
       : trialDaysLeft === 1
         ? '1 day left in your trial'
         : `${trialDaysLeft ?? 0} days left in your trial`;
+  const trialEndsLabel = formatDateLabel(subscription?.trialEndsAt);
   const trialStatusDetail =
     trialDaysLeft === 0
       ? 'Keep your verified number and call screening active without interruption.'
       : 'You can manage or cancel anytime in App Store subscriptions.';
+  const trialStatusMeta =
+    trialEndsLabel !== '—'
+      ? `Trial end: ${trialEndsLabel}. Cancel at least 24 hours before end to avoid a charge.`
+      : 'Cancel at least 24 hours before trial end to avoid a charge.';
 
   const handleManageMembership = useCallback(async () => {
     if (isOpeningManage) {
@@ -347,7 +354,8 @@ export default function MembershipBillingScreen() {
         contentContainerStyle={[
           styles.body,
           {
-            paddingBottom: Math.max(insets.bottom, 24) + 32,
+            // Keep content fully scrollable above the floating bottom dock/tab bar.
+            paddingBottom: Math.max(tabBarHeight + 28, insets.bottom + 56),
             paddingTop: Math.max(insets.top, 16),
           },
         ]}
@@ -406,6 +414,7 @@ export default function MembershipBillingScreen() {
                 <View style={styles.trialHeaderText}>
                   <Text style={styles.trialTitle}>{trialStatusTitle}</Text>
                   <Text style={styles.trialDetail}>{trialStatusDetail}</Text>
+                  <Text style={styles.trialMetaText}>{trialStatusMeta}</Text>
                 </View>
               </View>
               <Pressable
@@ -511,6 +520,9 @@ export default function MembershipBillingScreen() {
           <Text style={styles.bodyText}>
             The monthly plan starts with a 7-day free trial, and we surface an in-app reminder when two days remain so you can keep the number or cancel without surprise.
           </Text>
+          <Text style={styles.bodyText}>
+            If membership is canceled and stays inactive after trial, your Verity number may be reclaimed after the grace period. If inactive status continues, trial data is scheduled for deletion after the retention window.
+          </Text>
           {!hasProductsLoaded && productsError ? (
             <Text style={styles.errorText}>{productsError}</Text>
           ) : null}
@@ -613,6 +625,13 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
       fontSize: 13,
       lineHeight: 18,
       fontWeight: '500',
+    },
+    trialMetaText: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      lineHeight: 17,
+      fontWeight: '500',
+      marginTop: 2,
     },
     trialPrimaryButton: {
       marginTop: 2,

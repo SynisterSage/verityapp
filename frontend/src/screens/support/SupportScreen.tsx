@@ -46,6 +46,16 @@ const QUICK_PROMPTS = [
       'I noticed a charge from the App Store/Play Store for Verity Protect. Please confirm the receipt and next steps if I need a refund.',
   },
   {
+    label: 'Trial ending soon',
+    message:
+      'My 7-day monthly trial is ending soon. Please confirm my exact trial end time and how to cancel at least 24 hours before charge if needed.',
+  },
+  {
+    label: 'Number changed',
+    message:
+      'My Verity number changed after trial/billing changes. Please check whether my previous number was still available and explain what happened.',
+  },
+  {
     label: 'Automation & alerts',
     message:
       'I want to change automation rules or add safe phrases—help me understand what to edit so alerts behave better.',

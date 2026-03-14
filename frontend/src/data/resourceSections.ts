@@ -308,11 +308,23 @@ export const FAQ_CONTENT: ResourceSection[] = [
       'Yes. Export your timeline from Settings → Privacy, and delete your profile from Settings → Account to remove active profile data and history.',
   },
   {
+    id: 'faq-trial-monthly',
+    title: 'How does the 7-day trial work?',
+    body:
+      'Eligible new subscribers on the monthly plan get a 7-day free trial. You can use full protection during the trial, and billing is handled by Apple.',
+    bullets: [
+      'Apple charges your monthly plan when the trial ends unless you cancel at least 24 hours before the end of the trial period.',
+      'You can manage or cancel anytime in iPhone Settings → Apple Account → Subscriptions.',
+      'If you need help finding the right subscription or receipt, support can guide you.',
+    ],
+  },
+  {
     id: 'faq-app-store',
     title: 'How do I manage charges?',
     body:
       'All payments occur through the App Store or Google Play. Open the store’s subscription settings to view receipts, cancel, or request refunds. Support can pin down which charges to reference before you reach out to the store.',
     bullets: [
+      'Monthly membership may start with a 7-day free trial for eligible new subscribers, then auto-renews unless canceled at least 24 hours before renewal.',
       'The App Store billing portal shows the exact amounts you paid and any active subscriptions.',
       'Tap “Report a Problem” inside the store if you need a refund; mention the support ticket ID so we can link the conversation.',
       'Keep the ticket open and share the receipt you received from Apple/Google; we can help agents check the right profile.',
@@ -327,6 +339,8 @@ export const BILLING_CONTENT: ResourceSection[] = [
     body:
       'Verity Protect charges are processed through the platform store tied to your Apple or Google account. We do not store your payment info, and the store handles subscriptions, receipts, and refunds.',
     bullets: [
+      'Eligible new monthly subscribers may receive a 7-day free trial before the first charge.',
+      'After trial, the monthly plan renews automatically unless canceled at least 24 hours before the end of the trial or current billing period.',
       'Open the App Store or Play Store app, tap your profile, and go to Subscriptions to see active charges.',
       'Receipts are emailed from the store; save them for your records or share them with support.',
       'Need a refund? Use the store’s “Report a Problem” feature and mention the Verity Protect ticket so we can support the request.',

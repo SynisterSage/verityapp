@@ -67,7 +67,7 @@ const formatFullPhone = (phoneNumber: string) => {
 export default function CreateProfileScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const { activeProfile, setActiveProfile, setOnboardingComplete } = useProfile();
-  const { refreshStatus } = useSubscription();
+  const { refreshStatus, status } = useSubscription();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
@@ -92,6 +92,12 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const isProfileInfoComplete = Boolean(firstName.trim() && lastName.trim() && phoneDigits.length === 10);
   const isFormValid = Boolean(assignedNumber); // Continue only enabled after number assigned
   const primaryDisabled = !isFormValid || isSubmitting;
+  const isMonthlyTrialActive = Boolean(
+    status?.hasActiveSubscription &&
+      status.subscription?.productId?.toLowerCase().includes('month') &&
+      status.subscription?.trialEndsAt &&
+      !status.subscription?.trialConvertedAt
+  );
 
   // Sync assignedNumber when profile loads/changes
   useEffect(() => {
@@ -464,6 +470,14 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
                   If your app has been inactive for a while, we send a reminder so your line stays ready.
                 </Text>
               </View>
+              {isMonthlyTrialActive ? (
+                <View style={styles.modalRow}>
+                  <Ionicons name="refresh-outline" size={18} color={theme.colors.textMuted} />
+                  <Text style={styles.modalRowText}>
+                    After trial ends, we try to keep this same Verity number if you continue membership. If it is no longer available, we will assign the next available number.
+                  </Text>
+                </View>
+              ) : null}
 
               <View style={styles.modalActions}>
                 <Pressable style={styles.modalSecondaryButton} onPress={() => setShowCallFlowModal(false)}>

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  LayoutAnimation,
   Linking,
   Modal,
   Pressable,
@@ -52,7 +53,7 @@ const fallbackPlans: PlanOption[] = [
     productId: 'verityprotect_monthly',
     title: 'Monthly',
     price: '$9.99 / month',
-    detail: '7-day free trial, then $9.99/month',
+    detail: 'then $9.99/month',
     hasFreeTrial: true,
     trialLabel: '7-day free trial',
   },
@@ -241,6 +242,8 @@ export default function MembershipScreen() {
 
   const [selectedProductId, setSelectedProductId] = useState<string>(selectedDefaultProductId);
   const [feedback, setFeedback] = useState<MembershipFeedback | null>(null);
+  const [isFeaturesExpanded, setIsFeaturesExpanded] = useState(false);
+  const [isTrialInfoExpanded, setIsTrialInfoExpanded] = useState(false);
   const [isBillingExpanded, setIsBillingExpanded] = useState(false);
   const [footerHeight, setFooterHeight] = useState(156);
   const [showExitModal, setShowExitModal] = useState(false);
@@ -617,41 +620,86 @@ export default function MembershipScreen() {
         </View>
 
         <View style={styles.featuresCard}>
-          {FEATURES.map((f) => (
-            <View key={f.text} style={styles.featureRow}>
+          <Pressable
+            style={styles.featuresHeaderRow}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setIsFeaturesExpanded((prev) => !prev);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle call protection features"
+          >
+            <View style={styles.featuresHeaderLeft}>
               <View style={styles.featureIconWrap}>
-                <Ionicons name={f.icon as any} size={16} color={theme.colors.accent} />
+                <Ionicons name="shield-checkmark-outline" size={16} color={theme.colors.accent} />
               </View>
-              <Text style={styles.featureText}>{f.text}</Text>
+              <Text style={styles.featuresHeaderTitle}>Call protection features</Text>
             </View>
-          ))}
+            <Ionicons
+              name={isFeaturesExpanded ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={theme.colors.textMuted}
+            />
+          </Pressable>
+
+          {isFeaturesExpanded ? (
+            <View style={styles.featuresBody}>
+              {FEATURES.map((f) => (
+                <View key={f.text} style={styles.featureRow}>
+                  <View style={styles.featureIconWrap}>
+                    <Ionicons name={f.icon as any} size={16} color={theme.colors.accent} />
+                  </View>
+                  <Text style={styles.featureText}>{f.text}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.trialInfoCard}>
-          <View style={styles.trialInfoHeader}>
-            <View style={styles.trialInfoIconWrap}>
-              <Ionicons name="sparkles-outline" size={20} color={theme.colors.accent} />
-            </View>
-            <View>
-              <Text style={styles.trialInfoTitle}>Trial & billing</Text>
-              <Text style={styles.trialInfoSubtitle}>
-                We keep every charge transparent so your family stays protected without surprises.
-              </Text>
-            </View>
-          </View>
-          <View style={styles.trialInfoBody}>
-            {trialInfoRows.map((row) => (
-              <View key={row.id} style={styles.trialInfoRow}>
-                <View style={styles.trialInfoBullet}>
-                  <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
-                </View>
-                <View style={styles.trialInfoTextWrap}>
-                  <Text style={styles.trialInfoRowTitle}>{row.title}</Text>
-                  <Text style={styles.trialInfoRowDetail}>{row.detail}</Text>
-                </View>
+          <Pressable
+            style={styles.trialInfoHeader}
+            onPress={() => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setIsTrialInfoExpanded((prev) => !prev);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Toggle trial and billing details"
+          >
+            <View style={styles.trialInfoHeaderLeft}>
+              <View style={styles.trialInfoIconWrap}>
+                <Ionicons name="sparkles-outline" size={20} color={theme.colors.accent} />
               </View>
-            ))}
-          </View>
+              <View style={styles.trialInfoHeaderTextWrap}>
+                <Text style={styles.trialInfoTitle}>Trial & billing</Text>
+                {isTrialInfoExpanded ? (
+                  <Text style={styles.trialInfoSubtitle}>
+                    We keep every charge transparent so your family stays protected without surprises.
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+            <Ionicons
+              name={isTrialInfoExpanded ? 'chevron-up' : 'chevron-down'}
+              size={16}
+              color={theme.colors.textMuted}
+            />
+          </Pressable>
+          {isTrialInfoExpanded ? (
+            <View style={styles.trialInfoBody}>
+              {trialInfoRows.map((row) => (
+                <View key={row.id} style={styles.trialInfoRow}>
+                  <View style={styles.trialInfoBullet}>
+                    <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
+                  </View>
+                  <View style={styles.trialInfoTextWrap}>
+                    <Text style={styles.trialInfoRowTitle}>{row.title}</Text>
+                    <Text style={styles.trialInfoRowDetail}>{row.detail}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.planSection}>
@@ -672,6 +720,11 @@ export default function MembershipScreen() {
                     <View style={styles.planTextWrap}>
                       <View style={styles.planTitleRow}>
                         <Text style={styles.planTitle}>{plan.title}</Text>
+                        {isAnnual && plan.badge ? (
+                          <View style={styles.planBestValuePill}>
+                            <Text style={styles.planBestValueText}>{plan.badge}</Text>
+                          </View>
+                        ) : null}
                       </View>
                       {isAnnual ? (
                         <View style={styles.planSavingsPill}>
@@ -702,11 +755,6 @@ export default function MembershipScreen() {
                     </View>
                     <View style={styles.planPriceWrap}>
                       <Text style={[styles.planPrice, isAnnual && styles.planPriceAnnual]}>{plan.price}</Text>
-                      {isAnnual && plan.badge ? (
-                        <View style={styles.planBestValuePill}>
-                          <Text style={styles.planBestValueText}>{plan.badge}</Text>
-                        </View>
-                      ) : null}
                     </View>
                   </View>
                   <View style={[styles.radio, selected && styles.radioSelected]}>
@@ -1051,6 +1099,28 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       backgroundColor: theme.colors.surface,
       paddingHorizontal: 16,
       paddingVertical: 14,
+      gap: 10,
+    },
+    featuresHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    featuresHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flex: 1,
+      minWidth: 0,
+    },
+    featuresHeaderTitle: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    featuresBody: {
       gap: 12,
     },
     featureRow: {
@@ -1107,7 +1177,20 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
     trialInfoHeader: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
       gap: 12,
+    },
+    trialInfoHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flex: 1,
+      minWidth: 0,
+    },
+    trialInfoHeaderTextWrap: {
+      flex: 1,
+      minWidth: 0,
+      gap: 2,
     },
     trialInfoIconWrap: {
       width: 44,
@@ -1121,12 +1204,14 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       fontSize: 16,
       fontWeight: '700',
       color: theme.colors.text,
+      flexShrink: 1,
     },
     trialInfoSubtitle: {
       color: theme.colors.textMuted,
       fontSize: 13,
       lineHeight: 18,
       fontWeight: '500',
+      flexShrink: 1,
     },
     trialInfoBody: {
       gap: 12,
@@ -1205,17 +1290,20 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+      flexWrap: 'wrap',
     },
     planTitle: {
       fontSize: 17,
       fontWeight: '700',
       color: theme.colors.text,
+      flexShrink: 1,
     },
     planBestValuePill: {
       borderRadius: 20,
       paddingHorizontal: 8,
       paddingVertical: 3,
       backgroundColor: withOpacity(theme.colors.accent, 0.14),
+      alignSelf: 'flex-start',
     },
     planBestValueText: {
       fontSize: 11,

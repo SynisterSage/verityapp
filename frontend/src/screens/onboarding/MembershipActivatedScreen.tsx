@@ -35,8 +35,16 @@ export default function MembershipActivatedScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'MembershipActivated'>>();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const { membershipActivationNotice, clearMembershipActivationNotice } = useSubscription();
+  const { membershipActivationNotice, clearMembershipActivationNotice, status } = useSubscription();
   const planLabel = formatPlanLabel(membershipActivationNotice);
+  const hasActiveTrial = Boolean(
+    status?.hasActiveSubscription &&
+      status.subscription?.trialEndsAt &&
+      !status.subscription?.trialConvertedAt
+  );
+  const subtitle = hasActiveTrial
+    ? `Your ${planLabel} trial is active and protecting your account.`
+    : `Your ${planLabel} is active and protecting your account.`;
 
   // Staggered entrance anims
   const cardAnim = useRef(new Animated.Value(0)).current;
@@ -138,7 +146,7 @@ export default function MembershipActivatedScreen() {
               ]}
             >
               <Text style={styles.title}>Membership Activated</Text>
-              <Text style={styles.subtitle}>Your {planLabel} is active and protecting your account.</Text>
+              <Text style={styles.subtitle}>{subtitle}</Text>
             </Animated.View>
 
             {/* Button */}

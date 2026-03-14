@@ -1,4 +1,13 @@
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import {
+  LayoutAnimation,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -14,6 +23,18 @@ type Release = {
 };
 
 const RELEASES: Release[] = [
+  {
+    version: '1.0.1',
+    label: 'Latest Release',
+    date: 'March 2026',
+    highlights: [
+      'Added a 7-day free trial for the monthly membership plan for eligible new subscribers.',
+      'Improved trial visibility across onboarding and billing screens.',
+      'Added trial reminders in-app with clearer renewal timing guidance.',
+      'Added trial lifecycle handling so expired trial numbers can be reclaimed and reused.',
+      'Improved analytics instrumentation and purchase flow reliability.',
+    ],
+  },
   {
     version: '1.0.0',
     label: 'Initial Release',
@@ -39,6 +60,12 @@ export default function WhatsNewScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
   const styles = makeStyles(theme);
+  const [expandedByVersion, setExpandedByVersion] = useState<Record<string, boolean>>(
+    () =>
+      Object.fromEntries(
+        RELEASES.map((release, index) => [release.version, index === 0])
+      ) as Record<string, boolean>
+  );
 
   const containerPaddingTop = Math.max(16, insets.top + 4);
   const contentPaddingBottom = Math.max(insets.bottom, 32);
@@ -68,21 +95,43 @@ export default function WhatsNewScreen() {
 
         {RELEASES.map((release) => (
           <View key={release.version} style={styles.section}>
-            <View style={styles.sectionHeaderRow}>
-              <View style={styles.sectionHeaderLeft}>
-                <Text style={styles.sectionLabel}>{release.label}</Text>
-                <Text style={styles.sectionVersion}>{release.version}</Text>
-              </View>
-              <Text style={styles.sectionDate}>{release.date}</Text>
-            </View>
-            <View style={styles.card}>
-              {release.highlights.map((item, i) => (
-                <View key={i} style={[styles.bulletRow, i > 0 && styles.bulletRowBorder]}>
-                  <View style={styles.bulletDot} />
-                  <Text style={styles.bulletText}>{item}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.sectionHeaderPressable, pressed && styles.sectionHeaderPressed]}
+              onPress={() => {
+                LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+                setExpandedByVersion((prev) => ({
+                  ...prev,
+                  [release.version]: !prev[release.version],
+                }));
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Toggle release notes for version ${release.version}`}
+            >
+              <View style={styles.sectionHeaderRow}>
+                <View style={styles.sectionHeaderLeft}>
+                  <Text style={styles.sectionLabel}>{release.label}</Text>
+                  <Text style={styles.sectionVersion}>{release.version}</Text>
                 </View>
-              ))}
-            </View>
+                <View style={styles.sectionHeaderRight}>
+                  <Text style={styles.sectionDate}>{release.date}</Text>
+                  <Ionicons
+                    name={expandedByVersion[release.version] ? 'chevron-up' : 'chevron-down'}
+                    size={16}
+                    color={theme.colors.textMuted}
+                  />
+                </View>
+              </View>
+            </Pressable>
+            {expandedByVersion[release.version] ? (
+              <View style={styles.card}>
+                {release.highlights.map((item, i) => (
+                  <View key={i} style={[styles.bulletRow, i > 0 && styles.bulletRowBorder]}>
+                    <View style={styles.bulletDot} />
+                    <Text style={styles.bulletText}>{item}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         ))}
       </ScrollView>
@@ -156,10 +205,23 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 16,
+      gap: 10,
+    },
+    sectionHeaderPressable: {
+      marginBottom: 14,
+    },
+    sectionHeaderPressed: {
+      opacity: 0.72,
     },
     sectionHeaderLeft: {
       gap: 3,
+      flex: 1,
+      minWidth: 0,
+    },
+    sectionHeaderRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
     sectionLabel: {
       color: theme.colors.textMuted,
@@ -214,4 +276,3 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
       letterSpacing: 0.1,
     },
   });
-
