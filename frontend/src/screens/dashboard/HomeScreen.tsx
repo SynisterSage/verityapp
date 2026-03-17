@@ -104,6 +104,45 @@ type PinChangeNotice = {
   actorLabel: string;
 };
 
+type SetupNudgeKey = 'test_call' | 'alert_prefs' | 'safe_phrases';
+
+type SetupNudgeState = {
+  completed_test_call: boolean;
+  completed_alert_prefs: boolean;
+  completed_safe_phrases: boolean;
+  dismissed_nudge_cards: SetupNudgeKey[];
+};
+
+const SETUP_NUDGE_PRIORITY: SetupNudgeKey[] = ['test_call', 'alert_prefs', 'safe_phrases'];
+const setupNudgeDismissKey = (profileId: string) => `home:setupNudges:dismissed:${profileId}`;
+
+const emptySetupNudgeState = (): SetupNudgeState => ({
+  completed_test_call: false,
+  completed_alert_prefs: false,
+  completed_safe_phrases: false,
+  dismissed_nudge_cards: [],
+});
+
+function extractSetupNudgeState(profile?: Record<string, unknown> | null): SetupNudgeState {
+  if (!profile) {
+    return emptySetupNudgeState();
+  }
+
+  const dismissedRaw = profile.dismissed_nudge_cards;
+  const dismissed = Array.isArray(dismissedRaw)
+    ? dismissedRaw
+        .filter((value): value is string => typeof value === 'string')
+        .filter((value): value is SetupNudgeKey => SETUP_NUDGE_PRIORITY.includes(value as SetupNudgeKey))
+    : [];
+
+  return {
+    completed_test_call: profile.completed_test_call === true,
+    completed_alert_prefs: profile.completed_alert_prefs === true,
+    completed_safe_phrases: profile.completed_safe_phrases === true,
+    dismissed_nudge_cards: Array.from(new Set(dismissed)),
+  };
+}
+
 function formatPinChangeTimestamp(value: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
@@ -121,7 +160,7 @@ function formatPinChangeTimestamp(value: string) {
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
-  const { activeProfile } = useProfile();
+  const { activeProfile, setActiveProfile } = useProfile();
   const sessionUserId = session?.user?.id ?? null;
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -158,10 +197,252 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [refreshing, setRefreshing] = useState(false);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const [showNotifBanner, setShowNotifBanner] = useState(false);
+  const [setupNudgeState, setSetupNudgeState] = useState<SetupNudgeState>(emptySetupNudgeState);
+  const [localDismissedNudges, setLocalDismissedNudges] = useState<SetupNudgeKey[]>([]);
+  const [dismissingNudge, setDismissingNudge] = useState(false);
+  const setupNudgeOpacity = useRef(new Animated.Value(1)).current;
+  const canPatchDismissedNudgesRef = useRef(true);
   const shimmer = useRef(new Animated.Value(0.6)).current;
   const scrollRef = useRef<ScrollView>(null);
   const email = session?.user.email ?? 'Account';
   const hasTwilioNumber = Boolean(activeProfile?.twilio_virtual_number);
+  const triggerLightHaptic = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+  }, []);
+
+  useEffect(() => {
+    setSetupNudgeState(extractSetupNudgeState((activeProfile ?? null) as Record<string, unknown> | null));
+  }, [
+    activeProfile?.id,
+    activeProfile?.completed_alert_prefs,
+    activeProfile?.completed_safe_phrases,
+    activeProfile?.completed_test_call,
+    activeProfile?.dismissed_nudge_cards,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const profileId = activeProfile?.id;
+    if (!profileId) {
+      setLocalDismissedNudges([]);
+      return;
+    }
+
+    AsyncStorage.getItem(setupNudgeDismissKey(profileId))
+      .then((stored) => {
+        if (cancelled || !stored) {
+          return;
+        }
+        try {
+          const parsed = JSON.parse(stored);
+          if (!Array.isArray(parsed)) {
+            return;
+          }
+          const normalized = parsed
+            .filter((value): value is string => typeof value === 'string')
+            .filter((value): value is SetupNudgeKey =>
+              SETUP_NUDGE_PRIORITY.includes(value as SetupNudgeKey)
+            );
+          setLocalDismissedNudges(Array.from(new Set(normalized)));
+        } catch {
+          setLocalDismissedNudges([]);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLocalDismissedNudges([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProfile?.id]);
+
+  useEffect(() => {
+    const profileId = activeProfile?.id;
+    if (!profileId) {
+      return;
+    }
+    const profileRecord = (activeProfile ?? null) as Record<string, unknown> | null;
+    if (!profileRecord) {
+      return;
+    }
+    const hasServerDismissedField = Object.prototype.hasOwnProperty.call(
+      profileRecord,
+      'dismissed_nudge_cards'
+    );
+    if (!hasServerDismissedField) {
+      return;
+    }
+    const serverDismissedRaw = profileRecord.dismissed_nudge_cards;
+    const serverDismissed = Array.isArray(serverDismissedRaw)
+      ? serverDismissedRaw.filter((value): value is string => typeof value === 'string')
+      : [];
+    if (serverDismissed.length > 0 || localDismissedNudges.length === 0) {
+      return;
+    }
+
+    setLocalDismissedNudges([]);
+    AsyncStorage.removeItem(setupNudgeDismissKey(profileId)).catch(() => null);
+  }, [activeProfile, localDismissedNudges]);
+
+  const mergedDismissedNudges = useMemo(
+    () =>
+      Array.from(new Set([...setupNudgeState.dismissed_nudge_cards, ...localDismissedNudges])) as SetupNudgeKey[],
+    [localDismissedNudges, setupNudgeState.dismissed_nudge_cards]
+  );
+
+  const refreshSetupNudgeState = useCallback(async () => {
+    if (!activeProfile?.id) {
+      setSetupNudgeState(emptySetupNudgeState());
+      return;
+    }
+    try {
+      const data = await authorizedFetch(`/profiles/${activeProfile.id}`);
+      if (data?.profile) {
+        setActiveProfile(data.profile);
+        setSetupNudgeState(extractSetupNudgeState(data.profile as Record<string, unknown>));
+      }
+    } catch (error) {
+      console.warn('[home] refresh setup nudge state failed', error);
+    }
+  }, [activeProfile?.id, setActiveProfile]);
+
+  const activeSetupNudgeKey = useMemo<SetupNudgeKey | null>(() => {
+    const dismissed = new Set(mergedDismissedNudges);
+    for (const key of SETUP_NUDGE_PRIORITY) {
+      if (dismissed.has(key)) {
+        continue;
+      }
+      if (key === 'test_call' && !setupNudgeState.completed_test_call) {
+        return key;
+      }
+      if (key === 'alert_prefs' && !setupNudgeState.completed_alert_prefs) {
+        return key;
+      }
+      if (key === 'safe_phrases' && !setupNudgeState.completed_safe_phrases) {
+        return key;
+      }
+    }
+    return null;
+  }, [mergedDismissedNudges, setupNudgeState]);
+
+  const activeSetupNudge = useMemo(() => {
+    if (!activeSetupNudgeKey) {
+      return null;
+    }
+    if (activeSetupNudgeKey === 'test_call') {
+      return {
+        key: activeSetupNudgeKey,
+        title: 'Verify your setup works',
+        description: 'Make a quick test call to confirm Verity is screening correctly.',
+        ctaLabel: 'Run Test Call \u2192',
+        routeName: 'OnboardingTestCall',
+        iconName: 'call' as keyof typeof Ionicons.glyphMap,
+      };
+    }
+    if (activeSetupNudgeKey === 'alert_prefs') {
+      return {
+        key: activeSetupNudgeKey,
+        title: 'Customize your alerts',
+        description: 'Choose how and when you get notified when something is blocked.',
+        ctaLabel: 'Set Up Alerts \u2192',
+        routeName: 'OnboardingAlerts',
+        iconName: 'notifications' as keyof typeof Ionicons.glyphMap,
+      };
+    }
+    return {
+      key: activeSetupNudgeKey,
+      title: 'Add safe phrases',
+      description: 'Tell Verity what words to listen for in voicemails.',
+      ctaLabel: 'Add Phrases \u2192',
+      routeName: 'OnboardingSafePhrases',
+      iconName: 'chatbubble-ellipses' as keyof typeof Ionicons.glyphMap,
+    };
+  }, [activeSetupNudgeKey]);
+
+  useEffect(() => {
+    setupNudgeOpacity.stopAnimation();
+    if (!activeSetupNudge) {
+      setupNudgeOpacity.setValue(1);
+      return;
+    }
+    setupNudgeOpacity.setValue(0.8);
+    Animated.timing(setupNudgeOpacity, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [activeSetupNudge?.key, setupNudgeOpacity]);
+
+  const handleDismissSetupNudge = useCallback(() => {
+    if (!activeProfile?.id || !activeSetupNudge || dismissingNudge) {
+      return;
+    }
+
+    const nudgeKey = activeSetupNudge.key;
+    const nextDismissed = Array.from(
+      new Set([...mergedDismissedNudges, nudgeKey])
+    ) as SetupNudgeKey[];
+
+    setDismissingNudge(true);
+    Animated.timing(setupNudgeOpacity, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setSetupNudgeState((current) => ({
+        ...current,
+        dismissed_nudge_cards: nextDismissed,
+      }));
+      setLocalDismissedNudges(nextDismissed);
+      setActiveProfile({
+        ...activeProfile,
+        dismissed_nudge_cards: nextDismissed,
+      });
+      setDismissingNudge(false);
+
+      AsyncStorage.setItem(setupNudgeDismissKey(activeProfile.id), JSON.stringify(nextDismissed)).catch(
+        () => null
+      );
+
+      const profileIncludesDismissedNudges =
+        activeProfile && Object.prototype.hasOwnProperty.call(activeProfile, 'dismissed_nudge_cards');
+      if (!profileIncludesDismissedNudges || !canPatchDismissedNudgesRef.current) {
+        return;
+      }
+
+      authorizedFetch(`/profiles/${activeProfile.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ dismissed_nudge_cards: nextDismissed }),
+      }).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error ?? '');
+        if (message.toLowerCase().includes('validation failed')) {
+          // Older backend schema does not yet accept dismissed_nudge_cards.
+          canPatchDismissedNudgesRef.current = false;
+          return;
+        }
+        console.warn('[home] failed to dismiss setup nudge', error);
+      });
+    });
+  }, [
+    activeProfile,
+    activeSetupNudge,
+    dismissingNudge,
+    mergedDismissedNudges,
+    setActiveProfile,
+    setupNudgeOpacity,
+  ]);
+
+  const handleSetupNudgePress = useCallback(() => {
+    if (!activeSetupNudge) {
+      return;
+    }
+    triggerLightHaptic();
+    rootNavigationRef.navigate(activeSetupNudge.routeName as never);
+  }, [activeSetupNudge, triggerLightHaptic]);
+
   const loadStats = async (isRefresh = false, silent = false) => {
     if (!activeProfile) {
       setRecentCall(null);
@@ -429,7 +710,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       setRefreshing(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeProfile?.id]);
+  }, [activeProfile?.id, refreshSetupNudgeState]);
 
   useEffect(() => {
     setRecentCall(null);
@@ -443,7 +724,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     setShowPinChangeModal(false);
     setHasInitialLoadCompleted(false);
     loadStats();
-  }, [activeProfile?.id]);
+    void refreshSetupNudgeState();
+  }, [activeProfile?.id, refreshSetupNudgeState]);
 
   useEffect(() => {
     const interval = isAppActive
@@ -573,7 +855,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   useFocusEffect(
     useCallback(() => {
       scrollRef.current?.scrollTo({ y: 0, animated: false });
-    }, [])
+      void refreshSetupNudgeState();
+    }, [refreshSetupNudgeState])
   );
 
   // Check notification permission once on mount — show banner if not granted (required for CallKit)
@@ -654,10 +937,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         }),
     },
   ];
-
-  const triggerLightHaptic = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-  }, []);
 
   const handleSupportPress = useCallback(() => {
     triggerLightHaptic();
@@ -859,6 +1138,46 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 </View>
               </View>
             )}
+            {activeSetupNudge ? (
+              <Animated.View
+                style={[
+                  styles.section,
+                  styles.setupNudgeSection,
+                  { opacity: setupNudgeOpacity },
+                ]}
+              >
+                <Text style={styles.sectionLabel}>Complete your setup</Text>
+                <View style={styles.setupNudgeCard}>
+                  <View style={styles.setupNudgeAccent} />
+                  <View style={styles.setupNudgeBody}>
+                    <View style={styles.setupNudgeTopRow}>
+                      <View style={styles.setupNudgeHeadingRow}>
+                        <View style={styles.setupNudgeIconWrap}>
+                          <Ionicons name={activeSetupNudge.iconName} size={16} color={theme.colors.accent} />
+                        </View>
+                        <Text style={styles.setupNudgeTitle}>{activeSetupNudge.title}</Text>
+                      </View>
+                      <Pressable
+                        style={({ pressed }) => [styles.setupNudgeDismiss, pressed && styles.setupNudgeDismissPressed]}
+                        onPress={handleDismissSetupNudge}
+                        hitSlop={8}
+                        disabled={dismissingNudge}
+                      >
+                        <Ionicons name="close" size={14} color={theme.colors.textMuted} />
+                      </Pressable>
+                    </View>
+                    <Text style={styles.setupNudgeDescription}>{activeSetupNudge.description}</Text>
+
+                    <Pressable
+                      style={({ pressed }) => [styles.setupNudgeCta, pressed && styles.setupNudgeCtaPressed]}
+                      onPress={handleSetupNudgePress}
+                    >
+                      <Text style={styles.setupNudgeCtaText}>{activeSetupNudge.ctaLabel}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </Animated.View>
+            ) : null}
             <View style={styles.section}>
               <Text style={styles.sectionLabel}>Featured Event</Text>
               <RecentCallCard
@@ -1257,13 +1576,96 @@ const createStyles = (theme: AppTheme) =>
     section: {
       marginTop: 20,
     },
+    setupNudgeSection: {
+      marginTop: 10,
+    },
     sectionLabel: {
       color: theme.colors.textMuted,
       fontSize: 12,
       fontWeight: '600',
       letterSpacing: 0.4,
       textTransform: 'uppercase',
-      marginBottom: 12,
+      marginBottom: 8,
+    },
+    setupNudgeCard: {
+      borderRadius: 20,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: withOpacity(theme.colors.text, 0.12),
+      backgroundColor: theme.colors.surface,
+      overflow: 'hidden',
+      flexDirection: 'row',
+    },
+    setupNudgeAccent: {
+      width: 3,
+      backgroundColor: withOpacity(theme.colors.accent, 0.95),
+    },
+    setupNudgeBody: {
+      flex: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      gap: 5,
+    },
+    setupNudgeTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    setupNudgeHeadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      minWidth: 0,
+      marginRight: 8,
+    },
+    setupNudgeDismiss: {
+      alignSelf: 'flex-end',
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 10,
+      marginBottom: 0,
+    },
+    setupNudgeDismissPressed: {
+      backgroundColor: withOpacity(theme.colors.textMuted, 0.16),
+    },
+    setupNudgeIconWrap: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.14),
+      marginRight: 8,
+    },
+    setupNudgeTitle: {
+      color: theme.colors.text,
+      fontSize: 15,
+      fontWeight: '700',
+      letterSpacing: -0.2,
+      flexShrink: 1,
+    },
+    setupNudgeDescription: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+      lineHeight: 16,
+    },
+    setupNudgeCta: {
+      marginTop: 2,
+      width: '100%',
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 9,
+      backgroundColor: theme.colors.accent,
+    },
+    setupNudgeCtaPressed: {
+      opacity: 0.88,
+    },
+    setupNudgeCtaText: {
+      color: theme.colors.surface,
+      fontSize: 14,
+      fontWeight: '700',
     },
     statsGrid: {
       flexDirection: 'row',

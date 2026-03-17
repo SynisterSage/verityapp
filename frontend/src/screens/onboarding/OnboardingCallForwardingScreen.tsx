@@ -180,7 +180,7 @@ home: [
 
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
-      <OnboardingHeader chapter="Setup" activeStep={8} totalSteps={9} />
+      <OnboardingHeader chapter="Setup" activeStep={4} totalSteps={6} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -328,17 +328,15 @@ home: [
       </ScrollView>
 
     <ActionFooter
-      primaryLabel={twilioNumber ? "I've turned it on" : 'Open Settings'}
+      primaryLabel={twilioNumber ? "I've turned it on" : 'Continue'}
       onPrimaryPress={() => {
         if (!twilioNumber) {
           setRedirectToSettings(true);
-          navigation.navigate('OnboardingSuccess');
-          return;
         }
-        navigation.navigate('OnboardingTestCall');
+        navigation.navigate('OnboardingTrustedContacts');
       }}
       secondaryLabel={twilioNumber ? 'Do this later' : undefined}
-      onSecondaryPress={twilioNumber ? () => navigation.navigate('OnboardingTestCall') : undefined}
+      onSecondaryPress={twilioNumber ? () => navigation.navigate('OnboardingTrustedContacts') : undefined}
     />
   </SafeAreaView>
 );

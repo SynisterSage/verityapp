@@ -25,6 +25,10 @@ type MemberRole = (typeof INVITE_ROLES)[number];
 
 const SETUP_TICKET_ID = 'setup-help';
 const SETUP_TICKET_SUBJECT = 'Onboarding support';
+const PROFILE_SELECT_FIELDS =
+  'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, completed_safe_phrases, completed_alert_prefs, completed_test_call, dismissed_nudge_cards, created_at';
+const PROFILE_SELECT_FIELDS_NO_PIN =
+  'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, completed_safe_phrases, completed_alert_prefs, completed_test_call, dismissed_nudge_cards, created_at';
 
 async function migrateSetupSupportToProfile(userId: string, profileId: string) {
   const { count: profileCount } = await supabaseAdmin
@@ -195,9 +199,7 @@ async function listProfiles(req: Request, res: Response) {
 
   const { data: caretakerProfiles } = await supabaseAdmin
     .from('profiles')
-    .select(
-      'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
-    )
+    .select(PROFILE_SELECT_FIELDS)
     .eq('caretaker_id', userId);
 
   const { data: memberProfiles } = await supabaseAdmin
@@ -210,9 +212,7 @@ async function listProfiles(req: Request, res: Response) {
   if (memberIds.length > 0) {
     const { data } = await supabaseAdmin
       .from('profiles')
-      .select(
-        'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
-      )
+      .select(PROFILE_SELECT_FIELDS)
       .in('id', memberIds);
     memberRows = data ?? [];
   }
@@ -313,9 +313,7 @@ async function createProfile(req: Request, res: Response) {
       auto_block_on_fraud:
         typeof auto_block_on_fraud === 'boolean' ? auto_block_on_fraud : undefined,
     })
-    .select(
-      'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
-    )
+    .select(PROFILE_SELECT_FIELDS)
     .single();
 
   if (error || !data) {
@@ -762,10 +760,18 @@ async function updateAlertPrefs(req: Request, res: Response) {
     }
   }
 
+  const { error: completionError } = await supabaseAdmin
+    .from('profiles')
+    .update({ completed_alert_prefs: true })
+    .eq('id', profileId);
+  if (completionError) {
+    logger.err(completionError);
+  }
+
   // Fetch the profile to return (frontend expects profile object with notification fields)
   const { data: profileData, error: profileError } = await supabaseAdmin
     .from('profiles')
-    .select('id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at')
+    .select(PROFILE_SELECT_FIELDS_NO_PIN)
     .eq('id', profileId)
     .single();
 
@@ -862,14 +868,27 @@ async function updateProfile(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
-  const { first_name, last_name, phone_number, fallback_phone_number } = req.body as {
+  const {
+    first_name,
+    last_name,
+    phone_number,
+    fallback_phone_number,
+    completed_safe_phrases,
+    completed_alert_prefs,
+    completed_test_call,
+    dismissed_nudge_cards,
+  } = req.body as {
     first_name?: string;
     last_name?: string;
     phone_number?: string | null;
     fallback_phone_number?: string | null;
+    completed_safe_phrases?: boolean;
+    completed_alert_prefs?: boolean;
+    completed_test_call?: boolean;
+    dismissed_nudge_cards?: string[];
   };
 
-  const updates: Record<string, string | null> = {};
+  const updates: Record<string, string | null | boolean | string[]> = {};
   if (typeof first_name === 'string') {
     updates.first_name = first_name.trim();
   }
@@ -882,6 +901,25 @@ async function updateProfile(req: Request, res: Response) {
   if (typeof fallback_phone_number !== 'undefined') {
     updates.fallback_phone_number = fallback_phone_number ? fallback_phone_number.trim() : null;
   }
+  if (typeof completed_safe_phrases === 'boolean') {
+    updates.completed_safe_phrases = completed_safe_phrases;
+  }
+  if (typeof completed_alert_prefs === 'boolean') {
+    updates.completed_alert_prefs = completed_alert_prefs;
+  }
+  if (typeof completed_test_call === 'boolean') {
+    updates.completed_test_call = completed_test_call;
+  }
+  if (Array.isArray(dismissed_nudge_cards)) {
+    const normalized = Array.from(
+      new Set(
+        dismissed_nudge_cards
+          .map((value) => (typeof value === 'string' ? value.trim() : ''))
+          .filter((value) => value.length > 0)
+      )
+    );
+    updates.dismissed_nudge_cards = normalized;
+  }
 
   if (Object.keys(updates).length === 0) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'No updates provided' });
@@ -891,9 +929,7 @@ async function updateProfile(req: Request, res: Response) {
     .from('profiles')
     .update(updates)
     .eq('id', profileId)
-    .select(
-      'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, created_at'
-    )
+    .select(PROFILE_SELECT_FIELDS)
     .single();
 
   if (error || !data) {
@@ -923,9 +959,7 @@ async function getProfile(req: Request, res: Response) {
 
   const { data, error } = await supabaseAdmin
     .from('profiles')
-    .select(
-      'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
-    )
+    .select(PROFILE_SELECT_FIELDS)
     .eq('id', profileId)
     .maybeSingle();
 
@@ -987,9 +1021,7 @@ async function exportProfileData(req: Request, res: Response) {
   ] = await Promise.all([
     supabaseAdmin
       .from('profiles')
-      .select(
-        'id, first_name, last_name, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_salt, passcode_hash, pin_locked_until, pin_updated_at, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud, created_at'
-      )
+      .select(PROFILE_SELECT_FIELDS)
       .eq('id', profileId)
       .maybeSingle(),
     supabaseAdmin

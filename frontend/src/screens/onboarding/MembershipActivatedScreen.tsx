@@ -40,14 +40,24 @@ export default function MembershipActivatedScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const { membershipActivationNotice, clearMembershipActivationNotice, status } = useSubscription();
   const planLabel = formatPlanLabel(membershipActivationNotice);
+  const normalizedProductId = (
+    membershipActivationNotice?.productId ??
+    status?.subscription?.productId ??
+    ''
+  ).toLowerCase();
+  const isFacilityPlan = normalizedProductId.includes('facility');
   const hasActiveTrial = Boolean(
     status?.hasActiveSubscription &&
       status.subscription?.trialEndsAt &&
       !status.subscription?.trialConvertedAt
   );
   const subtitle = hasActiveTrial
-    ? `Your ${planLabel} trial is active and protecting your account.`
-    : `Your ${planLabel} is active and protecting your account.`;
+    ? isFacilityPlan
+      ? 'Your facility membership trial is active. You now have full protection during the 14-day trial.'
+      : `Your ${planLabel} trial is active. You now have full protection during your free trial.`
+    : isFacilityPlan
+      ? 'Your facility membership is active. Your protection and partner pricing are now in place.'
+      : `Your ${planLabel} is active and ready to protect your account.`;
 
   // Staggered entrance anims
   const cardAnim = useRef(new Animated.Value(0)).current;

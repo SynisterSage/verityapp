@@ -68,7 +68,13 @@ export default function CallFilter({ value, onChange, style }: CallFilterProps) 
   };
 
   return (
-    <View style={[styles.container, style, { backgroundColor: theme.colors.surface }]}>
+    <View
+      style={[
+        styles.container,
+        style,
+        { backgroundColor: theme.colors.surface, borderColor: withOpacity(theme.colors.text, 0.08) },
+      ]}
+    >
       <View style={styles.scrollViewport}>
         <ScrollView
           horizontal
@@ -101,7 +107,15 @@ export default function CallFilter({ value, onChange, style }: CallFilterProps) 
                     style={StyleSheet.absoluteFill}
                   />
                 )}
-                <Text style={[styles.label, active && styles.labelActive]}>{option.label}</Text>
+                <Text
+                  style={[
+                    styles.label,
+                    { color: theme.colors.textDim },
+                    active && styles.labelActive,
+                  ]}
+                >
+                  {option.label}
+                </Text>
               </Pressable>
             );
           })}
@@ -130,7 +144,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
     padding: 6,
     width: '100%',
   },
@@ -161,14 +174,13 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.985 }],
   },
   label: {
-    color: '#8aa0c6',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.2,
     textTransform: 'uppercase',
   },
   labelActive: {
-    color: '#fff',
+    color: '#FFFFFF',
   },
   edgeFadeLeft: {
     position: 'absolute',

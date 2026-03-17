@@ -65,6 +65,10 @@ export type Profile = {
   auto_mark_safe_threshold?: number | null;
   auto_trust_on_safe?: boolean | null;
   auto_block_on_fraud?: boolean | null;
+  completed_safe_phrases?: boolean | null;
+  completed_alert_prefs?: boolean | null;
+  completed_test_call?: boolean | null;
+  dismissed_nudge_cards?: string[] | null;
   created_at: string;
   last_pin_update?: string | null;
   address?: string | null;

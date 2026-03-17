@@ -176,7 +176,7 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
       setPasscodeDraft(createValue);
       setActiveProfile({ ...activeProfile, has_passcode: true, safety_pin: createValue });
       logEvent('passcode_setup_completed', { screen: 'Passcode' });
-      navigation.navigate('OnboardingTrustedContacts');
+      navigation.navigate('OnboardingCallForwarding');
     } catch (err: any) {
       setError(err?.message || 'Failed to save passcode.');
       logError(err, {
@@ -228,7 +228,7 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
   return (
     <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <OnboardingHeader chapter="Security" activeStep={4} totalSteps={9} showBack={false} />
+        <OnboardingHeader chapter="Security" activeStep={3} totalSteps={6} showBack={false} />
         <View style={styles.keyboardAvoiding}>
           <ScrollView
             contentContainerStyle={[

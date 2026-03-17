@@ -54,7 +54,13 @@ export default function AlertsModeFilter({ value, onChange, style }: AlertsModeF
   };
 
   return (
-    <View style={[styles.container, style, { backgroundColor: theme.colors.surface }]}>
+    <View
+      style={[
+        styles.container,
+        style,
+        { backgroundColor: theme.colors.surface, borderColor: withOpacity(theme.colors.text, 0.08) },
+      ]}
+    >
       <View style={styles.row}>
         {OPTIONS.map((option, index) => {
           const active = option.key === value;
@@ -82,7 +88,14 @@ export default function AlertsModeFilter({ value, onChange, style }: AlertsModeF
                   style={StyleSheet.absoluteFill}
                 />
               )}
-              <Text style={[styles.label, active && styles.labelActive]} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.label,
+                  { color: theme.colors.textDim },
+                  active && styles.labelActive,
+                ]}
+                numberOfLines={1}
+              >
                 {option.label}
               </Text>
             </Pressable>
@@ -98,7 +111,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderRadius: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
     padding: 6,
     width: '100%',
   },
@@ -127,7 +139,6 @@ const styles = StyleSheet.create({
     transform: [{ scale: 0.985 }],
   },
   label: {
-    color: '#8aa0c6',
     fontSize: 10,
     fontWeight: '900',
     letterSpacing: 0.2,
@@ -135,6 +146,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   labelActive: {
-    color: '#fff',
+    color: '#FFFFFF',
   },
 });

@@ -452,7 +452,7 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <OnboardingHeader chapter="Safe List" activeStep={5} totalSteps={9} />
+        <OnboardingHeader chapter="Safe List" activeStep={5} totalSteps={6} />
         <ScrollView
           contentContainerStyle={[
             styles.body,
@@ -566,9 +566,9 @@ export default function OnboardingTrustedContactsScreen({ navigation }: { naviga
 
         <ActionFooter
           primaryLabel="Save Safe List"
-          onPrimaryPress={() => navigation.navigate('OnboardingSafePhrases')}
+          onPrimaryPress={() => navigation.navigate('OnboardingInviteFamily')}
           secondaryLabel="Skip for now"
-          onSecondaryPress={() => navigation.navigate('OnboardingSafePhrases')}
+          onSecondaryPress={() => navigation.navigate('OnboardingInviteFamily')}
         />
 
         {isTrayMounted && trayContact && trayMode && (

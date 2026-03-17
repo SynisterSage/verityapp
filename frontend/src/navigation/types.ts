@@ -9,6 +9,7 @@ export type RootStackParamList = {
   OnboardingChoice: undefined;
   Membership: undefined;
   MembershipActivated: undefined;
+  MembershipFacilityOffer: undefined;
   MembershipExperience: undefined;
   WhyChooseVerity: undefined;
   OnboardingProfile: undefined;

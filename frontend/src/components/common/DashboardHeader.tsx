@@ -130,7 +130,6 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#f5f7fb',
     marginBottom: 2,
   },
   titleCenter: {
@@ -140,7 +139,6 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   subtitle: {
-    color: '#8aa0c6',
     fontSize: 15,
     marginTop: 2,
     marginBottom: 4,

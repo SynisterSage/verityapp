@@ -113,7 +113,7 @@ function buildTrialNudge(row: TrialSubscriptionRow, nowMs: number): TrialNudge |
     return {
       nudgeKey: 'trial_1_day_left',
       title: '1 day left in your trial',
-      body: 'Your call protection is active now. Keep it on with your monthly plan.',
+      body: 'Your call protection is active now. Keep it on by confirming your membership.',
     };
   }
 
@@ -129,7 +129,7 @@ function buildTrialNudge(row: TrialSubscriptionRow, nowMs: number): TrialNudge |
     return {
       nudgeKey: 'trial_value_day2',
       title: 'How is your trial going?',
-      body: 'Calls are being screened in real time. Keep everything active after trial with monthly billing.',
+      body: 'Calls are being screened in real time. Keep everything active after trial with ongoing membership.',
     };
   }
 

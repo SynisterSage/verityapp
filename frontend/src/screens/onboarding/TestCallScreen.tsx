@@ -55,9 +55,29 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
   const displayTwilioNumber = twilioNumber ? formatUsPhoneNumber(twilioNumber) : '';
   const displayRedirectNumber = redirectNumber ? formatUsPhoneNumber(redirectNumber) : '';
 
-  const finishOnboarding = () => {
-    setRedirectToSettings(false);
-    navigation.navigate('OnboardingSuccess');
+  const finishOnboarding = async () => {
+    if (!activeProfile?.id) {
+      setRedirectToSettings(false);
+      navigation.navigate('OnboardingSuccess');
+      return;
+    }
+
+    try {
+      const data = await authorizedFetch(`/profiles/${activeProfile.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ completed_test_call: true }),
+      });
+      if (data?.profile) {
+        setActiveProfile(data.profile);
+      } else {
+        setActiveProfile({ ...activeProfile, completed_test_call: true });
+      }
+    } catch (error) {
+      setActiveProfile({ ...activeProfile, completed_test_call: true });
+    } finally {
+      setRedirectToSettings(false);
+      navigation.navigate('OnboardingSuccess');
+    }
   };
 
   const handleCopyNumber = async () => {
@@ -76,6 +96,11 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
     if (!redirectNumber) return;
     await Clipboard.setStringAsync(redirectNumber);
     Haptics.selectionAsync();
+  };
+
+  const skipTestCall = () => {
+    setRedirectToSettings(false);
+    navigation.navigate('OnboardingSuccess');
   };
 
   useLayoutEffect(() => {
@@ -128,7 +153,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
-      <OnboardingHeader chapter="Security" activeStep={9} totalSteps={9} />
+      <OnboardingHeader chapter="Security" activeStep={9} totalSteps={9} showProgress={false} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -251,7 +276,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
         primaryLabel="Finish Setup"
         onPrimaryPress={finishOnboarding}
         secondaryLabel="Skip for now"
-        onSecondaryPress={finishOnboarding}
+        onSecondaryPress={skipTestCall}
       />
       <ReliableFallbackInfoModal
         visible={showFallbackInfoModal}

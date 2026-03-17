@@ -20,6 +20,7 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import { logEvent } from '../../services/sentry';
 import { MEMBERSHIP_SIGNOUT_NOTE_KEY } from '../../utils/membership';
 import { FALLBACK_LEGAL_VERSIONS } from '../../services/legal';
+import { withOpacity } from '../../utils/color';
 
 export default function SignInScreen({ navigation }: { navigation: any }) {
   const { signIn, signInWithGoogle, signInWithApple, sendPasswordReset } = useAuth();
@@ -290,8 +291,8 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
                   resetMessage.type === 'error' ? theme.colors.danger : theme.colors.success,
                 backgroundColor:
                   resetMessage.type === 'error'
-                    ? 'rgba(225, 29, 72, 0.08)'
-                    : 'rgba(16, 185, 129, 0.08)',
+                    ? withOpacity(theme.colors.danger, 0.08)
+                    : withOpacity(theme.colors.success, 0.08),
               },
             ]}
           >
@@ -313,7 +314,7 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
               styles.loginError,
               {
                 borderColor: theme.colors.danger,
-                backgroundColor: 'rgba(225, 29, 72, 0.08)',
+                backgroundColor: withOpacity(theme.colors.danger, 0.08),
               },
             ]}
           >
@@ -330,15 +331,15 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
         secondaryLabel="Apple"
         onSecondaryPress={handleAppleSignIn}
         secondaryIcon={
-          <View style={styles.appleIcon}>
+          <View style={[styles.appleIcon, { backgroundColor: theme.colors.text }]}>
             <Ionicons name="logo-apple" size={16} color="#FFFFFF" />
           </View>
         }
         tertiaryLabel="Google"
         onTertiaryPress={handleGoogleSignIn}
         tertiaryIcon={
-          <View style={styles.googleIcon}>
-            <Text style={styles.googleIconText}>G</Text>
+          <View style={[styles.googleIcon, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.googleIconText, { color: theme.colors.accent }]}>G</Text>
           </View>
         }
         helperPrefix="New to Verity?"

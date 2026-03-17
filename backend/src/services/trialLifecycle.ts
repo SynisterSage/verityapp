@@ -1,5 +1,9 @@
 const DAY_MS = 24 * 60 * 60 * 1000;
-const LIKELY_TRIAL_MAX_MS = 8.5 * DAY_MS;
+
+type TrialProductConfig = {
+  defaultTrialDays: number;
+  likelyTrialMaxMs: number;
+};
 
 type TrialLifecycleState = {
   trial_started_at?: string | null;
@@ -48,12 +52,24 @@ function toIso(value: number | null) {
   return new Date(value).toISOString();
 }
 
-function isMonthlyProduct(productId: string | null | undefined) {
+function getTrialProductConfig(productId: string | null | undefined): TrialProductConfig | null {
   const normalized = (productId ?? '').trim().toLowerCase();
   if (!normalized) {
-    return false;
+    return null;
   }
-  return normalized.includes('monthly') || normalized.includes('month');
+  if (normalized.includes('monthly') || normalized.includes('month')) {
+    return {
+      defaultTrialDays: 7,
+      likelyTrialMaxMs: 8.5 * DAY_MS,
+    };
+  }
+  if (normalized === 'verityprotect_facility_annual') {
+    return {
+      defaultTrialDays: 14,
+      likelyTrialMaxMs: 15.5 * DAY_MS,
+    };
+  }
+  return null;
 }
 
 function isInactiveStatus(status: string | null | undefined) {
@@ -65,7 +81,7 @@ export function deriveTrialLifecycleUpdate(input: TrialLifecycleInput): TrialLif
   const nowIso = input.nowIso ?? new Date().toISOString();
   const nowMs = Date.parse(nowIso);
   const existing = input.existing ?? {};
-  const monthlyProduct = isMonthlyProduct(input.productId ?? null);
+  const trialProduct = getTrialProductConfig(input.productId ?? null);
 
   const startedAtMs = parseIso(existing.trial_started_at);
   const existingEndsAtMs = parseIso(existing.trial_ends_at);
@@ -75,13 +91,13 @@ export function deriveTrialLifecycleUpdate(input: TrialLifecycleInput): TrialLif
   const durationMs =
     purchasedAtMs && expiresAtMs && expiresAtMs > purchasedAtMs ? expiresAtMs - purchasedAtMs : null;
   const likelyTrialByDuration = Boolean(
-    monthlyProduct &&
+    trialProduct &&
       durationMs &&
       durationMs > 0 &&
-      durationMs <= LIKELY_TRIAL_MAX_MS
+      durationMs <= trialProduct.likelyTrialMaxMs
   );
   const shouldStartTrial =
-    monthlyProduct &&
+    trialProduct &&
     !startedAtMs &&
     (input.isTrialSignal === true || likelyTrialByDuration);
 
@@ -97,13 +113,13 @@ export function deriveTrialLifecycleUpdate(input: TrialLifecycleInput): TrialLif
     if (expiresAtMs) {
       nextTrialEndsAtMs = expiresAtMs;
     } else if (nextTrialStartedAtMs) {
-      nextTrialEndsAtMs = nextTrialStartedAtMs + 7 * DAY_MS;
+      nextTrialEndsAtMs = nextTrialStartedAtMs + trialProduct.defaultTrialDays * DAY_MS;
     }
-  } else if (monthlyProduct && startedAtMs && input.isTrialSignal === true && expiresAtMs) {
+  } else if (trialProduct && startedAtMs && input.isTrialSignal === true && expiresAtMs) {
     nextTrialEndsAtMs = expiresAtMs;
   }
 
-  if (monthlyProduct && nextTrialStartedAtMs && !nextTrialConvertedAtMs) {
+  if (trialProduct && nextTrialStartedAtMs && !nextTrialConvertedAtMs) {
     const trialEnded = nextTrialEndsAtMs ? nowMs >= nextTrialEndsAtMs : false;
     const becamePaidRenewal = input.isActive && input.isTrialSignal === false;
     const renewedPastTrial = input.isActive && trialEnded;
@@ -115,7 +131,7 @@ export function deriveTrialLifecycleUpdate(input: TrialLifecycleInput): TrialLif
     }
   }
 
-  if (!monthlyProduct && isInactiveStatus(input.status)) {
+  if (!trialProduct && isInactiveStatus(input.status)) {
     nextTrialPurgeAfterAtMs = null;
     nextTrialPurgedAtMs = null;
   }

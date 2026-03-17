@@ -108,6 +108,14 @@ async function addSafePhrase(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to save phrase' });
   }
 
+  const { error: completionError } = await supabaseAdmin
+    .from('profiles')
+    .update({ completed_safe_phrases: true })
+    .eq('id', profileId);
+  if (completionError) {
+    logger.err(completionError);
+  }
+
   try {
     const isCaretakerUser = await userIsCaretaker(userId, profileId);
     await recordCircleAlert({

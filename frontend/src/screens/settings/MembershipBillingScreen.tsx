@@ -230,7 +230,7 @@ export default function MembershipBillingScreen() {
       ? `Trial end: ${trialEndsLabel}. Cancel at least 24 hours before end to avoid a charge.`
       : 'Cancel at least 24 hours before trial end to avoid a charge.';
   const trialReminderNote =
-    'We will also send you an email reminder before the trial ends so you can renew or cancel with plenty of time.';
+    'We will also send you a reminder before the trial ends so you can renew or cancel with plenty of time.';
 
   const handleManageMembership = useCallback(async () => {
     if (isOpeningManage) {
@@ -524,7 +524,7 @@ export default function MembershipBillingScreen() {
             before service pauses.
           </Text>
           <Text style={styles.bodyText}>
-            The monthly plan starts with a 7-day free trial, and we surface an in-app reminder when two days remain so you can keep the number or cancel without surprise.
+            Eligible memberships may start with a free trial, and we surface reminders before trial end so you can keep your number or cancel without surprise.
           </Text>
           <Text style={styles.bodyText}>
             If membership is canceled and stays inactive after trial, your Verity number may be reclaimed after the grace period. If inactive status continues, trial data is scheduled for deletion after the retention window.

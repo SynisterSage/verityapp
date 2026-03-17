@@ -210,13 +210,13 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
         enable_push_circle_activity: pushCircleActivity,
         enable_email_weekly_reports: weeklyEmailReports,
       });
-      navigation.navigate('OnboardingCallForwarding');
+      navigation.navigate('OnboardingTestCall');
     } catch (err: any) {
       setError(err?.message || 'Failed to update preferences.');
     }
   };
 
-  const footerSecondary = () => navigation.navigate('OnboardingCallForwarding');
+  const footerSecondary = () => navigation.navigate('OnboardingTestCall');
 
   const helperItems = useMemo(
     () => [
@@ -241,7 +241,7 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <OnboardingHeader chapter="Security" activeStep={8} totalSteps={9} />
+      <OnboardingHeader chapter="Security" activeStep={9} totalSteps={9} showProgress={false} />
       <ScrollView
         contentContainerStyle={[
           styles.content,

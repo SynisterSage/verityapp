@@ -23,119 +23,96 @@ import { logEvent } from '../../services/sentry';
 
 const riskStats = [
   {
-    value: '$12.5B',
-    title: 'Reported U.S. fraud losses in 2024',
-    source: 'Federal Trade Commission (FTC)',
+    value: '$12B+ lost to fraud in 2024',
+    source: 'SOURCE: FTC',
   },
   {
-    value: '#2',
-    title: 'Phone calls were the second most reported contact method',
-    source: 'FTC fraud reporting trends',
+    value: 'Older adults are the #1 target',
+    source: 'SOURCE: FBI',
+  },
+] as const;
+
+const scenarioCases = [
+  {
+    title: 'Your mom gets a call about her computer.',
+    before: 'Unknown caller claims your computer has a virus.',
+    after: 'Verity screens the call. Your family never hears it.',
   },
   {
-    value: 'Nearly $4.8B',
-    title: 'Losses reported by people age 60+ in 2024',
-    source: 'FBI IC3 Annual Report',
+    title: 'Someone says her account is locked.',
+    before: 'Caller says your account is locked, act now.',
+    after: 'Flagged as high risk. You get an alert. Call blocked.',
+  },
+  {
+    title: 'A stranger claims to be family.',
+    before: 'Someone claims to be a grandchild in trouble.',
+    after: "PIN required. Caller can't provide it. Sent to voicemail.",
   },
 ] as const;
 
 const useCases = [
   {
-    icon: 'home-outline' as const,
-    title: 'Older adults living independently',
-    copy: 'Keep daily calls simple while reducing scam pressure and rushed decisions.',
+    icon: 'person-outline' as const,
+    title: 'Older adults',
+    copy: 'Uses their existing phone. Nothing new to learn.',
   },
   {
-    icon: 'people-outline' as const,
-    title: 'Family caregivers managing remotely',
-    copy: 'Shared call visibility helps family members review risk quickly and stay aligned.',
+    icon: 'radio-outline' as const,
+    title: 'Remote caregivers',
+    copy: 'Stay informed from anywhere. Real-time alerts.',
   },
   {
     icon: 'business-outline' as const,
-    title: 'Facility partnerships and care teams',
-    copy: 'Support resident safety with trusted-routing and clear call review workflows.',
+    title: 'Facility partners',
+    copy: 'Zero setup for your team. Families handle everything.',
   },
   {
-    icon: 'call-outline' as const,
-    title: 'Works across phone types',
-    copy: 'Verity protects a forwarded line, so it can support smartphones, basic phones, and landline-style setups.',
+    icon: 'phone-portrait-outline' as const,
+    title: 'Any device',
+    copy: 'Family sets it up in the iOS app. Loved ones can keep mobile or landline phones.',
   },
 ] as const;
 
-const comparisonPoints = [
-  {
-    icon: 'shield-outline' as const,
-    title: 'More than just block or silence',
-    copy: 'iPhone call screening can reduce spam, but Verity also adds family review, trusted routing, and shared alerts.',
-  },
-  {
-    icon: 'people-circle-outline' as const,
-    title: 'Shared visibility for families',
-    copy: 'Other tools protect one phone. Verity lets caregivers and family members see what happened and respond together.',
-  },
-  {
-    icon: 'document-text-outline' as const,
-    title: 'Actionable call context',
-    copy: 'Instead of a missed call only, Verity provides transcript snippets and risk markers so people can make safer decisions.',
-  },
-  {
-    icon: 'swap-horizontal-outline' as const,
-    title: 'Reliable fallback coverage',
-    copy: 'Because protection sits on the forwarded line, coverage continues as a dependable fallback even when someone changes devices.',
-  },
-  {
-    icon: 'options-outline' as const,
-    title: 'Expanded controls when you need them',
-    copy: 'Use Safe Phrases, Trusted Contacts, blocked contacts, and automation settings to tune how calls are screened for each household.',
-  },
+const comparisonRows = [
+  'Shared family visibility',
+  'Call transcripts',
+  'Landline support',
+  'Advanced screening controls',
 ] as const;
 
 const caregiverPoints = [
-  'Know when a risky call was blocked without asking your parent to explain every detail.',
-  'Review suspicious calls quickly and decide together what to do next.',
-  'Keep independence in place while adding backup for high-pressure scam moments.',
-] as const;
-
-const scenarioCases = [
   {
-    title: 'Bank impersonation push',
-    before:
-      'Caller claims a fraud hold and asks for a one-time code “to verify identity” while keeping the person on the line.',
-    after:
-      'Unknown caller is screened first, the request is flagged as high-risk language, and family can review before any code is shared.',
+    icon: 'shield-checkmark-outline' as const,
+    title: 'Less worry',
+    copy: 'Stop wondering if they answered a scam call.',
   },
   {
-    title: 'Medicare or pharmacy callback trap',
-    before:
-      'A spoofed callback asks for Medicare ID, date of birth, and card details to “fix coverage today.”',
-    after:
-      'Verity captures context, routes trusted numbers normally, and gives caregivers a clear review trail before sensitive info is given.',
+    icon: 'flash-outline' as const,
+    title: 'Faster review',
+    copy: 'Transcripts and risk scores delivered instantly.',
   },
   {
-    title: 'Utility shutoff urgency',
-    before:
-      'Scammer pressures immediate payment by gift card or wire, threatening service shutoff within minutes.',
-    after:
-      'High-pressure payment language is surfaced quickly so families can pause, verify through trusted contacts, and avoid panic payments.',
+    icon: 'ellipse-outline' as const,
+    title: 'Their independence',
+    copy: 'They keep their phone. You keep your peace of mind.',
   },
 ] as const;
 
-const socialLinks = [
-  { label: 'Website', url: 'https://www.verityprotect.com/' },
-  { label: 'X', url: 'https://x.com/VerityProtect' },
+const topLinks = [
+  { label: 'verityprotect.com', url: 'https://www.verityprotect.com/' },
   { label: 'Instagram', url: 'https://instagram.com/VerityProtect' },
   { label: 'Facebook', url: 'https://www.facebook.com/profile.php?id=61586541604181' },
+  { label: 'X', url: 'https://x.com/VerityProtect' },
 ] as const;
 
-const policyLinks = [
+const bottomLinks = [
   { label: 'Terms', url: 'https://www.verityprotect.com/terms' },
   { label: 'Privacy', url: 'https://www.verityprotect.com/privacy' },
-  { label: 'Email Support', url: 'mailto:support@verityprotect.com' },
-] as const;
-
-const sourceLinks = [
-  { label: 'FTC 2024 fraud report', url: 'https://www.ftc.gov/news-events/news/press-releases/2025/03/new-ftc-data-show-big-jump-reported-losses-fraud-125-billion-2024' },
-  { label: 'FBI IC3 2024 report', url: 'https://www.ic3.gov/Media/PDF/AnnualReport/2024_IC3Report.pdf' },
+  {
+    label: 'FTC Source',
+    url: 'https://www.ftc.gov/news-events/news/press-releases/2025/03/new-ftc-data-show-big-jump-reported-losses-fraud-125-billion-2024',
+  },
+  { label: 'FBI Source', url: 'https://www.ic3.gov/Media/PDF/AnnualReport/2024_IC3Report.pdf' },
 ] as const;
 
 export default function WhyChooseVerityScreen() {
@@ -194,25 +171,24 @@ export default function WhyChooseVerityScreen() {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: Math.max(insets.bottom, 16) + 12 },
+          { paddingBottom: Math.max(insets.bottom, 16) + theme.spacing.xl },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>A calm first line of defense for family phones</Text>
+        <View style={styles.heroSection}>
+          <View style={styles.heroIconShell}>
+            <Ionicons name="shield-checkmark-outline" size={32} color={theme.colors.accent} />
+          </View>
+          <Text style={styles.heroTitle}>A calm first line{`\n`}of defense.</Text>
           <Text style={styles.heroCopy}>
-            Verity screens unknown callers before they reach your loved one, so urgent money scams
-            are less likely to land as high-pressure conversations.
+            Verity sits quietly between the outside world and the people you love. No disruption. No
+            confusion. Just protection.
           </Text>
-        </View>
 
-        <View style={styles.sectionWrap}>
-          <Text style={styles.sectionTitle}>Why this matters now</Text>
           <View style={styles.statsGrid}>
             {riskStats.map((stat) => (
-              <View key={stat.title} style={styles.statCard}>
+              <View key={stat.value} style={styles.statCard}>
                 <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statTitle}>{stat.title}</Text>
                 <Text style={styles.statSource}>{stat.source}</Text>
               </View>
             ))}
@@ -220,164 +196,154 @@ export default function WhyChooseVerityScreen() {
         </View>
 
         <View style={styles.sectionWrap}>
-          <Text style={styles.sectionTitle}>Real-world scenarios</Text>
-          <View style={styles.useCasesWrap}>
+          <Text style={styles.sectionTitle}>What changes</Text>
+          <View style={styles.stack16}>
             {scenarioCases.map((scenario) => (
               <View key={scenario.title} style={styles.scenarioCard}>
-                <Text style={styles.useCaseTitle}>{scenario.title}</Text>
-                <Text style={styles.scenarioHeadline}>Before Verity</Text>
-                <Text style={styles.scenarioCopy}>{scenario.before}</Text>
-                <View style={styles.scenarioDivider} />
-                <Text style={styles.scenarioHeadline}>With Verity</Text>
-                <Text style={styles.scenarioCopy}>{scenario.after}</Text>
+                <Text style={styles.scenarioTitle}>{scenario.title}</Text>
+
+                <View style={styles.scenarioRowsWrap}>
+                  <View style={styles.beforeRow}>
+                    <View style={[styles.rowMarker, styles.beforeMarker]} />
+                    <View style={styles.rowContentWrap}>
+                      <View style={styles.rowTagWrap}>
+                        <View style={styles.beforeDot} />
+                        <Text style={styles.beforeTag}>Before</Text>
+                      </View>
+                      <Text style={styles.beforeCopy}>{scenario.before}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.afterRow}>
+                    <View style={[styles.rowMarker, styles.afterMarker]} />
+                    <View style={styles.rowContentWrap}>
+                      <View style={styles.rowTagWrap}>
+                        <View style={styles.afterDot} />
+                        <Text style={styles.afterTag}>After</Text>
+                      </View>
+                      <Text style={styles.afterCopy}>{scenario.after}</Text>
+                    </View>
+                  </View>
+                </View>
               </View>
             ))}
           </View>
         </View>
 
         <View style={styles.sectionWrap}>
-          <Text style={styles.sectionTitle}>Who Verity is for</Text>
-          <View style={styles.useCasesWrap}>
+          <Text style={styles.sectionTitle}>Who it's for</Text>
+          <View style={styles.audienceGrid}>
             {useCases.map((item) => (
-              <View key={item.title} style={styles.useCaseCard}>
-                <View style={styles.useCaseIconWrap}>
-                  <Ionicons name={item.icon} size={16} color={theme.colors.accent} />
+              <View key={item.title} style={styles.audienceCard}>
+                <View style={styles.audienceIconWrap}>
+                  <Ionicons name={item.icon} size={14} color={theme.colors.accent} />
                 </View>
-                <View style={styles.useCaseTextWrap}>
-                  <Text style={styles.useCaseTitle}>{item.title}</Text>
-                  <Text style={styles.useCaseCopy}>{item.copy}</Text>
-                </View>
+                <Text style={styles.audienceTitle}>{item.title}</Text>
+                <Text style={styles.audienceCopy}>{item.copy}</Text>
               </View>
             ))}
           </View>
         </View>
 
         <View style={styles.sectionWrap}>
-          <Text style={styles.sectionTitle}>How Verity is different</Text>
-          <View style={styles.useCasesWrap}>
-            {comparisonPoints.map((item) => (
-              <View key={item.title} style={styles.useCaseCard}>
-                <View style={styles.useCaseIconWrap}>
-                  <Ionicons name={item.icon} size={16} color={theme.colors.accent} />
-                </View>
-                <View style={styles.useCaseTextWrap}>
-                  <Text style={styles.useCaseTitle}>{item.title}</Text>
-                  <Text style={styles.useCaseCopy}>{item.copy}</Text>
-                </View>
+          <Text style={styles.sectionTitle}>How we're different</Text>
+          <View style={styles.comparisonCard}>
+            <View style={styles.comparisonHeaderRow}>
+              <Text style={[styles.comparisonHeaderCell, styles.comparisonFeatureCell]}>Feature</Text>
+              <Text style={styles.comparisonHeaderCell}>Verity</Text>
+              <Text style={styles.comparisonHeaderCell}>Others</Text>
+            </View>
+
+            {comparisonRows.map((feature) => (
+              <View key={feature} style={styles.comparisonRow}>
+                <Text style={[styles.comparisonFeatureText, styles.comparisonFeatureCell]}>{feature}</Text>
+                <Ionicons name="checkmark" size={16} color={theme.colors.accent} />
+                <Ionicons name="close" size={16} color={withOpacity(theme.colors.danger, 0.75)} />
               </View>
             ))}
           </View>
         </View>
 
         <View style={styles.sectionWrap}>
-          <Text style={styles.sectionTitle}>Built for adult children and caregivers</Text>
-          <View style={styles.caregiverCard}>
+          <Text style={styles.sectionTitle}>For caregivers</Text>
+          <View style={styles.stack24}>
             {caregiverPoints.map((point) => (
-              <View key={point} style={styles.caregiverRow}>
-                <Ionicons name="checkmark-circle" size={15} color={theme.colors.accent} />
-                <Text style={styles.caregiverPoint}>{point}</Text>
+              <View key={point.title} style={styles.caregiverRow}>
+                <View style={styles.caregiverIconWrap}>
+                  <Ionicons name={point.icon} size={16} color={theme.colors.accent} />
+                </View>
+                <View style={styles.caregiverTextWrap}>
+                  <Text style={styles.caregiverTitle}>{point.title}</Text>
+                  <Text style={styles.caregiverCopy}>{point.copy}</Text>
+                </View>
               </View>
             ))}
           </View>
         </View>
 
-        <View style={styles.supportCard}>
-          <Text style={styles.supportTitle}>Need help before purchasing?</Text>
-          <Text style={styles.supportCopy}>
-            {session
-              ? 'Open billing and support directly from the app, or email our team.'
-              : 'Email our team and we can help with plans, setup, and account questions.'}
-          </Text>
-          <View style={styles.supportActionsRow}>
-            {session ? (
-              <Pressable
-                style={styles.supportPrimaryButton}
-                onPress={() => {
-                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-                  navigation.navigate('SupportPortal');
-                }}
-              >
-                <Text style={styles.supportPrimaryText}>Open Support Portal</Text>
-              </Pressable>
-            ) : null}
+        <View style={styles.sectionWrap}>
+          <Text style={styles.sectionTitle}>Need help?</Text>
+          <View style={styles.helpCard}>
             <Pressable
-              style={[styles.supportSecondaryButton, !session && styles.supportSecondaryButtonFull]}
+              style={styles.helpRow}
               onPress={() => {
-                void openExternalLink('mailto:support@verityprotect.com', 'Email Support');
+                void Haptics.selectionAsync().catch(() => null);
+                if (session) {
+                  navigation.navigate('SupportPortal');
+                  return;
+                }
+                void openExternalLink('mailto:support@verityprotect.com', 'Support Email');
               }}
             >
-              <Text style={styles.supportSecondaryText}>Email Support</Text>
+              <Text style={styles.helpRowText}>Open Support Portal</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+            </Pressable>
+
+            <View style={styles.helpDivider} />
+
+            <Pressable
+              style={styles.helpRow}
+              onPress={() => {
+                void openExternalLink(
+                  'mailto:support@verityprotect.com?subject=Facility%20Partnership%20Inquiry',
+                  'Facility Partnership Email'
+                );
+              }}
+            >
+              <Text style={styles.helpRowText}>Partner with us</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
             </Pressable>
           </View>
         </View>
 
-        <View style={styles.facilityCard}>
-          <View style={styles.facilityIconWrap}>
-            <Ionicons name="business-outline" size={16} color={theme.colors.accent} />
-          </View>
-          <View style={styles.facilityTextWrap}>
-            <Text style={styles.facilityTitle}>Facility partnerships</Text>
-            <Text style={styles.facilityCopy}>
-              Managing multiple residents or members? We can help you set up Verity for your team.
-            </Text>
-          </View>
-          <Pressable
-            style={styles.facilityButton}
-            onPress={() => {
-              void openExternalLink(
-                'mailto:support@verityprotect.com?subject=Facility%20Partnership%20Inquiry',
-                'Facility Partnership Email'
-              );
-            }}
-          >
-            <Text style={styles.facilityButtonText}>Email us</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.linksSection}>
-          <Text style={styles.linksLabel}>Connect</Text>
-          <View style={styles.linksWrap}>
-            {socialLinks.map((link) => (
-              <Pressable
-                key={link.label}
-                style={styles.linkPill}
-                onPress={() => {
-                  void openExternalLink(link.url, link.label);
-                }}
-              >
-                <Text style={styles.linkPillText}>{link.label}</Text>
-              </Pressable>
+        <View style={styles.linkRowsWrap}>
+          <View style={styles.dotLinkRow}>
+            {topLinks.map((link, index) => (
+              <View key={link.label} style={styles.inlineLinkWrap}>
+                {index > 0 ? <Text style={styles.inlineDot}>·</Text> : null}
+                <Pressable
+                  onPress={() => {
+                    void openExternalLink(link.url, link.label);
+                  }}
+                >
+                  <Text style={styles.inlineLink}>{link.label}</Text>
+                </Pressable>
+              </View>
             ))}
           </View>
 
-          <Text style={styles.linksLabel}>Policies</Text>
-          <View style={styles.linksWrap}>
-            {policyLinks.map((link) => (
-              <Pressable
-                key={link.label}
-                style={styles.linkPill}
-                onPress={() => {
-                  void openExternalLink(link.url, link.label);
-                }}
-              >
-                <Text style={styles.linkPillText}>{link.label}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Text style={styles.sourcesLabel}>Sources</Text>
-          <View style={styles.sourcesWrap}>
-            {sourceLinks.map((link) => (
-              <Pressable
-                key={link.label}
-                style={styles.sourceRow}
-                onPress={() => {
-                  void openExternalLink(link.url, link.label);
-                }}
-              >
-                <Text style={styles.sourceText}>{link.label}</Text>
-                <Ionicons name="open-outline" size={14} color={theme.colors.textMuted} />
-              </Pressable>
+          <View style={styles.dotLinkRow}>
+            {bottomLinks.map((link, index) => (
+              <View key={link.label} style={styles.inlineLinkWrap}>
+                {index > 0 ? <Text style={styles.inlineDot}>·</Text> : null}
+                <Pressable
+                  onPress={() => {
+                    void openExternalLink(link.url, link.label);
+                  }}
+                >
+                  <Text style={styles.inlineLink}>{link.label}</Text>
+                </Pressable>
+              </View>
             ))}
           </View>
         </View>
@@ -390,6 +356,7 @@ export default function WhyChooseVerityScreen() {
           }}
         >
           <Text style={styles.backToPlansText}>Back to plans</Text>
+          <Ionicons name="arrow-forward" size={16} color={theme.colors.surface} />
         </Pressable>
       </ScrollView>
     </SafeAreaView>
@@ -409,6 +376,7 @@ const createStyles = (theme: AppTheme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
+      backgroundColor: theme.colors.bg,
     },
     backButton: {
       width: 34,
@@ -433,318 +401,356 @@ const createStyles = (theme: AppTheme) =>
       height: 34,
     },
     content: {
-      paddingHorizontal: 24,
-      paddingTop: 24,
-      gap: 18,
+      paddingHorizontal: theme.spacing.xl,
+      paddingTop: theme.spacing.xs,
+      gap: theme.spacing.xl,
     },
-    heroCard: {
-      borderRadius: 24,
+    heroSection: {
+      paddingTop: theme.spacing.xxl + theme.spacing.xs,
+      alignItems: 'center',
+      gap: theme.spacing.sm,
+    },
+    heroIconShell: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: withOpacity(theme.colors.accent, 0.05),
       borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.35),
-      backgroundColor: withOpacity(theme.colors.accent, 0.09),
-      padding: 16,
-      gap: 8,
+      borderColor: withOpacity(theme.colors.accent, 0.16),
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     heroTitle: {
-      fontSize: 24,
-      lineHeight: 30,
+      textAlign: 'center',
+      fontSize: theme.typography.title.size,
+      lineHeight: theme.typography.title.lineHeight,
       fontWeight: '700',
       color: theme.colors.text,
-      letterSpacing: -0.3,
+      letterSpacing: -0.4,
     },
     heroCopy: {
-      fontSize: 15,
-      lineHeight: 21,
+      maxWidth: 320,
+      textAlign: 'center',
+      fontSize: theme.typography.body.size,
+      lineHeight: theme.typography.body.lineHeight,
       color: theme.colors.textMuted,
-    },
-    sectionWrap: {
-      gap: 10,
-    },
-    sectionTitle: {
-      fontSize: 13,
-      fontWeight: '800',
-      letterSpacing: 0.4,
-      textTransform: 'uppercase',
-      color: theme.colors.textMuted,
+      paddingHorizontal: theme.spacing.xs,
     },
     statsGrid: {
-      gap: 9,
+      width: '100%',
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.md,
+      marginTop: theme.spacing.md,
     },
     statCard: {
-      borderRadius: 18,
+      flexBasis: '47.5%',
+      flexGrow: 1,
+      borderRadius: theme.radii.sm,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
-      padding: 12,
-      gap: 4,
+      padding: theme.spacing.md,
+      gap: theme.spacing.sm,
+      minHeight: 118,
+      justifyContent: 'space-between',
     },
     statValue: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: theme.colors.accent,
-      letterSpacing: -0.2,
-    },
-    statTitle: {
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: '600',
+      fontSize: theme.typography.bodyStrong.size,
+      lineHeight: theme.typography.bodyStrong.lineHeight,
+      fontWeight: '700',
       color: theme.colors.text,
     },
     statSource: {
-      fontSize: 11.5,
-      lineHeight: 16,
-      color: theme.colors.textMuted,
+      fontSize: 10,
+      lineHeight: 14,
+      fontWeight: '700',
+      color: theme.colors.textDim,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+    },
+    sectionWrap: {
+      gap: theme.spacing.md,
+    },
+    sectionTitle: {
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 2,
+      color: theme.colors.textDim,
+    },
+    stack16: {
+      gap: theme.spacing.md,
     },
     scenarioCard: {
-      borderRadius: 18,
+      borderRadius: theme.radii.sm,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
-      padding: 12,
-      gap: 6,
+      padding: theme.spacing.md,
+      gap: theme.spacing.sm,
     },
-    scenarioHeadline: {
-      fontSize: 12.5,
+    scenarioTitle: {
+      fontSize: theme.typography.bodyStrong.size,
+      lineHeight: theme.typography.bodyStrong.lineHeight,
       fontWeight: '700',
       color: theme.colors.text,
     },
-    scenarioCopy: {
-      fontSize: 13,
-      lineHeight: 19,
+    scenarioRowsWrap: {
+      gap: 12,
+    },
+    beforeRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: 10,
+    },
+    afterRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      gap: 10,
+    },
+    rowMarker: {
+      width: 3,
+      borderRadius: 2,
+    },
+    beforeMarker: {
+      backgroundColor: withOpacity(theme.colors.danger, 0.9),
+    },
+    afterMarker: {
+      backgroundColor: withOpacity(theme.colors.success, 0.9),
+    },
+    rowContentWrap: {
+      flex: 1,
+      gap: 4,
+      paddingBottom: 1,
+    },
+    rowTagWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    beforeDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: withOpacity(theme.colors.danger, 0.95),
+    },
+    afterDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: withOpacity(theme.colors.success, 0.95),
+    },
+    beforeTag: {
+      fontSize: 10,
+      lineHeight: 13,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
+      color: withOpacity(theme.colors.danger, 0.9),
+    },
+    afterTag: {
+      fontSize: 10,
+      lineHeight: 13,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
+      color: withOpacity(theme.colors.success, 0.9),
+    },
+    beforeCopy: {
+      fontSize: theme.typography.caption.size,
+      lineHeight: theme.typography.caption.lineHeight,
       color: theme.colors.textMuted,
     },
-    scenarioDivider: {
-      marginVertical: 2,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+    afterCopy: {
+      fontSize: theme.typography.caption.size,
+      lineHeight: theme.typography.caption.lineHeight,
+      color: theme.colors.text,
+      fontWeight: '500',
     },
-    useCasesWrap: {
-      gap: 8,
+    audienceGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: theme.spacing.md,
     },
-    useCaseCard: {
-      borderRadius: 16,
+    audienceCard: {
+      flexBasis: '47.5%',
+      flexGrow: 1,
+      borderRadius: theme.radii.sm,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
-      padding: 12,
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 10,
+      padding: theme.spacing.md,
+      gap: theme.spacing.sm,
+      minHeight: 148,
     },
-    useCaseIconWrap: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
+    audienceIconWrap: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: withOpacity(theme.colors.accent, 0.14),
-      marginTop: 1,
     },
-    useCaseTextWrap: {
-      flex: 1,
-      gap: 2,
-    },
-    useCaseTitle: {
-      fontSize: 13.5,
+    audienceTitle: {
+      fontSize: theme.typography.bodyStrong.size,
+      lineHeight: 20,
       fontWeight: '700',
       color: theme.colors.text,
     },
-    useCaseCopy: {
-      fontSize: 13,
-      lineHeight: 18,
+    audienceCopy: {
+      fontSize: 12,
+      lineHeight: 17,
       color: theme.colors.textMuted,
     },
-    caregiverCard: {
-      borderRadius: 18,
+    comparisonCard: {
+      borderRadius: theme.radii.sm,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
-      padding: 12,
-      gap: 10,
+      overflow: 'hidden',
+    },
+    comparisonHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.surfaceAlt,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      paddingVertical: 10,
+      paddingHorizontal: theme.spacing.md,
+      gap: 8,
+    },
+    comparisonHeaderCell: {
+      width: 56,
+      textAlign: 'center',
+      fontSize: 10,
+      lineHeight: 13,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1.2,
+      color: theme.colors.textDim,
+    },
+    comparisonFeatureCell: {
+      flex: 1,
+      width: 'auto',
+      textAlign: 'left',
+    },
+    comparisonRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      paddingVertical: 13,
+      paddingHorizontal: theme.spacing.md,
+      gap: 8,
+    },
+    comparisonFeatureText: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.text,
+    },
+    stack24: {
+      gap: theme.spacing.xl,
     },
     caregiverRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      gap: 8,
+      gap: theme.spacing.md,
     },
-    caregiverPoint: {
-      flex: 1,
-      fontSize: 13,
-      lineHeight: 18,
-      color: theme.colors.text,
-      fontWeight: '600',
-    },
-    supportCard: {
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.35),
-      backgroundColor: withOpacity(theme.colors.accent, 0.1),
-      padding: 13,
-      gap: 8,
-    },
-    supportTitle: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: theme.colors.text,
-    },
-    supportCopy: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: theme.colors.textMuted,
-    },
-    supportActionsRow: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    supportPrimaryButton: {
-      flex: 1,
+    caregiverIconWrap: {
+      width: 40,
+      height: 40,
       borderRadius: 12,
-      backgroundColor: theme.colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 10,
-    },
-    supportPrimaryText: {
-      fontSize: 12.5,
-      fontWeight: '700',
-      color: '#FFFFFF',
-      textAlign: 'center',
-    },
-    supportSecondaryButton: {
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.45),
-      backgroundColor: withOpacity(theme.colors.accent, 0.12),
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-    },
-    supportSecondaryButtonFull: {
-      flex: 1,
-    },
-    supportSecondaryText: {
-      fontSize: 12.5,
-      fontWeight: '700',
-      color: theme.colors.accent,
-      textAlign: 'center',
-    },
-    facilityCard: {
-      borderRadius: 18,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
-      padding: 12,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    facilityIconWrap: {
-      width: 30,
-      height: 30,
-      borderRadius: 15,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.accent, 0.14),
     },
-    facilityTextWrap: {
+    caregiverTextWrap: {
       flex: 1,
-      gap: 1,
+      gap: 3,
     },
-    facilityTitle: {
-      fontSize: 13.5,
+    caregiverTitle: {
+      fontSize: theme.typography.bodyStrong.size,
+      lineHeight: theme.typography.bodyStrong.lineHeight,
       fontWeight: '700',
       color: theme.colors.text,
     },
-    facilityCopy: {
-      fontSize: 12.5,
-      lineHeight: 17,
+    caregiverCopy: {
+      fontSize: theme.typography.caption.size,
+      lineHeight: theme.typography.caption.lineHeight,
       color: theme.colors.textMuted,
     },
-    facilityButton: {
-      borderRadius: 10,
-      backgroundColor: theme.colors.accent,
-      paddingHorizontal: 11,
-      paddingVertical: 8,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    facilityButtonText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: '#FFFFFF',
-    },
-    linksSection: {
-      borderRadius: 18,
+    helpCard: {
+      borderRadius: theme.radii.sm,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
-      padding: 12,
-      gap: 9,
+      overflow: 'hidden',
     },
-    linksLabel: {
-      fontSize: 12,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.3,
-      color: theme.colors.textMuted,
-    },
-    linksWrap: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-    },
-    linkPill: {
-      borderRadius: 12,
-      borderWidth: 0,
-      backgroundColor: theme.colors.surfaceAlt,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
-    },
-    linkPillText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: theme.colors.text,
-    },
-    sourcesLabel: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.colors.textMuted,
-      marginTop: 2,
-    },
-    sourcesWrap: {
-      gap: 8,
-    },
-    sourceRow: {
-      borderRadius: 10,
-      borderWidth: 0,
-      backgroundColor: theme.colors.surfaceAlt,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
+    helpRow: {
+      paddingHorizontal: theme.spacing.md,
+      paddingVertical: 15,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 8,
     },
-    sourceText: {
-      flex: 1,
-      fontSize: 12.5,
+    helpRowText: {
+      fontSize: theme.typography.bodyStrong.size,
+      lineHeight: theme.typography.bodyStrong.lineHeight,
       color: theme.colors.text,
       fontWeight: '600',
-      lineHeight: 17,
+    },
+    helpDivider: {
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    linkRowsWrap: {
+      gap: 8,
+      paddingTop: 4,
+      alignItems: 'center',
+    },
+    dotLinkRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      rowGap: 4,
+    },
+    inlineLinkWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: 2,
+    },
+    inlineDot: {
+      fontSize: 12,
+      lineHeight: 16,
+      color: theme.colors.textDim,
+      marginHorizontal: 5,
+    },
+    inlineLink: {
+      fontSize: 12,
+      lineHeight: 16,
+      color: theme.colors.textMuted,
     },
     backToPlansButton: {
-      borderRadius: 18,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: theme.colors.accent,
       borderWidth: 1,
       borderColor: theme.colors.accent,
-      backgroundColor: theme.colors.accent,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 14,
+      gap: 8,
+      marginTop: 4,
     },
     backToPlansText: {
-      fontSize: 14,
+      fontSize: 18,
+      lineHeight: 24,
       fontWeight: '700',
-      color: '#FFFFFF',
+      color: theme.colors.surface,
     },
   });

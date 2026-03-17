@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Easing,
-  LayoutAnimation,
   Linking,
   Modal,
   Pressable,
@@ -11,6 +10,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  PanResponder,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -51,6 +51,15 @@ type MembershipFeedback = {
   retryProducts?: boolean;
 };
 
+type HeroSlide = {
+  id: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
+  title: string;
+  subtitle: string;
+  accent?: boolean;
+};
+
 const fallbackPlans: PlanOption[] = [
   {
     productId: 'verityprotect_monthly',
@@ -69,7 +78,7 @@ const fallbackPlans: PlanOption[] = [
   },
   {
     productId: 'verityprotect_facility_annual',
-    title: 'Facility',
+    title: 'Verity Protect Facility',
     price: 'Included',
     detail: 'Provided by your community',
     badge: 'Partner',
@@ -120,7 +129,7 @@ function toPlanOption(product: {
   if (isFacility) {
     return {
       productId: product.productId,
-      title: 'Facility',
+      title: 'Verity Protect Facility',
       price: 'Included',
       detail: 'Provided by your community',
       badge: 'Partner',
@@ -164,14 +173,6 @@ function formatFacilityCode(value: string) {
 function isFacilityPlan(productId?: string | null) {
   return productId === FACILITY_PRODUCT_ID;
 }
-
-const FEATURES: { icon: string; text: string }[] = [
-  { icon: 'shield-checkmark-outline', text: 'Screens every call before it reaches you' },
-  { icon: 'warning-outline', text: 'Flags scam and fraud attempts in real time' },
-  { icon: 'person-circle-outline', text: 'Trusted contacts skip screening automatically' },
-  { icon: 'mic-outline', text: 'Call recordings and transcripts saved securely' },
-  { icon: 'people-outline', text: 'Add family members to your protection circle' },
-];
 
 function isNetworkIssue(message: string) {
   return /network|internet|offline|timed out|could not connect/i.test(message);
@@ -289,13 +290,9 @@ export default function MembershipScreen() {
 
   const [selectedProductId, setSelectedProductId] = useState<string>(selectedDefaultProductId);
   const [feedback, setFeedback] = useState<MembershipFeedback | null>(null);
-  const [isFeaturesExpanded, setIsFeaturesExpanded] = useState(false);
-  const [isTrialInfoExpanded, setIsTrialInfoExpanded] = useState(false);
-  const [isBillingExpanded, setIsBillingExpanded] = useState(false);
   const [footerHeight, setFooterHeight] = useState(156);
   const [showExitModal, setShowExitModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isOpeningManage, setIsOpeningManage] = useState(false);
   const [showFacilityModal, setShowFacilityModal] = useState(false);
   const [facilityCode, setFacilityCode] = useState('');
   const [facilityError, setFacilityError] = useState<string | null>(null);
@@ -316,11 +313,21 @@ export default function MembershipScreen() {
   const trialCtaScale = useRef(new Animated.Value(1)).current;
   const feedbackCardOpacity = useRef(new Animated.Value(0)).current;
   const feedbackCardTranslateY = useRef(new Animated.Value(8)).current;
+  const heroIconOpacity = useRef(new Animated.Value(1)).current;
+  const heroIconTranslateY = useRef(new Animated.Value(0)).current;
+  const heroIconScale = useRef(new Animated.Value(1)).current;
+  const heroTextOpacity = useRef(new Animated.Value(1)).current;
+  const heroTextTranslateY = useRef(new Animated.Value(0)).current;
+  const heroProgressValues = useRef(
+    Array.from({ length: 4 }, (_, index) => new Animated.Value(index === 0 ? 1 : 0))
+  ).current;
+  const isHeroTransitioningRef = useRef(false);
   const planScaleByIdRef = useRef<Record<string, Animated.Value>>({});
   const hasLoggedMembershipView = useRef(false);
   const hasAutoCompletedActivationRef = useRef(false);
   const showInviteCodeAction = status?.canJoinWithInviteCode !== false;
   const plansUnavailable = !isLoadingProducts && products.length === 0;
+  const [heroIndex, setHeroIndex] = useState(0);
 
   useEffect(() => {
     if (products.length > 0 || isLoadingProducts) {
@@ -393,40 +400,205 @@ export default function MembershipScreen() {
     return storeProduct?.displayPrice ?? '$74.99';
   }, [products]);
 
-  const selectedPlanHasFreeTrial = Boolean(selectedPlan?.hasFreeTrial);
-  const trialInfoRows = useMemo(
+  const heroSlides = useMemo<HeroSlide[]>(
     () => [
       {
-        id: 'trial',
-        title: isFacilitySelected ? '14-day facility trial' : '7-day free trial',
-        detail: isFacilitySelected
-          ? 'Facility partner plans begin with 14 days of protection before Apple charges your account. A valid community code is required before this plan can be claimed.'
-          : selectedPlanHasFreeTrial
-            ? 'The monthly plan starts with 7 days of protection before Apple charges your account. Cancel at least 24 hours before the trial ends to avoid a charge.'
-            : 'Switch to the monthly plan to unlock a 7-day trial before any charge hits your Apple account.',
+        id: 'problem',
+        icon: 'alert-circle-outline',
+        iconColor: theme.colors.danger,
+        title: 'The Problem',
+        subtitle: 'Scammers keep dialing your family. Each time, they sound urgent and real.',
       },
       {
-        id: 'billing',
-        title: 'Billing through Apple',
-        detail: 'Charges and renewals happen inside Apple subscriptions. Renewals include a 3-day grace period before service pauses, and you manage the plan in iPhone settings.',
+        id: 'solution',
+        icon: 'shield-outline',
+        iconColor: theme.colors.accent,
+        title: 'The Solution',
+        subtitle: 'Verity answers first, filters risk, and only lets trusted people through.',
       },
       {
-        id: 'reminder',
-        title: 'Reminder before renewal',
-        detail:
-          'When two days or less remain we show a reminder inside the app, send a push if enabled, and email a heads-up so your call screening keeps running without surprises.',
+        id: 'payoff',
+        icon: 'shield-checkmark-outline',
+        iconColor: theme.colors.success,
+        title: 'The Payoff',
+        subtitle: 'You stay informed, they stay independent, and worry stops here.',
+      },
+      {
+        id: 'ready',
+        icon: 'shield-checkmark-outline',
+        iconColor: theme.colors.accent,
+        title: 'Ready to protect your family?',
+        subtitle: 'Select your plan below.',
       },
     ],
-    [isFacilitySelected, selectedPlanHasFreeTrial]
+    [theme.colors.accent, theme.colors.danger, theme.colors.success]
   );
+  const activeHeroSlide = heroSlides[heroIndex] ?? heroSlides[0];
+
+  const heroEasing = useMemo(() => Easing.bezier(0.32, 1, 0.2, 1), []);
+
+  const animateHeroEntrance = useMemo(
+    () => (nextIndex: number) => {
+      Animated.parallel([
+        Animated.timing(heroIconOpacity, {
+          toValue: 1,
+          duration: 860,
+          easing: heroEasing,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroIconTranslateY, {
+          toValue: 0,
+          duration: 920,
+          easing: heroEasing,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroIconScale, {
+          toValue: 1,
+          duration: 920,
+          easing: heroEasing,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroTextOpacity, {
+          toValue: 1,
+          duration: 860,
+          delay: 100,
+          easing: heroEasing,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroTextTranslateY, {
+          toValue: 0,
+          duration: 920,
+          delay: 100,
+          easing: heroEasing,
+          useNativeDriver: true,
+        }),
+      ]).start(() => {
+        isHeroTransitioningRef.current = false;
+      });
+    },
+    [
+      heroEasing,
+      heroIconOpacity,
+      heroIconScale,
+      heroIconTranslateY,
+      heroTextOpacity,
+      heroTextTranslateY,
+    ]
+  );
+
+  const transitionHeroTo = useMemo(
+    () => (nextIndex: number) => {
+      if (nextIndex === heroIndex || isHeroTransitioningRef.current) {
+        return;
+      }
+
+      isHeroTransitioningRef.current = true;
+      Animated.parallel([
+        Animated.timing(heroIconOpacity, {
+          toValue: 0,
+          duration: 280,
+          easing: heroEasing,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroIconTranslateY, {
+          toValue: -12,
+          duration: 360,
+          easing: heroEasing,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroTextOpacity, {
+          toValue: 0,
+          duration: 260,
+          easing: heroEasing,
+          useNativeDriver: true,
+        }),
+        Animated.timing(heroTextTranslateY, {
+          toValue: -20,
+          duration: 360,
+          easing: heroEasing,
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (!finished) {
+          isHeroTransitioningRef.current = false;
+          return;
+        }
+
+        heroIconOpacity.setValue(0);
+        heroIconTranslateY.setValue(20);
+        heroIconScale.setValue(0.96);
+        heroTextOpacity.setValue(0);
+        heroTextTranslateY.setValue(20);
+        setHeroIndex(nextIndex);
+        animateHeroEntrance(nextIndex);
+      });
+    },
+    [
+      animateHeroEntrance,
+      heroEasing,
+      heroIconOpacity,
+      heroIconScale,
+      heroIconTranslateY,
+      heroIndex,
+      heroTextOpacity,
+      heroTextTranslateY,
+    ]
+  );
+
+  const advanceHero = useCallback((direction: 'next' | 'prev') => {
+    const nextIndex =
+      direction === 'next'
+        ? (heroIndex + 1) % heroSlides.length
+        : heroIndex === 0
+          ? heroSlides.length - 1
+          : heroIndex - 1;
+    transitionHeroTo(nextIndex);
+  }, [heroIndex, heroSlides.length, transitionHeroTo]);
+
+  useEffect(() => {
+    heroIconOpacity.setValue(0);
+    heroIconTranslateY.setValue(20);
+    heroIconScale.setValue(0.92);
+    heroTextOpacity.setValue(0);
+    heroTextTranslateY.setValue(20);
+    animateHeroEntrance(heroIndex);
+  }, [
+    animateHeroEntrance,
+    heroIconOpacity,
+    heroIconScale,
+    heroIconTranslateY,
+    heroIndex,
+    heroTextOpacity,
+    heroTextTranslateY,
+  ]);
+
+  useEffect(() => {
+    Animated.parallel(
+      heroProgressValues.map((value, index) =>
+        Animated.timing(value, {
+          toValue: index === heroIndex ? 1 : 0,
+          duration: 800,
+          easing: heroEasing,
+          useNativeDriver: false,
+        })
+      )
+    ).start();
+  }, [heroEasing, heroIndex, heroProgressValues]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      advanceHero('next');
+    }, 4800);
+
+    return () => clearInterval(timer);
+  }, [advanceHero]);
 
   useEffect(() => {
     if (
-      !selectedPlan?.hasFreeTrial ||
+      !selectedPlan?.productId ||
       isProcessingPurchase ||
       isLoadingProducts ||
-      plansUnavailable ||
-      isFacilitySelected
+      plansUnavailable
     ) {
       trialCtaScale.stopAnimation();
       trialCtaScale.setValue(1);
@@ -458,11 +630,10 @@ export default function MembershipScreen() {
       trialCtaScale.setValue(1);
     };
   }, [
-    isFacilitySelected,
     isLoadingProducts,
     isProcessingPurchase,
     plansUnavailable,
-    selectedPlan?.hasFreeTrial,
+    selectedPlan?.productId,
     trialCtaScale,
   ]);
 
@@ -525,12 +696,11 @@ export default function MembershipScreen() {
   const handlePurchase = async () => {
     if (isFacilitySelected) {
       setFeedback(null);
-      setFacilityError(null);
-      setShowFacilityModal(true);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
       logEvent('membership_facility_modal_opened', {
         screen: 'MembershipScreen',
       });
+      navigation.navigate('MembershipFacilityOffer');
       return;
     }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => null);
@@ -689,37 +859,6 @@ export default function MembershipScreen() {
     ).catch(() => null);
   };
 
-  const handleManageInStore = async () => {
-    if (isOpeningManage || isProcessingPurchase) {
-      return;
-    }
-    setFeedback(null);
-    setIsOpeningManage(true);
-    void Haptics.selectionAsync().catch(() => null);
-    const targets = [
-      'itms-apps://apps.apple.com/account/subscriptions',
-      'https://apps.apple.com/account/subscriptions',
-    ];
-    try {
-      for (const target of targets) {
-        try {
-          await Linking.openURL(target);
-          return;
-        } catch {
-          continue;
-        }
-      }
-      setFeedback({
-        kind: 'failed',
-        title: 'Could not open subscriptions',
-        detail: 'Open iPhone Settings > Apple Account > Subscriptions to manage billing.',
-        tone: 'error',
-      });
-    } finally {
-      setIsOpeningManage(false);
-    }
-  };
-
   const retryProducts = async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     setFeedback(null);
@@ -728,6 +867,22 @@ export default function MembershipScreen() {
     });
     await refreshProducts();
   };
+  const heroPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gestureState) =>
+          Math.abs(gestureState.dx) > 12 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dx <= -40) {
+            advanceHero('next');
+          } else if (gestureState.dx >= 40) {
+            advanceHero('prev');
+          }
+        },
+        onPanResponderTerminate: () => null,
+      }),
+    [advanceHero]
+  );
 
   useEffect(() => {
     if (!showExitModal) {
@@ -787,359 +942,243 @@ export default function MembershipScreen() {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: Math.max(insets.top, 0) + 26,
+            paddingTop: 0,
             paddingBottom: footerHeight + 36,
           },
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerBlock}>
-          <View style={styles.heroIconWrap}>
-            <Ionicons name="shield-checkmark" size={32} color={theme.colors.accent} />
-          </View>
-          <Text style={styles.title}>Your family's call protection</Text>
-          <Text style={styles.subtitle}>
-            Every call screened, every fraud attempt flagged — before it reaches you.
-          </Text>
-        </View>
-
-        <View style={styles.featuresCard}>
-          <Pressable
-            style={styles.featuresHeaderRow}
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setIsFeaturesExpanded((prev) => !prev);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Toggle call protection features"
-          >
-            <View style={styles.featuresHeaderLeft}>
-              <View style={styles.featureIconWrap}>
-                <Ionicons name="shield-checkmark-outline" size={16} color={theme.colors.accent} />
-              </View>
-              <Text style={styles.featuresHeaderTitle}>Call protection features</Text>
-            </View>
-            <Ionicons
-              name={isFeaturesExpanded ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color={theme.colors.textMuted}
-            />
-          </Pressable>
-
-          {isFeaturesExpanded ? (
-            <View style={styles.featuresBody}>
-              {FEATURES.map((f) => (
-                <View key={f.text} style={styles.featureRow}>
-                  <View style={styles.featureIconWrap}>
-                    <Ionicons name={f.icon as any} size={16} color={theme.colors.accent} />
-                  </View>
-                  <Text style={styles.featureText}>{f.text}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.trialInfoCard}>
-          <Pressable
-            style={styles.trialInfoHeader}
-            onPress={() => {
-              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-              setIsTrialInfoExpanded((prev) => !prev);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Toggle trial and billing details"
-          >
-            <View style={styles.trialInfoHeaderLeft}>
-              <View style={styles.trialInfoIconWrap}>
-                <Ionicons name="sparkles-outline" size={20} color={theme.colors.accent} />
-              </View>
-              <View style={styles.trialInfoHeaderTextWrap}>
-                <Text style={styles.trialInfoTitle}>Trial & billing</Text>
-                {isTrialInfoExpanded ? (
-                  <Text style={styles.trialInfoSubtitle}>
-                    We keep every charge transparent so your family stays protected without surprises.
-                  </Text>
-                ) : null}
-              </View>
-            </View>
-            <Ionicons
-              name={isTrialInfoExpanded ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color={theme.colors.textMuted}
-            />
-          </Pressable>
-          {isTrialInfoExpanded ? (
-            <View style={styles.trialInfoBody}>
-              {trialInfoRows.map((row) => (
-                <View key={row.id} style={styles.trialInfoRow}>
-                  <View style={styles.trialInfoBullet}>
-                    <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
-                  </View>
-                  <View style={styles.trialInfoTextWrap}>
-                    <Text style={styles.trialInfoRowTitle}>{row.title}</Text>
-                    <Text style={styles.trialInfoRowDetail}>{row.detail}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        <View style={styles.planSection}>
-          <Text style={styles.planSectionTitle}>Choose your plan</Text>
-          {planOptions.map((plan) => {
-            const selected = selectedPlan.productId === plan.productId;
-            const isAnnual = plan.productId.includes('annual');
-            return (
+        <Animated.View
+          style={[
+            styles.heroCard,
+            activeHeroSlide.accent && styles.heroCardAccent,
+            {
+              paddingTop: Math.max(insets.top, 0) + 34,
+            },
+          ]}
+          {...heroPanResponder.panHandlers}
+        >
+          <View style={styles.heroSlide}>
+            <View style={styles.heroCardTop}>
               <Animated.View
-                key={plan.productId}
-                style={{ transform: [{ scale: getPlanScale(plan.productId) }] }}
+                style={{
+                  opacity: heroIconOpacity,
+                  transform: [{ translateY: heroIconTranslateY }, { scale: heroIconScale }],
+                }}
               >
-                <Pressable
-                  style={[styles.planCard, selected && styles.planCardSelected, isAnnual && styles.planCardAnnual]}
-                  onPress={() => setPlan(plan.productId)}
-                >
-                  <View style={styles.planMainRow}>
-                    <View style={styles.planTextWrap}>
-                      <View style={styles.planTitleRow}>
-                        <Text style={styles.planTitle}>{plan.title}</Text>
-                        {plan.badge ? (
-                          <View
-                            style={[
-                              styles.planBestValuePill,
-                              isFacilityPlan(plan.productId) && styles.planPartnerPill,
-                            ]}
-                          >
-                            <Text style={styles.planBestValueText}>{plan.badge}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                      {isFacilityPlan(plan.productId) ? (
-                        <Text style={styles.planDetail}>{plan.detail}</Text>
-                      ) : isAnnual ? (
-                        <View style={styles.planSavingsPill}>
-                          <Ionicons
-                            name="pricetag-outline"
-                            size={11}
-                            color={theme.colors.accent}
-                            style={{ marginTop: 1 }}
-                          />
-                          <Text style={styles.planSavingsText}>{plan.detail}</Text>
-                        </View>
-                      ) : (
-                        <>
-                          {plan.hasFreeTrial && plan.trialLabel ? (
-                            <View style={styles.planTrialPill}>
-                              <Ionicons
-                                name="flash-outline"
-                                size={11}
-                                color={theme.colors.accent}
-                                style={{ marginTop: 1 }}
-                              />
-                              <Text style={styles.planTrialText}>{plan.trialLabel}</Text>
-                            </View>
-                          ) : null}
-                          <Text style={styles.planDetail}>{plan.detail}</Text>
-                        </>
-                      )}
-                    </View>
-                    <View style={styles.planPriceWrap}>
-                      <Text style={[styles.planPrice, isAnnual && styles.planPriceAnnual]}>{plan.price}</Text>
-                    </View>
-                  </View>
-                  <View style={[styles.radio, selected && styles.radioSelected]}>
-                    {selected ? <View style={styles.radioInner} /> : null}
-                  </View>
-                </Pressable>
+                <View style={[styles.heroIconWrap, activeHeroSlide.accent && styles.heroIconWrapAccent]}>
+                  <Ionicons
+                    name={activeHeroSlide.icon}
+                    size={36}
+                    color={activeHeroSlide.iconColor}
+                  />
+                </View>
               </Animated.View>
-            );
-          })}
-        </View>
-
-        <View style={styles.actionsStack}>
-          <View style={[styles.actionsInline, !showInviteCodeAction && styles.actionsInlineSingle]}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.inlineButton,
-                pressed && styles.inlineButtonPressed,
-                isProcessingPurchase && styles.inlineButtonDisabled,
+            </View>
+            <Animated.View
+              style={[
+                styles.heroTextWrap,
+                {
+                  opacity: heroTextOpacity,
+                  transform: [{ translateY: heroTextTranslateY }],
+                },
               ]}
-              onPress={handleRestore}
-              disabled={isProcessingPurchase}
             >
-              <Text style={styles.inlineButtonText}>Restore</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.inlineButton,
-                pressed && styles.inlineButtonPressed,
-                (isProcessingPurchase || isOpeningManage) && styles.inlineButtonDisabled,
-              ]}
-              onPress={handleManageInStore}
-              disabled={isProcessingPurchase || isOpeningManage}
-            >
-              <Text style={styles.inlineButtonText}>{isOpeningManage ? 'Opening…' : 'Manage'}</Text>
-            </Pressable>
+                <Text style={[styles.title, activeHeroSlide.accent && styles.titleAccent]}>
+                  {activeHeroSlide.title}
+                </Text>
+                <Text style={[styles.subtitle, activeHeroSlide.accent && styles.subtitleAccent]}>
+                  {activeHeroSlide.subtitle}
+                </Text>
+            </Animated.View>
           </View>
-          {showInviteCodeAction ? (
-            <Pressable
-              style={({ pressed }) => [
-                styles.inlineButtonSecondary,
-                pressed && styles.inlineButtonPressed,
-                isProcessingPurchase && styles.inlineButtonDisabled,
-              ]}
-              onPress={() => {
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
-                logEvent('membership_invite_code_tapped', {
-                  screen: 'MembershipScreen',
-                });
-                navigation.navigate('OnboardingInviteCode');
-              }}
-              disabled={isProcessingPurchase}
-            >
-              <Text style={styles.inlineButtonSecondaryText}>Use invite code</Text>
-            </Pressable>
-          ) : null}
-        </View>
+          <View style={styles.heroFooter}>
+            <View style={styles.heroProgressCentered}>
+              <View style={styles.heroProgress}>
+                {heroSlides.map((slide, index) => {
+                  const animatedSegmentStyle = {
+                    width: heroProgressValues[index].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [6, 26],
+                    }),
+                    backgroundColor: heroProgressValues[index].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [
+                        withOpacity(theme.colors.textMuted, 0.28),
+                        theme.colors.accent,
+                      ],
+                    }),
+                  };
 
-        <View style={styles.learnMoreRow}>
+                  return (
+                  <Pressable
+                    key={slide.id}
+                    style={styles.heroProgressSegmentPressable}
+                    onPress={() => transitionHeroTo(index)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Show ${slide.title}`}
+                  >
+                    <Animated.View style={[styles.heroProgressSegment, animatedSegmentStyle]} />
+                  </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
+        </Animated.View>
+
+        <View style={styles.bodySection}>
+          <View style={styles.heroLinkGrid}>
           <Pressable
-            style={styles.learnMoreBtn}
+            style={({ pressed }) => [styles.heroLinkCard, pressed && styles.inlineButtonPressed]}
             onPress={() => {
               void Haptics.selectionAsync().catch(() => null);
               logEvent('membership_experience_opened', { screen: 'MembershipScreen' });
               navigation.navigate('MembershipExperience');
             }}
           >
-            <Ionicons name="sparkles-outline" size={14} color={theme.colors.accent} />
-            <Text style={styles.learnMoreText}>See how it works</Text>
+            <Ionicons name="call-outline" size={16} color={theme.colors.accent} />
+            <View style={styles.heroLinkBottomRow}>
+              <Text style={styles.heroLinkTitle}>How It Works</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+            </View>
           </Pressable>
-          <Text style={styles.learnMoreDivider}>·</Text>
           <Pressable
-            style={styles.learnMoreBtn}
+            style={({ pressed }) => [styles.heroLinkCard, pressed && styles.inlineButtonPressed]}
             onPress={() => {
               void Haptics.selectionAsync().catch(() => null);
               logEvent('membership_why_choose_opened', { screen: 'MembershipScreen' });
               navigation.navigate('WhyChooseVerity');
             }}
           >
-            <Ionicons name="trending-up-outline" size={14} color={theme.colors.accent} />
-            <Text style={styles.learnMoreText}>Why Verity</Text>
-          </Pressable>
-        </View>
-
-        <View style={styles.billingCard}>
-          <Pressable
-            style={styles.billingHeaderRow}
-            onPress={() => {
-              void Haptics.selectionAsync().catch(() => null);
-              setIsBillingExpanded((prev) => !prev);
-            }}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Toggle membership billing details"
-          >
-            <View style={styles.billingHeaderTextWrap}>
-              <Text style={styles.billingTitle}>Why membership is required</Text>
-              <Text style={styles.billingSummary}>
-                Covers phone infrastructure, recording, and active fraud monitoring.
-              </Text>
+            <Ionicons name="information-circle-outline" size={16} color={theme.colors.accent} />
+            <View style={styles.heroLinkBottomRow}>
+              <Text style={styles.heroLinkTitle}>Why Verity?</Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
             </View>
-            <Ionicons
-              name={isBillingExpanded ? 'chevron-up' : 'chevron-down'}
-              size={16}
-              color={theme.colors.textMuted}
-              style={styles.billingChevronIcon}
-            />
-          </Pressable>
-          {isBillingExpanded ? (
-            <Text style={styles.billingCopy}>
-              Billing is handled by Apple, and you can cancel anytime in iPhone subscription settings. If
-              a renewal payment fails, both plans include a 3-day billing grace period for all renewals
-              before service is paused.
-            </Text>
-          ) : null}
-          <Pressable
-            onPress={() => {
-              void Haptics.selectionAsync().catch(() => null);
-              navigation.navigate('SupportPortal', { initialResource: 'billing' });
-            }}
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="Open billing help"
-          >
-            <Text style={styles.billingHelpLink}>Billing help</Text>
           </Pressable>
         </View>
 
-        <Pressable
-          style={styles.supportQuickRow}
-          onPress={() => {
-            void Haptics.selectionAsync().catch(() => null);
-            navigation.navigate('SupportPortal');
-          }}
-        >
-          <Ionicons name="chatbubble-ellipses-outline" size={15} color={theme.colors.accent} />
-          <Text style={styles.supportQuickText}>Need help now? Open support portal.</Text>
-          <Ionicons name="chevron-forward" size={14} color={theme.colors.textMuted} />
-        </Pressable>
+          <View style={styles.planSection}>
+            <Text style={styles.planSectionTitle}>Choose your plan</Text>
+            {planOptions.map((plan) => {
+              const selected = selectedPlan.productId === plan.productId;
+              const isAnnual = plan.productId.includes('annual');
+              const planPrice = isFacilityPlan(plan.productId)
+                ? 'Included'
+                : isAnnual
+                  ? '$99.99'
+                  : '$9.99';
+              const planUnit = isFacilityPlan(plan.productId) ? null : isAnnual ? '/yr' : '/mo';
+              const planSubdetail = isFacilityPlan(plan.productId)
+                ? 'Provided by your community'
+                : isAnnual
+                  ? 'Save 17% ($8.33/mo)'
+                  : '7-day free trial included';
+              return (
+                <Animated.View
+                  key={plan.productId}
+                  style={{ transform: [{ scale: getPlanScale(plan.productId) }] }}
+                >
+                  <Pressable
+                    style={[styles.planCard, selected && styles.planCardSelected]}
+                    onPress={() => setPlan(plan.productId)}
+                  >
+                    <View style={styles.planMainRow}>
+                      <View style={styles.planTextWrap}>
+                        <View style={styles.planTitleWrap}>
+                          <View style={styles.planTitleRow}>
+                            <Text style={styles.planTitle}>{plan.title}</Text>
+                            {plan.badge && !isAnnual ? (
+                              <View
+                                style={[
+                                  styles.planBestValuePill,
+                                  isFacilityPlan(plan.productId) && styles.planPartnerPill,
+                                ]}
+                              >
+                                <Text style={styles.planBestValueText}>{plan.badge}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                          {plan.badge && isAnnual ? (
+                            <View style={styles.planBadgeRow}>
+                              <View style={styles.planBestValuePill}>
+                                <Text style={styles.planBestValueText}>{plan.badge}</Text>
+                              </View>
+                            </View>
+                          ) : null}
+                        </View>
+                        <View style={styles.planPriceLine}>
+                          <Text style={styles.planPrice}>{planPrice}</Text>
+                          {planUnit ? <Text style={styles.planPriceUnit}>{planUnit}</Text> : null}
+                        </View>
+                        <Text style={styles.planDetail}>{planSubdetail}</Text>
+                      </View>
+                      <View style={[styles.radio, selected && styles.radioSelected]}>
+                        {selected ? <View style={styles.radioInner} /> : null}
+                      </View>
+                    </View>
+                  </Pressable>
+                </Animated.View>
+              );
+            })}
+          </View>
 
-        <Pressable
-          style={styles.notNowRow}
-          onPress={() => {
-            void Haptics.selectionAsync().catch(() => null);
-            setShowExitModal(true);
-          }}
-        >
-          <Text style={styles.notNowText}>Not now</Text>
-        </Pressable>
-
-        <View style={styles.legalFooter}>
-          <Text style={styles.legalText}>
-            {selectedPlan?.hasFreeTrial
-              ? 'No charge during the free trial. When the trial ends, your Apple Account is charged unless cancelled at least 24 hours before renewal.'
-              : 'Payment charged to your Apple Account at confirmation. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period.'}{' '}
-            <Text
-              style={styles.legalLink}
-              onPress={() => Linking.openURL(legalVersions.privacyUrl).catch(() => null)}
-            >
-              Privacy Policy
+          <View style={styles.legalFooter}>
+            <Text style={styles.legalText}>
+              {selectedPlan?.hasFreeTrial
+                ? 'No charge during the free trial. When the trial ends, your Apple Account is charged unless cancelled at least 24 hours before renewal.'
+                : 'Payment charged to your Apple Account at confirmation. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period.'}
             </Text>
-            {' · '}
-            <Text
-              style={styles.legalLink}
-              onPress={() => Linking.openURL(legalVersions.termsUrl).catch(() => null)}
-            >
-              Terms of Use
-            </Text>
-          </Text>
-        </View>
-
-        {(statusError || feedback) ? (
-          <Animated.View
-            style={[
-              styles.feedbackCard,
-              feedback?.tone === 'info' ? styles.feedbackCardInfo : styles.feedbackCardError,
-              {
-                opacity: feedbackCardOpacity,
-                transform: [{ translateY: feedbackCardTranslateY }],
-              },
-            ]}
-          >
-            <Text style={styles.feedbackTitle}>
-              {feedback?.title ?? 'Could not load membership status'}
-            </Text>
-            <Text style={styles.feedbackText}>
-              {feedback?.detail ?? statusError ?? 'Please try again.'}
-            </Text>
-            {feedback?.retryProducts ? (
-              <Pressable style={styles.feedbackActionButton} onPress={retryProducts}>
-                <Text style={styles.feedbackActionText}>Reload plans</Text>
+            <View style={styles.legalMetaRow}>
+              <Pressable onPress={handleRestore} disabled={isProcessingPurchase}>
+                <Text style={styles.legalMetaLink}>Restore Purchases</Text>
               </Pressable>
-            ) : null}
-          </Animated.View>
-        ) : null}
+              <Pressable
+                onPress={() => {
+                  void Haptics.selectionAsync().catch(() => null);
+                  navigation.navigate('SupportPortal');
+                }}
+              >
+                <Text style={styles.legalMetaLink}>Contact Support</Text>
+              </Pressable>
+            </View>
+            <View style={styles.legalPolicyRow}>
+              <Pressable onPress={() => Linking.openURL(legalVersions.privacyUrl).catch(() => null)}>
+                <Text style={styles.legalLink}>Privacy Policy</Text>
+              </Pressable>
+              <Text style={styles.legalPolicyDivider}>·</Text>
+              <Pressable onPress={() => Linking.openURL(legalVersions.termsUrl).catch(() => null)}>
+                <Text style={styles.legalLink}>Terms of Use</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {(statusError || feedback) ? (
+            <Animated.View
+              style={[
+                styles.feedbackCard,
+                feedback?.tone === 'info' ? styles.feedbackCardInfo : styles.feedbackCardError,
+                {
+                  opacity: feedbackCardOpacity,
+                  transform: [{ translateY: feedbackCardTranslateY }],
+                },
+              ]}
+            >
+              <Text style={styles.feedbackTitle}>
+                {feedback?.title ?? 'Could not load membership status'}
+              </Text>
+              <Text style={styles.feedbackText}>
+                {feedback?.detail ?? statusError ?? 'Please try again.'}
+              </Text>
+              {feedback?.retryProducts ? (
+                <Pressable style={styles.feedbackActionButton} onPress={retryProducts}>
+                  <Text style={styles.feedbackActionText}>Reload plans</Text>
+                </Pressable>
+              ) : null}
+            </Animated.View>
+          ) : null}
+        </View>
       </ScrollView>
 
       <View
@@ -1180,9 +1219,29 @@ export default function MembershipScreen() {
             )}
           </Pressable>
         </Animated.View>
+        {showInviteCodeAction ? (
+          <Pressable
+            style={({ pressed }) => [
+              styles.footerSecondaryButton,
+              pressed && styles.inlineButtonPressed,
+              isProcessingPurchase && styles.inlineButtonDisabled,
+            ]}
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+              logEvent('membership_invite_code_tapped', {
+                screen: 'MembershipScreen',
+              });
+              navigation.navigate('OnboardingInviteCode');
+            }}
+            disabled={isProcessingPurchase}
+          >
+            <Text style={styles.footerSecondaryButtonText}>Have an invite code?</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+          </Pressable>
+        ) : null}
         <Text style={styles.trustStrip}>
           {isFacilitySelected
-            ? 'Community partner plan • Code required • Secure billing via Apple'
+            ? 'Community plan • Code required • Secure billing via Apple'
             : selectedPlan?.hasFreeTrial
               ? '7-day free trial • Secure billing via Apple • Cancel anytime'
               : 'Secure billing via Apple • Cancel anytime • 3-day grace period'}
@@ -1191,34 +1250,42 @@ export default function MembershipScreen() {
 
       <Modal
         visible={showFacilityModal}
-        transparent
-        animationType="fade"
-        statusBarTranslucent
+        animationType="slide"
         onRequestClose={closeFacilityModal}
       >
-        <View style={styles.facilityModalRoot}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closeFacilityModal}>
-            <BlurView intensity={90} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.facilityModalBlur} />
-            <View style={styles.facilityModalBackdrop} />
-          </Pressable>
-          <View style={styles.facilitySheet}>
-            <View style={styles.facilitySheetHandle} />
-            <View style={styles.facilitySheetHeader}>
-              <View style={styles.facilitySheetHeaderText}>
-                <Text style={styles.facilitySheetEyebrow}>Community partner plan</Text>
-                <Text style={styles.facilitySheetTitle}>Activate your facility offer</Text>
-                <Text style={styles.facilitySheetSubtitle}>
-                  Enter the code from your brochure or QR page to unlock your community pricing.
-                </Text>
-              </View>
-              <Pressable style={styles.facilitySheetClose} onPress={closeFacilityModal}>
-                <Ionicons name="close" size={18} color={theme.colors.text} />
-              </Pressable>
+        <SafeAreaView style={styles.facilityScreen} edges={[]}>
+          <View style={[styles.facilityHeaderRow, { paddingTop: Math.max(insets.top, 14) }]}>
+            <Pressable
+              style={styles.facilityBackButton}
+              onPress={() => {
+                void Haptics.selectionAsync().catch(() => null);
+                closeFacilityModal();
+              }}
+            >
+              <Ionicons name="chevron-down" size={18} color={theme.colors.text} />
+            </Pressable>
+            <Text style={styles.facilityHeaderTitle}>Facility Partner</Text>
+            <View style={styles.facilityHeaderSpacer} />
+          </View>
+
+          <ScrollView
+            contentContainerStyle={[
+              styles.facilityContent,
+              { paddingBottom: Math.max(insets.bottom, 24) + 172 },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.facilityIntroBlock}>
+              <Text style={styles.facilitySheetEyebrow}>Community partner plan</Text>
+              <Text style={styles.facilitySheetTitle}>Activate your facility offer</Text>
+              <Text style={styles.facilitySheetSubtitle}>
+                Enter the code from your brochure or QR page to unlock your community pricing.
+              </Text>
             </View>
 
             <View style={styles.facilityHeroCard}>
               <View style={styles.facilityHeroIcon}>
-                <Ionicons name="business-outline" size={20} color={theme.colors.accent} />
+                <Ionicons name="business-outline" size={22} color={theme.colors.accent} />
               </View>
               <View style={styles.facilityHeroBody}>
                 <Text style={styles.facilityHeroTitle}>
@@ -1227,7 +1294,7 @@ export default function MembershipScreen() {
                 <Text style={styles.facilityHeroCopy}>
                   {validatedFacility
                     ? `Residents of ${validatedFacility.facilityName} can start with a 14-day free trial, then continue at ${facilityDisplayPrice}/year.`
-                    : 'This plan stays hidden behind a valid facility code so only partner residents can claim it.'}
+                    : 'This plan stays behind a valid facility code so only partner residents can claim it.'}
                 </Text>
               </View>
             </View>
@@ -1278,56 +1345,63 @@ export default function MembershipScreen() {
                 </View>
               </View>
             ) : null}
+          </ScrollView>
 
-            <View style={styles.facilityActionRow}>
-              {!validatedFacility ? (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.facilityPrimaryButton,
-                    pressed && styles.primaryButtonPressed,
-                    isFacilityValidating && styles.inlineButtonDisabled,
-                  ]}
-                  onPress={handleFacilityValidate}
-                  disabled={isFacilityValidating}
-                >
-                  {isFacilityValidating ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.primaryButtonText}>Verify Code</Text>
-                  )}
-                </Pressable>
-              ) : (
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.facilityPrimaryButton,
-                    pressed && styles.primaryButtonPressed,
-                    (isProcessingPurchase || isLoadingProducts) && styles.inlineButtonDisabled,
-                  ]}
-                  onPress={handleFacilityPurchase}
-                  disabled={isProcessingPurchase || isLoadingProducts}
-                >
-                  {isProcessingPurchase ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <Text style={styles.primaryButtonText}>Claim Facility Offer</Text>
-                  )}
-                </Pressable>
-              )}
+          <View
+            style={[
+              styles.facilityFooter,
+              {
+                paddingBottom: Math.max(insets.bottom, 20),
+              },
+            ]}
+          >
+            {!validatedFacility ? (
               <Pressable
                 style={({ pressed }) => [
-                  styles.facilitySecondaryButton,
-                  pressed && styles.inlineButtonPressed,
+                  styles.facilityPrimaryButton,
+                  pressed && styles.primaryButtonPressed,
+                  isFacilityValidating && styles.inlineButtonDisabled,
                 ]}
-                onPress={validatedFacility ? () => setValidatedFacility(null) : closeFacilityModal}
-                disabled={isFacilityValidating || isProcessingPurchase}
+                onPress={handleFacilityValidate}
+                disabled={isFacilityValidating}
               >
-                <Text style={styles.facilitySecondaryButtonText}>
-                  {validatedFacility ? 'Enter a different code' : 'Close'}
-                </Text>
+                {isFacilityValidating ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Verify Code</Text>
+                )}
               </Pressable>
-            </View>
+            ) : (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.facilityPrimaryButton,
+                  pressed && styles.primaryButtonPressed,
+                  (isProcessingPurchase || isLoadingProducts) && styles.inlineButtonDisabled,
+                ]}
+                onPress={handleFacilityPurchase}
+                disabled={isProcessingPurchase || isLoadingProducts}
+              >
+                {isProcessingPurchase ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.primaryButtonText}>Claim Facility Offer</Text>
+                )}
+              </Pressable>
+            )}
+            <Pressable
+              style={({ pressed }) => [
+                styles.facilitySecondaryButton,
+                pressed && styles.inlineButtonPressed,
+              ]}
+              onPress={validatedFacility ? () => setValidatedFacility(null) : closeFacilityModal}
+              disabled={isFacilityValidating || isProcessingPurchase}
+            >
+              <Text style={styles.facilitySecondaryButtonText}>
+                {validatedFacility ? 'Enter a different code' : 'Close'}
+              </Text>
+            </Pressable>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       <Modal
@@ -1398,320 +1472,254 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       backgroundColor: theme.colors.bg,
     },
     content: {
-      paddingHorizontal: 24,
-      paddingTop: 26,
+      paddingHorizontal: 32,
+      paddingTop: 24,
       flexGrow: 1,
-      gap: 18,
+      gap: 32,
     },
-    headerBlock: {
-      gap: 10,
-      marginBottom: 4,
-      alignItems: 'flex-start',
+    bodySection: {
+      marginHorizontal: -32,
+      backgroundColor: theme.colors.bg,
+      paddingHorizontal: 32,
+      paddingTop: 16,
+      gap: 32,
+    },
+    heroCard: {
+      marginHorizontal: -32,
+      backgroundColor: theme.colors.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      paddingHorizontal: 32,
+      paddingTop: 34,
+      paddingBottom: 10,
+      minHeight: 404,
+      justifyContent: 'space-between',
+      overflow: 'hidden',
+    },
+    heroCardAccent: {
+      backgroundColor: theme.colors.accent,
+      borderBottomColor: withOpacity('#FFFFFF', 0.16),
+    },
+    heroPager: {
+      flexGrow: 0,
+    },
+    heroSlide: {
+      justifyContent: 'flex-start',
+      alignItems: 'center',
+      minHeight: 286,
     },
     heroIconWrap: {
-      width: 56,
-      height: 56,
-      borderRadius: 18,
-      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      backgroundColor: withOpacity(theme.colors.text, 0.02),
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.textMuted, 0.2),
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 2,
+      alignSelf: 'center',
+    },
+    heroIconWrapAccent: {
+      backgroundColor: withOpacity('#FFFFFF', 0.08),
+      borderColor: withOpacity('#FFFFFF', 0.22),
+    },
+    heroCardTop: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: 8,
+      marginTop: 0,
+    },
+    heroTextWrap: {
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 4,
+      marginTop: 18,
+      minHeight: 108,
+      justifyContent: 'flex-start',
     },
     title: {
       fontSize: 34,
       fontWeight: '700',
       letterSpacing: -0.4,
       color: theme.colors.text,
-      lineHeight: 38,
+      lineHeight: 40,
+      textAlign: 'center',
+    },
+    titleAccent: {
+      color: '#FFFFFF',
     },
     subtitle: {
-      fontSize: 16,
+      fontSize: 18,
+      fontWeight: '600',
       color: theme.colors.textMuted,
-      lineHeight: 22,
+      lineHeight: 26,
+      textAlign: 'center',
+      minHeight: 52,
+      maxWidth: 280,
     },
-    featuresCard: {
-      borderRadius: 20,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      gap: 10,
+    subtitleAccent: {
+      color: withOpacity('#FFFFFF', 0.82),
     },
-    featuresHeaderRow: {
+    heroFooter: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: 28,
+    },
+    heroProgressCentered: {
+      minHeight: 18,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    heroProgress: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
-    },
-    featuresHeaderLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      flex: 1,
-      minWidth: 0,
-    },
-    featuresHeaderTitle: {
-      flex: 1,
-      fontSize: 14,
-      fontWeight: '700',
-      color: theme.colors.text,
-    },
-    featuresBody: {
-      gap: 12,
-    },
-    featureRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-    },
-    featureIconWrap: {
-      width: 30,
-      height: 30,
-      borderRadius: 10,
-      backgroundColor: withOpacity(theme.colors.accent, 0.12),
-      alignItems: 'center',
+      gap: 8,
       justifyContent: 'center',
     },
-    featureText: {
+    heroProgressSegmentPressable: {
+      paddingVertical: 4,
+    },
+    heroProgressSegment: {
+      minWidth: 6,
+      height: 6,
+      borderRadius: 999,
+    },
+    heroLinkGrid: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    heroLinkCard: {
       flex: 1,
-      fontSize: 14,
-      fontWeight: '500',
+      minHeight: 96,
+      borderRadius: 24,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      justifyContent: 'flex-start',
+    },
+    heroLinkTitle: {
+      fontSize: 16,
+      fontWeight: '700',
       color: theme.colors.text,
       lineHeight: 20,
     },
-    learnMoreRow: {
+    heroLinkBottomRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      marginTop: -4,
-    },
-    learnMoreBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      paddingVertical: 4,
-      paddingHorizontal: 6,
-    },
-    learnMoreText: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: theme.colors.accent,
-    },
-    learnMoreDivider: {
-      fontSize: 14,
-      color: theme.colors.textMuted,
-    },
-    trialInfoCard: {
-      borderRadius: 24,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
-      padding: 18,
-      gap: 12,
-    },
-    trialInfoHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-end',
       justifyContent: 'space-between',
-      gap: 12,
-    },
-    trialInfoHeaderLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      flex: 1,
-      minWidth: 0,
-    },
-    trialInfoHeaderTextWrap: {
-      flex: 1,
-      minWidth: 0,
-      gap: 2,
-    },
-    trialInfoIconWrap: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.accent, 0.18),
-    },
-    trialInfoTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: theme.colors.text,
-      flexShrink: 1,
-    },
-    trialInfoSubtitle: {
-      color: theme.colors.textMuted,
-      fontSize: 13,
-      lineHeight: 18,
-      fontWeight: '500',
-      flexShrink: 1,
-    },
-    trialInfoBody: {
-      gap: 12,
-    },
-    trialInfoRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 12,
-    },
-    trialInfoBullet: {
-      width: 26,
-      height: 26,
-      borderRadius: 10,
-      backgroundColor: withOpacity(theme.colors.accent, 0.18),
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 2,
-    },
-    trialInfoTextWrap: {
-      flex: 1,
-      gap: 4,
-    },
-    trialInfoRowTitle: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.colors.text,
-    },
-    trialInfoRowDetail: {
-      fontSize: 13,
-      color: theme.colors.textMuted,
-      lineHeight: 18,
-      fontWeight: '500',
+      gap: 10,
+      marginTop: 'auto',
     },
     planSection: {
-      gap: 10,
+      gap: 8,
     },
     planSectionTitle: {
       fontSize: 13,
       fontWeight: '800',
-      letterSpacing: 0.4,
+      letterSpacing: 0.7,
       textTransform: 'uppercase',
       color: theme.colors.textMuted,
-      marginTop: 2,
     },
     planCard: {
-      borderRadius: 24,
-      padding: 16,
+      borderRadius: 32,
+      paddingHorizontal: 16,
+      paddingVertical: 20,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      gap: 10,
       overflow: 'hidden',
-    },
-    planCardAnnual: {
-      paddingTop: 16,
+      marginBottom: 8,
     },
     planCardSelected: {
-      borderColor: withOpacity(theme.colors.accent, 0.8),
-      backgroundColor: withOpacity(theme.colors.accent, 0.09),
+      borderWidth: 2,
+      borderColor: theme.colors.accent,
       shadowColor: theme.colors.accent,
-      shadowOpacity: 0.16,
-      shadowRadius: 16,
-      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.14,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 8 },
       elevation: 6,
     },
     planMainRow: {
       flexDirection: 'row',
+      alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
+      minHeight: 86,
     },
     planTextWrap: {
       flex: 1,
-      gap: 5,
+      justifyContent: 'space-between',
+      gap: 10,
+    },
+    planTitleWrap: {
+      gap: 8,
     },
     planTitleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      flexWrap: 'wrap',
+      flexWrap: 'nowrap',
+    },
+    planBadgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
     },
     planTitle: {
-      fontSize: 17,
+      fontSize: 18,
       fontWeight: '700',
       color: theme.colors.text,
       flexShrink: 1,
+      lineHeight: 22,
     },
     planBestValuePill: {
       borderRadius: 20,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      backgroundColor: withOpacity(theme.colors.accent, 0.14),
-      alignSelf: 'flex-start',
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      backgroundColor: withOpacity(theme.colors.accent, 0.16),
     },
     planPartnerPill: {
       backgroundColor: withOpacity(theme.colors.accent, 0.18),
     },
     planBestValueText: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: theme.colors.accent,
-      letterSpacing: 0.2,
-    },
-    planSavingsPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      alignSelf: 'flex-start',
-      borderRadius: 20,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      backgroundColor: withOpacity(theme.colors.accent, 0.12),
-    },
-    planTrialPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      alignSelf: 'flex-start',
-      borderRadius: 20,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      backgroundColor: withOpacity(theme.colors.accent, 0.12),
-    },
-    planTrialText: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: theme.colors.accent,
-      letterSpacing: 0.2,
-    },
-    planSavingsText: {
       fontSize: 12,
-      fontWeight: '600',
+      fontWeight: '700',
       color: theme.colors.accent,
+      letterSpacing: 0.2,
     },
-    planDetail: {
-      fontSize: 13,
-      color: theme.colors.textMuted,
-    },
-    planPriceWrap: {
+    planPriceLine: {
+      flexDirection: 'row',
       alignItems: 'flex-end',
-      gap: 2,
+      gap: 4,
     },
     planPrice: {
-      fontSize: 15,
+      fontSize: 28,
       fontWeight: '700',
       color: theme.colors.text,
+      lineHeight: 30,
     },
-    planPriceAnnual: {
-      color: theme.colors.text,
+    planPriceUnit: {
+      fontSize: 14,
+      lineHeight: 22,
+      fontWeight: '600',
+      color: theme.colors.textMuted,
+      marginBottom: 3,
     },
-    planBadge: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.colors.accent,
+    planDetail: {
+      fontSize: 14,
+      color: theme.colors.textMuted,
+      lineHeight: 20,
     },
     radio: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
       borderWidth: 1.5,
       borderColor: withOpacity(theme.colors.textMuted, 0.45),
       alignItems: 'center',
       justifyContent: 'center',
-      alignSelf: 'flex-end',
+      marginTop: 4,
     },
     radioSelected: {
       borderColor: theme.colors.accent,
@@ -1722,26 +1730,6 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       borderRadius: 4.5,
       backgroundColor: theme.colors.accent,
     },
-    actionsInline: {
-      flexDirection: 'row',
-      gap: 10,
-    },
-    actionsStack: {
-      gap: 10,
-    },
-    actionsInlineSingle: {
-      justifyContent: 'flex-start',
-    },
-    inlineButton: {
-      flex: 1,
-      minHeight: 52,
-      borderRadius: 16,
-      backgroundColor: theme.colors.surfaceAlt,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.38),
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
     inlineButtonPressed: {
       opacity: 0.9,
       transform: [{ scale: 0.99 }],
@@ -1749,105 +1737,10 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
     inlineButtonDisabled: {
       opacity: 0.62,
     },
-    inlineButtonText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.colors.accent,
-      textAlign: 'center',
-    },
-    inlineButtonSecondary: {
-      minHeight: 52,
-      borderRadius: 16,
-      backgroundColor: withOpacity(theme.colors.textMuted, 0.12),
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.textMuted, 0.34),
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 14,
-    },
-    inlineButtonSecondaryText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.colors.text,
-      textAlign: 'center',
-    },
-    billingCard: {
-      borderRadius: 24,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surface,
-      padding: 16,
-      gap: 7,
-    },
-    billingHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      justifyContent: 'space-between',
-      gap: 10,
-    },
-    billingHeaderTextWrap: {
-      flex: 1,
-      gap: 2,
-    },
-    billingTitle: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: theme.colors.text,
-    },
-    billingSummary: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: theme.colors.textMuted,
-    },
-    billingChevronIcon: {
-      marginTop: 1,
-    },
-    billingCopy: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: theme.colors.textMuted,
-    },
-    billingHelpLink: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.colors.accent,
-      marginTop: 2,
-      alignSelf: 'flex-start',
-    },
-    supportQuickRow: {
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: withOpacity(theme.colors.accent, 0.3),
-      backgroundColor: withOpacity(theme.colors.accent, 0.09),
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
-    supportQuickText: {
-      flex: 1,
-      fontSize: 13,
-      fontWeight: '600',
-      color: theme.colors.text,
-    },
-    notNowRow: {
-      alignSelf: 'center',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      marginTop: 6,
-      marginBottom: 0,
-    },
-    notNowText: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: theme.colors.textMuted,
-      textDecorationLine: 'underline',
-    },
     legalFooter: {
-      marginTop: 16,
+      marginTop: -8,
       paddingHorizontal: 4,
-      paddingBottom: 8,
+      gap: 8,
     },
     legalText: {
       fontSize: 11,
@@ -1859,6 +1752,28 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       fontSize: 11,
       color: theme.colors.textMuted,
       textDecorationLine: 'underline',
+    },
+    legalPolicyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      flexWrap: 'nowrap',
+    },
+    legalPolicyDivider: {
+      fontSize: 11,
+      color: theme.colors.textMuted,
+    },
+    legalMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 18,
+    },
+    legalMetaLink: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: theme.colors.textMuted,
     },
     feedbackCard: {
       marginTop: 4,
@@ -1907,10 +1822,14 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       right: 0,
       bottom: 0,
       paddingHorizontal: 24,
-      paddingTop: 16,
+      paddingTop: 18,
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
       backgroundColor: withOpacity(theme.colors.bg, 0.98),
+      shadowColor: '#000',
+      shadowOpacity: mode === 'dark' ? 0.24 : 0.08,
+      shadowRadius: 20,
+      shadowOffset: { width: 0, height: -10 },
     },
     catalogErrorInlineSimple: {
       marginBottom: 10,
@@ -1928,8 +1847,8 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       textAlign: 'center',
     },
     primaryButton: {
-      height: 58,
-      borderRadius: 20,
+      height: 60,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: theme.colors.accent,
@@ -1950,6 +1869,47 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       ...StyleSheet.absoluteFillObject,
       backgroundColor:
         mode === 'dark' ? withOpacity(theme.colors.bg, 0.56) : withOpacity(theme.colors.text, 0.22),
+    },
+    facilityScreen: {
+      flex: 1,
+      backgroundColor: theme.colors.bg,
+    },
+    facilityHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      backgroundColor: theme.colors.bg,
+    },
+    facilityBackButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    facilityHeaderTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    facilityHeaderSpacer: {
+      width: 34,
+      height: 34,
+    },
+    facilityContent: {
+      paddingHorizontal: 24,
+      paddingTop: 28,
+      gap: 18,
+    },
+    facilityIntroBlock: {
+      gap: 6,
     },
     facilitySheet: {
       borderTopLeftRadius: 30,
@@ -2017,7 +1977,7 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      padding: 16,
+      padding: 18,
       flexDirection: 'row',
       gap: 14,
     },
@@ -2125,6 +2085,18 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
     facilityActionRow: {
       gap: 10,
     },
+    facilityFooter: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: 24,
+      paddingTop: 14,
+      gap: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      backgroundColor: theme.colors.bg,
+    },
     facilityPrimaryButton: {
       height: 58,
       borderRadius: 20,
@@ -2159,6 +2131,23 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       fontSize: 16,
       fontWeight: '700',
       color: '#FFFFFF',
+    },
+    footerSecondaryButton: {
+      minHeight: 52,
+      marginTop: 10,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      flexDirection: 'row',
+      gap: 6,
+    },
+    footerSecondaryButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.textMuted,
     },
     trustStrip: {
       marginTop: 9,

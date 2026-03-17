@@ -81,6 +81,7 @@ import OnboardingSuccessScreen from './src/screens/onboarding/OnboardingSuccessS
 import PermissionPrimingScreen from './src/screens/onboarding/PermissionPrimingScreen';
 import MembershipScreen from './src/screens/onboarding/MembershipScreen';
 import MembershipActivatedScreen from './src/screens/onboarding/MembershipActivatedScreen';
+import MembershipFacilityOfferScreen from './src/screens/onboarding/MembershipFacilityOfferScreen';
 import MembershipExperienceScreen from './src/screens/onboarding/MembershipExperienceScreen';
 import WhyChooseVerityScreen from './src/screens/onboarding/WhyChooseVerityScreen';
 import {
@@ -883,34 +884,19 @@ function RootNavigator() {
               options={{ headerShown: false, animation: 'none' }}
             />
             <RootStack.Screen
-              name="OnboardingTrustedContacts"
-              component={OnboardingTrustedContactsScreen}
-              options={{ headerShown: false }}
+              name="OnboardingCallForwarding"
+              component={OnboardingCallForwardingScreen}
+              options={{ title: 'Call Forwarding' }}
             />
             <RootStack.Screen
-              name="OnboardingSafePhrases"
-              component={OnboardingSafePhrasesScreen}
+              name="OnboardingTrustedContacts"
+              component={OnboardingTrustedContactsScreen}
               options={{ headerShown: false }}
             />
             <RootStack.Screen
               name="OnboardingInviteFamily"
               component={InviteFamilyScreen}
               options={{ headerShown: false }}
-            />
-            <RootStack.Screen
-              name="OnboardingAlerts"
-              component={AlertPrefsScreen}
-              options={{ headerShown: false }}
-            />
-            <RootStack.Screen
-              name="OnboardingCallForwarding"
-              component={OnboardingCallForwardingScreen}
-              options={{ title: 'Call Forwarding' }}
-            />
-            <RootStack.Screen
-              name="OnboardingTestCall"
-              component={TestCallScreen}
-              options={{ title: 'Test Call' }}
             />
             <RootStack.Screen
               name="OnboardingInviteCode"
@@ -1016,6 +1002,26 @@ function RootNavigator() {
         name="PermissionPriming"
         component={PermissionPrimingScreen}
         options={{ headerShown: false, gestureEnabled: false }}
+      />
+      <RootStack.Screen
+        name="OnboardingSafePhrases"
+        component={OnboardingSafePhrasesScreen}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="OnboardingAlerts"
+        component={AlertPrefsScreen}
+        options={{ headerShown: false }}
+      />
+      <RootStack.Screen
+        name="OnboardingTestCall"
+        component={TestCallScreen}
+        options={{ title: 'Test Call' }}
+      />
+      <RootStack.Screen
+        name="MembershipFacilityOffer"
+        component={MembershipFacilityOfferScreen}
+        options={{ headerShown: false, presentation: 'modal' }}
       />
       <RootStack.Screen
         name="MembershipExperience"

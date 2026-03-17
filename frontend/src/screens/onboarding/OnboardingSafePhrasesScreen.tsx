@@ -133,7 +133,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   return (
     <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <OnboardingHeader chapter="Phrases" activeStep={6} totalSteps={9} />
+        <OnboardingHeader chapter="Phrases" activeStep={7} totalSteps={9} showProgress={false} />
         <ScrollView
           contentContainerStyle={[
             styles.content,

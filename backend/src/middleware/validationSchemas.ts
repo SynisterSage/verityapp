@@ -49,6 +49,10 @@ export const createProfileSchema = z.object({
   auto_mark_safe_threshold: z.number().min(0).max(100).optional(),
   auto_trust_on_safe: z.boolean().optional(),
   auto_block_on_fraud: z.boolean().optional(),
+  completed_safe_phrases: z.boolean().optional(),
+  completed_alert_prefs: z.boolean().optional(),
+  completed_test_call: z.boolean().optional(),
+  dismissed_nudge_cards: z.array(z.string().min(1).max(64)).optional(),
 });
 
 export const updateProfileSchema = createProfileSchema.partial().strict();

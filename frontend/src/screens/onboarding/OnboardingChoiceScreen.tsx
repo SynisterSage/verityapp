@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,22 +13,23 @@ import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
 import { logEvent } from '../../services/sentry';
 import { navigateToSupportPortal } from '../../navigation/rootNavigator';
+import OnboardingChoiceInfoModal from '../../components/common/OnboardingChoiceInfoModal';
 
 type OnboardingChoiceTarget = 'OnboardingProfile' | 'OnboardingInviteCode';
 
 const cards = [
   {
     id: 'start',
-    title: 'Start Fresh',
-    subtitle: 'Set up new protection',
+    title: 'Set Up Protection',
+    subtitle: 'Create a new protected profile',
     icon: 'shield-checkmark-outline',
     variant: 'primary' as const,
     target: 'OnboardingProfile' as OnboardingChoiceTarget,
   },
   {
     id: 'join',
-    title: 'Join Circle',
-    subtitle: 'Use an invitation code',
+    title: 'I Have an Invite Code',
+    subtitle: 'Join an existing family or facility setup',
     icon: 'person-add-outline',
     variant: 'secondary' as const,
     target: 'OnboardingInviteCode' as OnboardingChoiceTarget,
@@ -38,9 +39,10 @@ const cards = [
 export default function OnboardingChoiceScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'OnboardingChoice'>>();
   const insets = useSafeAreaInsets();
-  const { theme } = useTheme();
+  const { theme, mode } = useTheme();
   const { membershipActivationNotice } = useSubscription();
   const styles = useMemo(() => createChoiceStyles(theme), [theme]);
+  const [showSetupHelp, setShowSetupHelp] = useState(false);
 
   useEffect(() => {
     logEvent('onboarding_started', { screen: 'OnboardingChoice' });
@@ -63,7 +65,7 @@ export default function OnboardingChoiceScreen() {
 
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
-      <OnboardingHeader chapter="setup" activeStep={2} showBack={false} />
+      <OnboardingHeader chapter="setup" activeStep={1} totalSteps={6} showBack={false} />
         <ScrollView
           contentContainerStyle={[
             styles.body,
@@ -76,9 +78,18 @@ export default function OnboardingChoiceScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>How would you like to start?</Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.title}>How are you setting up today?</Text>
+            <Pressable
+              style={({ pressed }) => [styles.helpButton, pressed && styles.helpButtonPressed]}
+              onPress={() => setShowSetupHelp(true)}
+              hitSlop={8}
+            >
+              <Ionicons name="help-circle-outline" size={18} color={theme.colors.textMuted} />
+            </Pressable>
+          </View>
           <Text style={styles.subtitle}>
-            Simple protection, tailored to your needs.
+            If you just subscribed, choose Set Up Protection.
           </Text>
         </View>
 
@@ -137,6 +148,12 @@ export default function OnboardingChoiceScreen() {
           <Text style={[styles.footerLink, { color: theme.colors.accent }]}>Speak with our team</Text>
         </Pressable>
       </View>
+      <OnboardingChoiceInfoModal
+        visible={showSetupHelp}
+        onClose={() => setShowSetupHelp(false)}
+        theme={theme}
+        mode={mode}
+      />
     </SafeAreaView>
   );
 }
@@ -155,6 +172,12 @@ const createChoiceStyles = (theme: AppTheme) =>
     header: {
       marginBottom: 32,
     },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
     title: {
       fontSize: 34,
       fontWeight: '700',
@@ -162,13 +185,28 @@ const createChoiceStyles = (theme: AppTheme) =>
       letterSpacing: -0.35,
       lineHeight: 38,
       maxWidth: 320,
+      flex: 1,
     },
     subtitle: {
       fontSize: 17,
       fontWeight: '500',
       color: theme.colors.textMuted,
-      marginTop: 8,
+      marginTop: 10,
       maxWidth: 320,
+    },
+    helpButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceAlt,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    helpButtonPressed: {
+      opacity: 0.75,
+      transform: [{ scale: 0.95 }],
     },
     cards: {
       flexDirection: 'column',

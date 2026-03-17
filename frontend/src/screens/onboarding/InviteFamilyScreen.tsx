@@ -553,7 +553,7 @@ export default function InviteFamilyScreen({ navigation }: Props) {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
-      <OnboardingHeader chapter="Circle" activeStep={7} totalSteps={9} />
+      <OnboardingHeader chapter="Circle" activeStep={6} totalSteps={6} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -698,9 +698,9 @@ export default function InviteFamilyScreen({ navigation }: Props) {
       </ScrollView>
       <ActionFooter
         primaryLabel="Continue"
-        onPrimaryPress={() => navigation.navigate('OnboardingAlerts')}
+        onPrimaryPress={() => navigation.navigate('OnboardingSuccess')}
         secondaryLabel="Skip for now"
-        onSecondaryPress={() => navigation.navigate('OnboardingAlerts')}
+        onSecondaryPress={() => navigation.navigate('OnboardingSuccess')}
       />
       {selectedInvite && (
         <View style={styles.actionOverlay} pointerEvents="box-none">

@@ -66,7 +66,17 @@ export default function RecentCallCard({
 
   const headerRowStyles = [styles.headerRow, hideBadge && styles.headerRowNoBadge];
   return (
-    <TouchableOpacity style={[styles.card, { backgroundColor: theme.colors.surface }]} onPress={handlePress} activeOpacity={0.85}>
+    <TouchableOpacity
+      style={[
+        styles.card,
+        {
+          backgroundColor: theme.colors.surface,
+          borderColor: withOpacity(theme.colors.text, 0.08),
+        },
+      ]}
+      onPress={handlePress}
+      activeOpacity={0.85}
+    >
       <View style={headerRowStyles}>
         <View style={styles.headerRowLeft}>
           <View style={[styles.iconCircle, { backgroundColor: iconBackgroundColor ?? theme.colors.surfaceAlt }]}>
@@ -114,7 +124,6 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
     marginBottom: 16,
   },

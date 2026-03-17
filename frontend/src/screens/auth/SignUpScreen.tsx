@@ -290,7 +290,9 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
 
   const alertColor = alert?.type === 'warning' ? theme.colors.warning : theme.colors.danger;
   const alertBg =
-    alert?.type === 'warning' ? 'rgba(245, 158, 11, 0.08)' : 'rgba(225, 29, 72, 0.08)';
+    alert?.type === 'warning'
+      ? withOpacity(theme.colors.warning, 0.08)
+      : withOpacity(theme.colors.danger, 0.08);
 
   const alertSpacing = alert ? 40 : 24;
   const scrollPaddingBottom = Math.max(insets.bottom, 32) + 80 + alertSpacing;
@@ -639,15 +641,15 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         secondaryLabel="Apple"
         onSecondaryPress={handleAppleSignUp}
         secondaryIcon={
-          <View style={styles.appleIcon}>
+          <View style={[styles.appleIcon, { backgroundColor: theme.colors.text }]}>
             <Ionicons name="logo-apple" size={16} color="#FFFFFF" />
           </View>
         }
         tertiaryLabel="Google"
         onTertiaryPress={handleGoogleSignUp}
         tertiaryIcon={
-          <View style={styles.googleIcon}>
-            <Text style={styles.googleIconText}>G</Text>
+          <View style={[styles.googleIcon, { backgroundColor: theme.colors.surface }]}>
+            <Text style={[styles.googleIconText, { color: theme.colors.accent }]}>G</Text>
           </View>
         }
         helperPrefix="Already have an account?"

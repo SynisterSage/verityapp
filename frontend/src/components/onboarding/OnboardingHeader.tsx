@@ -16,6 +16,7 @@ type Props = {
   totalSteps?: number;
   activeStep?: number;
   showBack?: boolean;
+  showProgress?: boolean;
   /** Hides step pills and support button — just the chapter label */
   minimal?: boolean;
 };
@@ -27,6 +28,7 @@ export default function OnboardingHeader({
   activeStep = 0,
   totalSteps = TOTAL_SEGMENTS,
   showBack = true,
+  showProgress = true,
   minimal = false,
 }: Props) {
   const navigation = useNavigation();
@@ -99,7 +101,7 @@ export default function OnboardingHeader({
             </View>
 
             <View style={styles.progressRow}>
-              {!minimal ? (
+              {!minimal && showProgress ? (
                 <View style={styles.progress}>
                   {steps.map((step) => {
                     const isActive = step < activeStep;

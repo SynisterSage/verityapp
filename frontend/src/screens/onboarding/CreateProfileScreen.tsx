@@ -403,7 +403,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
     return (
       <View style={styles.outer}>
         <SafeAreaView style={styles.screen} edges={['bottom']}>
-          <OnboardingHeader chapter="Identity" activeStep={3} totalSteps={9} />
+          <OnboardingHeader chapter="Identity" activeStep={2} totalSteps={6} />
           <View style={styles.keyboardAvoiding}>
             <ScrollView
               contentContainerStyle={[
@@ -440,7 +440,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   return (
     <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <OnboardingHeader chapter="Identity" activeStep={3} totalSteps={9} />
+        <OnboardingHeader chapter="Identity" activeStep={2} totalSteps={6} />
         <View style={styles.keyboardAvoiding}>{renderScrollContent()}</View>
         <ActionFooter
           primaryLabel="Continue"
