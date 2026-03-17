@@ -15,11 +15,11 @@ export type RootStackParamList = {
   OnboardingProfile: undefined;
   OnboardingPasscode: undefined;
   OnboardingTrustedContacts: undefined;
-  OnboardingSafePhrases: undefined;
+  OnboardingSafePhrases: { source?: 'onboarding' | 'nudge' } | undefined;
   OnboardingInviteFamily: undefined;
-  OnboardingAlerts: undefined;
-  OnboardingCallForwarding: undefined;
-  OnboardingTestCall: undefined;
+  OnboardingAlerts: { source?: 'onboarding' | 'nudge' } | undefined;
+  OnboardingCallForwarding: { source?: 'onboarding' | 'nudge' } | undefined;
+  OnboardingTestCall: { source?: 'onboarding' | 'nudge' } | undefined;
   OnboardingInviteCode: undefined;
   OnboardingSuccess: undefined;
   PermissionPriming: undefined;

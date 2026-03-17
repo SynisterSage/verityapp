@@ -43,11 +43,18 @@ const formatFullPhone = (phoneNumber: string) => {
   return `+1 (${area}) ${prefix}-${line}`;
 };
 
-export default function OnboardingCallForwardingScreen({ navigation }: { navigation: any }) {
+export default function OnboardingCallForwardingScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route?: { params?: { source?: 'onboarding' | 'nudge' } };
+}) {
   const { activeProfile, setOnboardingComplete, setRedirectToSettings } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createCallForwardingStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+  const isNudgeFlow = route?.params?.source === 'nudge';
   const [activePlatform, setActivePlatform] = useState<'ios' | 'droid' | 'home'>(
     Platform.OS === 'ios' ? 'ios' : 'droid'
   );
@@ -180,7 +187,7 @@ home: [
 
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
-      <OnboardingHeader chapter="Setup" activeStep={4} totalSteps={6} />
+      <OnboardingHeader chapter="Setup" activeStep={4} totalSteps={6} showProgress={!isNudgeFlow} />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -328,15 +335,25 @@ home: [
       </ScrollView>
 
     <ActionFooter
-      primaryLabel={twilioNumber ? "I've turned it on" : 'Continue'}
+      primaryLabel={isNudgeFlow ? 'Continue' : twilioNumber ? "I've turned it on" : 'Continue'}
       onPrimaryPress={() => {
+        if (isNudgeFlow) {
+          if (navigation.canGoBack?.()) {
+            navigation.goBack();
+          } else {
+            navigation.navigate('AppTabs', { screen: 'HomeTab' });
+          }
+          return;
+        }
         if (!twilioNumber) {
           setRedirectToSettings(true);
         }
         navigation.navigate('OnboardingTrustedContacts');
       }}
-      secondaryLabel={twilioNumber ? 'Do this later' : undefined}
-      onSecondaryPress={twilioNumber ? () => navigation.navigate('OnboardingTrustedContacts') : undefined}
+      secondaryLabel={isNudgeFlow ? undefined : twilioNumber ? 'Do this later' : undefined}
+      onSecondaryPress={
+        isNudgeFlow ? undefined : twilioNumber ? () => navigation.navigate('OnboardingTrustedContacts') : undefined
+      }
     />
   </SafeAreaView>
 );

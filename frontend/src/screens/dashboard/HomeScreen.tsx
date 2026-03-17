@@ -160,7 +160,7 @@ function formatPinChangeTimestamp(value: string) {
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
-  const { activeProfile, setActiveProfile } = useProfile();
+  const { activeProfile, setActiveProfile, canManageProfile } = useProfile();
   const sessionUserId = session?.user?.id ?? null;
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -310,6 +310,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   }, [activeProfile?.id, setActiveProfile]);
 
   const activeSetupNudgeKey = useMemo<SetupNudgeKey | null>(() => {
+    if (!canManageProfile) {
+      return null;
+    }
     const dismissed = new Set(mergedDismissedNudges);
     for (const key of SETUP_NUDGE_PRIORITY) {
       if (dismissed.has(key)) {
@@ -326,7 +329,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       }
     }
     return null;
-  }, [mergedDismissedNudges, setupNudgeState]);
+  }, [canManageProfile, mergedDismissedNudges, setupNudgeState]);
 
   const activeSetupNudge = useMemo(() => {
     if (!activeSetupNudgeKey) {
@@ -440,7 +443,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       return;
     }
     triggerLightHaptic();
-    rootNavigationRef.navigate(activeSetupNudge.routeName as never);
+    (rootNavigationRef as any).navigate(activeSetupNudge.routeName, { source: 'nudge' });
   }, [activeSetupNudge, triggerLightHaptic]);
 
   const loadStats = async (isRefresh = false, silent = false) => {
@@ -1151,12 +1154,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   <View style={styles.setupNudgeAccent} />
                   <View style={styles.setupNudgeBody}>
                     <View style={styles.setupNudgeTopRow}>
-                      <View style={styles.setupNudgeHeadingRow}>
-                        <View style={styles.setupNudgeIconWrap}>
-                          <Ionicons name={activeSetupNudge.iconName} size={16} color={theme.colors.accent} />
-                        </View>
-                        <Text style={styles.setupNudgeTitle}>{activeSetupNudge.title}</Text>
-                      </View>
+                      <Text style={styles.setupNudgeTitle}>{activeSetupNudge.title}</Text>
                       <Pressable
                         style={({ pressed }) => [styles.setupNudgeDismiss, pressed && styles.setupNudgeDismissPressed]}
                         onPress={handleDismissSetupNudge}
@@ -1601,62 +1599,47 @@ const createStyles = (theme: AppTheme) =>
     },
     setupNudgeBody: {
       flex: 1,
-      paddingHorizontal: 14,
-      paddingVertical: 9,
-      gap: 5,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 10,
     },
     setupNudgeTopRow: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       justifyContent: 'space-between',
-    },
-    setupNudgeHeadingRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-      minWidth: 0,
-      marginRight: 8,
+      gap: 8,
     },
     setupNudgeDismiss: {
-      alignSelf: 'flex-end',
-      width: 20,
-      height: 20,
+      width: 24,
+      height: 24,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 10,
-      marginBottom: 0,
+      borderRadius: 12,
+      marginTop: -2,
     },
     setupNudgeDismissPressed: {
       backgroundColor: withOpacity(theme.colors.textMuted, 0.16),
     },
-    setupNudgeIconWrap: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: withOpacity(theme.colors.accent, 0.14),
-      marginRight: 8,
-    },
     setupNudgeTitle: {
       color: theme.colors.text,
-      fontSize: 15,
+      fontSize: 20,
       fontWeight: '700',
-      letterSpacing: -0.2,
-      flexShrink: 1,
+      lineHeight: 25,
+      letterSpacing: -0.25,
+      flex: 1,
     },
     setupNudgeDescription: {
       color: theme.colors.textMuted,
-      fontSize: 12,
-      lineHeight: 16,
+      fontSize: 15,
+      lineHeight: 21,
     },
     setupNudgeCta: {
       marginTop: 2,
       width: '100%',
-      borderRadius: 12,
+      borderRadius: 14,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 9,
+      paddingVertical: 12,
       backgroundColor: theme.colors.accent,
     },
     setupNudgeCtaPressed: {
@@ -1664,7 +1647,7 @@ const createStyles = (theme: AppTheme) =>
     },
     setupNudgeCtaText: {
       color: theme.colors.surface,
-      fontSize: 14,
+      fontSize: 16,
       fontWeight: '700',
     },
     statsGrid: {

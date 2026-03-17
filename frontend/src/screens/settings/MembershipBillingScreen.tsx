@@ -223,14 +223,13 @@ export default function MembershipBillingScreen() {
   const trialEndsLabel = formatDateLabel(subscription?.trialEndsAt);
   const trialStatusDetail =
     trialDaysLeft === 0
-      ? 'Keep your verified number and call screening active without interruption.'
-      : 'You can manage or cancel anytime in App Store subscriptions.';
+      ? 'Keep call screening going by sticking with a paid plan.'
+      : 'Manage or cancel anytime via App Store subscriptions.';
   const trialStatusMeta =
     trialEndsLabel !== '—'
-      ? `Trial end: ${trialEndsLabel}. Cancel at least 24 hours before end to avoid a charge.`
-      : 'Cancel at least 24 hours before trial end to avoid a charge.';
-  const trialReminderNote =
-    'We will also send you a reminder before the trial ends so you can renew or cancel with plenty of time.';
+      ? `Ends ${trialEndsLabel}. Cancel 24 hours before to avoid charges.`
+      : 'Cancel 24 hours before the trial ends to avoid charges.';
+  const trialReminderNote = "We'll remind you before the trial ends so you can decide.";
 
   const handleManageMembership = useCallback(async () => {
     if (isOpeningManage) {
@@ -411,22 +410,24 @@ export default function MembershipBillingScreen() {
         {showTrialStatusCard ? (
           <>
             <Text style={styles.sectionLabel}>Trial status</Text>
-            <View style={[styles.card, styles.trialCard]}>
-              <View style={styles.trialHeader}>
-                <View style={styles.trialIconWrap}>
-                  <Ionicons name="hourglass-outline" size={20} color={theme.colors.accent} />
-                </View>
+          <View style={[styles.card, styles.trialCard]}>
+            <View style={styles.trialHeader}>
+              <View style={styles.trialIconWrap}>
+                <Ionicons name="hourglass-outline" size={20} color={theme.colors.accent} />
+              </View>
               <View style={styles.trialHeaderText}>
                 <Text style={styles.trialTitle}>{trialStatusTitle}</Text>
                 <Text style={styles.trialDetail}>{trialStatusDetail}</Text>
-                <Text style={styles.trialMetaText}>{trialStatusMeta}</Text>
-                <Text style={styles.trialReminderNote}>{trialReminderNote}</Text>
               </View>
             </View>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.trialPrimaryButton,
-                  pressed ? styles.trialPrimaryButtonPressed : undefined,
+            <View style={styles.trialMetaBlock}>
+              <Text style={styles.trialMetaText}>{trialStatusMeta}</Text>
+              <Text style={styles.trialReminderNote}>{trialReminderNote}</Text>
+            </View>
+            <Pressable
+              style={({ pressed }) => [
+                styles.trialPrimaryButton,
+                pressed ? styles.trialPrimaryButtonPressed : undefined,
                 ]}
                 onPress={handleManageMembership}
               >
@@ -619,6 +620,10 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
     trialHeaderText: {
       flex: 1,
       gap: 2,
+    },
+    trialMetaBlock: {
+      marginTop: 10,
+      gap: 4,
     },
     trialTitle: {
       color: theme.colors.text,

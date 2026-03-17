@@ -135,6 +135,7 @@ export default function SecurityScreen() {
     }, [fetchProfileDetails, setActiveProfile])
   );
   const isEmailProvider = provider === 'email';
+  const isAppleProvider = provider === 'apple';
 
   const clearFields = () => {
     setCurrentPassword('');
@@ -307,6 +308,16 @@ export default function SecurityScreen() {
     Alert.alert('Unable to open settings', 'Please visit myaccount.google.com manually.');
   };
 
+  const handleAppleSettings = async () => {
+    const url = 'https://appleid.apple.com/account';
+    const canOpen = await Linking.canOpenURL(url);
+    if (canOpen) {
+      Linking.openURL(url);
+      return;
+    }
+    Alert.alert('Unable to open settings', 'Please visit appleid.apple.com/account manually.');
+  };
+
   const handleSupportPinReset = () => {
     navigateToSupportPortal();
   };
@@ -335,43 +346,59 @@ export default function SecurityScreen() {
             <View style={styles.form}>
               <View>
                 <Text style={styles.inputLabel}>Current password</Text>
-            <TextInput
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-              secureTextEntry
-              placeholder="••••••••"
-              placeholderTextColor={placeholderColor}
-              style={[styles.input, !canManageProfile && styles.inputDisabled]}
-              editable={canManageProfile}
-            />
+                <TextInput
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry
+                  placeholder="••••••••"
+                  placeholderTextColor={placeholderColor}
+                  style={[styles.input, !canManageProfile && styles.inputDisabled]}
+                  editable={canManageProfile}
+                />
               </View>
               <View>
                 <Text style={styles.inputLabel}>New password</Text>
-            <TextInput
-              value={newPassword}
-              onChangeText={setNewPassword}
-              secureTextEntry
-              placeholder="••••••••"
-              placeholderTextColor={placeholderColor}
-              style={[styles.input, !canManageProfile && styles.inputDisabled]}
-              editable={canManageProfile}
-            />
+                <TextInput
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  placeholder="••••••••"
+                  placeholderTextColor={placeholderColor}
+                  style={[styles.input, !canManageProfile && styles.inputDisabled]}
+                  editable={canManageProfile}
+                />
               </View>
               <View>
                 <Text style={styles.inputLabel}>Confirm new password</Text>
-            <TextInput
-              value={confirmPassword}
-              onChangeText={setConfirmPassword}
-              secureTextEntry
-              placeholder="••••••••"
-              placeholderTextColor={placeholderColor}
-              style={[styles.input, !canManageProfile && styles.inputDisabled]}
-              editable={canManageProfile}
-            />
+                <TextInput
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  placeholder="••••••••"
+                  placeholderTextColor={placeholderColor}
+                  style={[styles.input, !canManageProfile && styles.inputDisabled]}
+                  editable={canManageProfile}
+                />
               </View>
             </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {successMessage ? <Text style={styles.successText}>{successMessage}</Text> : null}
+          <Text style={styles.footerLabel}>Security managed by Verity Protect.</Text>
+        </View>
+      ) : isAppleProvider ? (
+          <View style={styles.card}>
+            <View style={styles.appleBadge}>
+              <Ionicons name="logo-apple" size={28} color={theme.colors.text} />
+            </View>
+            <Text style={[styles.cardLabel, styles.centerText]}>Signed in with Apple</Text>
+            <Text style={[styles.cardHelper, styles.centerText]}>
+              You use Sign in with Apple. Password management is handled by Apple, so update it directly
+              in your Apple ID settings.
+            </Text>
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleAppleSettings}>
+              <Text style={styles.secondaryText}>Go to Apple ID settings</Text>
+              <Ionicons name="open-outline" size={18} color={theme.colors.text} />
+            </TouchableOpacity>
           <Text style={styles.footerLabel}>Security managed by Verity Protect.</Text>
         </View>
       ) : (
@@ -655,6 +682,16 @@ const createSecurityStyles = (theme: AppTheme) =>
       height: 64,
       borderRadius: 24,
       backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'center',
+      marginBottom: 16,
+    },
+    appleBadge: {
+      width: 64,
+      height: 64,
+      borderRadius: 24,
+      backgroundColor: theme.colors.surfaceAlt,
       alignItems: 'center',
       justifyContent: 'center',
       alignSelf: 'center',

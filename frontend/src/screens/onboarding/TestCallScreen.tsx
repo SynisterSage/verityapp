@@ -39,7 +39,13 @@ function formatUsPhoneNumber(raw?: string | null) {
   return `+1 (${area}) ${prefix}-${line}`;
 }
 
-export default function TestCallScreen({ navigation }: { navigation: any }) {
+export default function TestCallScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route?: { params?: { source?: 'onboarding' | 'nudge' } };
+}) {
   const { activeProfile, passcodeDraft, setActiveProfile, setRedirectToSettings } =
     useProfile();
   const { theme, mode } = useTheme();
@@ -48,6 +54,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
   const [showVerityNumberInfoModal, setShowVerityNumberInfoModal] = useState(false);
   const [showSafetyPinInfoModal, setShowSafetyPinInfoModal] = useState(false);
+  const isNudgeFlow = route?.params?.source === 'nudge';
 
   const twilioNumber = activeProfile?.twilio_virtual_number ?? '';
   const redirectNumber = activeProfile?.fallback_phone_number ?? '';
@@ -55,10 +62,22 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
   const displayTwilioNumber = twilioNumber ? formatUsPhoneNumber(twilioNumber) : '';
   const displayRedirectNumber = redirectNumber ? formatUsPhoneNumber(redirectNumber) : '';
 
+  const completeAndExit = useCallback(() => {
+    setRedirectToSettings(false);
+    if (isNudgeFlow) {
+      if (navigation.canGoBack?.()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('AppTabs', { screen: 'HomeTab' });
+      }
+      return;
+    }
+    navigation.navigate('OnboardingSuccess');
+  }, [isNudgeFlow, navigation, setRedirectToSettings]);
+
   const finishOnboarding = async () => {
     if (!activeProfile?.id) {
-      setRedirectToSettings(false);
-      navigation.navigate('OnboardingSuccess');
+      completeAndExit();
       return;
     }
 
@@ -75,8 +94,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
     } catch (error) {
       setActiveProfile({ ...activeProfile, completed_test_call: true });
     } finally {
-      setRedirectToSettings(false);
-      navigation.navigate('OnboardingSuccess');
+      completeAndExit();
     }
   };
 
@@ -99,8 +117,7 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
   };
 
   const skipTestCall = () => {
-    setRedirectToSettings(false);
-    navigation.navigate('OnboardingSuccess');
+    completeAndExit();
   };
 
   useLayoutEffect(() => {
@@ -273,10 +290,10 @@ export default function TestCallScreen({ navigation }: { navigation: any }) {
       </ScrollView>
 
       <ActionFooter
-        primaryLabel="Finish Setup"
+        primaryLabel="Continue"
         onPrimaryPress={finishOnboarding}
-        secondaryLabel="Skip for now"
-        onSecondaryPress={skipTestCall}
+        secondaryLabel={isNudgeFlow ? undefined : 'Skip for now'}
+        onSecondaryPress={isNudgeFlow ? undefined : skipTestCall}
       />
       <ReliableFallbackInfoModal
         visible={showFallbackInfoModal}

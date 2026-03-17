@@ -105,6 +105,7 @@ export const updateAlertPrefsSchema = z.object({
   auto_mark_safe_threshold: z.number().min(0).max(100).optional(),
   auto_trust_on_safe: z.boolean().optional(),
   auto_block_on_fraud: z.boolean().optional(),
+  completed_alert_prefs: z.boolean().optional(),
 }).strict();
 
 export const updateContactsPermissionSchema = z

@@ -31,7 +31,8 @@ function isLegacyAlertPrefsError(err: unknown) {
     message.includes('Unrecognized keys') &&
     (message.includes('enable_push_trusted_activity') ||
       message.includes('enable_push_circle_activity') ||
-      message.includes('enable_email_weekly_reports'))
+      message.includes('enable_email_weekly_reports') ||
+      message.includes('completed_alert_prefs'))
   );
 }
 
@@ -93,7 +94,13 @@ function getThresholdForScreeningChoice(choice: ScreeningChoiceKey) {
   return SCREENING_CHOICES.find((item) => item.key === choice)?.threshold ?? 60;
 }
 
-export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
+export default function AlertPrefsScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route?: { params?: { source?: 'onboarding' | 'nudge' } };
+}) {
   const { activeProfile, setActiveProfile } = useProfile();
   const insets = useSafeAreaInsets();
   const { theme, mode } = useTheme();
@@ -118,6 +125,7 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
   const [error, setError] = useState('');
   const [useLegacyAlertPrefsApi, setUseLegacyAlertPrefsApi] = useState(false);
   const [showScreeningInfoModal, setShowScreeningInfoModal] = useState(false);
+  const isNudgeFlow = route?.params?.source === 'nudge';
 
   const initializedProfileIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -209,14 +217,26 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
         enable_push_trusted_activity: pushTrustedActivity,
         enable_push_circle_activity: pushCircleActivity,
         enable_email_weekly_reports: weeklyEmailReports,
+        completed_alert_prefs: true,
       });
-      navigation.navigate('OnboardingTestCall');
+      if (isNudgeFlow) {
+        if (navigation.canGoBack?.()) {
+          navigation.goBack();
+        } else {
+          navigation.navigate('AppTabs', { screen: 'HomeTab' });
+        }
+      } else {
+        navigation.navigate('OnboardingTestCall');
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to update preferences.');
     }
   };
 
-  const footerSecondary = () => navigation.navigate('OnboardingTestCall');
+  const footerSecondary = () => {
+    if (isNudgeFlow) return;
+    navigation.navigate('OnboardingTestCall');
+  };
 
   const helperItems = useMemo(
     () => [
@@ -435,8 +455,8 @@ export default function AlertPrefsScreen({ navigation }: { navigation: any }) {
       <ActionFooter
         primaryLabel="Continue"
         onPrimaryPress={handleContinue}
-        secondaryLabel="Skip for now"
-        onSecondaryPress={footerSecondary}
+        secondaryLabel={isNudgeFlow ? undefined : 'Skip for now'}
+        onSecondaryPress={isNudgeFlow ? undefined : footerSecondary}
       />
     </SafeAreaView>
   );

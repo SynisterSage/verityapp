@@ -117,7 +117,10 @@ type PendingNotificationData = {
     | 'circle_activity'
     | 'alerts'
     | 'support_portal'
-    | 'membership_billing';
+    | 'membership_billing'
+    | 'nudge_test_call'
+    | 'nudge_alert_prefs'
+    | 'nudge_safe_phrases';
   alertType?: string;
 };
 
@@ -260,6 +263,34 @@ function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'
     normalized === 'subscriptions'
   ) {
     return 'membership_billing';
+  }
+  if (
+    normalized === 'nudge_test_call' ||
+    normalized === 'nudge-test-call' ||
+    normalized === 'nudge:test_call' ||
+    normalized === 'test_call' ||
+    normalized === 'test-call'
+  ) {
+    return 'nudge_test_call';
+  }
+  if (
+    normalized === 'nudge_alert_prefs' ||
+    normalized === 'nudge-alert-prefs' ||
+    normalized === 'nudge:alert_prefs' ||
+    normalized === 'alert_prefs' ||
+    normalized === 'alert-prefs' ||
+    normalized === 'alert_preferences'
+  ) {
+    return 'nudge_alert_prefs';
+  }
+  if (
+    normalized === 'nudge_safe_phrases' ||
+    normalized === 'nudge-safe-phrases' ||
+    normalized === 'nudge:safe_phrases' ||
+    normalized === 'safe_phrases' ||
+    normalized === 'safe-phrases'
+  ) {
+    return 'nudge_safe_phrases';
   }
   return undefined;
 }
@@ -489,6 +520,22 @@ function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
     firstSegment === 'subscriptions'
   ) {
     return { routeTarget: 'membership_billing' };
+  }
+  if (firstSegment === 'nudge') {
+    if (secondSegment === 'test_call' || secondSegment === 'test-call') {
+      return { routeTarget: 'nudge_test_call' };
+    }
+    if (
+      secondSegment === 'alert_prefs' ||
+      secondSegment === 'alert-prefs' ||
+      secondSegment === 'alert_preferences'
+    ) {
+      return { routeTarget: 'nudge_alert_prefs' };
+    }
+    if (secondSegment === 'safe_phrases' || secondSegment === 'safe-phrases') {
+      return { routeTarget: 'nudge_safe_phrases' };
+    }
+    return null;
   }
   if (
     firstSegment === 'call' ||
@@ -1334,6 +1381,7 @@ function NavigationHost() {
     profiles,
     activeProfile,
     setActiveProfile,
+    canManageProfile,
   } = useProfile();
   const pendingNotificationRef = useRef<PendingNotificationData | null>(null);
   const notificationListenerRef = useRef<Notifications.Subscription | null>(null);
@@ -1635,6 +1683,27 @@ function NavigationHost() {
         });
         return;
       }
+      if (payload.routeTarget === 'nudge_test_call') {
+        if (!canManageProfile) {
+          return;
+        }
+        rootNavigationRef.current.navigate('OnboardingTestCall', { source: 'nudge' });
+        return;
+      }
+      if (payload.routeTarget === 'nudge_alert_prefs') {
+        if (!canManageProfile) {
+          return;
+        }
+        rootNavigationRef.current.navigate('OnboardingAlerts', { source: 'nudge' });
+        return;
+      }
+      if (payload.routeTarget === 'nudge_safe_phrases') {
+        if (!canManageProfile) {
+          return;
+        }
+        rootNavigationRef.current.navigate('OnboardingSafePhrases', { source: 'nudge' });
+        return;
+      }
       if (payload.alertId || payload.routeTarget === 'alerts' || payload.alertType) {
         rootNavigationRef.current.navigate('AppTabs', {
           screen: 'AlertsTab',
@@ -1646,6 +1715,7 @@ function NavigationHost() {
     }
   }, [
     activateProfileForNotification,
+    canManageProfile,
     onboardingComplete,
     resolveAlertRoutingContext,
     session,

@@ -33,8 +33,14 @@ const normalizePhrase = (value: string) => {
   return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
 };
 
-export default function OnboardingSafePhrasesScreen({ navigation }: { navigation: any }) {
-  const { activeProfile } = useProfile();
+export default function OnboardingSafePhrasesScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route?: { params?: { source?: 'onboarding' | 'nudge' } };
+}) {
+  const { activeProfile, setActiveProfile } = useProfile();
   const { theme } = useTheme();
   const styles = useMemo(() => createSafePhrasesStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
@@ -44,6 +50,7 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const isNudgeFlow = route?.params?.source === 'nudge';
 
   const shimmer = useMemo(() => new Animated.Value(0.6), []);
   const skeletonRows = useMemo(
@@ -129,6 +136,35 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
   }, [shimmer]);
 
   const showSkeleton = loading;
+
+  const handleContinue = async () => {
+    if (activeProfile?.id) {
+      try {
+        const data = await authorizedFetch(`/profiles/${activeProfile.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ completed_safe_phrases: true }),
+        });
+        if (data?.profile) {
+          setActiveProfile(data.profile);
+        } else {
+          setActiveProfile({ ...activeProfile, completed_safe_phrases: true });
+        }
+      } catch {
+        setActiveProfile({ ...activeProfile, completed_safe_phrases: true });
+      }
+    }
+
+    if (isNudgeFlow) {
+      if (navigation.canGoBack?.()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('AppTabs', { screen: 'HomeTab' });
+      }
+      return;
+    }
+
+    navigation.navigate('OnboardingInviteFamily');
+  };
 
   return (
     <View style={styles.outer}>
@@ -223,10 +259,10 @@ export default function OnboardingSafePhrasesScreen({ navigation }: { navigation
         </ScrollView>
 
         <ActionFooter
-          primaryLabel="Save Safe Topics"
-          onPrimaryPress={() => navigation.navigate('OnboardingInviteFamily')}
-          secondaryLabel="Skip for now"
-          onSecondaryPress={() => navigation.navigate('OnboardingInviteFamily')}
+          primaryLabel="Continue"
+          onPrimaryPress={handleContinue}
+          secondaryLabel={isNudgeFlow ? undefined : 'Skip for now'}
+          onSecondaryPress={isNudgeFlow ? undefined : handleContinue}
         />
       </SafeAreaView>
     </View>
