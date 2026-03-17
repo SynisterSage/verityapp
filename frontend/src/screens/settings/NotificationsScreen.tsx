@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Keyboard,
   Pressable,
   ScrollView,
@@ -292,6 +293,7 @@ export default function NotificationsScreen() {
           : (data?.profile ?? activeProfile).enable_email_alerts,
       };
       setActiveProfile(mergedProfile);
+      Alert.alert('Saved', 'Notification preferences updated.');
 
       logEvent('notification_preferences_changed', {
         screen: 'Notifications',

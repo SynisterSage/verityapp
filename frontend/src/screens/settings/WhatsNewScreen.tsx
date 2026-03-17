@@ -28,10 +28,10 @@ const RELEASES: Release[] = [
     label: 'Latest Release',
     date: 'March 2026',
     highlights: [
-      'Added facility partner membership support with invite-code validation and a dedicated annual plan.',
-      'Added a facility activation modal so eligible residents can unlock partner pricing directly from the paywall.',
-      'Secured facility offers with backend validation, redemption tracking, and row-level security protections.',
-      'Improved membership activation handling for facility purchases and annual entitlement syncing.',
+      'Added Facility Partner access with community invite codes, partner pricing, and a 14-day trial for eligible residents.',
+      'Updated membership activation so it clearly confirms your protection status and next step.',
+      'Shortened onboarding so families can finish setup faster with fewer required steps.',
+      'Added smart setup reminders on Home so unfinished steps are easier to complete later.',
     ],
   },
   {

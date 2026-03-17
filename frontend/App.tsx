@@ -1967,7 +1967,7 @@ export default function App() {
   );
 
   if (!posthogClient) {
-    console.warn('[PostHog] client missing; env key:', getPublicEnv('EXPO_PUBLIC_POSTHOG_KEY'));
+    console.warn('[PostHog] client missing; EXPO_PUBLIC_POSTHOG_KEY is empty.');
     return content;
   }
 
