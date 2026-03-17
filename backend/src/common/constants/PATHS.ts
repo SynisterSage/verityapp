@@ -31,6 +31,7 @@ const PATHS = {
     Status: '/status',
     Verify: '/verify',
     SyncEntitlement: '/sync-entitlement',
+    FacilityValidate: '/facility-offer/validate',
   },
   Fraud: {
     _: '/fraud',

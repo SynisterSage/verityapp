@@ -24,8 +24,19 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: '1.0.1',
+    version: '1.0.2',
     label: 'Latest Release',
+    date: 'March 2026',
+    highlights: [
+      'Added facility partner membership support with invite-code validation and a dedicated annual plan.',
+      'Added a facility activation modal so eligible residents can unlock partner pricing directly from the paywall.',
+      'Secured facility offers with backend validation, redemption tracking, and row-level security protections.',
+      'Improved membership activation handling for facility purchases and annual entitlement syncing.',
+    ],
+  },
+  {
+    version: '1.0.1',
+    label: 'Previous Release',
     date: 'March 2026',
     highlights: [
       'Added a 7-day free trial for the monthly membership plan for eligible new subscribers.',

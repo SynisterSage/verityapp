@@ -22,6 +22,9 @@ function formatPlanLabel(notice: MembershipActivationNotice | null) {
   }
 
   const productId = (notice?.productId ?? '').toLowerCase();
+  if (productId.includes('facility')) {
+    return 'Facility Membership';
+  }
   if (productId.includes('annual') || productId.includes('year')) {
     return 'Annual Membership';
   }

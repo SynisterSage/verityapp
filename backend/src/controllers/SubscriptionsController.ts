@@ -13,8 +13,16 @@ import {
 import supabaseAdmin from '@src/services/supabase';
 import { deriveTrialLifecycleUpdate } from '@src/services/trialLifecycle';
 import { restoreOrAssignNumbersForUser } from '@src/services/twilioNumberPool';
+import {
+  authorizeFacilityOfferAccess,
+  FACILITY_PRODUCT_ID,
+  isFacilityProductId,
+  normalizeFacilityCode,
+  recordFacilityOfferRedemption,
+  validateFacilityOfferCode,
+} from '@src/services/facilityOffers';
 
-const DEFAULT_PRODUCT_IDS = ['verityprotect_monthly', 'verityprotect_annual'];
+const DEFAULT_PRODUCT_IDS = ['verityprotect_monthly', 'verityprotect_annual', FACILITY_PRODUCT_ID];
 const ALLOWED_PRODUCT_IDS = new Set(
   (process.env.APPLE_SUBSCRIPTION_PRODUCT_IDS ?? DEFAULT_PRODUCT_IDS.join(','))
     .split(',')
@@ -143,6 +151,41 @@ async function status(req: Request, res: Response) {
   }
 }
 
+async function validateFacilityOffer(req: Request, res: Response) {
+  const userId = await getAuthenticatedUserId(req);
+  if (!userId) {
+    return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
+  }
+
+  const { code } = req.body as { code: string };
+
+  try {
+    const offer = await validateFacilityOfferCode(code);
+    if (!offer) {
+      return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Facility code not found or no longer active' });
+    }
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({
+      eligible: true,
+      productId: FACILITY_PRODUCT_ID,
+      facility: {
+        id: offer.facilityId,
+        name: offer.facilityName,
+      },
+      code: offer.code,
+      offer: {
+        trialDays: 14,
+        annualPriceLabel: '$74.99/year',
+      },
+    });
+  } catch (error) {
+    logger.err(toLogMessage('subscriptions.validate_facility_offer', error));
+    return res
+      .status(HTTP_STATUS_CODES.InternalServerError)
+      .json({ error: 'Failed to validate facility code' });
+  }
+}
+
 async function verify(req: Request, res: Response) {
   const userId = await getAuthenticatedUserId(req);
   if (!userId) {
@@ -155,12 +198,14 @@ async function verify(req: Request, res: Response) {
     productId,
     transactionId,
     originalTransactionId,
+    facilityCode,
   } = req.body as {
     receiptData?: string;
     platform?: string;
     productId?: string;
     transactionId?: string;
     originalTransactionId?: string;
+    facilityCode?: string;
   };
 
   const normalizedReceiptData =
@@ -175,6 +220,10 @@ async function verify(req: Request, res: Response) {
   }
 
   const existing = await getUserSubscription(userId);
+  const normalizedFacilityCode =
+    typeof facilityCode === 'string' && facilityCode.trim().length > 0
+      ? normalizeFacilityCode(facilityCode)
+      : null;
 
   try {
     let verification:
@@ -248,6 +297,47 @@ async function verify(req: Request, res: Response) {
       nowIso,
     });
 
+    const facilityOffer = isFacilityProductId(resolvedProductId)
+      ? await authorizeFacilityOfferAccess({
+          userId,
+          facilityCode: normalizedFacilityCode,
+          existingSubscription: existing,
+        })
+      : null;
+
+    if (isFacilityProductId(resolvedProductId) && !facilityOffer) {
+      return res
+        .status(HTTP_STATUS_CODES.Forbidden)
+        .json({ error: 'A valid facility code is required to activate this partner plan' });
+    }
+
+    const nextMetadata = {
+      ...(existing?.metadata ?? {}),
+      verifyRequestProductId: productId ?? null,
+      verifyRequestTransactionId: normalizedTransactionId,
+      verifyRequestOriginalTransactionId: originalTransactionId ?? null,
+      hasVerifiedSubscription: Boolean(verifiedSubscription),
+      hasServerTransaction: Boolean(serverTransaction),
+      serverTransactionLookupFailed,
+      receiptTrialSignal: verifiedSubscription?.isTrialPeriod ?? null,
+      serverTrialSignal: serverTransaction?.isTrialPeriod ?? null,
+      verificationMethod:
+        hasServerActiveSubscription || Boolean(serverTransaction)
+          ? 'app_store_server_api'
+          : normalizedReceiptData
+            ? 'verify_receipt'
+            : 'none',
+      facilityOffer: facilityOffer
+        ? {
+            facilityId: facilityOffer.facilityId,
+            facilityName: facilityOffer.facilityName,
+            facilityCodeId: facilityOffer.facilityCodeId,
+            code: facilityOffer.code,
+            validatedAt: nowIso,
+          }
+        : (existing?.metadata?.facilityOffer ?? null),
+    };
+
     const { error: upsertError } = await supabaseAdmin
       .from('user_subscriptions')
       .upsert(
@@ -272,23 +362,7 @@ async function verify(req: Request, res: Response) {
           verification_environment: serverTransaction?.environment ?? verification.environment ?? null,
           latest_receipt_status: verification.status,
           latest_receipt_data: verification.latestReceiptData ?? normalizedReceiptData,
-          metadata: {
-            ...(existing?.metadata ?? {}),
-            verifyRequestProductId: productId ?? null,
-            verifyRequestTransactionId: normalizedTransactionId,
-            verifyRequestOriginalTransactionId: originalTransactionId ?? null,
-            hasVerifiedSubscription: Boolean(verifiedSubscription),
-            hasServerTransaction: Boolean(serverTransaction),
-            serverTransactionLookupFailed,
-            receiptTrialSignal: verifiedSubscription?.isTrialPeriod ?? null,
-            serverTrialSignal: serverTransaction?.isTrialPeriod ?? null,
-            verificationMethod:
-              hasServerActiveSubscription || Boolean(serverTransaction)
-                ? 'app_store_server_api'
-                : normalizedReceiptData
-                  ? 'verify_receipt'
-                  : 'none',
-          },
+          metadata: nextMetadata,
           ...trialLifecycle,
           last_verified_at: nowIso,
         },
@@ -300,6 +374,26 @@ async function verify(req: Request, res: Response) {
       return res
         .status(HTTP_STATUS_CODES.InternalServerError)
         .json({ error: 'Failed to persist subscription verification' });
+    }
+
+    if (facilityOffer && isActive) {
+      try {
+        await recordFacilityOfferRedemption({
+          userId,
+          facilityOffer,
+          transactionId:
+            serverTransaction?.transactionId ??
+            verifiedSubscription?.transactionId ??
+            normalizedTransactionId,
+          originalTransactionId:
+            serverTransaction?.originalTransactionId ??
+            verifiedSubscription?.originalTransactionId ??
+            originalTransactionId ??
+            null,
+        });
+      } catch (redemptionError) {
+        logger.err(toLogMessage('subscriptions.verify.record_facility_redemption', redemptionError));
+      }
     }
 
     const [access, subscription] = await Promise.all([
@@ -326,7 +420,7 @@ async function verify(req: Request, res: Response) {
         if (serverTransaction && (!serverTransaction.productId || isAllowedProductId(serverTransaction.productId))) {
           const nowIso = new Date().toISOString();
           const nextStatus = normalizeSubscriptionStatus(serverTransaction.status, 'unknown');
-          const isActive = Boolean(serverTransaction.isActive);
+          const isActive = serverTransaction.isActive;
           const trialLifecycle = deriveTrialLifecycleUpdate({
             existing,
             productId: serverTransaction.productId ?? productId ?? existing?.product_id ?? null,
@@ -390,7 +484,7 @@ async function verify(req: Request, res: Response) {
           }
 
           return res.status(HTTP_STATUS_CODES.Ok).json({
-            verified: Boolean(serverTransaction.isActive),
+            verified: serverTransaction.isActive,
             hasActiveSubscription: access.hasActiveSubscription,
             requiresPaidMembership: access.requiresPaidMembership,
             ownerProfileCount: access.ownerProfileCount,
@@ -426,6 +520,7 @@ async function syncEntitlement(req: Request, res: Response) {
     originalTransactionId,
     purchasedAt,
     expiresAt,
+    facilityCode,
   } = req.body as {
     platform?: string;
     productId: string;
@@ -433,6 +528,7 @@ async function syncEntitlement(req: Request, res: Response) {
     originalTransactionId?: string;
     purchasedAt?: string;
     expiresAt?: string;
+    facilityCode?: string;
   };
 
   if (!isAllowedProductId(productId)) {
@@ -441,6 +537,10 @@ async function syncEntitlement(req: Request, res: Response) {
 
   const existing = await getUserSubscription(userId);
   const nowIso = new Date().toISOString();
+  const normalizedFacilityCode =
+    typeof facilityCode === 'string' && facilityCode.trim().length > 0
+      ? normalizeFacilityCode(facilityCode)
+      : null;
   const normalizedTransactionId =
     typeof transactionId === 'string' && transactionId.trim().length > 0 ? transactionId.trim() : null;
   let serverTransaction:
@@ -476,8 +576,8 @@ async function syncEntitlement(req: Request, res: Response) {
     ? 'app_store_server_api'
     : existing?.source ?? 'storekit_local_entitlement';
   const nextIsActive = serverTransaction
-    ? Boolean(serverTransaction.isActive)
-    : entitlementIsActiveByClaim || Boolean(existing?.is_active);
+    ? serverTransaction.isActive
+    : entitlementIsActiveByClaim || existing?.is_active === true;
   const resolvedProductId = serverTransaction?.productId ?? productId ?? existing?.product_id ?? null;
   const resolvedPurchasedAt = serverTransaction?.purchaseDate ?? purchasedAt ?? existing?.purchased_at ?? null;
   const resolvedExpiresAt = serverTransaction?.expiresDate ?? expiresAt ?? existing?.expires_at ?? null;
@@ -491,6 +591,61 @@ async function syncEntitlement(req: Request, res: Response) {
     isTrialSignal: parseTrialSignal(serverTransaction?.isTrialPeriod),
     nowIso,
   });
+
+  const facilityOffer = isFacilityProductId(resolvedProductId)
+    ? await authorizeFacilityOfferAccess({
+        userId,
+        facilityCode: normalizedFacilityCode,
+        existingSubscription: existing,
+      })
+    : null;
+
+  if (isFacilityProductId(resolvedProductId) && !facilityOffer) {
+    return res
+      .status(HTTP_STATUS_CODES.Forbidden)
+      .json({ error: 'A valid facility code is required to activate this partner plan' });
+  }
+
+  const nextMetadata = {
+    ...(existing?.metadata ?? {}),
+    appStoreServerTransaction: serverTransaction
+      ? {
+          environment: serverTransaction.environment,
+          productId: serverTransaction.productId,
+          transactionId: serverTransaction.transactionId,
+          originalTransactionId: serverTransaction.originalTransactionId,
+          purchaseDate: serverTransaction.purchaseDate,
+          expiresDate: serverTransaction.expiresDate,
+          revocationDate: serverTransaction.revocationDate,
+          offerType: serverTransaction.offerType,
+          offerIdentifier: serverTransaction.offerIdentifier,
+          isTrialPeriod: serverTransaction.isTrialPeriod,
+          status: serverTransaction.status,
+          isActive: serverTransaction.isActive,
+          checkedAt: nowIso,
+        }
+      : null,
+    entitlementReport: {
+      source: 'storekit_entitlement',
+      reportedAt: nowIso,
+      productId,
+      transactionId: normalizedTransactionId,
+      originalTransactionId: originalTransactionId ?? null,
+      purchasedAt: purchasedAt ?? null,
+      expiresAt: expiresAt ?? null,
+      appStoreServerApiChecked: Boolean(normalizedTransactionId),
+      appStoreServerApiLookupFailed: serverTransactionLookupFailed,
+    },
+    facilityOffer: facilityOffer
+      ? {
+          facilityId: facilityOffer.facilityId,
+          facilityName: facilityOffer.facilityName,
+          facilityCodeId: facilityOffer.facilityCodeId,
+          code: facilityOffer.code,
+          validatedAt: nowIso,
+        }
+      : (existing?.metadata?.facilityOffer ?? null),
+  };
 
   const { error: upsertError } = await supabaseAdmin.from('user_subscriptions').upsert(
     {
@@ -508,37 +663,7 @@ async function syncEntitlement(req: Request, res: Response) {
       verification_environment: serverTransaction?.environment ?? existing?.verification_environment ?? null,
       latest_receipt_status: existing?.latest_receipt_status ?? null,
       latest_receipt_data: existing?.latest_receipt_data ?? null,
-      metadata: {
-        ...(existing?.metadata ?? {}),
-        appStoreServerTransaction: serverTransaction
-          ? {
-              environment: serverTransaction.environment,
-              productId: serverTransaction.productId,
-              transactionId: serverTransaction.transactionId,
-              originalTransactionId: serverTransaction.originalTransactionId,
-              purchaseDate: serverTransaction.purchaseDate,
-              expiresDate: serverTransaction.expiresDate,
-              revocationDate: serverTransaction.revocationDate,
-              offerType: serverTransaction.offerType,
-              offerIdentifier: serverTransaction.offerIdentifier,
-              isTrialPeriod: serverTransaction.isTrialPeriod,
-              status: serverTransaction.status,
-              isActive: serverTransaction.isActive,
-              checkedAt: nowIso,
-            }
-          : null,
-        entitlementReport: {
-          source: 'storekit_entitlement',
-          reportedAt: nowIso,
-          productId,
-          transactionId: normalizedTransactionId,
-          originalTransactionId: originalTransactionId ?? null,
-          purchasedAt: purchasedAt ?? null,
-          expiresAt: expiresAt ?? null,
-          appStoreServerApiChecked: Boolean(normalizedTransactionId),
-          appStoreServerApiLookupFailed: serverTransactionLookupFailed,
-        },
-      },
+      metadata: nextMetadata,
       ...trialLifecycle,
       last_verified_at: nowIso,
     },
@@ -550,6 +675,20 @@ async function syncEntitlement(req: Request, res: Response) {
     return res
       .status(HTTP_STATUS_CODES.InternalServerError)
       .json({ error: 'Failed to persist subscription entitlement sync' });
+  }
+
+  if (facilityOffer && nextIsActive) {
+    try {
+      await recordFacilityOfferRedemption({
+        userId,
+        facilityOffer,
+        transactionId: serverTransaction?.transactionId ?? normalizedTransactionId,
+        originalTransactionId:
+          serverTransaction?.originalTransactionId ?? originalTransactionId ?? null,
+      });
+    } catch (redemptionError) {
+      logger.err(toLogMessage('subscriptions.sync_entitlement.record_facility_redemption', redemptionError));
+    }
   }
 
   const [access, subscription] = await Promise.all([
@@ -577,6 +716,7 @@ async function syncEntitlement(req: Request, res: Response) {
 
 export default {
   status,
+  validateFacilityOffer,
   verify,
   syncEntitlement,
 };

@@ -15,7 +15,8 @@
     "trial:reminders": "npx ts-node ./scripts/trialReminderPush.ts",
     "trial:reminder-email": "npx ts-node ./scripts/send-trial-reminder-email.ts",
     "dev-support": "ts-node ./scripts/dev-support.ts",
-    "sync-twilio-numbers": "ts-node ./scripts/syncTwilioNumbers.ts"
+    "sync-twilio-numbers": "ts-node ./scripts/syncTwilioNumbers.ts",
+    "facility:upsert": "ts-node ./scripts/upsertFacilityOffer.ts"
   },
   "engines": {
     "node": ">=16.0.0"

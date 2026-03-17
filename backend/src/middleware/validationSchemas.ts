@@ -203,6 +203,7 @@ export const verifySubscriptionReceiptSchema = z
     productId: z.string().min(1).max(128).optional(),
     transactionId: z.string().min(1).max(128).optional(),
     originalTransactionId: z.string().min(1).max(128).optional(),
+    facilityCode: z.string().min(4).max(64).optional(),
   })
   .refine(
     (value) =>
@@ -223,6 +224,13 @@ export const syncSubscriptionEntitlementSchema = z
     originalTransactionId: z.string().min(1).max(128).optional(),
     purchasedAt: z.string().datetime().optional(),
     expiresAt: z.string().datetime().optional(),
+    facilityCode: z.string().min(4).max(64).optional(),
+  })
+  .strict();
+
+export const validateFacilityOfferCodeSchema = z
+  .object({
+    code: z.string().min(4).max(64),
   })
   .strict();
 

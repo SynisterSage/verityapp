@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +30,7 @@ import { withOpacity } from '../../utils/color';
 import { logEvent } from '../../services/sentry';
 import { MEMBERSHIP_SIGNOUT_NOTE_KEY } from '../../utils/membership';
 import { FALLBACK_LEGAL_VERSIONS, fetchCurrentLegalVersions } from '../../services/legal';
+import { validateFacilityOfferCode } from '../../services/facilityOffers';
 
 type PlanOption = {
   productId: string;
@@ -38,6 +40,7 @@ type PlanOption = {
   badge?: string;
   hasFreeTrial?: boolean;
   trialLabel?: string | null;
+  ctaLabel?: string;
 };
 
 type MembershipFeedback = {
@@ -64,8 +67,20 @@ const fallbackPlans: PlanOption[] = [
     detail: 'Save 17% vs monthly',
     badge: 'Best Value',
   },
+  {
+    productId: 'verityprotect_facility_annual',
+    title: 'Facility',
+    price: 'Included',
+    detail: 'Provided by your community',
+    badge: 'Partner',
+    hasFreeTrial: true,
+    trialLabel: '14-day free trial',
+    ctaLabel: 'Activate Protection',
+  },
 ];
 
+const FACILITY_PRODUCT_ID = 'verityprotect_facility_annual';
+const FACILITY_CODE_LENGTH = 16;
 function toPlanOption(product: {
   productId: string;
   displayName: string;
@@ -101,6 +116,22 @@ function toPlanOption(product: {
         : null;
 
   const isAnnual = product.productId === 'verityprotect_annual';
+  const isFacility = product.productId === FACILITY_PRODUCT_ID;
+  if (isFacility) {
+    return {
+      productId: product.productId,
+      title: 'Facility',
+      price: 'Included',
+      detail: 'Provided by your community',
+      badge: 'Partner',
+      hasFreeTrial: true,
+      trialLabel:
+        hasFreeTrial && introPeriodCount && normalizedIntroUnit
+          ? `${introPeriodCount}-${normalizedIntroUnit} free trial`
+          : '14-day free trial',
+      ctaLabel: 'Activate Protection',
+    };
+  }
   const detail = isAnnual
     ? 'Save 17% vs monthly'
     : `${product.displayPrice} a month`;
@@ -113,7 +144,25 @@ function toPlanOption(product: {
     badge: isAnnual ? 'Best Value' : undefined,
     hasFreeTrial,
     trialLabel: trialDurationLabel,
+    ctaLabel: hasFreeTrial ? 'Start Free Trial' : 'Start Protection',
   };
+}
+
+function normalizeFacilityCode(value: string) {
+  return value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, FACILITY_CODE_LENGTH);
+}
+
+function formatFacilityCode(value: string) {
+  const compact = normalizeFacilityCode(value);
+  if (compact.length <= 4) {
+    return compact;
+  }
+  const chunks = compact.match(/.{1,4}/g);
+  return chunks ? chunks.join('-') : compact;
+}
+
+function isFacilityPlan(productId?: string | null) {
+  return productId === FACILITY_PRODUCT_ID;
 }
 
 const FEATURES: { icon: string; text: string }[] = [
@@ -247,6 +296,15 @@ export default function MembershipScreen() {
   const [showExitModal, setShowExitModal] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [isOpeningManage, setIsOpeningManage] = useState(false);
+  const [showFacilityModal, setShowFacilityModal] = useState(false);
+  const [facilityCode, setFacilityCode] = useState('');
+  const [facilityError, setFacilityError] = useState<string | null>(null);
+  const [isFacilityValidating, setIsFacilityValidating] = useState(false);
+  const [validatedFacility, setValidatedFacility] = useState<{
+    code: string;
+    facilityName: string;
+    headline: string;
+  } | null>(null);
   const [legalVersions, setLegalVersions] = useState(FALLBACK_LEGAL_VERSIONS);
   useEffect(() => {
     fetchCurrentLegalVersions().then(setLegalVersions).catch(() => null);
@@ -325,16 +383,27 @@ export default function MembershipScreen() {
     planOptions.find((plan) => plan.productId === selectedProductId) ??
     planOptions[0] ??
     fallbackPlans[0];
+  const facilityPlan =
+    planOptions.find((plan) => plan.productId === FACILITY_PRODUCT_ID) ??
+    fallbackPlans.find((plan) => plan.productId === FACILITY_PRODUCT_ID) ??
+    null;
+  const isFacilitySelected = isFacilityPlan(selectedPlan?.productId);
+  const facilityDisplayPrice = useMemo(() => {
+    const storeProduct = products.find((product) => product.productId === FACILITY_PRODUCT_ID);
+    return storeProduct?.displayPrice ?? '$74.99';
+  }, [products]);
 
   const selectedPlanHasFreeTrial = Boolean(selectedPlan?.hasFreeTrial);
   const trialInfoRows = useMemo(
     () => [
       {
         id: 'trial',
-        title: '7-day free trial',
-        detail: selectedPlanHasFreeTrial
-          ? 'The monthly plan starts with 7 days of protection before Apple charges your account. Cancel at least 24 hours before the trial ends to avoid a charge.'
-          : 'Switch to the monthly plan to unlock a 7-day trial before any charge hits your Apple account.',
+        title: isFacilitySelected ? '14-day facility trial' : '7-day free trial',
+        detail: isFacilitySelected
+          ? 'Facility partner plans begin with 14 days of protection before Apple charges your account. A valid community code is required before this plan can be claimed.'
+          : selectedPlanHasFreeTrial
+            ? 'The monthly plan starts with 7 days of protection before Apple charges your account. Cancel at least 24 hours before the trial ends to avoid a charge.'
+            : 'Switch to the monthly plan to unlock a 7-day trial before any charge hits your Apple account.',
       },
       {
         id: 'billing',
@@ -348,11 +417,17 @@ export default function MembershipScreen() {
           'When two days or less remain we show a reminder inside the app, send a push if enabled, and email a heads-up so your call screening keeps running without surprises.',
       },
     ],
-    [selectedPlanHasFreeTrial]
+    [isFacilitySelected, selectedPlanHasFreeTrial]
   );
 
   useEffect(() => {
-    if (!selectedPlan?.hasFreeTrial || isProcessingPurchase || isLoadingProducts || plansUnavailable) {
+    if (
+      !selectedPlan?.hasFreeTrial ||
+      isProcessingPurchase ||
+      isLoadingProducts ||
+      plansUnavailable ||
+      isFacilitySelected
+    ) {
       trialCtaScale.stopAnimation();
       trialCtaScale.setValue(1);
       return;
@@ -382,7 +457,14 @@ export default function MembershipScreen() {
       trialCtaScale.stopAnimation();
       trialCtaScale.setValue(1);
     };
-  }, [isLoadingProducts, isProcessingPurchase, plansUnavailable, selectedPlan?.hasFreeTrial, trialCtaScale]);
+  }, [
+    isFacilitySelected,
+    isLoadingProducts,
+    isProcessingPurchase,
+    plansUnavailable,
+    selectedPlan?.hasFreeTrial,
+    trialCtaScale,
+  ]);
 
   useEffect(() => {
     if (!feedback && !statusError) {
@@ -441,6 +523,16 @@ export default function MembershipScreen() {
   };
 
   const handlePurchase = async () => {
+    if (isFacilitySelected) {
+      setFeedback(null);
+      setFacilityError(null);
+      setShowFacilityModal(true);
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+      logEvent('membership_facility_modal_opened', {
+        screen: 'MembershipScreen',
+      });
+      return;
+    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => null);
     setFeedback(null);
     logEvent('membership_continue_pressed', {
@@ -477,6 +569,99 @@ export default function MembershipScreen() {
       screen: 'MembershipScreen',
       extra: { kind: nextFeedback.kind, status: result.status },
     });
+  };
+
+  const closeFacilityModal = () => {
+    if (isProcessingPurchase || isFacilityValidating) {
+      return;
+    }
+    void Haptics.selectionAsync().catch(() => null);
+    setShowFacilityModal(false);
+  };
+
+  const handleFacilityCodeChange = (text: string) => {
+    setFacilityCode(normalizeFacilityCode(text));
+    if (facilityError) {
+      setFacilityError(null);
+    }
+  };
+
+  const handleFacilityValidate = async () => {
+    const normalizedCode = normalizeFacilityCode(facilityCode);
+    if (normalizedCode.length < 6) {
+      setFacilityError('Enter the code from your brochure or community QR page.');
+      return;
+    }
+
+    setFacilityError(null);
+    setIsFacilityValidating(true);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+
+    try {
+      const response = await validateFacilityOfferCode(normalizedCode);
+      setValidatedFacility({
+        code: response.code,
+        facilityName: response.facility.name,
+        headline: 'Partner pricing unlocked',
+      });
+      setIsFacilityValidating(false);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
+      logEvent('membership_facility_code_validated', {
+        screen: 'MembershipScreen',
+        extra: { facilityName: response.facility.name },
+      });
+    } catch (error) {
+      setValidatedFacility(null);
+      setFacilityError(
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : 'That code was not recognized. Double-check the brochure code and try again.'
+      );
+      setIsFacilityValidating(false);
+    }
+  };
+
+  const handleFacilityPurchase = async () => {
+    if (!validatedFacility || !facilityPlan) {
+      return;
+    }
+
+    setFacilityError(null);
+    setFeedback(null);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => null);
+    logEvent('membership_facility_claim_pressed', {
+      screen: 'MembershipScreen',
+      extra: { facilityName: validatedFacility.facilityName, code: validatedFacility.code },
+    });
+
+    const result = await purchase(FACILITY_PRODUCT_ID, {
+      facilityCode: validatedFacility.code,
+    });
+    if (result.status === 'purchased') {
+      showMembershipActivationNotice({
+        productId: FACILITY_PRODUCT_ID,
+        planLabel: facilityPlan.title,
+      });
+      setShowFacilityModal(false);
+      navigation.replace('MembershipActivated');
+      logEvent('membership_purchase_success', {
+        screen: 'MembershipScreen',
+        extra: { productId: FACILITY_PRODUCT_ID, facilityName: validatedFacility.facilityName },
+      });
+      logEvent('membership_trial_started', {
+        screen: 'MembershipScreen',
+        extra: { productId: FACILITY_PRODUCT_ID },
+      });
+      return;
+    }
+
+    const nextFeedback = toPurchaseFeedback(result);
+    setFacilityError(nextFeedback.detail);
+    void Haptics.notificationAsync(
+      nextFeedback.tone === 'error'
+        ? Haptics.NotificationFeedbackType.Error
+        : Haptics.NotificationFeedbackType.Warning
+    ).catch(() => null);
   };
 
   const handleRestore = async () => {
@@ -719,13 +904,20 @@ export default function MembershipScreen() {
                     <View style={styles.planTextWrap}>
                       <View style={styles.planTitleRow}>
                         <Text style={styles.planTitle}>{plan.title}</Text>
-                        {isAnnual && plan.badge ? (
-                          <View style={styles.planBestValuePill}>
+                        {plan.badge ? (
+                          <View
+                            style={[
+                              styles.planBestValuePill,
+                              isFacilityPlan(plan.productId) && styles.planPartnerPill,
+                            ]}
+                          >
                             <Text style={styles.planBestValueText}>{plan.badge}</Text>
                           </View>
                         ) : null}
                       </View>
-                      {isAnnual ? (
+                      {isFacilityPlan(plan.productId) ? (
+                        <Text style={styles.planDetail}>{plan.detail}</Text>
+                      ) : isAnnual ? (
                         <View style={styles.planSavingsPill}>
                           <Ionicons
                             name="pricetag-outline"
@@ -980,17 +1172,163 @@ export default function MembershipScreen() {
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <Text style={styles.primaryButtonText}>
-                {selectedPlan?.hasFreeTrial ? 'Start Free Trial' : 'Start Protection'}
+                {isFacilitySelected
+                  ? selectedPlan?.ctaLabel ?? 'Activate Protection'
+                  : selectedPlan?.ctaLabel ??
+                    (selectedPlan?.hasFreeTrial ? 'Start Free Trial' : 'Start Protection')}
               </Text>
             )}
           </Pressable>
         </Animated.View>
         <Text style={styles.trustStrip}>
-          {selectedPlan?.hasFreeTrial
-            ? '7-day free trial • Secure billing via Apple • Cancel anytime'
-            : 'Secure billing via Apple • Cancel anytime • 3-day grace period'}
+          {isFacilitySelected
+            ? 'Community partner plan • Code required • Secure billing via Apple'
+            : selectedPlan?.hasFreeTrial
+              ? '7-day free trial • Secure billing via Apple • Cancel anytime'
+              : 'Secure billing via Apple • Cancel anytime • 3-day grace period'}
         </Text>
       </View>
+
+      <Modal
+        visible={showFacilityModal}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={closeFacilityModal}
+      >
+        <View style={styles.facilityModalRoot}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeFacilityModal}>
+            <BlurView intensity={90} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.facilityModalBlur} />
+            <View style={styles.facilityModalBackdrop} />
+          </Pressable>
+          <View style={styles.facilitySheet}>
+            <View style={styles.facilitySheetHandle} />
+            <View style={styles.facilitySheetHeader}>
+              <View style={styles.facilitySheetHeaderText}>
+                <Text style={styles.facilitySheetEyebrow}>Community partner plan</Text>
+                <Text style={styles.facilitySheetTitle}>Activate your facility offer</Text>
+                <Text style={styles.facilitySheetSubtitle}>
+                  Enter the code from your brochure or QR page to unlock your community pricing.
+                </Text>
+              </View>
+              <Pressable style={styles.facilitySheetClose} onPress={closeFacilityModal}>
+                <Ionicons name="close" size={18} color={theme.colors.text} />
+              </Pressable>
+            </View>
+
+            <View style={styles.facilityHeroCard}>
+              <View style={styles.facilityHeroIcon}>
+                <Ionicons name="business-outline" size={20} color={theme.colors.accent} />
+              </View>
+              <View style={styles.facilityHeroBody}>
+                <Text style={styles.facilityHeroTitle}>
+                  {validatedFacility?.headline ?? 'Reserved for partner residents'}
+                </Text>
+                <Text style={styles.facilityHeroCopy}>
+                  {validatedFacility
+                    ? `Residents of ${validatedFacility.facilityName} can start with a 14-day free trial, then continue at ${facilityDisplayPrice}/year.`
+                    : 'This plan stays hidden behind a valid facility code so only partner residents can claim it.'}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.facilityInputGroup}>
+              <Text style={styles.facilityInputLabel}>Facility code</Text>
+              <View style={styles.facilityInputWrap}>
+                <Ionicons name="key-outline" size={18} color={theme.colors.textMuted} />
+                <TextInput
+                  style={styles.facilityInput}
+                  placeholder="Enter facility code"
+                  placeholderTextColor={withOpacity(theme.colors.textMuted, 0.55)}
+                  value={formatFacilityCode(facilityCode)}
+                  onChangeText={handleFacilityCodeChange}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  editable={!isFacilityValidating && !isProcessingPurchase}
+                  returnKeyType="done"
+                />
+              </View>
+              <Text style={styles.facilityInputHint}>
+                Found on your printed brochure or the page opened from your facility QR code.
+              </Text>
+            </View>
+
+            {facilityError ? (
+              <View style={styles.facilityErrorCard}>
+                <Ionicons name="alert-circle-outline" size={16} color={theme.colors.danger} />
+                <Text style={styles.facilityErrorText}>{facilityError}</Text>
+              </View>
+            ) : null}
+
+            {validatedFacility ? (
+              <View style={styles.facilityOfferCard}>
+                <Text style={styles.facilityOfferEyebrow}>Eligible offer</Text>
+                <Text style={styles.facilityOfferTitle}>{validatedFacility.facilityName}</Text>
+                <View style={styles.facilityOfferRow}>
+                  <Ionicons name="sparkles-outline" size={16} color={theme.colors.accent} />
+                  <Text style={styles.facilityOfferText}>14-day free trial included</Text>
+                </View>
+                <View style={styles.facilityOfferRow}>
+                  <Ionicons name="card-outline" size={16} color={theme.colors.accent} />
+                  <Text style={styles.facilityOfferText}>Then {facilityDisplayPrice}/year through Apple billing</Text>
+                </View>
+                <View style={styles.facilityOfferRow}>
+                  <Ionicons name="shield-checkmark-outline" size={16} color={theme.colors.accent} />
+                  <Text style={styles.facilityOfferText}>Available only to partner residents with this code</Text>
+                </View>
+              </View>
+            ) : null}
+
+            <View style={styles.facilityActionRow}>
+              {!validatedFacility ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.facilityPrimaryButton,
+                    pressed && styles.primaryButtonPressed,
+                    isFacilityValidating && styles.inlineButtonDisabled,
+                  ]}
+                  onPress={handleFacilityValidate}
+                  disabled={isFacilityValidating}
+                >
+                  {isFacilityValidating ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Verify Code</Text>
+                  )}
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.facilityPrimaryButton,
+                    pressed && styles.primaryButtonPressed,
+                    (isProcessingPurchase || isLoadingProducts) && styles.inlineButtonDisabled,
+                  ]}
+                  onPress={handleFacilityPurchase}
+                  disabled={isProcessingPurchase || isLoadingProducts}
+                >
+                  {isProcessingPurchase ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>Claim Facility Offer</Text>
+                  )}
+                </Pressable>
+              )}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.facilitySecondaryButton,
+                  pressed && styles.inlineButtonPressed,
+                ]}
+                onPress={validatedFacility ? () => setValidatedFacility(null) : closeFacilityModal}
+                disabled={isFacilityValidating || isProcessingPurchase}
+              >
+                <Text style={styles.facilitySecondaryButtonText}>
+                  {validatedFacility ? 'Enter a different code' : 'Close'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showExitModal}
@@ -1304,6 +1642,9 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       backgroundColor: withOpacity(theme.colors.accent, 0.14),
       alignSelf: 'flex-start',
     },
+    planPartnerPill: {
+      backgroundColor: withOpacity(theme.colors.accent, 0.18),
+    },
     planBestValueText: {
       fontSize: 11,
       fontWeight: '700',
@@ -1597,6 +1938,218 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       shadowRadius: 18,
       shadowOffset: { width: 0, height: 8 },
       elevation: 10,
+    },
+    facilityModalRoot: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    facilityModalBlur: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    facilityModalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor:
+        mode === 'dark' ? withOpacity(theme.colors.bg, 0.56) : withOpacity(theme.colors.text, 0.22),
+    },
+    facilitySheet: {
+      borderTopLeftRadius: 30,
+      borderTopRightRadius: 30,
+      backgroundColor: theme.colors.bg,
+      borderTopWidth: 1,
+      borderColor: theme.colors.border,
+      paddingHorizontal: 24,
+      paddingTop: 12,
+      paddingBottom: 34,
+      gap: 18,
+      shadowColor: '#000',
+      shadowOpacity: mode === 'dark' ? 0.34 : 0.18,
+      shadowRadius: 28,
+      shadowOffset: { width: 0, height: -8 },
+      elevation: 18,
+    },
+    facilitySheetHandle: {
+      alignSelf: 'center',
+      width: 44,
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: withOpacity(theme.colors.textMuted, 0.4),
+      marginBottom: 6,
+    },
+    facilitySheetHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 14,
+    },
+    facilitySheetHeaderText: {
+      flex: 1,
+      gap: 4,
+    },
+    facilitySheetEyebrow: {
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      color: theme.colors.accent,
+    },
+    facilitySheetTitle: {
+      fontSize: 24,
+      lineHeight: 28,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    facilitySheetSubtitle: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.textMuted,
+    },
+    facilitySheetClose: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    facilityHeroCard: {
+      borderRadius: 24,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      padding: 16,
+      flexDirection: 'row',
+      gap: 14,
+    },
+    facilityHeroIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: withOpacity(theme.colors.accent, 0.14),
+    },
+    facilityHeroBody: {
+      flex: 1,
+      gap: 4,
+    },
+    facilityHeroTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    facilityHeroCopy: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: theme.colors.textMuted,
+    },
+    facilityInputGroup: {
+      gap: 8,
+    },
+    facilityInputLabel: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    facilityInputWrap: {
+      minHeight: 58,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 16,
+    },
+    facilityInput: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+      letterSpacing: 1,
+    },
+    facilityInputHint: {
+      fontSize: 12,
+      lineHeight: 17,
+      color: theme.colors.textMuted,
+    },
+    facilityErrorCard: {
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.danger, 0.28),
+      backgroundColor: withOpacity(theme.colors.danger, 0.08),
+      paddingHorizontal: 12,
+      paddingVertical: 11,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+    },
+    facilityErrorText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.colors.text,
+    },
+    facilityOfferCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, 0.28),
+      backgroundColor: withOpacity(theme.colors.accent, 0.08),
+      padding: 16,
+      gap: 10,
+    },
+    facilityOfferEyebrow: {
+      fontSize: 12,
+      fontWeight: '800',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      color: theme.colors.accent,
+    },
+    facilityOfferTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    facilityOfferRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    facilityOfferText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.colors.text,
+    },
+    facilityActionRow: {
+      gap: 10,
+    },
+    facilityPrimaryButton: {
+      height: 58,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.accent,
+      shadowColor: theme.colors.accent,
+      shadowOpacity: 0.22,
+      shadowRadius: 18,
+      shadowOffset: { width: 0, height: 8 },
+      elevation: 10,
+    },
+    facilitySecondaryButton: {
+      minHeight: 50,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
+    },
+    facilitySecondaryButtonText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.colors.text,
     },
     primaryButtonPressed: {
       opacity: 0.95,

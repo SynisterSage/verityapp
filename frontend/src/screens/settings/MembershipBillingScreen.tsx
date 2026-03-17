@@ -114,6 +114,9 @@ function mapProductIdLabel(productId?: string | null) {
     return 'No active plan';
   }
   const normalized = productId.toLowerCase();
+  if (normalized.includes('facility')) {
+    return 'Verity Protect Facility Annual';
+  }
   if (normalized.includes('annual') || normalized.includes('year')) {
     return 'Verity Protect Annual';
   }

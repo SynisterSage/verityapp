@@ -22,7 +22,12 @@ import {
 } from '../native/Subscriptions';
 import { logError, logEvent } from '../services/sentry';
 
-const PRODUCT_IDS = ['verityprotect_monthly', 'verityprotect_annual'];
+const PRODUCT_IDS = [
+  'verityprotect_monthly',
+  'verityprotect_annual',
+  'verityprotect_facility_annual',
+];
+const FACILITY_PRODUCT_ID = 'verityprotect_facility_annual';
 
 type SubscriptionRecord = {
   status: string;
@@ -60,6 +65,10 @@ type PurchaseActionResult = {
   hasActiveSubscription: boolean;
 };
 
+type PurchaseVerificationOptions = {
+  facilityCode?: string | null;
+};
+
 export type MembershipActivationNotice = {
   productId: string | null;
   planLabel: string | null;
@@ -79,7 +88,7 @@ type SubscriptionContextValue = {
   productsError: string | null;
   refreshStatus: (options?: { silent?: boolean }) => Promise<SubscriptionStatusSnapshot | null>;
   refreshProducts: () => Promise<StoreProduct[]>;
-  purchase: (productId: string) => Promise<PurchaseActionResult>;
+  purchase: (productId: string, options?: PurchaseVerificationOptions) => Promise<PurchaseActionResult>;
   restore: () => Promise<PurchaseActionResult>;
   showMembershipActivationNotice: (notice: {
     productId?: string | null;
@@ -209,6 +218,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     if (!snapshot?.hasActiveSubscription) {
       return false;
     }
+    if (snapshot.subscription?.productId === FACILITY_PRODUCT_ID) {
+      return false;
+    }
     if (snapshot.subscription?.source !== 'storekit_local_entitlement') {
       return false;
     }
@@ -232,6 +244,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       originalTransactionId?: string | null;
       purchasedAt?: string | null;
       expiresAt?: string | null;
+      facilityCode?: string | null;
     }) => {
       const response = await authorizedFetch('/subscriptions/sync-entitlement', {
         method: 'POST',
@@ -242,11 +255,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           originalTransactionId: args.originalTransactionId ?? undefined,
           purchasedAt: args.purchasedAt ?? undefined,
           expiresAt: args.expiresAt ?? undefined,
+          facilityCode: args.facilityCode ?? undefined,
         }),
       });
 
       const normalized = normalizeSubscriptionStatus(response);
-      if (!normalized.hasActiveSubscription) {
+      if (!normalized.hasActiveSubscription && args.productId !== FACILITY_PRODUCT_ID) {
         const activeEntitlement = await getActiveStoreEntitlement().catch(() => null);
         if (activeEntitlement) {
           const optimistic = buildActiveSnapshot(
@@ -326,6 +340,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
                   productId: activeEntitlement.productId,
                 },
               });
+
+              if (activeEntitlement.productId === FACILITY_PRODUCT_ID) {
+                setStatus(normalized);
+                setStatusError(null);
+                lastStatusFetchAtRef.current = Date.now();
+                return normalized;
+              }
 
               const optimistic = buildActiveSnapshot(
                 normalized,
@@ -522,6 +543,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       productId?: string | null;
       transactionId?: string | null;
       originalTransactionId?: string | null;
+      facilityCode?: string | null;
     }) => {
       const payload = {
         receiptData: args.receiptData,
@@ -529,6 +551,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         productId: args.productId ?? undefined,
         transactionId: args.transactionId ?? undefined,
         originalTransactionId: args.originalTransactionId ?? undefined,
+        facilityCode: args.facilityCode ?? undefined,
       };
 
       const response = await authorizedFetch('/subscriptions/verify', {
@@ -545,8 +568,15 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     []
   );
 
+  const requiresStrictServerValidation = useCallback((productId?: string | null) => {
+    return productId === FACILITY_PRODUCT_ID;
+  }, []);
+
   const mapPurchaseOutcome = useCallback(
-    async (result: PurchaseResult): Promise<PurchaseActionResult> => {
+    async (
+      result: PurchaseResult,
+      verificationOptions?: PurchaseVerificationOptions
+    ): Promise<PurchaseActionResult> => {
       if (result.status === 'cancelled') {
         return {
           status: 'cancelled',
@@ -587,6 +617,43 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
             purchasedAt: entitlement?.purchasedAt ?? null,
             expiresAt: entitlement?.expiresAt ?? null,
           };
+          if (requiresStrictServerValidation(entitlementPayload.productId ?? result.productId)) {
+            try {
+              const snapshot = await syncEntitlement({
+                productId: entitlementPayload.productId ?? FACILITY_PRODUCT_ID,
+                transactionId: entitlementPayload.transactionId ?? null,
+                originalTransactionId: entitlementPayload.originalTransactionId ?? null,
+                purchasedAt: entitlementPayload.purchasedAt ?? null,
+                expiresAt: entitlementPayload.expiresAt ?? null,
+                facilityCode: verificationOptions?.facilityCode ?? null,
+              });
+              return {
+                status: snapshot.hasActiveSubscription ? 'purchased' : 'failed',
+                message: snapshot.hasActiveSubscription
+                  ? 'Membership activated.'
+                  : 'Purchase found, but the facility offer could not be activated.',
+                hasActiveSubscription: Boolean(snapshot.hasActiveSubscription),
+              };
+            } catch (syncErr) {
+              const message =
+                syncErr instanceof Error && syncErr.message.trim().length > 0
+                  ? syncErr.message
+                  : 'Could not verify the facility offer.';
+              logError(syncErr, {
+                screen: 'SubscriptionContext',
+                extra: {
+                  reason: 'facility_sync_entitlement_failed_after_purchase',
+                  productId: entitlementPayload.productId,
+                },
+              });
+              return {
+                status: 'failed',
+                message,
+                hasActiveSubscription: Boolean(status?.hasActiveSubscription),
+              };
+            }
+          }
+
           applyActiveEntitlement(entitlementPayload);
 
           if (entitlementPayload.productId) {
@@ -597,6 +664,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
                 originalTransactionId: entitlementPayload.originalTransactionId ?? null,
                 purchasedAt: entitlementPayload.purchasedAt ?? null,
                 expiresAt: entitlementPayload.expiresAt ?? null,
+                facilityCode: verificationOptions?.facilityCode ?? null,
               });
             } catch (syncErr) {
               logError(syncErr, {
@@ -634,6 +702,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         productId: result.productId,
         transactionId: result.transactionId,
         originalTransactionId: result.originalTransactionId,
+        facilityCode: verificationOptions?.facilityCode ?? null,
       });
 
       const hasActiveSubscription = Boolean(snapshot.hasActiveSubscription);
@@ -645,11 +714,17 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         hasActiveSubscription,
       };
     },
-    [applyActiveEntitlement, status?.hasActiveSubscription, syncEntitlement, verifyReceipt]
+    [
+      applyActiveEntitlement,
+      requiresStrictServerValidation,
+      status?.hasActiveSubscription,
+      syncEntitlement,
+      verifyReceipt,
+    ]
   );
 
   const purchase = useCallback(
-    async (productId: string): Promise<PurchaseActionResult> => {
+    async (productId: string, options?: PurchaseVerificationOptions): Promise<PurchaseActionResult> => {
       setIsProcessingPurchase(true);
       logEvent('membership_purchase_started', {
         screen: 'SubscriptionContext',
@@ -657,7 +732,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       });
       try {
         const nativeResult = await purchaseStoreProduct(productId);
-        const mapped = await mapPurchaseOutcome(nativeResult);
+        const mapped = await mapPurchaseOutcome(nativeResult, options);
         if (mapped.status === 'purchased') {
           setMembershipActivationNotice({
             productId,
