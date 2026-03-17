@@ -15,9 +15,11 @@ import { deriveTrialLifecycleUpdate } from '@src/services/trialLifecycle';
 import { restoreOrAssignNumbersForUser } from '@src/services/twilioNumberPool';
 import {
   authorizeFacilityOfferAccess,
+  createFacilityOfferClaimToken,
   FACILITY_PRODUCT_ID,
   isFacilityProductId,
   normalizeFacilityCode,
+  parseFacilityOfferClaimToken,
   recordFacilityOfferRedemption,
   validateFacilityOfferCode,
 } from '@src/services/facilityOffers';
@@ -183,6 +185,57 @@ async function validateFacilityOffer(req: Request, res: Response) {
     return res
       .status(HTTP_STATUS_CODES.InternalServerError)
       .json({ error: 'Failed to validate facility code' });
+  }
+}
+
+async function resolveFacilityOfferToken(req: Request, res: Response) {
+  const query = ((req as any).validatedBody ?? req.query ?? {}) as { t?: string; token?: string };
+  const tokenValue = (query.t ?? query.token ?? '').trim();
+  if (!tokenValue) {
+    return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Token is required' });
+  }
+
+  const parsedToken = parseFacilityOfferClaimToken(tokenValue);
+  if (!parsedToken) {
+    return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Facility link is invalid or expired' });
+  }
+
+  try {
+    const offer = await validateFacilityOfferCode(parsedToken.code);
+    if (!offer) {
+      return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Facility link is invalid or expired' });
+    }
+
+    let refreshToken = tokenValue;
+    try {
+      refreshToken = createFacilityOfferClaimToken({
+        code: offer.code,
+        facilitySlug: parsedToken.facilitySlug,
+      });
+    } catch {
+      // Do not block redemption if secret rotation is in progress.
+    }
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({
+      eligible: true,
+      productId: FACILITY_PRODUCT_ID,
+      token: refreshToken,
+      code: offer.code,
+      facility: {
+        id: offer.facilityId,
+        name: offer.facilityName,
+        slug: parsedToken.facilitySlug,
+      },
+      offer: {
+        trialDays: 14,
+        annualPriceLabel: '$74.99/year',
+      },
+    });
+  } catch (error) {
+    logger.err(toLogMessage('subscriptions.resolve_facility_offer_token', error));
+    return res
+      .status(HTTP_STATUS_CODES.InternalServerError)
+      .json({ error: 'Failed to resolve facility link' });
   }
 }
 
@@ -717,6 +770,7 @@ async function syncEntitlement(req: Request, res: Response) {
 export default {
   status,
   validateFacilityOffer,
+  resolveFacilityOfferToken,
   verify,
   syncEntitlement,
 };

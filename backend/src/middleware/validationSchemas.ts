@@ -239,6 +239,16 @@ export const validateFacilityOfferCodeSchema = z
   })
   .strict();
 
+export const resolveFacilityOfferTokenSchema = z
+  .object({
+    t: z.string().min(16).max(2048).optional(),
+    token: z.string().min(16).max(2048).optional(),
+  })
+  .strict()
+  .refine((value) => Boolean(value.t || value.token), {
+    message: 'Token is required',
+  });
+
 export const appStoreNotificationSchema = z
   .object({
     signedPayload: z.string().min(20, 'signedPayload is required'),

@@ -9,7 +9,14 @@ export type RootStackParamList = {
   OnboardingChoice: undefined;
   Membership: undefined;
   MembershipActivated: undefined;
-  MembershipFacilityOffer: undefined;
+  MembershipFacilityOffer:
+    | {
+        initialCode?: string;
+        claimToken?: string;
+        facilitySlug?: string;
+        source?: 'deeplink' | 'in_app';
+      }
+    | undefined;
   MembershipExperience: undefined;
   WhyChooseVerity: undefined;
   OnboardingProfile: undefined;

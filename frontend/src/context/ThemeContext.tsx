@@ -4,10 +4,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { AppTheme, getTheme, ThemeMode } from '../theme/tokens';
 
+type ThemePreference = ThemeMode | 'system';
+
 type ThemeContextValue = {
   mode: ThemeMode;
   theme: AppTheme;
-  setMode: (mode: ThemeMode) => void;
+  isUsingSystemTheme: boolean;
+  setMode: (mode: ThemePreference) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -24,8 +27,9 @@ const getSystemMode = (): ThemeMode => {
 };
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [mode, setModeState] = useState<ThemeMode>(() => getSystemMode());
-  const [hasManualPreference, setHasManualPreference] = useState(false);
+  const [systemMode, setSystemMode] = useState<ThemeMode>(() => getSystemMode());
+  const [preference, setPreference] = useState<ThemePreference>('system');
+  const mode = preference === 'system' ? systemMode : preference;
   const theme = useMemo(() => getTheme(mode), [mode]);
 
   useEffect(() => {
@@ -36,10 +40,9 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
           return;
         }
         if (storedMode === 'light' || storedMode === 'dark') {
-          setModeState(storedMode);
-          setHasManualPreference(true);
+          setPreference(storedMode);
         } else {
-          setModeState(getSystemMode());
+          setPreference('system');
         }
       })
       .catch(() => null);
@@ -49,22 +52,23 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   }, []);
 
   useEffect(() => {
-    if (hasManualPreference) {
-      return;
-    }
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
       if (colorScheme === 'light' || colorScheme === 'dark') {
-        setModeState(colorScheme);
+        setSystemMode(colorScheme);
       }
     });
     return () => {
       subscription.remove();
     };
-  }, [hasManualPreference]);
+  }, []);
 
-  const setMode = useCallback((nextMode: ThemeMode) => {
-    setModeState(nextMode);
-    setHasManualPreference(true);
+  const setMode = useCallback((nextMode: ThemePreference) => {
+    if (nextMode === 'system') {
+      setPreference('system');
+      AsyncStorage.removeItem(THEME_PREFERENCE_KEY).catch(() => null);
+      return;
+    }
+    setPreference(nextMode);
     AsyncStorage.setItem(THEME_PREFERENCE_KEY, nextMode).catch(() => null);
   }, []);
 
@@ -72,9 +76,10 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     () => ({
       mode,
       theme,
+      isUsingSystemTheme: preference === 'system',
       setMode,
     }),
-    [mode, theme, setMode]
+    [mode, preference, theme, setMode]
   );
 
   return <ThemeContext.Provider value={contextValue}>{children}</ThemeContext.Provider>;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -16,7 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 
 import type { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../context/ThemeContext';
@@ -24,7 +24,7 @@ import { useSubscription } from '../../context/SubscriptionContext';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { logEvent } from '../../services/sentry';
-import { validateFacilityOfferCode } from '../../services/facilityOffers';
+import { resolveFacilityOfferToken, validateFacilityOfferCode } from '../../services/facilityOffers';
 
 const FACILITY_PRODUCT_ID = 'verityprotect_facility_annual';
 
@@ -34,6 +34,7 @@ function normalizeFacilityCode(value: string) {
 
 export default function MembershipFacilityOfferScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'MembershipFacilityOffer'>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'MembershipFacilityOffer'>>();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -47,6 +48,7 @@ export default function MembershipFacilityOfferScreen() {
 
   const [facilityCode, setFacilityCode] = useState('');
   const [facilityError, setFacilityError] = useState<string | null>(null);
+  const [isResolvingClaimToken, setIsResolvingClaimToken] = useState(false);
   const [isFacilityValidating, setIsFacilityValidating] = useState(false);
   const [validatedFacility, setValidatedFacility] = useState<{
     code: string;
@@ -55,6 +57,11 @@ export default function MembershipFacilityOfferScreen() {
   } | null>(null);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const hasAttemptedAutoValidateRef = useRef(false);
+  const initialFacilityCode = route.params?.initialCode ?? '';
+  const claimToken = route.params?.claimToken ?? null;
+  const facilitySlug = route.params?.facilitySlug ?? null;
+  const launchSource = route.params?.source ?? 'in_app';
 
   const inputOpacity = useRef(new Animated.Value(1)).current;
   const inputScale = useRef(new Animated.Value(1)).current;
@@ -68,6 +75,18 @@ export default function MembershipFacilityOfferScreen() {
 
   const facilityPlan = products.find((product) => product.productId === FACILITY_PRODUCT_ID);
   const facilityDisplayPrice = facilityPlan?.displayPrice ?? '$74.99';
+
+  useEffect(() => {
+    logEvent('membership_facility_offer_opened', {
+      screen: 'MembershipFacilityOfferScreen',
+      extra: {
+        source: launchSource,
+        hasClaimToken: Boolean(claimToken),
+        hasInitialCode: Boolean(initialFacilityCode),
+        facilitySlug: facilitySlug ?? null,
+      },
+    });
+  }, [claimToken, facilitySlug, initialFacilityCode, launchSource]);
 
   useEffect(() => {
     Animated.timing(inputGlowOpacity, {
@@ -180,8 +199,8 @@ export default function MembershipFacilityOfferScreen() {
     }
   };
 
-  const handleFacilityValidate = async () => {
-    const normalizedCode = normalizeFacilityCode(facilityCode);
+  const handleFacilityValidate = useCallback(async (rawCode?: string) => {
+    const normalizedCode = normalizeFacilityCode(rawCode ?? facilityCode);
     if (normalizedCode.length < 6) {
       setFacilityError('Enter the code from your brochure or community QR page.');
       return;
@@ -189,6 +208,7 @@ export default function MembershipFacilityOfferScreen() {
 
     setFacilityError(null);
     setIsFacilityValidating(true);
+    setFacilityCode(normalizedCode);
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
 
     try {
@@ -213,7 +233,48 @@ export default function MembershipFacilityOfferScreen() {
       );
       setIsFacilityValidating(false);
     }
-  };
+  }, [facilityCode]);
+
+  useEffect(() => {
+    const normalizedInitialCode = normalizeFacilityCode(initialFacilityCode);
+    if (hasAttemptedAutoValidateRef.current) {
+      return;
+    }
+
+    if (claimToken?.trim()) {
+      hasAttemptedAutoValidateRef.current = true;
+      setIsResolvingClaimToken(true);
+      setFacilityError(null);
+      void resolveFacilityOfferToken(claimToken.trim())
+        .then((response) => {
+          const resolvedCode = normalizeFacilityCode(response.code);
+          if (!resolvedCode) {
+            throw new Error('Facility link is missing a valid code.');
+          }
+          setFacilityCode(resolvedCode);
+          return handleFacilityValidate(resolvedCode);
+        })
+        .catch((error) => {
+          setFacilityError(
+            error instanceof Error && error.message.trim().length > 0
+              ? error.message
+              : 'This facility link is invalid or expired. Enter your code manually.'
+          );
+        })
+        .finally(() => {
+          setIsResolvingClaimToken(false);
+        });
+      return;
+    }
+
+    if (!normalizedInitialCode) {
+      return;
+    }
+
+    hasAttemptedAutoValidateRef.current = true;
+    setFacilityCode(normalizedInitialCode);
+    void handleFacilityValidate(normalizedInitialCode);
+  }, [claimToken, handleFacilityValidate, initialFacilityCode]);
 
   const handleFacilityPurchase = async () => {
     if (!validatedFacility) {
@@ -344,7 +405,7 @@ export default function MembershipFacilityOfferScreen() {
                     onChangeText={handleFacilityCodeChange}
                     autoCapitalize="characters"
                     autoCorrect={false}
-                    editable={!isFacilityValidating && !isProcessingPurchase}
+                    editable={!isFacilityValidating && !isResolvingClaimToken && !isProcessingPurchase}
                     returnKeyType="done"
                     textAlign="center"
                     onFocus={() => setIsInputFocused(true)}
@@ -444,10 +505,12 @@ export default function MembershipFacilityOfferScreen() {
               pressed && styles.primaryButtonPressed,
               isFacilityValidating && styles.buttonDisabled,
             ]}
-            onPress={handleFacilityValidate}
-            disabled={isFacilityValidating}
+            onPress={() => {
+              void handleFacilityValidate();
+            }}
+            disabled={isFacilityValidating || isResolvingClaimToken}
           >
-            {isFacilityValidating ? (
+            {isFacilityValidating || isResolvingClaimToken ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
               <>

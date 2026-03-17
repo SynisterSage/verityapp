@@ -4,6 +4,7 @@ import PATHS from '@src/common/constants/PATHS';
 import SubscriptionsController from '@src/controllers/SubscriptionsController';
 import { validateRequest } from '@src/middleware/validateRequest';
 import {
+  resolveFacilityOfferTokenSchema,
   validateFacilityOfferCodeSchema,
   syncSubscriptionEntitlementSchema,
   verifySubscriptionReceiptSchema,
@@ -16,6 +17,11 @@ router.post(
   PATHS.Subscriptions.FacilityValidate,
   validateRequest(validateFacilityOfferCodeSchema),
   SubscriptionsController.validateFacilityOffer
+);
+router.get(
+  PATHS.Subscriptions.FacilityResolveToken,
+  validateRequest(resolveFacilityOfferTokenSchema),
+  SubscriptionsController.resolveFacilityOfferToken
 );
 router.post(
   PATHS.Subscriptions.Verify,

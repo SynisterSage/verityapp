@@ -32,7 +32,7 @@ export default function SettingsScreen({
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const { canManageProfile } = useProfile();
-  const { theme, mode, setMode } = useTheme();
+  const { theme, mode, setMode, isUsingSystemTheme } = useTheme();
   const [isSigningOut, setIsSigningOut] = useState(false);
   const { unreadAgentCount } = useSupportContext();
 
@@ -208,11 +208,22 @@ export default function SettingsScreen({
   const appearanceRow = useMemo<SettingsRowItem>(
     () => ({
       label: 'Theme',
-      subtitle: isDarkMode ? 'Dark mode enabled' : 'Dark mode disabled',
+      subtitle: isUsingSystemTheme
+        ? `Following iPhone (${isDarkMode ? 'Dark' : 'Light'})`
+        : `Manual ${isDarkMode ? 'Dark' : 'Light'} mode`,
       icon: 'moon-outline',
       onPress: toggleThemeMode,
     }),
-    [isDarkMode, toggleThemeMode]
+    [isDarkMode, isUsingSystemTheme, toggleThemeMode]
+  );
+  const systemThemeRow = useMemo<SettingsRowItem>(
+    () => ({
+      label: 'Use iPhone Theme',
+      subtitle: 'Automatically follow your phone appearance',
+      icon: 'phone-portrait-outline',
+      onPress: () => setMode('system'),
+    }),
+    [setMode]
   );
   const signOutHandler = createRowHandler(signOutRow);
 
@@ -284,11 +295,17 @@ export default function SettingsScreen({
                     true: theme.colors.accent,
                   }}
                   ios_backgroundColor={withOpacity(theme.colors.textMuted, 0.35)}
-                  accessibilityLabel="Toggle dark mode"
+                  accessibilityLabel="Toggle dark mode override"
                   style={styles.themeSwitch}
                 />
               }
             />
+            {!isUsingSystemTheme ? (
+              <SettingRow
+                item={systemThemeRow}
+                onPress={createRowHandler(systemThemeRow)}
+              />
+            ) : null}
             <SettingRow
               item={howItWorksRow}
               onPress={createRowHandler(howItWorksRow)}

@@ -10,6 +10,7 @@ type ProfileRow = {
   completed_test_call: boolean | null;
   completed_alert_prefs: boolean | null;
   completed_safe_phrases: boolean | null;
+  dismissed_nudge_cards?: string[] | null;
   pin_hash: string | null;
   passcode_hash: string | null;
   timezone?: string | null;
@@ -91,13 +92,20 @@ const apnProvider = new apn.Provider({
 });
 
 function determineNudge(profile: ProfileRow): NudgeCopy | null {
-  if (profile.completed_test_call !== true) {
+  const dismissed = new Set(
+    (profile.dismissed_nudge_cards ?? [])
+      .map((value) => value.trim().toLowerCase())
+      .filter((value) => value.length > 0)
+      .map((value) => value.replace(/^onboarding_/, ''))
+  );
+
+  if (profile.completed_test_call !== true && !dismissed.has('test_call')) {
     return NUDGES.test_call;
   }
-  if (profile.completed_alert_prefs !== true) {
+  if (profile.completed_alert_prefs !== true && !dismissed.has('alert_prefs')) {
     return NUDGES.alert_prefs;
   }
-  if (profile.completed_safe_phrases !== true) {
+  if (profile.completed_safe_phrases !== true && !dismissed.has('safe_phrases')) {
     return NUDGES.safe_phrases;
   }
   return null;
@@ -252,27 +260,28 @@ async function loadCandidateProfiles(now: Date) {
   const olderThan24h = new Date(now.getTime() - ONE_DAY_MS).toISOString();
   const newerThan7d = new Date(now.getTime() - 7 * ONE_DAY_MS).toISOString();
 
-  const withTimezone = await supabaseAdmin
+  const baseSelect =
+    'id, caretaker_id, created_at, completed_test_call, completed_alert_prefs, completed_safe_phrases, pin_hash, passcode_hash';
+  const withOptionalColumns = await supabaseAdmin
     .from('profiles')
-    .select(
-      'id, caretaker_id, created_at, completed_test_call, completed_alert_prefs, completed_safe_phrases, pin_hash, passcode_hash, timezone'
-    )
+    .select(`${baseSelect}, timezone, dismissed_nudge_cards`)
     .lte('created_at', olderThan24h)
     .gte('created_at', newerThan7d);
 
-  let data: ProfileRow[] | null = withTimezone.data as ProfileRow[] | null;
-  let error = withTimezone.error;
+  let data: ProfileRow[] | null = withOptionalColumns.data as ProfileRow[] | null;
+  let error = withOptionalColumns.error;
 
-  if (error && isMissingColumnError(error, 'timezone')) {
-    const withoutTimezone = await supabaseAdmin
+  if (
+    error &&
+    (isMissingColumnError(error, 'timezone') || isMissingColumnError(error, 'dismissed_nudge_cards'))
+  ) {
+    const withoutOptionalColumns = await supabaseAdmin
       .from('profiles')
-      .select(
-        'id, caretaker_id, created_at, completed_test_call, completed_alert_prefs, completed_safe_phrases, pin_hash, passcode_hash'
-      )
+      .select(baseSelect)
       .lte('created_at', olderThan24h)
       .gte('created_at', newerThan7d);
-    data = withoutTimezone.data as ProfileRow[] | null;
-    error = withoutTimezone.error;
+    data = withoutOptionalColumns.data as ProfileRow[] | null;
+    error = withoutOptionalColumns.error;
   }
 
   if (error) {
@@ -379,7 +388,7 @@ async function main() {
     const nudge = determineNudge(profile);
     if (!nudge) {
       skippedCount += 1;
-      logger.info(`[nudge] skip profile=${profile.id} reason=no_pending_steps`);
+      logger.info(`[nudge] skip profile=${profile.id} reason=no_pending_steps_or_dismissed`);
       continue;
     }
 

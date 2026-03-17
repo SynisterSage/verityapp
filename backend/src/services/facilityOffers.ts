@@ -1,7 +1,11 @@
 import supabaseAdmin from '@src/services/supabase';
 import type { UserSubscriptionRow } from '@src/services/subscriptionAccess';
+import jwt, { JwtPayload, SignOptions } from 'jsonwebtoken';
 
 export const FACILITY_PRODUCT_ID = 'verityprotect_facility_annual';
+const FACILITY_CLAIM_TOKEN_ISSUER = 'verityprotect';
+const FACILITY_CLAIM_TOKEN_AUDIENCE = 'facility-offer';
+const DEFAULT_FACILITY_CLAIM_TOKEN_TTL = '365d';
 
 interface FacilityRow {
   id: string
@@ -32,6 +36,11 @@ interface FacilityRedemptionRow {
   metadata: Record<string, unknown> | null
 }
 
+interface FacilityClaimTokenPayload extends JwtPayload {
+  code?: string
+  facilitySlug?: string | null
+}
+
 export interface FacilityOfferAccess {
   facilityId: string
   facilityName: string
@@ -55,6 +64,75 @@ export function normalizeFacilityCode(value: string) {
 
 export function isFacilityProductId(productId: string | null | undefined) {
   return (productId ?? '').trim().toLowerCase() === FACILITY_PRODUCT_ID;
+}
+
+function getFacilityClaimTokenSecret() {
+  const secret = process.env.FACILITY_CLAIM_TOKEN_SECRET?.trim();
+  if (!secret) {
+    throw new Error('FACILITY_CLAIM_TOKEN_SECRET is not configured');
+  }
+  return secret;
+}
+
+export function createFacilityOfferClaimToken(args: {
+  code: string;
+  facilitySlug?: string | null;
+  expiresIn?: string;
+}) {
+  const normalizedCode = normalizeFacilityCode(args.code);
+  if (!normalizedCode) {
+    throw new Error('Cannot create facility claim token without a valid code');
+  }
+
+  return jwt.sign(
+    {
+      code: normalizedCode,
+      facilitySlug: args.facilitySlug?.trim() || null,
+    },
+    getFacilityClaimTokenSecret(),
+    {
+      algorithm: 'HS256',
+      issuer: FACILITY_CLAIM_TOKEN_ISSUER,
+      audience: FACILITY_CLAIM_TOKEN_AUDIENCE,
+      expiresIn: (args.expiresIn ??
+        process.env.FACILITY_CLAIM_TOKEN_TTL ??
+        DEFAULT_FACILITY_CLAIM_TOKEN_TTL) as SignOptions['expiresIn'],
+    }
+  );
+}
+
+export function parseFacilityOfferClaimToken(token: string) {
+  const trimmed = token.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const decoded = jwt.verify(trimmed, getFacilityClaimTokenSecret(), {
+      algorithms: ['HS256'],
+      issuer: FACILITY_CLAIM_TOKEN_ISSUER,
+      audience: FACILITY_CLAIM_TOKEN_AUDIENCE,
+    }) as FacilityClaimTokenPayload | string;
+
+    if (!decoded || typeof decoded === 'string') {
+      return null;
+    }
+
+    const code = typeof decoded.code === 'string' ? normalizeFacilityCode(decoded.code) : '';
+    if (!code) {
+      return null;
+    }
+
+    return {
+      code,
+      facilitySlug:
+        typeof decoded.facilitySlug === 'string' && decoded.facilitySlug.trim().length > 0
+          ? decoded.facilitySlug.trim()
+          : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 async function loadFacilityCodeByCode(code: string) {

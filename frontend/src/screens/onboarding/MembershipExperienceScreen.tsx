@@ -721,6 +721,7 @@ const createStyles = (theme: AppTheme) =>
     copyWrapIntro: {
       minHeight: 0,
       maxWidth: 320,
+      justifyContent: 'center',
     },
     copyWrapResult: {
       minHeight: 0,

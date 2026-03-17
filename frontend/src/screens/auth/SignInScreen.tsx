@@ -331,8 +331,13 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
         secondaryLabel="Apple"
         onSecondaryPress={handleAppleSignIn}
         secondaryIcon={
-          <View style={[styles.appleIcon, { backgroundColor: theme.colors.text }]}>
-            <Ionicons name="logo-apple" size={16} color="#FFFFFF" />
+          <View
+            style={[
+              styles.appleIcon,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+            ]}
+          >
+            <Ionicons name="logo-apple" size={16} color={theme.colors.text} />
           </View>
         }
         tertiaryLabel="Google"
@@ -499,7 +504,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#111827',
+    borderWidth: StyleSheet.hairlineWidth,
     justifyContent: 'center',
     alignItems: 'center',
   },

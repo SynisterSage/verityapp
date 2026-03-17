@@ -3,7 +3,7 @@ import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 
 import supabaseAdmin from '@src/services/supabase';
-import { normalizeFacilityCode } from '@src/services/facilityOffers';
+import { createFacilityOfferClaimToken, normalizeFacilityCode } from '@src/services/facilityOffers';
 
 interface Args {
   name: string
@@ -154,6 +154,28 @@ async function main() {
   logger.info(
     `Facility code upserted name="${facility.name}" slug="${facility.slug}" code="${args.code}" active=${String(!args.inactive)}`
   );
+
+  if (!args.inactive) {
+    const websiteBaseUrl = (process.env.FACILITY_OFFER_WEBSITE_URL ?? 'https://www.verityprotect.com').replace(
+      /\/+$/,
+      ''
+    );
+    const safeSlug = facility.slug?.trim() || toSlug(facility.name);
+    try {
+      const claimToken = createFacilityOfferClaimToken({
+        code: args.code,
+        facilitySlug: safeSlug,
+      });
+      const claimUrl = `${websiteBaseUrl}/f/${safeSlug}?t=${encodeURIComponent(claimToken)}`;
+      logger.info(`Facility claim link: ${claimUrl}`);
+    } catch (tokenError) {
+      logger.warn(
+        `Could not generate claim link (set FACILITY_CLAIM_TOKEN_SECRET): ${
+          tokenError instanceof Error ? tokenError.message : 'unknown error'
+        }`
+      );
+    }
+  }
 }
 
 if (require.main === module) {

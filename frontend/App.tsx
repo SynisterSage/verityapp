@@ -12,7 +12,18 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { enableScreens } from 'react-native-screens';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { Alert, AppState, ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  AppState,
+  ActivityIndicator,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import {
   SafeAreaProvider,
   initialWindowMetrics,
@@ -102,6 +113,20 @@ import * as Haptics from 'expo-haptics';
 
 enableScreens(true);
 
+const GLOBAL_MAX_FONT_SIZE_MULTIPLIER = 1.2;
+
+if (Text.defaultProps == null) {
+  Text.defaultProps = {};
+}
+Text.defaultProps.allowFontScaling = true;
+Text.defaultProps.maxFontSizeMultiplier = GLOBAL_MAX_FONT_SIZE_MULTIPLIER;
+
+if (TextInput.defaultProps == null) {
+  TextInput.defaultProps = {};
+}
+TextInput.defaultProps.allowFontScaling = true;
+TextInput.defaultProps.maxFontSizeMultiplier = GLOBAL_MAX_FONT_SIZE_MULTIPLIER;
+
 type PendingNotificationData = {
   callId?: string;
   alertId?: string;
@@ -118,9 +143,13 @@ type PendingNotificationData = {
     | 'alerts'
     | 'support_portal'
     | 'membership_billing'
+    | 'membership_facility_offer'
     | 'nudge_test_call'
     | 'nudge_alert_prefs'
     | 'nudge_safe_phrases';
+  facilityCode?: string;
+  facilityToken?: string;
+  facilitySlug?: string;
   alertType?: string;
 };
 
@@ -263,6 +292,16 @@ function parseRouteTarget(value: unknown): PendingNotificationData['routeTarget'
     normalized === 'subscriptions'
   ) {
     return 'membership_billing';
+  }
+  if (
+    normalized === 'membership_facility_offer' ||
+    normalized === 'membership-facility-offer' ||
+    normalized === 'membershipfacilityoffer' ||
+    normalized === 'facility_offer' ||
+    normalized === 'facility-offer' ||
+    normalized === 'facilityoffer'
+  ) {
+    return 'membership_facility_offer';
   }
   if (
     normalized === 'nudge_test_call' ||
@@ -453,6 +492,15 @@ function parseNotificationPayload(data: Record<string, unknown>): PendingNotific
         'target'
       )
     ) ?? parsedRoutePayload?.routeTarget;
+  const facilityCode =
+    readDataString(normalizedData, 'facilityCode', 'facility_code', 'code') ??
+    parsedRoutePayload?.facilityCode;
+  const facilityToken =
+    readDataString(normalizedData, 'facilityToken', 'facility_token', 'claimToken', 'claim_token', 't') ??
+    parsedRoutePayload?.facilityToken;
+  const facilitySlug =
+    readDataString(normalizedData, 'facilitySlug', 'facility_slug', 'facility') ??
+    parsedRoutePayload?.facilitySlug;
 
   const routeTarget =
     parsedRoute ??
@@ -472,6 +520,9 @@ function parseNotificationPayload(data: Record<string, unknown>): PendingNotific
     supportTicketId,
     supportMessageId,
     profileId,
+    facilityCode,
+    facilityToken,
+    facilitySlug,
   };
 }
 
@@ -491,6 +542,47 @@ function parseWidgetRoutePayload(url: string): PendingNotificationData | null {
   const secondSegmentRaw = segments[1]?.trim();
   if (!firstSegment) {
     return null;
+  }
+  const queryFacilityCode = parsed.queryParams?.code;
+  const facilityCode =
+    typeof queryFacilityCode === 'string'
+      ? queryFacilityCode.trim()
+      : Array.isArray(queryFacilityCode)
+      ? queryFacilityCode[0]?.trim()
+      : undefined;
+  const queryFacilityToken = parsed.queryParams?.t ?? parsed.queryParams?.token;
+  const facilityToken =
+    typeof queryFacilityToken === 'string'
+      ? queryFacilityToken.trim()
+      : Array.isArray(queryFacilityToken)
+      ? queryFacilityToken[0]?.trim()
+      : undefined;
+  const queryFacilitySlug = parsed.queryParams?.facility ?? parsed.queryParams?.facility_slug;
+  const facilitySlugFromQuery =
+    typeof queryFacilitySlug === 'string'
+      ? queryFacilitySlug.trim()
+      : Array.isArray(queryFacilitySlug)
+      ? queryFacilitySlug[0]?.trim()
+      : undefined;
+
+  if (
+    (firstSegment === 'membership' || firstSegment === 'subscription' || firstSegment === 'subscriptions') &&
+    (secondSegment === 'facility' || secondSegment === 'partner')
+  ) {
+    return {
+      routeTarget: 'membership_facility_offer',
+      facilityCode,
+      facilityToken,
+      facilitySlug: facilitySlugFromQuery,
+    };
+  }
+  if (firstSegment === 'facility' || firstSegment === 'partner') {
+    return {
+      routeTarget: 'membership_facility_offer',
+      facilityCode,
+      facilityToken,
+      facilitySlug: secondSegmentRaw ?? facilitySlugFromQuery,
+    };
   }
 
   if (firstSegment === 'alerts') {
@@ -1594,7 +1686,8 @@ function NavigationHost() {
       if (
         !onboardingComplete &&
         payload.routeTarget !== 'support_portal' &&
-        payload.routeTarget !== 'membership_billing'
+        payload.routeTarget !== 'membership_billing' &&
+        payload.routeTarget !== 'membership_facility_offer'
       ) {
         return;
       }
@@ -1680,6 +1773,15 @@ function NavigationHost() {
           params: {
             screen: 'MembershipBilling',
           },
+        });
+        return;
+      }
+      if (payload.routeTarget === 'membership_facility_offer') {
+        rootNavigationRef.current.navigate('MembershipFacilityOffer', {
+          initialCode: payload.facilityCode,
+          claimToken: payload.facilityToken,
+          facilitySlug: payload.facilitySlug,
+          source: 'deeplink',
         });
         return;
       }

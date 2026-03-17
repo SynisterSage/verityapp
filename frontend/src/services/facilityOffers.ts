@@ -21,3 +21,18 @@ export async function validateFacilityOfferCode(code: string) {
   }) as Promise<FacilityOfferValidationResponse>;
 }
 
+export type FacilityOfferTokenResolutionResponse = FacilityOfferValidationResponse & {
+  token: string;
+  facility: FacilityOfferValidationResponse['facility'] & {
+    slug?: string | null;
+  };
+};
+
+export async function resolveFacilityOfferToken(token: string) {
+  return authorizedFetch(
+    `/subscriptions/facility-offer/resolve-token?t=${encodeURIComponent(token)}`,
+    {
+      method: 'GET',
+    }
+  ) as Promise<FacilityOfferTokenResolutionResponse>;
+}

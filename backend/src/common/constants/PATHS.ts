@@ -32,6 +32,7 @@ const PATHS = {
     Verify: '/verify',
     SyncEntitlement: '/sync-entitlement',
     FacilityValidate: '/facility-offer/validate',
+    FacilityResolveToken: '/facility-offer/resolve-token',
   },
   Fraud: {
     _: '/fraud',
