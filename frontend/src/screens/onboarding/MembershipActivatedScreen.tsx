@@ -226,7 +226,7 @@ export default function MembershipActivatedScreen() {
             <Text style={[styles.primaryButtonText, { color: buttonLabelColor }]}>Set Up Protection</Text>
             <Ionicons name="arrow-forward" size={22} color={buttonLabelColor} />
           </Pressable>
-          <Text style={styles.helperText}>Takes about 2 minutes</Text>
+          <Text style={styles.helperText}>Takes about 1 minute</Text>
         </Animated.View>
           </View>
     </SafeAreaView>

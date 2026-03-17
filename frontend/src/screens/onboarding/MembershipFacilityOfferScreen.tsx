@@ -325,16 +325,41 @@ export default function MembershipFacilityOfferScreen() {
     ).catch(() => null);
   };
 
+  const handleClose = useCallback(() => {
+    void Haptics.selectionAsync().catch(() => null);
+    const routeNames = navigation.getState?.().routeNames ?? [];
+
+    // QR/deeplink flow should always land on paywall, not previous auth/root screen.
+    if (launchSource === 'deeplink') {
+      if (routeNames.includes('Membership')) {
+        navigation.replace('Membership');
+        return;
+      }
+      if (routeNames.includes('AppTabs')) {
+        navigation.replace('AppTabs');
+        return;
+      }
+    }
+
+    if (navigation.canGoBack?.()) {
+      navigation.goBack();
+      return;
+    }
+
+    if (routeNames.includes('Membership')) {
+      navigation.navigate('Membership');
+      return;
+    }
+
+    if (routeNames.includes('AppTabs')) {
+      navigation.navigate('AppTabs');
+    }
+  }, [launchSource, navigation]);
+
   return (
     <SafeAreaView style={styles.screen} edges={[]}>
       <View style={[styles.headerRow, { paddingTop: Math.max(insets.top, 16) }]}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => {
-            void Haptics.selectionAsync().catch(() => null);
-            navigation.goBack();
-          }}
-        >
+        <Pressable style={styles.backButton} onPress={handleClose}>
           <Ionicons name="chevron-down" size={18} color={theme.colors.text} />
         </Pressable>
         <Text style={styles.headerTitle}>Facility Partner</Text>
@@ -539,7 +564,7 @@ export default function MembershipFacilityOfferScreen() {
 
         <Pressable
           style={styles.secondaryLinkWrap}
-          onPress={validatedFacility ? () => setValidatedFacility(null) : () => navigation.goBack()}
+          onPress={validatedFacility ? () => setValidatedFacility(null) : handleClose}
           disabled={isFacilityValidating || isProcessingPurchase}
         >
           <Text style={styles.secondaryLinkText}>

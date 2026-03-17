@@ -48,6 +48,7 @@ type SubscriptionRecord = {
   trialPurgeAfterAt: string | null;
   trialPurgedAt: string | null;
   lastVerifiedAt: string | null;
+  facilityName: string | null;
 } | null;
 
 export type SubscriptionStatusSnapshot = {
@@ -155,6 +156,7 @@ function buildActiveSnapshot(
       trialPurgeAfterAt: base?.subscription?.trialPurgeAfterAt ?? null,
       trialPurgedAt: base?.subscription?.trialPurgedAt ?? null,
       lastVerifiedAt: nowIso,
+      facilityName: base?.subscription?.facilityName ?? null,
     },
   };
 }

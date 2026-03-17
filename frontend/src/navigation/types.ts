@@ -2,8 +2,18 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { SupportResourceType } from '../data/resourceSections';
 
 export type RootStackParamList = {
-  SignIn: undefined;
-  SignUp: undefined;
+  SignIn:
+    | {
+        facilityClaimPrompt?: boolean;
+        facilitySlug?: string;
+      }
+    | undefined;
+  SignUp:
+    | {
+        facilityClaimPrompt?: boolean;
+        facilitySlug?: string;
+      }
+    | undefined;
   ConfirmEmail: { email?: string; confirmed?: boolean };
   ResetPassword: undefined;
   OnboardingChoice: undefined;

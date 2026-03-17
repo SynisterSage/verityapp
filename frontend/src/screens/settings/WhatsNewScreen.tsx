@@ -28,10 +28,12 @@ const RELEASES: Release[] = [
     label: 'Latest Release',
     date: 'March 2026',
     highlights: [
-      'Added Facility Partner access with community invite codes, partner pricing, and a 14-day trial for eligible residents.',
-      'Updated membership activation so it clearly confirms your protection status and next step.',
-      'Shortened onboarding so families can finish setup faster with fewer required steps.',
-      'Added smart setup reminders on Home so unfinished steps are easier to complete later.',
+      'New Facility Partner program: eligible residents can claim community pricing and a 14-day trial with a facility code.',
+      'QR and invite-link claim flow is now smoother, including clear sign-in prompts when needed.',
+      'Paywall and membership screens were redesigned to make plan choices and activation steps clearer.',
+      'Onboarding is shorter and easier, with core protection setup moved earlier in the flow.',
+      'Home now shows simple setup reminders so unfinished steps are easy to complete later.',
+      'Updated education pages explain how Verity works and why families choose it, in a clearer format.',
     ],
   },
   {

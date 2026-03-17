@@ -65,6 +65,21 @@ function serializeSubscription(row: UserSubscriptionRow | null) {
   if (!row) {
     return null;
   }
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : null;
+  const facilityOffer =
+    metadata &&
+    'facilityOffer' in metadata &&
+    typeof (metadata as { facilityOffer?: unknown }).facilityOffer === 'object' &&
+    (metadata as { facilityOffer?: Record<string, unknown> }).facilityOffer
+      ? ((metadata as { facilityOffer?: Record<string, unknown> }).facilityOffer as Record<string, unknown>)
+      : null;
+  const facilityName =
+    facilityOffer &&
+    typeof facilityOffer.facilityName === 'string' &&
+    facilityOffer.facilityName.trim().length > 0
+      ? facilityOffer.facilityName.trim()
+      : null;
+
   return {
     status: row.status,
     isActive: row.is_active,
@@ -84,6 +99,7 @@ function serializeSubscription(row: UserSubscriptionRow | null) {
     trialPurgeAfterAt: row.trial_purge_after_at,
     trialPurgedAt: row.trial_purged_at,
     lastVerifiedAt: row.last_verified_at,
+    facilityName,
   };
 }
 

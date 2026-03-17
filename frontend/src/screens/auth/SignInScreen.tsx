@@ -21,8 +21,27 @@ import { logEvent } from '../../services/sentry';
 import { MEMBERSHIP_SIGNOUT_NOTE_KEY } from '../../utils/membership';
 import { FALLBACK_LEGAL_VERSIONS } from '../../services/legal';
 import { withOpacity } from '../../utils/color';
+import type { RootStackParamList } from '../../navigation/types';
 
-export default function SignInScreen({ navigation }: { navigation: any }) {
+function formatFacilityNameFromSlug(slug?: string) {
+  const value = slug?.trim();
+  if (!value) {
+    return null;
+  }
+  return value
+    .split('-')
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+}
+
+export default function SignInScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route?: { params?: RootStackParamList['SignIn'] };
+}) {
   const { signIn, signInWithGoogle, signInWithApple, sendPasswordReset } = useAuth();
   const { theme } = useTheme();
   const [email, setEmail] = useState('');
@@ -36,6 +55,8 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
   const [membershipNoteVisible, setMembershipNoteVisible] = useState(false);
   const [isDismissingMembershipNote, setIsDismissingMembershipNote] = useState(false);
   const insets = useSafeAreaInsets();
+  const isFacilityClaimPromptVisible = Boolean(route?.params?.facilityClaimPrompt);
+  const facilityNameFromPrompt = formatFacilityNameFromSlug(route?.params?.facilitySlug);
 
   useEffect(() => {
     let mounted = true;
@@ -161,6 +182,32 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
             Sign into your Verity account.
           </Text>
         </View>
+
+        {isFacilityClaimPromptVisible ? (
+          <View
+            style={[
+              styles.facilityClaimPrompt,
+              {
+                borderColor: withOpacity(theme.colors.accent, 0.42),
+                backgroundColor: withOpacity(theme.colors.accent, 0.1),
+              },
+            ]}
+          >
+            <View style={[styles.facilityClaimIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.2) }]}>
+              <Ionicons name="business-outline" size={14} color={theme.colors.accent} />
+            </View>
+            <View style={styles.facilityClaimTextWrap}>
+              <Text style={[styles.facilityClaimTitle, { color: theme.colors.text }]}>
+                Sign in required to claim facility partnership
+              </Text>
+              <Text style={[styles.facilityClaimBody, { color: theme.colors.textMuted }]}>
+                {facilityNameFromPrompt
+                  ? `Continue signing in to claim ${facilityNameFromPrompt}'s partner offer.`
+                  : 'Continue signing in to claim your facility partner offer.'}
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         {membershipNoteVisible ? (
           <View
@@ -349,7 +396,17 @@ export default function SignInScreen({ navigation }: { navigation: any }) {
         }
         helperPrefix="New to Verity?"
         helperActionLabel="Join Now"
-        onHelperPress={() => navigation.navigate('SignUp')}
+        onHelperPress={() =>
+          navigation.navigate(
+            'SignUp',
+            isFacilityClaimPromptVisible
+              ? {
+                  facilityClaimPrompt: true,
+                  facilitySlug: route?.params?.facilitySlug,
+                }
+              : undefined
+          )
+        }
         subHelperPrimaryLabel="How it works"
         onSubHelperPrimaryPress={() => {
           logEvent('signin_how_it_works_opened', { screen: 'SignIn' });
@@ -397,6 +454,39 @@ const styles = StyleSheet.create({
   fields: {
     marginTop: 20,
     marginBottom: 36,
+  },
+  facilityClaimPrompt: {
+    marginTop: 14,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    gap: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  facilityClaimIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  facilityClaimTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  facilityClaimTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  facilityClaimBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   membershipNote: {
     marginTop: 16,

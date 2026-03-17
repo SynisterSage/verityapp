@@ -21,6 +21,7 @@ import ActionFooter from '../../components/onboarding/ActionFooter';
 import { logEvent } from '../../services/sentry';
 import { FALLBACK_LEGAL_VERSIONS, fetchCurrentLegalVersions } from '../../services/legal';
 import { withOpacity } from '../../utils/color';
+import type { RootStackParamList } from '../../navigation/types';
 
 type AlertState = {
   message: string;
@@ -37,7 +38,25 @@ type EmailAvailabilityState =
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function SignUpScreen({ navigation }: { navigation: any }) {
+function formatFacilityNameFromSlug(slug?: string) {
+  const value = slug?.trim();
+  if (!value) {
+    return null;
+  }
+  return value
+    .split('-')
+    .filter(Boolean)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(' ');
+}
+
+export default function SignUpScreen({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route?: { params?: RootStackParamList['SignUp'] };
+}) {
   const { signUp, signInWithGoogle, signInWithApple } = useAuth();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
@@ -57,6 +76,8 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
   const [legalVersions, setLegalVersions] = useState(FALLBACK_LEGAL_VERSIONS);
   const [emailAvailability, setEmailAvailability] =
     useState<EmailAvailabilityState>('idle');
+  const isFacilityClaimPromptVisible = Boolean(route?.params?.facilityClaimPrompt);
+  const facilityNameFromPrompt = formatFacilityNameFromSlug(route?.params?.facilitySlug);
 
   useEffect(() => {
     let active = true;
@@ -354,6 +375,32 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
             Create your Verity account.
           </Text>
         </View>
+
+        {isFacilityClaimPromptVisible ? (
+          <View
+            style={[
+              styles.facilityClaimPrompt,
+              {
+                borderColor: withOpacity(theme.colors.accent, 0.42),
+                backgroundColor: withOpacity(theme.colors.accent, 0.1),
+              },
+            ]}
+          >
+            <View style={[styles.facilityClaimIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.2) }]}>
+              <Ionicons name="business-outline" size={14} color={theme.colors.accent} />
+            </View>
+            <View style={styles.facilityClaimTextWrap}>
+              <Text style={[styles.facilityClaimTitle, { color: theme.colors.text }]}>
+                Sign up required to claim facility partnership
+              </Text>
+              <Text style={[styles.facilityClaimBody, { color: theme.colors.textMuted }]}>
+                {facilityNameFromPrompt
+                  ? `Create your account to claim ${facilityNameFromPrompt}'s partner offer.`
+                  : 'Create your account to claim your facility partner offer.'}
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.fields}>
           <View style={styles.fieldWrapper}>
@@ -659,7 +706,17 @@ export default function SignUpScreen({ navigation }: { navigation: any }) {
         }
         helperPrefix="Already have an account?"
         helperActionLabel="Sign In"
-        onHelperPress={() => navigation.navigate('SignIn')}
+        onHelperPress={() =>
+          navigation.navigate(
+            'SignIn',
+            isFacilityClaimPromptVisible
+              ? {
+                  facilityClaimPrompt: true,
+                  facilitySlug: route?.params?.facilitySlug,
+                }
+              : undefined
+          )
+        }
         subHelperPrimaryLabel="How it works"
         onSubHelperPrimaryPress={() => {
           logEvent('signup_how_it_works_opened', { screen: 'SignUp' });
@@ -720,6 +777,39 @@ const styles = StyleSheet.create({
   fields: {
     marginTop: 32,
     marginBottom: 36,
+  },
+  facilityClaimPrompt: {
+    marginTop: 14,
+    marginBottom: 2,
+    borderWidth: 1,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    gap: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  facilityClaimIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
+  },
+  facilityClaimTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  facilityClaimTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
+  facilityClaimBody: {
+    fontSize: 12,
+    lineHeight: 17,
+    fontWeight: '500',
   },
   fieldWrapper: {
     marginBottom: 14,

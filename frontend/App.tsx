@@ -1476,6 +1476,7 @@ function NavigationHost() {
     canManageProfile,
   } = useProfile();
   const pendingNotificationRef = useRef<PendingNotificationData | null>(null);
+  const pendingFacilityAuthPromptRef = useRef<{ facilitySlug?: string } | null>(null);
   const notificationListenerRef = useRef<Notifications.Subscription | null>(null);
   const isResolvingNotificationRef = useRef(false);
   const notificationRetryCountRef = useRef<Record<string, number>>({});
@@ -1628,6 +1629,16 @@ function NavigationHost() {
     [activeProfile?.id, profiles, setActiveProfile]
   );
 
+  const routeToFacilityAuthPrompt = useCallback((facilitySlug?: string) => {
+    if (!rootNavigationRef.current?.isReady()) {
+      return;
+    }
+    rootNavigationRef.current.navigate('SignIn', {
+      facilityClaimPrompt: true,
+      facilitySlug: facilitySlug?.trim() || undefined,
+    });
+  }, []);
+
   const resolvePendingNotification = useCallback(async () => {
     if (isResolvingNotificationRef.current) {
       return;
@@ -1637,6 +1648,12 @@ function NavigationHost() {
       return;
     }
     if (!session) {
+      if (payload.routeTarget === 'membership_facility_offer') {
+        pendingFacilityAuthPromptRef.current = {
+          facilitySlug: payload.facilitySlug?.trim() || undefined,
+        };
+        routeToFacilityAuthPrompt(payload.facilitySlug);
+      }
       return;
     }
     if (!rootNavigationRef.current?.isReady()) {
@@ -1777,6 +1794,24 @@ function NavigationHost() {
         return;
       }
       if (payload.routeTarget === 'membership_facility_offer') {
+        const currentRouteName = rootNavigationRef.current.getCurrentRoute()?.name;
+        const canOpenFacilityOfferFromRoute =
+          !currentRouteName ||
+          currentRouteName === 'SignIn' ||
+          currentRouteName === 'SignUp' ||
+          currentRouteName === 'Membership' ||
+          currentRouteName === 'MembershipActivated' ||
+          currentRouteName === 'OnboardingChoice';
+        if (!canOpenFacilityOfferFromRoute) {
+          logEvent('membership_facility_offer_skipped', {
+            screen: 'App',
+            extra: {
+              reason: 'stale_deeplink_ignored',
+              currentRouteName,
+            },
+          });
+          return;
+        }
         rootNavigationRef.current.navigate('MembershipFacilityOffer', {
           initialCode: payload.facilityCode,
           claimToken: payload.facilityToken,
@@ -1819,6 +1854,7 @@ function NavigationHost() {
     activateProfileForNotification,
     canManageProfile,
     onboardingComplete,
+    routeToFacilityAuthPrompt,
     resolveAlertRoutingContext,
     session,
   ]);
@@ -1850,6 +1886,12 @@ function NavigationHost() {
         return;
       }
       pendingNotificationRef.current = payload;
+      if (!session && payload.routeTarget === 'membership_facility_offer') {
+        pendingFacilityAuthPromptRef.current = {
+          facilitySlug: payload.facilitySlug?.trim() || undefined,
+        };
+        routeToFacilityAuthPrompt(payload.facilitySlug);
+      }
       void resolvePendingNotification();
     };
 
@@ -1863,7 +1905,13 @@ function NavigationHost() {
       .catch(() => null);
 
     return () => subscription.remove();
-  }, [resolvePendingNotification]);
+  }, [resolvePendingNotification, routeToFacilityAuthPrompt, session]);
+
+  useEffect(() => {
+    if (session) {
+      pendingFacilityAuthPromptRef.current = null;
+    }
+  }, [session]);
 
   useEffect(() => {
     void consumePendingSiriRoute();
@@ -1978,6 +2026,9 @@ function NavigationHost() {
         ref={rootNavigationRef}
         onReady={() => {
           setNavigationReady(true);
+          if (!session && pendingFacilityAuthPromptRef.current) {
+            routeToFacilityAuthPrompt(pendingFacilityAuthPromptRef.current.facilitySlug);
+          }
           if (pendingNotificationRef.current) {
             void resolvePendingNotification();
           }

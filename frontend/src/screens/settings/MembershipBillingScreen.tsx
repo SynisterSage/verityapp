@@ -190,6 +190,14 @@ export default function MembershipBillingScreen() {
     }
     return mapProductIdLabel(subscription.productId);
   }, [products, subscription?.productId]);
+  const facilityName = useMemo(() => {
+    const value = subscription?.facilityName;
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }, [subscription?.facilityName]);
 
   const statusLabel = useMemo(() => {
     if (isLoadingStatus && !status) {
@@ -381,6 +389,12 @@ export default function MembershipBillingScreen() {
               <Text style={[styles.membershipStatusText, hasActiveSubscription ? styles.membershipStatusActive : styles.membershipStatusInactive]}>
                 {statusLabel}
               </Text>
+              {facilityName ? (
+                <View style={styles.facilityBadge}>
+                  <Ionicons name="business-outline" size={12} color={theme.colors.accent} />
+                  <Text style={styles.facilityBadgeText}>{facilityName}</Text>
+                </View>
+              ) : null}
             </View>
             <View style={[styles.statusPill, statusTone === 'active' ? styles.statusPillActive : styles.statusPillInactive]}>
               <Text style={[styles.statusPillText, statusTone === 'active' ? styles.statusPillTextActive : styles.statusPillTextInactive]}>
@@ -691,6 +705,27 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
     membershipHeroText: {
       flex: 1,
       gap: 2,
+    },
+    facilityBadge: {
+      marginTop: 5,
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 999,
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.accent, 0.3),
+    },
+    facilityBadgeText: {
+      color: theme.colors.accent,
+      fontSize: 12,
+      fontWeight: '700',
+      lineHeight: 16,
+      letterSpacing: 0.1,
+      maxWidth: 210,
     },
     membershipPlanName: {
       fontSize: 17,
