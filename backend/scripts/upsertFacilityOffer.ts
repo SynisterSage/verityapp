@@ -1,4 +1,6 @@
 import logger from 'jet-logger';
+import readline from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
 
 import supabaseAdmin from '@src/services/supabase';
 import { normalizeFacilityCode } from '@src/services/facilityOffers';
@@ -66,8 +68,52 @@ function parseArgs(): Args {
   };
 }
 
+async function promptArgs(): Promise<Args> {
+  const rl = readline.createInterface({ input, output });
+
+  try {
+    const name = (await rl.question('Facility name: ')).trim();
+    if (!name) {
+      throw new Error('Facility name is required');
+    }
+
+    const defaultSlug = toSlug(name);
+    const slugInput = (await rl.question(`Slug [${defaultSlug}]: `)).trim();
+
+    const rawCode = (await rl.question('Facility code: ')).trim();
+    if (!rawCode) {
+      throw new Error('Facility code is required');
+    }
+
+    const maxRedemptionsInput = (await rl.question('Max redemptions [optional]: ')).trim();
+    const expiresAtInput = (await rl.question('Expires at ISO timestamp [optional]: ')).trim();
+    const notesInput = (await rl.question('Notes [optional]: ')).trim();
+    const inactiveInput = (await rl.question('Mark inactive? (y/N): ')).trim().toLowerCase();
+
+    const maxRedemptions =
+      maxRedemptionsInput.length > 0 ? Number.parseInt(maxRedemptionsInput, 10) : null;
+
+    if (maxRedemptionsInput.length > 0 && !Number.isFinite(maxRedemptions)) {
+      throw new Error('Max redemptions must be an integer');
+    }
+
+    return {
+      name,
+      code: normalizeFacilityCode(rawCode),
+      slug: slugInput || defaultSlug,
+      maxRedemptions,
+      expiresAt: expiresAtInput || null,
+      inactive: inactiveInput === 'y' || inactiveInput === 'yes',
+      notes: notesInput || null,
+    };
+  } finally {
+    rl.close();
+  }
+}
+
 async function main() {
-  const args = parseArgs();
+  const hasCliFlags = process.argv.slice(2).length > 0;
+  const args = hasCliFlags ? parseArgs() : await promptArgs();
 
   const response = await supabaseAdmin
     .from('facilities')
