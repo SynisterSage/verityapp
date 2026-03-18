@@ -1,5 +1,7 @@
 import {
   Animated,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +22,7 @@ import SettingsHeader from '../../components/common/SettingsHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
+import { markInviteClaimAccepted } from '../../services/inviteClaims';
 
 const CODE_LENGTH = 8;
 
@@ -112,6 +115,7 @@ export default function EnterInviteCodeScreen() {
           lastName: lastName.trim(),
         }),
       });
+      await markInviteClaimAccepted(codeValue);
       await refreshProfiles();
       
       // Find and switch to the newly joined profile
@@ -125,6 +129,11 @@ export default function EnterInviteCodeScreen() {
       }
       
       setOnboardingComplete(true);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Settings' }],
+      });
+      navigation.getParent()?.navigate('HomeTab' as never);
     } catch (err: any) {
       setMessage(err?.message || 'Unable to redeem invite code.');
     } finally {
@@ -137,98 +146,107 @@ export default function EnterInviteCodeScreen() {
     [theme.colors.textMuted]
   );
   const iconColor = useMemo(() => withOpacity(theme.colors.text, 0.55), [theme.colors.text]);
+  const keyboardVerticalOffset = useMemo(
+    () => Math.max(insets.top, 0) + 72,
+    [insets.top]
+  );
 
   return (
     <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={[]}>
         <SettingsHeader title="Enter invite code" subtitle="Tap the code shared with you to join." />
-        <ScrollView
-          contentContainerStyle={[
-            styles.body,
-            {
-              paddingBottom: footerHeight + 24,
-              paddingTop: Math.max(insets.top, 12) + 0,
-
-            },
-          ]}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentInsetAdjustmentBehavior="automatic"
+        <KeyboardAvoidingView
+          style={styles.keyboardAvoiding}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={keyboardVerticalOffset}
         >
-          <View style={styles.inputGroup}>
+          <ScrollView
+            contentContainerStyle={[
+              styles.body,
+              {
+                paddingBottom: footerHeight + 24,
+                paddingTop: Math.max(insets.top, 12),
+              },
+            ]}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentInsetAdjustmentBehavior="automatic"
+          >
+            <View style={styles.inputGroup}>
 
-            <Text style={styles.inputLabel}>First name</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={18} color={iconColor} />
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Robert"
-                placeholderTextColor={placeholderColor}
-                value={firstName}
-                onChangeText={setFirstName}
-                autoCapitalize="words"
-                ref={firstNameRef}
-                returnKeyType="next"
-                onSubmitEditing={() => lastNameRef.current?.focus()}
-              />
+              <Text style={styles.inputLabel}>First name</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={18} color={iconColor} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Robert"
+                  placeholderTextColor={placeholderColor}
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  autoCapitalize="words"
+                  ref={firstNameRef}
+                  returnKeyType="next"
+                  onSubmitEditing={() => lastNameRef.current?.focus()}
+                />
+              </View>
+              <Text style={styles.inputLabel}>Last name</Text>
+              <View style={styles.inputContainer}>
+                <Ionicons name="person-outline" size={18} color={iconColor} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. Miller"
+                  placeholderTextColor={placeholderColor}
+                  value={lastName}
+                  onChangeText={setLastName}
+                  autoCapitalize="words"
+                  ref={lastNameRef}
+                  returnKeyType="next"
+                  onSubmitEditing={() => codeInputRef.current?.focus()}
+                />
+              </View>
             </View>
-            <Text style={styles.inputLabel}>Last name</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="person-outline" size={18} color={iconColor} />
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Miller"
-                placeholderTextColor={placeholderColor}
-                value={lastName}
-                onChangeText={setLastName}
-                autoCapitalize="words"
-                ref={lastNameRef}
-                returnKeyType="next"
-                onSubmitEditing={() => codeInputRef.current?.focus()}
-              />
+
+            <View style={styles.codeSection}>
+              <Text style={styles.codeLabel}>8-character invite code</Text>
+              <Animated.View
+                style={[
+                  styles.codeInputWrapper,
+                  { transform: [{ scale: pulse }] },
+                ]}
+              >
+                <TextInput
+                  ref={codeInputRef}
+                  style={styles.codeInput}
+                  keyboardType="default"
+                  maxLength={CODE_LENGTH + 1}
+                  value={formatDisplayValue(code)}
+                  onChangeText={handleCodeChange}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  placeholder="AB12-CD34"
+                  placeholderTextColor={withOpacity(theme.colors.textMuted, 0.45)}
+                  textAlign="center"
+                  returnKeyType="done"
+                />
+              </Animated.View>
             </View>
-          </View>
 
-          <View style={styles.codeSection}>
-            <Text style={styles.codeLabel}>8-character invite code</Text>
-            <Animated.View
-              style={[
-                styles.codeInputWrapper,
-                { transform: [{ scale: pulse }] },
-              ]}
-            >
-              <TextInput
-                ref={codeInputRef}
-                style={styles.codeInput}
-                keyboardType="default"
-                maxLength={CODE_LENGTH + 1}
-                value={formatDisplayValue(code)}
-                onChangeText={handleCodeChange}
-                autoCapitalize="characters"
-                autoCorrect={false}
-                placeholder="AB12-CD34"
-                placeholderTextColor={withOpacity(theme.colors.textMuted, 0.45)}
-                textAlign="center"
-                returnKeyType="done"
-              />
-            </Animated.View>
-          </View>
+            {message ? <Text style={styles.message}>{message}</Text> : null}
+          </ScrollView>
 
-          {message ? <Text style={styles.message}>{message}</Text> : null}
-        </ScrollView>
-
-        <ActionFooter
-          primaryLabel="Connect to Circle"
-          onPrimaryPress={acceptCode}
-          primaryLoading={isSubmitting}
-          primaryDisabled={!areNamesEntered || !isCodeComplete || isSubmitting}
-          secondaryLabel="Never mind"
-          onSecondaryPress={() => navigation.goBack()}
-          onLayout={(event) => {
-            const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-            setFooterHeight((prev) => (Math.abs(prev - nextHeight) > 1 ? nextHeight : prev));
-          }}
-        />
+          <ActionFooter
+            primaryLabel="Connect to Circle"
+            onPrimaryPress={acceptCode}
+            primaryLoading={isSubmitting}
+            primaryDisabled={!areNamesEntered || !isCodeComplete || isSubmitting}
+            secondaryLabel="Never mind"
+            onSecondaryPress={() => navigation.goBack()}
+            onLayout={(event) => {
+              const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+              setFooterHeight((prev) => (Math.abs(prev - nextHeight) > 1 ? nextHeight : prev));
+            }}
+          />
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );
@@ -243,6 +261,10 @@ const createEnterInviteCodeStyles = (theme: AppTheme) =>
     screen: {
       flex: 1,
       backgroundColor: theme.colors.bg,
+    },
+    keyboardAvoiding: {
+      flex: 1,
+      width: '100%',
     },
     body: {
       paddingHorizontal: 24,

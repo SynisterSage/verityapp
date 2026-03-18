@@ -300,6 +300,10 @@ export default function DataPrivacyScreen() {
   const { signOut, markSignOutIntentional } = useAuth();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createDataPrivacyStyles(theme, mode), [theme, mode]);
+  const manageActions = useMemo(
+    () => MANAGE_ACTIONS.filter((action) => action.key !== 'delete' || canDeleteProfile),
+    [canDeleteProfile]
+  );
   const policyIconColor = theme.colors.accent;
   const placeholderColor = useMemo(
     () => withOpacity(theme.colors.textMuted, 0.65),
@@ -561,11 +565,9 @@ export default function DataPrivacyScreen() {
             </Text>
           ) : null}
           <View style={styles.manageControls}>
-            {MANAGE_ACTIONS.map((action) => {
+            {manageActions.map((action) => {
               const isWorking = manageAction === action.key;
-              const isDeleteAction = action.key === 'delete';
-              const disabled =
-                !canManageProfile || Boolean(manageAction) || (isDeleteAction && !canDeleteProfile);
+              const disabled = !canManageProfile || Boolean(manageAction);
               return (
                 <TouchableOpacity
                   key={action.key}
@@ -599,11 +601,7 @@ export default function DataPrivacyScreen() {
                       {isWorking ? 'Working…' : action.label}
                     </Text>
                     <Text style={styles.rowDescription}>
-                      {isDeleteAction && !canDeleteProfile
-                        ? 'Only the circle owner can delete the account.'
-                        : action.destructive
-                          ? 'This cannot be undone'
-                          : 'Tap to manage'}
+                      {action.destructive ? 'This cannot be undone' : 'Tap to manage'}
                     </Text>
                   </View>
                   {isWorking ? (

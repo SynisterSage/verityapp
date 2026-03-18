@@ -1,5 +1,7 @@
 import {
   Animated,
+  Keyboard,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -17,6 +19,7 @@ import { useProfile } from '../../context/ProfileContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { withOpacity } from '../../utils/color';
+import { markInviteClaimAccepted } from '../../services/inviteClaims';
 import type { AppTheme } from '../../theme/tokens';
 import { RootStackParamList } from '../../navigation/types';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
@@ -31,7 +34,7 @@ export default function OnboardingInviteCodeScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const styles = useMemo(() => createInviteCodeStyles(theme), [theme]);
-  const { refreshProfiles, setOnboardingComplete } = useProfile();
+  const { refreshProfiles, setOnboardingComplete, setRedirectToSettings } = useProfile();
   const { refreshStatus } = useSubscription();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -39,6 +42,7 @@ export default function OnboardingInviteCodeScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [code, setCode] = useState('');
   const [footerHeight, setFooterHeight] = useState(188);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const firstNameRef = useRef<TextInput | null>(null);
   const lastNameRef = useRef<TextInput | null>(null);
   const codeInputRef = useRef<TextInput | null>(null);
@@ -56,6 +60,17 @@ export default function OnboardingInviteCodeScreen() {
       ]).start();
     }
   }, [isCodeComplete, pulse]);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const sanitizeCode = (value: string) => {
     return value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, CODE_LENGTH);
@@ -109,8 +124,10 @@ export default function OnboardingInviteCodeScreen() {
           lastName: lastName.trim(),
         }),
       });
+      await markInviteClaimAccepted(codeValue);
       await refreshStatus({ silent: true });
       await refreshProfiles();
+      setRedirectToSettings(false);
       setOnboardingComplete(true);
       logEvent('invite_code_accepted', { screen: 'OnboardingInviteCode' });
       logEvent('onboarding_completed', { screen: 'OnboardingInviteCode' });
@@ -129,20 +146,21 @@ export default function OnboardingInviteCodeScreen() {
     <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={['bottom']}>
         <OnboardingHeader chapter="Circle" activeStep={2} totalSteps={2} showBack />
-        <View style={styles.keyboardAvoiding}>
-          <ScrollView
-            contentContainerStyle={[
-              styles.body,
-              {
-                paddingTop: 28,
-                flexGrow: 1,
-                paddingBottom: footerHeight + 24,
-              },
-            ]}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            contentInsetAdjustmentBehavior="automatic"
-          >
+        <ScrollView
+          contentContainerStyle={[
+            styles.body,
+            {
+              paddingTop: 28,
+              flexGrow: 1,
+              paddingBottom: isKeyboardVisible ? 24 : footerHeight + 24,
+            },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentInsetAdjustmentBehavior="never"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+        >
             <View>
               <Text style={styles.title}>Join your circle</Text>
               <Text style={styles.subtitle}>Enter your name and the code shared with you.</Text>
@@ -206,20 +224,21 @@ export default function OnboardingInviteCodeScreen() {
               </Animated.View>
             </View>
 
-            {message ? <Text style={styles.message}>{message}</Text> : null}
-          </ScrollView>
-        </View>
+          {message ? <Text style={styles.message}>{message}</Text> : null}
+        </ScrollView>
 
-        <ActionFooter
-          primaryLabel="Connect to Circle"
-          onPrimaryPress={acceptCode}
-          primaryLoading={isSubmitting}
-          primaryDisabled={!areNamesEntered || !isCodeComplete || isSubmitting}
-          onLayout={(event) => {
-            const nextHeight = Math.ceil(event.nativeEvent.layout.height);
-            setFooterHeight((prev) => (Math.abs(prev - nextHeight) > 1 ? nextHeight : prev));
-          }}
-        />
+        {!isKeyboardVisible ? (
+          <ActionFooter
+            primaryLabel="Connect to Circle"
+            onPrimaryPress={acceptCode}
+            primaryLoading={isSubmitting}
+            primaryDisabled={!areNamesEntered || !isCodeComplete || isSubmitting}
+            onLayout={(event) => {
+              const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+              setFooterHeight((prev) => (Math.abs(prev - nextHeight) > 1 ? nextHeight : prev));
+            }}
+          />
+        ) : null}
       </SafeAreaView>
     </View>
   );

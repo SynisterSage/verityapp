@@ -95,7 +95,7 @@ const SAFETY_ACTIONS: Array<{
 export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const { signOut, session, markSignOutIntentional } = useAuth();
-  const { activeProfile, setActiveProfile, canManageProfile, refreshProfiles } = useProfile();
+  const { activeProfile, setActiveProfile, canManageProfile, canDeleteProfile, refreshProfiles } = useProfile();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createAccountStyles(theme), [theme]);
   const [firstName, setFirstName] = useState('');
@@ -140,6 +140,10 @@ export default function AccountScreen() {
   }, [numberCopied]);
 
   const isReadOnly = !canManageProfile;
+  const safetyActions = useMemo(
+    () => SAFETY_ACTIONS.filter((action) => action.key !== 'delete' || canDeleteProfile),
+    [canDeleteProfile]
+  );
 
   const hasChanges = useMemo(() => {
     if (!activeProfile) return false;
@@ -300,8 +304,8 @@ export default function AccountScreen() {
   };
 
   const handleDeletePress = () => {
-    if (!canManageProfile) {
-      setSafetyMessage('Only caretakers can delete this profile.');
+    if (!canDeleteProfile) {
+      setSafetyMessage('Only the circle owner can delete this profile.');
       return;
     }
     setSafetyMessage('');
@@ -485,21 +489,16 @@ export default function AccountScreen() {
           </View>
 
           <Text style={styles.sectionLabel}>Safety controls</Text>
-          <View style={styles.safetyControls}>
-          {SAFETY_ACTIONS.map((action) => {
+        <View style={styles.safetyControls}>
+          {safetyActions.map((action) => {
             const isWorking =
               action.key === 'logout' ? isSigningOut : action.key === 'delete' ? isPinVerifying : false;
-            const isDeleteDisabled = action.key === 'delete' && isReadOnly;
             const disabled =
-              isDeleteDisabled || (action.key === 'logout' ? isSigningOut : isPinVerifying);
+              action.key === 'logout' ? isSigningOut : isPinVerifying;
             const iconColor = action.destructive
-              ? isDeleteDisabled
-                ? withOpacity(theme.colors.danger, 0.55)
-                : theme.colors.danger
+              ? theme.colors.danger
               : theme.colors.accent;
-            const rowDescription = isDeleteDisabled
-              ? 'Only caretakers can delete this profile.'
-              : action.description;
+            const rowDescription = action.description;
               return (
                 <TouchableOpacity
                   key={action.key}

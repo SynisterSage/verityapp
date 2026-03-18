@@ -129,6 +129,10 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   const [twilioClientIdentity, setTwilioClientIdentity] = useState<string | null>(null);
   const [twilioClientError, setTwilioClientError] = useState<string | null>(null);
   const [twilioClientHeartbeatActive, setTwilioClientHeartbeatActive] = useState(false);
+  const isCaretaker = Boolean(activeMembership?.is_caretaker);
+  const isAdmin = !isCaretaker && activeMembership?.role === 'admin';
+  const canManageProfile = useMemo(() => isCaretaker || isAdmin, [isCaretaker, isAdmin]);
+  const canDeleteProfile = isCaretaker;
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tokenRefreshInFlightRef = useRef<Promise<void> | null>(null);
   const lastTokenRefreshAtRef = useRef(0);
@@ -234,12 +238,27 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       });
       setTwilioClientToken(data.token);
       setTwilioClientIdentity(data.identity);
-      await sendTwilioClientHeartbeat(profileId, data.identity);
-      console.info('[twilio-client] heartbeat success', {
-        profileId,
-        identity: data.identity,
-      });
-      setTwilioClientHeartbeatActive(true);
+      if (isCaretaker) {
+        try {
+          await sendTwilioClientHeartbeat(profileId, data.identity);
+          console.info('[twilio-client] heartbeat success', {
+            profileId,
+            identity: data.identity,
+          });
+          setTwilioClientHeartbeatActive(true);
+        } catch (heartbeatError) {
+          console.warn('[twilio-client] heartbeat skipped', {
+            profileId,
+            message:
+              heartbeatError instanceof Error
+                ? heartbeatError.message
+                : String(heartbeatError),
+          });
+          setTwilioClientHeartbeatActive(false);
+        }
+      } else {
+        setTwilioClientHeartbeatActive(false);
+      }
       lastTokenRefreshAtRef.current = Date.now();
     } catch (err) {
       console.warn('[twilio-client] token refresh failed', {
@@ -261,7 +280,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       tokenRefreshInFlightRef.current = null;
     }
     },
-    []
+    [isCaretaker]
   );
 
   const refreshTwilioClientSession = useCallback(async (options?: { force?: boolean }) => {
@@ -690,7 +709,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
   }, [activeProfile?.id, refreshTwilioClientToken]);
 
   useEffect(() => {
-    if (!activeProfile?.id || !twilioClientIdentity) {
+    if (!activeProfile?.id || !twilioClientIdentity || !isCaretaker) {
       if (heartbeatRef.current) {
         clearInterval(heartbeatRef.current);
         heartbeatRef.current = null;
@@ -698,12 +717,14 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setTwilioClientHeartbeatActive(false);
       return;
     }
-    const interval = setInterval(() => {
+    const sendHeartbeat = () => {
       sendTwilioClientHeartbeat(activeProfile.id, twilioClientIdentity).catch((err) => {
         console.warn('Twilio client heartbeat failed', err);
         setTwilioClientHeartbeatActive(false);
       });
-    }, 45_000);
+    };
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 45_000);
     heartbeatRef.current = interval;
     setTwilioClientHeartbeatActive(true);
     return () => {
@@ -712,12 +733,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         heartbeatRef.current = null;
       }
     };
-  }, [activeProfile?.id, twilioClientIdentity]);
-
-  const isCaretaker = Boolean(activeMembership?.is_caretaker);
-  const isAdmin = !isCaretaker && activeMembership?.role === 'admin';
-  const canManageProfile = useMemo(() => isCaretaker || isAdmin, [isCaretaker, isAdmin]);
-  const canDeleteProfile = isCaretaker;
+  }, [activeProfile?.id, isCaretaker, twilioClientIdentity]);
 
   const isTwilioClientReady = Boolean(twilioClientToken && twilioClientIdentity);
 

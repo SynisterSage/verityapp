@@ -1455,9 +1455,10 @@ const createStyles = (theme: AppTheme) =>
     },
     pinNoticeOverlay: {
       ...StyleSheet.absoluteFillObject,
-      justifyContent: 'flex-end',
+      justifyContent: 'center',
+      alignItems: 'center',
       paddingHorizontal: 24,
-      paddingBottom: 28,
+      paddingVertical: 32,
       backgroundColor: withOpacity(theme.colors.text, 0.34),
     },
     pinNoticeBackdrop: {
@@ -1475,6 +1476,9 @@ const createStyles = (theme: AppTheme) =>
       shadowRadius: 16,
       shadowOffset: { width: 0, height: 8 },
       elevation: 8,
+      width: '100%',
+      maxWidth: 360,
+      alignSelf: 'center',
     },
     pinNoticeIconWrap: {
       width: 34,

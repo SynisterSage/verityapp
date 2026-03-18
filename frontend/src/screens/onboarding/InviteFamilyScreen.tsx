@@ -109,6 +109,7 @@ export default function InviteFamilyScreen({ navigation }: Props) {
   const inviteSkeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `invite-skeleton-${i}`), []);
   const showMembersSkeleton = loadingMembers && members.length === 0;
   const showInvitesSkeleton = loadingInvites && invites.length === 0;
+  const hasPendingInvites = invites.length > 0;
   const sessionUserId = session?.user?.id ?? null;
   const [revokingInviteId, setRevokingInviteId] = useState<string | null>(null);
   const currentMembership = members.find((member) => member.user_id === sessionUserId);
@@ -272,6 +273,9 @@ export default function InviteFamilyScreen({ navigation }: Props) {
       });
       const createdInvite: Invite | undefined = data?.invite;
       setInviteRole('editor');
+      if (createdInvite) {
+        setInvites((prev) => [createdInvite, ...prev.filter((item) => item.id !== createdInvite.id)]);
+      }
       await fetchInvites();
       if (createdInvite) {
         shareViaSMS(createdInvite);
@@ -489,6 +493,14 @@ export default function InviteFamilyScreen({ navigation }: Props) {
     );
   };
 
+  const handlePrimaryAction = () => {
+    if (hasPendingInvites || !canCreateInvite) {
+      navigation.navigate('OnboardingSuccess');
+      return;
+    }
+    handleCreateInvite();
+  };
+
   const renderMemberRow = () => (
     <View>
       {members.map((member) => {
@@ -672,8 +684,9 @@ export default function InviteFamilyScreen({ navigation }: Props) {
         <View style={{ height: Math.max(insets.bottom, 40) }} />
       </ScrollView>
       <ActionFooter
-        primaryLabel="Continue"
-        onPrimaryPress={() => navigation.navigate('OnboardingSuccess')}
+        primaryLabel={hasPendingInvites ? 'Continue' : 'Create invite'}
+        onPrimaryPress={handlePrimaryAction}
+        primaryLoading={isInviting}
         secondaryLabel="Skip for now"
         onSecondaryPress={() => navigation.navigate('OnboardingSuccess')}
       />

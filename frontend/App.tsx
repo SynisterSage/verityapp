@@ -43,7 +43,7 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { authorizedFetch } from './src/services/backend';
 import { supabase } from './src/services/supabase';
 import { getPublicEnv } from './src/services/publicConfig';
-import { resolveInviteClaimToken } from './src/services/inviteClaims';
+import { resolveInviteClaimToken, wasInviteClaimRecentlyAccepted } from './src/services/inviteClaims';
 import SignInScreen from './src/screens/auth/SignInScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
 import ConfirmEmailScreen from './src/screens/auth/ConfirmEmailScreen';
@@ -116,17 +116,28 @@ enableScreens(true);
 
 const GLOBAL_MAX_FONT_SIZE_MULTIPLIER = 1.2;
 
-if (Text.defaultProps == null) {
-  Text.defaultProps = {};
-}
-Text.defaultProps.allowFontScaling = true;
-Text.defaultProps.maxFontSizeMultiplier = GLOBAL_MAX_FONT_SIZE_MULTIPLIER;
+type FontScalingDefaults = {
+  allowFontScaling?: boolean;
+  maxFontSizeMultiplier?: number;
+};
 
-if (TextInput.defaultProps == null) {
-  TextInput.defaultProps = {};
+type ComponentWithDefaultProps = {
+  defaultProps?: FontScalingDefaults;
+};
+
+const textWithDefaults = Text as unknown as ComponentWithDefaultProps;
+if (textWithDefaults.defaultProps == null) {
+  textWithDefaults.defaultProps = {};
 }
-TextInput.defaultProps.allowFontScaling = true;
-TextInput.defaultProps.maxFontSizeMultiplier = GLOBAL_MAX_FONT_SIZE_MULTIPLIER;
+textWithDefaults.defaultProps.allowFontScaling = true;
+textWithDefaults.defaultProps.maxFontSizeMultiplier = GLOBAL_MAX_FONT_SIZE_MULTIPLIER;
+
+const textInputWithDefaults = TextInput as unknown as ComponentWithDefaultProps;
+if (textInputWithDefaults.defaultProps == null) {
+  textInputWithDefaults.defaultProps = {};
+}
+textInputWithDefaults.defaultProps.allowFontScaling = true;
+textInputWithDefaults.defaultProps.maxFontSizeMultiplier = GLOBAL_MAX_FONT_SIZE_MULTIPLIER;
 
 type PendingNotificationData = {
   callId?: string;
@@ -166,7 +177,7 @@ const TRIAL_REMINDER_MODAL_LAST_SHOWN_AT_KEY = 'trial:reminder:last-shown-at';
 function normalizeInviteIdentifier(value: string | null | undefined) {
   const trimmed = typeof value === 'string' ? value.trim() : '';
   if (!trimmed) {
-    return null;
+    return undefined;
   }
   const cleaned = trimmed.replace(/[^A-Z0-9]/gi, '').toUpperCase();
   if (cleaned.length === 8) {
@@ -755,7 +766,7 @@ function parseInviteClaimFromUrl(url: string): InviteClaimPayload | null {
   const pathInviteCode =
     hasInviteSegment && segments.length > inviteIndex + 1
       ? normalizeInviteIdentifier(segments[inviteIndex + 1])
-      : null;
+      : undefined;
 
   const queryInviteToken = parsed.queryParams?.t ?? parsed.queryParams?.token;
   const inviteToken =
@@ -772,7 +783,7 @@ function parseInviteClaimFromUrl(url: string): InviteClaimPayload | null {
       ? normalizeInviteIdentifier(queryInviteCode)
       : Array.isArray(queryInviteCode)
       ? normalizeInviteIdentifier(queryInviteCode[0] ?? '')
-      : null;
+      : undefined;
 
   if (!hasInviteSegment && !inviteCode && !inviteToken) {
     return null;
@@ -828,7 +839,11 @@ function InviteLinkHandler() {
         return false;
       }
 
-      if (onboardingComplete) {
+      const routeNames = rootNavigationRef.current.getRootState()?.routeNames ?? [];
+      const canUseAppTabs = routeNames.includes('AppTabs');
+      const canUseOnboardingInviteCode = routeNames.includes('OnboardingInviteCode');
+
+      if (onboardingComplete && canUseAppTabs) {
         rootNavigationRef.current.navigate('AppTabs', {
           screen: 'SettingsTab',
           params: {
@@ -841,11 +856,15 @@ function InviteLinkHandler() {
         return true;
       }
 
-      rootNavigationRef.current.navigate('OnboardingInviteCode', {
-        initialCode: inviteCode,
-        source: 'deeplink',
-      });
-      return true;
+      if (canUseOnboardingInviteCode) {
+        rootNavigationRef.current.navigate('OnboardingInviteCode', {
+          initialCode: inviteCode,
+          source: 'deeplink',
+        });
+        return true;
+      }
+
+      return false;
     },
     [onboardingComplete]
   );
@@ -868,7 +887,7 @@ function InviteLinkHandler() {
     []
   );
 
-  const processInviteClaim = useCallback(async () => {
+  const processInviteClaim = useCallback(async (attempt = 0): Promise<void> => {
     if (isResolvingInviteRef.current) {
       return;
     }
@@ -886,8 +905,25 @@ function InviteLinkHandler() {
         return;
       }
 
+      const wasAcceptedRecently = await wasInviteClaimRecentlyAccepted(inviteCode);
+      if (wasAcceptedRecently) {
+        pendingInviteRef.current = null;
+        await clearPendingInvite();
+        return;
+      }
+
+      pendingInviteRef.current = {
+        inviteCode,
+        inviteToken: pendingInviteRef.current?.inviteToken,
+      };
+
       const opened = openInviteEntry(inviteCode);
       if (!opened) {
+        if (attempt < 8) {
+          setTimeout(() => {
+            void processInviteClaim(attempt + 1);
+          }, 250);
+        }
         return;
       }
 
