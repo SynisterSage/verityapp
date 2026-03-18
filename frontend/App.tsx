@@ -114,31 +114,6 @@ import * as Haptics from 'expo-haptics';
 
 enableScreens(true);
 
-const GLOBAL_MAX_FONT_SIZE_MULTIPLIER = 1.2;
-
-type FontScalingDefaults = {
-  allowFontScaling?: boolean;
-  maxFontSizeMultiplier?: number;
-};
-
-type ComponentWithDefaultProps = {
-  defaultProps?: FontScalingDefaults;
-};
-
-const textWithDefaults = Text as unknown as ComponentWithDefaultProps;
-if (textWithDefaults.defaultProps == null) {
-  textWithDefaults.defaultProps = {};
-}
-textWithDefaults.defaultProps.allowFontScaling = true;
-textWithDefaults.defaultProps.maxFontSizeMultiplier = GLOBAL_MAX_FONT_SIZE_MULTIPLIER;
-
-const textInputWithDefaults = TextInput as unknown as ComponentWithDefaultProps;
-if (textInputWithDefaults.defaultProps == null) {
-  textInputWithDefaults.defaultProps = {};
-}
-textInputWithDefaults.defaultProps.allowFontScaling = true;
-textInputWithDefaults.defaultProps.maxFontSizeMultiplier = GLOBAL_MAX_FONT_SIZE_MULTIPLIER;
-
 type PendingNotificationData = {
   callId?: string;
   alertId?: string;

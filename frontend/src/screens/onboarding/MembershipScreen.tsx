@@ -28,6 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { logEvent } from '../../services/sentry';
+import { authorizedFetch } from '../../services/backend';
 import { MEMBERSHIP_SIGNOUT_NOTE_KEY } from '../../utils/membership';
 import { FALLBACK_LEGAL_VERSIONS, fetchCurrentLegalVersions } from '../../services/legal';
 import { validateFacilityOfferCode } from '../../services/facilityOffers';
@@ -90,6 +91,42 @@ const fallbackPlans: PlanOption[] = [
 
 const FACILITY_PRODUCT_ID = 'verityprotect_facility_annual';
 const FACILITY_CODE_LENGTH = 16;
+const SOCIAL_LEGAL_ACCEPTED_KEY_PREFIX = 'auth:social-legal-accepted:';
+
+function readLegalAcceptedAt(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
+
+  const value = raw as Record<string, unknown>;
+  const directCandidates = [
+    value.terms_accepted_at,
+    value.termsAcceptedAt,
+    value.accepted_at,
+    value.acceptedAt,
+    value.legal_accepted_at,
+    value.legalAcceptedAt,
+  ];
+
+  for (const candidate of directCandidates) {
+    if (typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate;
+    }
+  }
+
+  if (value.hasAccepted === true || value.accepted === true) {
+    return 'true';
+  }
+
+  if (typeof value.legalAcceptance === 'object' && value.legalAcceptance) {
+    const nested = readLegalAcceptedAt(value.legalAcceptance);
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
 function toPlanOption(product: {
   productId: string;
   displayName: string;
@@ -264,7 +301,7 @@ export default function MembershipScreen() {
   const insets = useSafeAreaInsets();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createMembershipStyles(theme, mode), [mode, theme]);
-  const { signOut } = useAuth();
+  const { signOut, session } = useAuth();
 
   const {
     status,
@@ -303,6 +340,15 @@ export default function MembershipScreen() {
     headline: string;
   } | null>(null);
   const [legalVersions, setLegalVersions] = useState(FALLBACK_LEGAL_VERSIONS);
+  const [requiresSocialLegalAcceptance, setRequiresSocialLegalAcceptance] = useState(false);
+  const [hasResolvedSocialLegalAcceptance, setHasResolvedSocialLegalAcceptance] = useState(false);
+  const [socialLegalModalVisible, setSocialLegalModalVisible] = useState(false);
+  const [socialLegalScrolledToEnd, setSocialLegalScrolledToEnd] = useState(false);
+  const [socialLegalError, setSocialLegalError] = useState<string | null>(null);
+  const [isSubmittingSocialLegalAcceptance, setIsSubmittingSocialLegalAcceptance] = useState(false);
+  const [isSocialLegalSignOutPending, setIsSocialLegalSignOutPending] = useState(false);
+  const [isSocialLegalModalClosing, setIsSocialLegalModalClosing] = useState(false);
+  const [isSocialLegalSuccessAnimating, setIsSocialLegalSuccessAnimating] = useState(false);
   useEffect(() => {
     fetchCurrentLegalVersions().then(setLegalVersions).catch(() => null);
   }, []);
@@ -318,6 +364,10 @@ export default function MembershipScreen() {
   const heroIconScale = useRef(new Animated.Value(1)).current;
   const heroTextOpacity = useRef(new Animated.Value(1)).current;
   const heroTextTranslateY = useRef(new Animated.Value(0)).current;
+  const socialLegalBackdropOpacity = useRef(new Animated.Value(0)).current;
+  const socialLegalCardOpacity = useRef(new Animated.Value(0)).current;
+  const socialLegalCardTranslateY = useRef(new Animated.Value(14)).current;
+  const socialLegalAcceptCheckScale = useRef(new Animated.Value(0.86)).current;
   const heroProgressValues = useRef(
     Array.from({ length: 4 }, (_, index) => new Animated.Value(index === 0 ? 1 : 0))
   ).current;
@@ -328,6 +378,11 @@ export default function MembershipScreen() {
   const showInviteCodeAction = status?.canJoinWithInviteCode !== false;
   const plansUnavailable = !isLoadingProducts && products.length === 0;
   const [heroIndex, setHeroIndex] = useState(0);
+  const authProvider = String(session?.user?.app_metadata?.provider ?? '').toLowerCase();
+  const isSocialAuthProvider = authProvider === 'google' || authProvider === 'apple';
+  const socialLegalCacheKey = session?.user?.id
+    ? `${SOCIAL_LEGAL_ACCEPTED_KEY_PREFIX}${session.user.id}`
+    : null;
 
   useEffect(() => {
     if (products.length > 0 || isLoadingProducts) {
@@ -344,6 +399,171 @@ export default function MembershipScreen() {
       return selectedDefaultProductId;
     });
   }, [planOptions, selectedDefaultProductId]);
+
+  useEffect(() => {
+    let active = true;
+
+    const resolveSocialLegalGate = async () => {
+      if (!session?.user?.id || !socialLegalCacheKey) {
+        if (!active) {
+          return;
+        }
+        setRequiresSocialLegalAcceptance(false);
+        setSocialLegalModalVisible(false);
+        setHasResolvedSocialLegalAcceptance(true);
+        setSocialLegalError(null);
+        return;
+      }
+
+      if (!isSocialAuthProvider) {
+        if (!active) {
+          return;
+        }
+        setRequiresSocialLegalAcceptance(false);
+        setSocialLegalModalVisible(false);
+        setHasResolvedSocialLegalAcceptance(true);
+        setSocialLegalError(null);
+        return;
+      }
+
+      setHasResolvedSocialLegalAcceptance(false);
+      setSocialLegalError(null);
+
+      try {
+        const cached = await AsyncStorage.getItem(socialLegalCacheKey);
+        if (!active) {
+          return;
+        }
+        if (cached === '1') {
+          setRequiresSocialLegalAcceptance(false);
+          setSocialLegalModalVisible(false);
+          setHasResolvedSocialLegalAcceptance(true);
+          return;
+        }
+      } catch {
+        // no-op
+      }
+
+      const metadataAcceptedAt =
+        readLegalAcceptedAt(session.user.user_metadata) ??
+        readLegalAcceptedAt(session.user.app_metadata);
+      if (metadataAcceptedAt) {
+        if (socialLegalCacheKey) {
+          void AsyncStorage.setItem(socialLegalCacheKey, '1').catch(() => null);
+        }
+        if (!active) {
+          return;
+        }
+        setRequiresSocialLegalAcceptance(false);
+        setSocialLegalModalVisible(false);
+        setHasResolvedSocialLegalAcceptance(true);
+        return;
+      }
+
+      let remoteAccepted = false;
+      try {
+        const response = await authorizedFetch('/auth/legal-acceptance', {
+          method: 'GET',
+          skipUnauthorizedSignOut: true,
+        });
+        remoteAccepted = Boolean(readLegalAcceptedAt(response));
+      } catch {
+        remoteAccepted = false;
+      }
+
+      if (remoteAccepted && socialLegalCacheKey) {
+        void AsyncStorage.setItem(socialLegalCacheKey, '1').catch(() => null);
+      }
+
+      if (!active) {
+        return;
+      }
+
+      if (remoteAccepted) {
+        setRequiresSocialLegalAcceptance(false);
+        setSocialLegalModalVisible(false);
+      } else {
+        setRequiresSocialLegalAcceptance(true);
+        setIsSocialLegalModalClosing(false);
+        setIsSocialLegalSuccessAnimating(false);
+        setSocialLegalModalVisible(true);
+        setSocialLegalScrolledToEnd(false);
+      }
+      setHasResolvedSocialLegalAcceptance(true);
+    };
+
+    void resolveSocialLegalGate();
+
+    return () => {
+      active = false;
+    };
+  }, [isSocialAuthProvider, session?.user?.id, socialLegalCacheKey]);
+
+  const animateSocialLegalModalIn = () => {
+    socialLegalBackdropOpacity.setValue(0);
+    socialLegalCardOpacity.setValue(0);
+    socialLegalCardTranslateY.setValue(14);
+    Animated.parallel([
+      Animated.timing(socialLegalBackdropOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(socialLegalCardOpacity, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(socialLegalCardTranslateY, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeSocialLegalModal = (onClosed?: () => void) => {
+    if (isSocialLegalModalClosing || isSocialLegalSuccessAnimating) {
+      return;
+    }
+    setIsSocialLegalModalClosing(true);
+    Animated.parallel([
+      Animated.timing(socialLegalBackdropOpacity, {
+        toValue: 0,
+        duration: 150,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(socialLegalCardOpacity, {
+        toValue: 0,
+        duration: 170,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(socialLegalCardTranslateY, {
+        toValue: 10,
+        duration: 170,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      setIsSocialLegalModalClosing(false);
+      if (finished) {
+        setSocialLegalModalVisible(false);
+        onClosed?.();
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (!socialLegalModalVisible) {
+      return;
+    }
+    animateSocialLegalModalIn();
+  }, [socialLegalBackdropOpacity, socialLegalCardOpacity, socialLegalCardTranslateY, socialLegalModalVisible]);
 
   useEffect(() => {
     if (hasLoggedMembershipView.current) {
@@ -390,6 +610,17 @@ export default function MembershipScreen() {
     planOptions.find((plan) => plan.productId === selectedProductId) ??
     planOptions[0] ??
     fallbackPlans[0];
+  const canConfirmSocialLegal =
+    socialLegalScrolledToEnd &&
+    !isSubmittingSocialLegalAcceptance &&
+    !isSocialLegalModalClosing &&
+    !isSocialLegalSuccessAnimating;
+  const isSocialLegalGateBlocking =
+    !hasResolvedSocialLegalAcceptance ||
+    requiresSocialLegalAcceptance ||
+    isSubmittingSocialLegalAcceptance ||
+    isSocialLegalModalClosing ||
+    isSocialLegalSuccessAnimating;
   const facilityPlan =
     planOptions.find((plan) => plan.productId === FACILITY_PRODUCT_ID) ??
     fallbackPlans.find((plan) => plan.productId === FACILITY_PRODUCT_ID) ??
@@ -694,6 +925,12 @@ export default function MembershipScreen() {
   };
 
   const handlePurchase = async () => {
+    if (requiresSocialLegalAcceptance || !hasResolvedSocialLegalAcceptance) {
+      setIsSocialLegalModalClosing(false);
+      setIsSocialLegalSuccessAnimating(false);
+      setSocialLegalModalVisible(true);
+      return;
+    }
     if (isFacilitySelected) {
       setFeedback(null);
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
@@ -835,6 +1072,12 @@ export default function MembershipScreen() {
   };
 
   const handleRestore = async () => {
+    if (requiresSocialLegalAcceptance || !hasResolvedSocialLegalAcceptance) {
+      setIsSocialLegalModalClosing(false);
+      setIsSocialLegalSuccessAnimating(false);
+      setSocialLegalModalVisible(true);
+      return;
+    }
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     setFeedback(null);
     const result = await restore();
@@ -936,6 +1179,96 @@ export default function MembershipScreen() {
     }
   };
 
+  const confirmSocialLegalAcceptance = async () => {
+    if (!canConfirmSocialLegal || !socialLegalCacheKey || !session?.user?.id) {
+      return;
+    }
+
+    setIsSubmittingSocialLegalAcceptance(true);
+    setSocialLegalError(null);
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
+    try {
+      const acceptedAt = new Date().toISOString();
+      await authorizedFetch('/auth/legal-acceptance', {
+        method: 'POST',
+        skipUnauthorizedSignOut: true,
+        body: JSON.stringify({
+          terms_version: legalVersions.termsVersion,
+          privacy_version: legalVersions.privacyVersion,
+          accepted_at: acceptedAt,
+          source: 'mobile_social_paywall_gate',
+          metadata: {
+            screen: 'MembershipScreen',
+            provider: authProvider || 'unknown',
+          },
+        }),
+      });
+      await AsyncStorage.setItem(socialLegalCacheKey, '1');
+      setIsSocialLegalSuccessAnimating(true);
+      socialLegalAcceptCheckScale.setValue(0.86);
+      Animated.sequence([
+        Animated.spring(socialLegalAcceptCheckScale, {
+          toValue: 1.16,
+          speed: 20,
+          bounciness: 10,
+          useNativeDriver: true,
+        }),
+        Animated.spring(socialLegalAcceptCheckScale, {
+          toValue: 1,
+          speed: 24,
+          bounciness: 6,
+          useNativeDriver: true,
+        }),
+        Animated.delay(70),
+      ]).start(() => {
+        setRequiresSocialLegalAcceptance(false);
+        setIsSocialLegalSuccessAnimating(false);
+        closeSocialLegalModal();
+      });
+      logEvent('membership_social_legal_accepted', {
+        screen: 'MembershipScreen',
+        extra: { provider: authProvider || 'unknown' },
+      });
+    } catch (error) {
+      setIsSocialLegalSuccessAnimating(false);
+      const message =
+        error instanceof Error && error.message.trim().length > 0
+          ? error.message
+          : 'Could not record acceptance. Please try again.';
+      setSocialLegalError(message);
+      logEvent('membership_social_legal_acceptance_failed', {
+        level: 'warning',
+        screen: 'MembershipScreen',
+        extra: { reason: message },
+      });
+    } finally {
+      setIsSubmittingSocialLegalAcceptance(false);
+    }
+  };
+
+  const signOutFromSocialLegalGate = async () => {
+    if (
+      isSocialLegalSignOutPending ||
+      isSubmittingSocialLegalAcceptance ||
+      isSocialLegalModalClosing ||
+      isSocialLegalSuccessAnimating
+    ) {
+      return;
+    }
+    setIsSocialLegalSignOutPending(true);
+    void Haptics.selectionAsync().catch(() => null);
+    closeSocialLegalModal(() => {
+      void (async () => {
+        try {
+          await signOut();
+          logEvent('membership_social_legal_signout', { screen: 'MembershipScreen' });
+        } finally {
+          setIsSocialLegalSignOutPending(false);
+        }
+      })();
+    });
+  };
+
   return (
     <SafeAreaView style={styles.screen} edges={[]}>
       <ScrollView
@@ -958,6 +1291,21 @@ export default function MembershipScreen() {
           ]}
           {...heroPanResponder.panHandlers}
         >
+          <Pressable
+            style={[
+              styles.heroExitButton,
+              {
+                top: Math.max(insets.top, 12),
+              },
+            ]}
+            onPress={() => {
+              void Haptics.selectionAsync().catch(() => null);
+              setShowExitModal(true);
+              logEvent('membership_signout_prompt_opened', { screen: 'MembershipScreen' });
+            }}
+          >
+            <Ionicons name="chevron-back" size={18} color={activeHeroSlide.accent ? '#fff' : theme.colors.text} />
+          </Pressable>
           <View style={styles.heroSlide}>
             <View style={styles.heroCardTop}>
               <Animated.View
@@ -1034,13 +1382,20 @@ export default function MembershipScreen() {
             onPress={() => {
               void Haptics.selectionAsync().catch(() => null);
               logEvent('membership_experience_opened', { screen: 'MembershipScreen' });
-              navigation.navigate('MembershipExperience');
+              navigation.navigate('MembershipExperience', { source: 'paywall', origin: 'membership' });
             }}
           >
             <Ionicons name="call-outline" size={16} color={theme.colors.accent} />
             <View style={styles.heroLinkBottomRow}>
-              <Text style={styles.heroLinkTitle}>How It Works</Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+              <Text style={styles.heroLinkTitle}>
+                How It Works
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={theme.colors.textMuted}
+                style={styles.heroLinkChevron}
+              />
             </View>
           </Pressable>
           <Pressable
@@ -1053,8 +1408,15 @@ export default function MembershipScreen() {
           >
             <Ionicons name="information-circle-outline" size={16} color={theme.colors.accent} />
             <View style={styles.heroLinkBottomRow}>
-              <Text style={styles.heroLinkTitle}>Why Verity?</Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
+              <Text style={styles.heroLinkTitle}>
+                Why Verity?
+              </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={16}
+                color={theme.colors.textMuted}
+                style={styles.heroLinkChevron}
+              />
             </View>
           </Pressable>
         </View>
@@ -1131,7 +1493,7 @@ export default function MembershipScreen() {
                 : 'Payment charged to your Apple Account at confirmation. Subscription auto-renews unless cancelled at least 24 hours before the end of the current period.'}
             </Text>
             <View style={styles.legalMetaRow}>
-              <Pressable onPress={handleRestore} disabled={isProcessingPurchase}>
+              <Pressable onPress={handleRestore} disabled={isProcessingPurchase || isSocialLegalGateBlocking}>
                 <Text style={styles.legalMetaLink}>Restore Purchases</Text>
               </Pressable>
               <Pressable
@@ -1205,7 +1567,7 @@ export default function MembershipScreen() {
           <Pressable
             style={({ pressed }) => [styles.primaryButton, pressed && styles.primaryButtonPressed]}
             onPress={handlePurchase}
-            disabled={isProcessingPurchase || isLoadingProducts || plansUnavailable}
+            disabled={isProcessingPurchase || isLoadingProducts || plansUnavailable || isSocialLegalGateBlocking}
           >
             {isProcessingPurchase || isLoadingProducts ? (
               <ActivityIndicator color="#FFFFFF" />
@@ -1224,7 +1586,7 @@ export default function MembershipScreen() {
             style={({ pressed }) => [
               styles.footerSecondaryButton,
               pressed && styles.inlineButtonPressed,
-              isProcessingPurchase && styles.inlineButtonDisabled,
+              (isProcessingPurchase || isSocialLegalGateBlocking) && styles.inlineButtonDisabled,
             ]}
             onPress={() => {
               void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
@@ -1233,7 +1595,7 @@ export default function MembershipScreen() {
               });
               navigation.navigate('OnboardingInviteCode');
             }}
-            disabled={isProcessingPurchase}
+            disabled={isProcessingPurchase || isSocialLegalGateBlocking}
           >
             <Text style={styles.footerSecondaryButtonText}>Have an invite code?</Text>
             <Ionicons name="chevron-forward" size={16} color={theme.colors.textMuted} />
@@ -1247,6 +1609,144 @@ export default function MembershipScreen() {
               : 'Secure billing via Apple • Cancel anytime • 3-day grace period'}
         </Text>
       </View>
+
+      <Modal
+        visible={socialLegalModalVisible}
+        transparent
+        animationType="none"
+        onRequestClose={() => null}
+      >
+        <View style={styles.socialLegalModalOverlay}>
+          <Animated.View
+            style={[
+              styles.socialLegalModalBackdrop,
+              { opacity: socialLegalBackdropOpacity },
+            ]}
+          />
+          <Animated.View
+            style={[
+              styles.socialLegalModalCard,
+              { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+              {
+                opacity: socialLegalCardOpacity,
+                transform: [{ translateY: socialLegalCardTranslateY }],
+              },
+            ]}
+          >
+            <Text style={[styles.socialLegalModalTitle, { color: theme.colors.text }]}>
+              Terms & Privacy
+            </Text>
+            <Text style={[styles.socialLegalModalSubtitle, { color: theme.colors.textMuted }]}>
+              Review this summary and agree before continuing to membership.
+            </Text>
+            <ScrollView
+              style={[
+                styles.socialLegalScroll,
+                { borderColor: theme.colors.border, backgroundColor: theme.colors.surfaceAlt },
+              ]}
+              contentContainerStyle={styles.socialLegalScrollContent}
+              showsVerticalScrollIndicator
+              onContentSizeChange={(_, contentHeight) => {
+                if (contentHeight <= 250) {
+                  setSocialLegalScrolledToEnd(true);
+                }
+              }}
+              onScroll={({ nativeEvent }) => {
+                const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+                const nearBottom = layoutMeasurement.height + contentOffset.y >= contentSize.height - 20;
+                if (nearBottom && !socialLegalScrolledToEnd) {
+                  setSocialLegalScrolledToEnd(true);
+                }
+              }}
+              scrollEventThrottle={16}
+            >
+              <Text style={[styles.socialLegalParagraph, { color: theme.colors.text }]}>
+                By continuing, you agree to the Verity Protect Terms of Service and Privacy Policy.
+                These documents explain arbitration, acceptable use, billing, data handling,
+                retention, and your privacy rights.
+              </Text>
+              <Text style={[styles.socialLegalParagraph, { color: theme.colors.text }]}>
+                Key points: your circle data is protected with role-based access, call records are
+                available while your profile is active unless you clear them, and deletion removes
+                active profile data from production systems.
+              </Text>
+              <Text style={[styles.socialLegalParagraph, { color: theme.colors.text }]}>
+                You can open the full legal documents below before agreeing.
+              </Text>
+              <View style={styles.socialLegalLinksGroup}>
+                <Pressable onPress={() => Linking.openURL(legalVersions.termsUrl).catch(() => null)}>
+                  <Text style={[styles.linkText, styles.socialLegalLinkText, { color: theme.colors.accent }]}>
+                    Open Terms of Service
+                  </Text>
+                </Pressable>
+                <Pressable onPress={() => Linking.openURL(legalVersions.privacyUrl).catch(() => null)}>
+                  <Text style={[styles.linkText, styles.socialLegalLinkText, { color: theme.colors.accent }]}>
+                    Open Privacy Policy
+                  </Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+            {socialLegalError ? (
+              <View
+                style={[
+                  styles.socialLegalErrorCard,
+                  {
+                    borderColor: withOpacity(theme.colors.danger, 0.45),
+                    backgroundColor: withOpacity(theme.colors.danger, 0.1),
+                  },
+                ]}
+              >
+                <Text style={[styles.socialLegalErrorText, { color: theme.colors.danger }]}>
+                  {socialLegalError}
+                </Text>
+              </View>
+            ) : null}
+            <View style={styles.socialLegalModalActions}>
+              <Pressable
+                style={[styles.socialLegalActionButton, { borderColor: theme.colors.border }]}
+                onPress={signOutFromSocialLegalGate}
+                disabled={
+                  isSubmittingSocialLegalAcceptance ||
+                  isSocialLegalSignOutPending ||
+                  isSocialLegalSuccessAnimating
+                }
+              >
+                <Text style={[styles.socialLegalActionLabel, { color: theme.colors.textMuted }]}>
+                  {isSocialLegalSignOutPending ? 'Signing Out…' : 'Sign Out'}
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.socialLegalActionButton,
+                  styles.socialLegalActionPrimary,
+                  {
+                    backgroundColor: canConfirmSocialLegal
+                      ? theme.colors.accent
+                      : withOpacity(theme.colors.textMuted, 0.4),
+                  },
+                ]}
+                disabled={!canConfirmSocialLegal || isSocialLegalSignOutPending}
+                onPress={confirmSocialLegalAcceptance}
+              >
+                <View style={styles.socialLegalActionPrimaryInner}>
+                  {isSocialLegalSuccessAnimating ? (
+                    <Animated.View style={{ transform: [{ scale: socialLegalAcceptCheckScale }] }}>
+                      <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                    </Animated.View>
+                  ) : null}
+                  <Text style={styles.socialLegalActionPrimaryLabel}>
+                    {isSocialLegalSuccessAnimating
+                      ? 'Saved'
+                      : isSubmittingSocialLegalAcceptance
+                        ? 'Saving…'
+                        : 'Agree and Continue'}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
 
       <Modal
         visible={showFacilityModal}
@@ -1496,6 +1996,24 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       justifyContent: 'space-between',
       overflow: 'hidden',
     },
+    heroExitButton: {
+      position: 'absolute',
+      left: 18,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: withOpacity(theme.colors.surface, 0.96),
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10,
+      shadowColor: '#000',
+      shadowOpacity: 0.14,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 6,
+    },
     heroCardAccent: {
       backgroundColor: theme.colors.accent,
       borderBottomColor: withOpacity('#FFFFFF', 0.16),
@@ -1604,6 +2122,8 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       fontWeight: '700',
       color: theme.colors.text,
       lineHeight: 20,
+      flex: 1,
+      minWidth: 0,
     },
     heroLinkBottomRow: {
       flexDirection: 'row',
@@ -1611,6 +2131,11 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       justifyContent: 'space-between',
       gap: 10,
       marginTop: 'auto',
+    },
+    heroLinkChevron: {
+      flexShrink: 0,
+      alignSelf: 'flex-end',
+      marginLeft: 8,
     },
     planSection: {
       gap: 8,
@@ -1774,6 +2299,97 @@ const createMembershipStyles = (theme: AppTheme, mode?: 'light' | 'dark' | strin
       fontSize: 12,
       fontWeight: '500',
       color: theme.colors.textMuted,
+    },
+    linkText: {
+      textDecorationLine: 'underline',
+    },
+    socialLegalModalOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 20,
+    },
+    socialLegalModalBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    },
+    socialLegalModalCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 16,
+      gap: 10,
+    },
+    socialLegalModalTitle: {
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    socialLegalModalSubtitle: {
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    socialLegalScroll: {
+      maxHeight: 260,
+      borderWidth: 1,
+      borderRadius: 14,
+    },
+    socialLegalScrollContent: {
+      padding: 12,
+    },
+    socialLegalParagraph: {
+      fontSize: 13,
+      lineHeight: 20,
+      marginBottom: 10,
+    },
+    socialLegalLinksGroup: {
+      gap: 6,
+      paddingTop: 2,
+      paddingBottom: 8,
+    },
+    socialLegalLinkText: {
+      lineHeight: 20,
+    },
+    socialLegalErrorCard: {
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 9,
+      marginTop: 2,
+    },
+    socialLegalErrorText: {
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '500',
+    },
+    socialLegalModalActions: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 10,
+      marginTop: 8,
+    },
+    socialLegalActionButton: {
+      minWidth: 92,
+      height: 40,
+      borderRadius: 12,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 14,
+    },
+    socialLegalActionPrimary: {
+      borderWidth: 0,
+    },
+    socialLegalActionPrimaryInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    socialLegalActionLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    socialLegalActionPrimaryLabel: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#fff',
     },
     feedbackCard: {
       marginTop: 4,

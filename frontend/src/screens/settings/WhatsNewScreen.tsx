@@ -24,16 +24,14 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: '1.0.2',
+    version: '1.0.3',
     label: 'Latest Release',
     date: 'March 2026',
     highlights: [
-      'New Facility Partner program: eligible residents can claim community pricing and a 14-day trial with a facility code.',
-      'QR and invite-link claim flow is now smoother, including clear sign-in prompts when needed.',
-      'Paywall and membership screens were redesigned to make plan choices and activation steps clearer.',
-      'Onboarding is shorter and easier, with core protection setup moved earlier in the flow.',
-      'Home now shows simple setup reminders so unfinished steps are easy to complete later.',
-      'Updated education pages explain how Verity works and why families choose it, in a clearer format.',
+      "Hey, it's Lex from Verity. Quick but important update following yesterday's 1.0.2 release.",
+      "What we fixed: a navigation issue that blocked some people from getting back to plans, and text scaling that broke the app for larger display settings. If your loved one's phone looked broken, this one's for them.",
+      'What we improved: tighter first-time welcome, stronger sign-in flow, and smoother onboarding with the rough edges sanded down.',
+      "We're watching closely and moving fast. More soon. — Lex & the Verity team",
     ],
   },
   {
@@ -41,11 +39,11 @@ const RELEASES: Release[] = [
     label: 'Previous Release',
     date: 'March 2026',
     highlights: [
-      'Added a 7-day free trial for the monthly membership plan for eligible new subscribers.',
-      'Improved trial visibility across onboarding and billing screens.',
-      'Added trial reminders in-app with clearer renewal timing guidance.',
-      'Added trial lifecycle handling so expired trial numbers can be reclaimed and reused.',
-      'Improved analytics instrumentation and purchase flow reliability.',
+      "Hey, it's Lex from Verity. 1.0.1 focused on stability right after launch.",
+      'Fixes: addressed early crashes, login edge cases, and tightened fraud screening reliability.',
+      'Accessibility: added larger-text support in key surfaces so high-scale devices stay readable.',
+      'Quality-of-life: smoother invite/join steps for family circles and clearer trial messaging.',
+      'Thanks for the fast feedback — keep it coming. — Lex & the Verity team',
     ],
   },
   {
@@ -53,17 +51,12 @@ const RELEASES: Release[] = [
     label: 'Initial Release',
     date: 'March 2026',
     highlights: [
-      'Your protected line is live. Share it with people you want to hear from.',
-      'Unknown callers are screened before your phone rings. You stay in control.',
-      'Add trusted contacts so the people you know always get through.',
-      'Set a safe phrase so callers can identify themselves before you pick up.',
-      'Calls from unknown numbers are analyzed for spam and fraud in real time.',
-      'Get a push notification for every call, whether it was screened, blocked, or connected.',
-      'Screened calls are recorded and transcribed so you can review them anytime.',
-      'Block any number with one tap. Blocked callers never reach you.',
-      'Set rules for how your line handles calls when you are busy or unavailable.',
-      'Invite family or trusted people to your circle so they can see your activity.',
-      'Membership is billed through the App Store. Cancel anytime from your account settings.',
+      "Hey, it's Lex from Verity. 1.0.0 is our first public release.",
+      'What you get: the protected Verity line, real-time fraud and spam screening, trusted contacts that always get through, and transcripts/recordings for reviewed calls.',
+      'Control: set safe phrases, block with one tap, and tune rules for when you are busy.',
+      'Sharing: invite family to your circle so they can help monitor and keep an eye on activity.',
+      'Billing: App Store subscription with easy cancellation anytime.',
+      'We are just getting started — thanks for being early with us. — Lex & the Verity team',
     ],
   },
 ];

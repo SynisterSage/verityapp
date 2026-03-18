@@ -7,6 +7,7 @@ export type RootStackParamList = {
         facilityClaimPrompt?: boolean;
         facilitySlug?: string;
         inviteClaimPrompt?: boolean;
+        viewPlansPrompt?: boolean;
       }
     | undefined;
   SignUp:
@@ -29,7 +30,12 @@ export type RootStackParamList = {
         source?: 'deeplink' | 'in_app';
       }
     | undefined;
-  MembershipExperience: undefined;
+  MembershipExperience:
+    | {
+        source?: 'auth' | 'paywall';
+        origin?: 'signin' | 'signup' | 'membership';
+      }
+    | undefined;
   WhyChooseVerity: undefined;
   OnboardingProfile: undefined;
   OnboardingPasscode: undefined;

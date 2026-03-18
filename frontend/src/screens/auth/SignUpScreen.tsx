@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   Linking,
   Modal,
   Platform,
@@ -73,12 +75,18 @@ export default function SignUpScreen({
   const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [legalModalVisible, setLegalModalVisible] = useState(false);
   const [legalScrolledToEnd, setLegalScrolledToEnd] = useState(false);
+  const [isLegalModalClosing, setIsLegalModalClosing] = useState(false);
+  const [isLegalAcceptanceAnimating, setIsLegalAcceptanceAnimating] = useState(false);
   const [legalVersions, setLegalVersions] = useState(FALLBACK_LEGAL_VERSIONS);
   const [emailAvailability, setEmailAvailability] =
     useState<EmailAvailabilityState>('idle');
   const isFacilityClaimPromptVisible = Boolean(route?.params?.facilityClaimPrompt);
   const facilityNameFromPrompt = formatFacilityNameFromSlug(route?.params?.facilitySlug);
   const isInviteClaimPromptVisible = Boolean(route?.params?.inviteClaimPrompt);
+  const legalBackdropOpacity = useMemo(() => new Animated.Value(0), []);
+  const legalCardOpacity = useMemo(() => new Animated.Value(0), []);
+  const legalCardTranslateY = useMemo(() => new Animated.Value(14), []);
+  const legalAcceptCheckScale = useMemo(() => new Animated.Value(0.86), []);
 
   useEffect(() => {
     let active = true;
@@ -320,11 +328,116 @@ export default function SignUpScreen({
   const scrollPaddingBottom = Math.max(insets.bottom, 32) + 80 + alertSpacing;
   const bottomBuffer = scrollPaddingBottom + 64;
   const requiresLegalAcceptance = !acceptedLegal;
-  const canConfirmLegal = !requiresLegalAcceptance || legalScrolledToEnd;
+  const canConfirmLegal =
+    !requiresLegalAcceptance || (legalScrolledToEnd && !isLegalModalClosing && !isLegalAcceptanceAnimating);
+
+  const animateLegalModalIn = () => {
+    legalBackdropOpacity.setValue(0);
+    legalCardOpacity.setValue(0);
+    legalCardTranslateY.setValue(14);
+    Animated.parallel([
+      Animated.timing(legalBackdropOpacity, {
+        toValue: 1,
+        duration: 180,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(legalCardOpacity, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(legalCardTranslateY, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeLegalModal = (onClosed?: () => void) => {
+    if (isLegalModalClosing || isLegalAcceptanceAnimating) {
+      return;
+    }
+    setIsLegalModalClosing(true);
+    Animated.parallel([
+      Animated.timing(legalBackdropOpacity, {
+        toValue: 0,
+        duration: 150,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(legalCardOpacity, {
+        toValue: 0,
+        duration: 170,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(legalCardTranslateY, {
+        toValue: 10,
+        duration: 170,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      setIsLegalModalClosing(false);
+      if (finished) {
+        setLegalModalVisible(false);
+        onClosed?.();
+      }
+    });
+  };
 
   const openLegalModal = () => {
+    if (legalModalVisible) {
+      return;
+    }
     setLegalScrolledToEnd(false);
+    setIsLegalModalClosing(false);
+    setIsLegalAcceptanceAnimating(false);
     setLegalModalVisible(true);
+  };
+
+  useEffect(() => {
+    if (!legalModalVisible) {
+      return;
+    }
+    animateLegalModalIn();
+  }, [legalModalVisible, legalBackdropOpacity, legalCardOpacity, legalCardTranslateY]);
+
+  const confirmLegalAcceptance = () => {
+    if (!canConfirmLegal || isLegalAcceptanceAnimating || isLegalModalClosing) {
+      return;
+    }
+
+    if (!requiresLegalAcceptance) {
+      closeLegalModal();
+      return;
+    }
+
+    setIsLegalAcceptanceAnimating(true);
+    legalAcceptCheckScale.setValue(0.86);
+    Animated.sequence([
+      Animated.spring(legalAcceptCheckScale, {
+        toValue: 1.16,
+        speed: 20,
+        bounciness: 10,
+        useNativeDriver: true,
+      }),
+      Animated.spring(legalAcceptCheckScale, {
+        toValue: 1,
+        speed: 24,
+        bounciness: 6,
+        useNativeDriver: true,
+      }),
+      Animated.delay(70),
+    ]).start(() => {
+      setAcceptedLegal(true);
+      setIsLegalAcceptanceAnimating(false);
+      closeLegalModal();
+    });
   };
 
   const emailStatusMessage =
@@ -604,15 +717,30 @@ export default function SignUpScreen({
       <Modal
         visible={legalModalVisible}
         transparent
-        animationType="fade"
-        onRequestClose={() => setLegalModalVisible(false)}
+        animationType="none"
+        onRequestClose={() => closeLegalModal()}
       >
         <View style={styles.legalModalOverlay}>
-          <Pressable style={styles.legalModalBackdrop} onPress={() => setLegalModalVisible(false)} />
-          <View
+          <Animated.View
+            style={[
+              styles.legalModalBackdrop,
+              { opacity: legalBackdropOpacity },
+            ]}
+          >
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => closeLegalModal()}
+              disabled={isLegalModalClosing || isLegalAcceptanceAnimating}
+            />
+          </Animated.View>
+          <Animated.View
             style={[
               styles.legalModalCard,
               { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+              {
+                opacity: legalCardOpacity,
+                transform: [{ translateY: legalCardTranslateY }],
+              },
             ]}
           >
             <Text style={[styles.legalModalTitle, { color: theme.colors.text }]}>
@@ -672,7 +800,8 @@ export default function SignUpScreen({
             <View style={styles.legalModalActions}>
               <Pressable
                 style={[styles.legalActionButton, { borderColor: theme.colors.border }]}
-                onPress={() => setLegalModalVisible(false)}
+                onPress={() => closeLegalModal()}
+                disabled={isLegalModalClosing || isLegalAcceptanceAnimating}
               >
                 <Text style={[styles.legalActionLabel, { color: theme.colors.textMuted }]}>
                   Cancel
@@ -689,19 +818,25 @@ export default function SignUpScreen({
                   },
                 ]}
                 disabled={!canConfirmLegal}
-                onPress={() => {
-                  if (requiresLegalAcceptance) {
-                    setAcceptedLegal(true);
-                  }
-                  setLegalModalVisible(false);
-                }}
+                onPress={confirmLegalAcceptance}
               >
-                <Text style={styles.legalActionPrimaryLabel}>
-                  {requiresLegalAcceptance ? 'Accept' : 'Done'}
-                </Text>
+                <View style={styles.legalActionPrimaryInner}>
+                  {isLegalAcceptanceAnimating ? (
+                    <Animated.View style={{ transform: [{ scale: legalAcceptCheckScale }] }}>
+                      <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                    </Animated.View>
+                  ) : null}
+                  <Text style={styles.legalActionPrimaryLabel}>
+                    {isLegalAcceptanceAnimating
+                      ? 'Saved'
+                      : requiresLegalAcceptance
+                        ? 'Accept'
+                        : 'Done'}
+                  </Text>
+                </View>
               </Pressable>
             </View>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -746,7 +881,7 @@ export default function SignUpScreen({
         subHelperPrimaryLabel="How it works"
         onSubHelperPrimaryPress={() => {
           logEvent('signup_how_it_works_opened', { screen: 'SignUp' });
-          navigation.navigate('MembershipExperience');
+          navigation.navigate('MembershipExperience', { source: 'auth', origin: 'signup' });
         }}
         subHelperSecondaryLabel="Why choose Verity"
         onSubHelperSecondaryPress={() => {
@@ -1024,6 +1159,11 @@ const styles = StyleSheet.create({
   },
   legalActionPrimary: {
     borderWidth: 0,
+  },
+  legalActionPrimaryInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   legalActionLabel: {
     fontSize: 14,

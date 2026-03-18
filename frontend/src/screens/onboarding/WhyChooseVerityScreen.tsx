@@ -250,8 +250,12 @@ export default function WhyChooseVerityScreen() {
           <View style={styles.comparisonCard}>
             <View style={styles.comparisonHeaderRow}>
               <Text style={[styles.comparisonHeaderCell, styles.comparisonFeatureCell]}>Feature</Text>
-              <Text style={styles.comparisonHeaderCell}>Verity</Text>
-              <Text style={styles.comparisonHeaderCell}>Others</Text>
+              <Text style={[styles.comparisonHeaderCell, styles.comparisonValueHeaderCell]} numberOfLines={1}>
+                Verity
+              </Text>
+              <Text style={[styles.comparisonHeaderCell, styles.comparisonValueHeaderCell]} numberOfLines={1}>
+                Others
+              </Text>
             </View>
 
             {comparisonRows.map((feature) => (
@@ -619,7 +623,7 @@ const createStyles = (theme: AppTheme) =>
       borderBottomColor: theme.colors.border,
       paddingVertical: 10,
       paddingHorizontal: theme.spacing.md,
-      gap: 8,
+      gap: 12,
     },
     comparisonHeaderCell: {
       width: 56,
@@ -630,6 +634,10 @@ const createStyles = (theme: AppTheme) =>
       textTransform: 'uppercase',
       letterSpacing: 1.2,
       color: theme.colors.textDim,
+    },
+    comparisonValueHeaderCell: {
+      width: 68,
+      flexShrink: 0,
     },
     comparisonFeatureCell: {
       flex: 1,

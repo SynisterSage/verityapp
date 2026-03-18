@@ -58,6 +58,7 @@ export default function SignInScreen({
   const isFacilityClaimPromptVisible = Boolean(route?.params?.facilityClaimPrompt);
   const facilityNameFromPrompt = formatFacilityNameFromSlug(route?.params?.facilitySlug);
   const isInviteClaimPromptVisible = Boolean(route?.params?.inviteClaimPrompt);
+  const isViewPlansPromptVisible = Boolean(route?.params?.viewPlansPrompt);
 
   useEffect(() => {
     let mounted = true;
@@ -156,6 +157,7 @@ export default function SignInScreen({
 
   const inputBorderColor = (field: 'email' | 'password') =>
     focusField === field ? theme.colors.accent : theme.colors.border;
+  const isPrimaryDisabled = isSubmitting || !email.trim() || !password.trim();
 
   return (
     <SafeAreaView
@@ -234,6 +236,30 @@ export default function SignInScreen({
           </View>
         ) : null}
 
+        {isViewPlansPromptVisible ? (
+          <View
+            style={[
+              styles.facilityClaimPrompt,
+              {
+                borderColor: withOpacity(theme.colors.accent, 0.42),
+                backgroundColor: withOpacity(theme.colors.accent, 0.1),
+              },
+            ]}
+          >
+            <View style={[styles.facilityClaimIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.2) }]}>
+              <Ionicons name="pricetag-outline" size={14} color={theme.colors.accent} />
+            </View>
+            <View style={styles.facilityClaimTextWrap}>
+              <Text style={[styles.facilityClaimTitle, { color: theme.colors.text }]}>
+                Sign in required to view plans
+              </Text>
+              <Text style={[styles.facilityClaimBody, { color: theme.colors.textMuted }]}>
+                Continue signing in to view and choose your Verity membership plan.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         {membershipNoteVisible ? (
           <View
             style={[
@@ -246,7 +272,7 @@ export default function SignInScreen({
           >
             <View style={styles.membershipNoteHeader}>
               <Text style={[styles.membershipNoteTitle, { color: theme.colors.text }]}>
-                Thanks for checking Verity
+                Thanks for checking out Verity
               </Text>
               <Pressable
                 onPress={() => {
@@ -263,7 +289,7 @@ export default function SignInScreen({
               </Pressable>
             </View>
             <Text style={[styles.membershipNoteBody, { color: theme.colors.textMuted }]}>
-              Membership funds secure call routing, screening, recordings, and fraud monitoring infrastructure.
+              Come back anytime.
             </Text>
             <TouchableOpacity
               onPress={() => {
@@ -271,9 +297,6 @@ export default function SignInScreen({
               }}
               style={styles.membershipNoteLinkWrap}
             >
-              <Text style={[styles.membershipNoteLink, { color: theme.colors.accent }]}>
-                Contact support about pricing
-              </Text>
             </TouchableOpacity>
           </View>
         ) : null}
@@ -400,6 +423,7 @@ export default function SignInScreen({
         primaryLabel={isSubmitting ? 'Signing In…' : 'Sign In'}
         onPrimaryPress={handleSubmit}
         primaryLoading={isSubmitting}
+        primaryDisabled={isPrimaryDisabled}
         secondaryLabel="Apple"
         onSecondaryPress={handleAppleSignIn}
         secondaryIcon={
@@ -436,7 +460,7 @@ export default function SignInScreen({
         subHelperPrimaryLabel="How it works"
         onSubHelperPrimaryPress={() => {
           logEvent('signin_how_it_works_opened', { screen: 'SignIn' });
-          navigation.navigate('MembershipExperience');
+          navigation.navigate('MembershipExperience', { source: 'auth', origin: 'signin' });
         }}
         subHelperSecondaryLabel="Why choose Verity"
         onSubHelperSecondaryPress={() => {
@@ -518,9 +542,9 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderWidth: 1,
     borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    gap: 10,
   },
   membershipNoteHeader: {
     flexDirection: 'row',
@@ -542,7 +566,7 @@ const styles = StyleSheet.create({
   },
   membershipNoteBody: {
     fontSize: 13,
-    lineHeight: 19,
+    lineHeight: 20,
   },
   membershipNoteLinkWrap: {
     alignSelf: 'flex-start',

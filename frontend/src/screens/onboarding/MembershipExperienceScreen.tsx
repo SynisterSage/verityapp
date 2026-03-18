@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Asset } from 'expo-asset';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 
 import type { RootStackParamList } from '../../navigation/types';
 import { useTheme } from '../../context/ThemeContext';
@@ -159,6 +159,7 @@ function StoryScenePanel({
   const resultTextColor = mode === 'light' ? theme.colors.surface : theme.colors.text;
   const isIntroScene = !scene.mockup && !scene.result;
   const isResultScene = Boolean(scene.result);
+  const hasLongTitle = !scene.result && scene.title.length > 34;
   const resultLines = scene.result ? scene.title.split('\n') : [];
 
   return (
@@ -174,9 +175,17 @@ function StoryScenePanel({
         <Text style={[styles.sceneLabel, scene.result && { color: withOpacity(resultTextColor, 0.78) }]}>
           {scene.label}
         </Text>
-        {!scene.result ? <Text style={styles.sceneTitle}>{scene.title}</Text> : null}
+        {!scene.result ? (
+          <Text style={[styles.sceneTitle, hasLongTitle && styles.sceneTitleCompact]}>{scene.title}</Text>
+        ) : null}
         {scene.subtitle && !scene.result ? (
-          <Text style={[styles.sceneSubtitle, scene.result && { color: withOpacity(resultTextColor, 0.82) }]}>
+          <Text
+            style={[
+              styles.sceneSubtitle,
+              scene.mockup && styles.sceneSubtitleMockup,
+              scene.result && { color: withOpacity(resultTextColor, 0.82) },
+            ]}
+          >
             {scene.subtitle}
           </Text>
         ) : null}
@@ -241,6 +250,7 @@ export default function MembershipExperienceScreen() {
   const navigation = useNavigation<
     NativeStackNavigationProp<RootStackParamList, 'MembershipExperience'>
   >();
+  const route = useRoute<RouteProp<RootStackParamList, 'MembershipExperience'>>();
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
   const { theme, mode } = useTheme();
@@ -264,6 +274,8 @@ export default function MembershipExperienceScreen() {
 
   const activeScene = STORY_SCENES[activeIndex] ?? STORY_SCENES[0];
   const isResultScene = Boolean(activeScene.result);
+  const launchSource = route.params?.source ?? 'unknown';
+  const launchOrigin = route.params?.origin ?? 'unknown';
   const carouselTokens = useMemo(() => {
     const resultForeground = mode === 'light' ? theme.colors.surface : theme.colors.text;
     return {
@@ -449,7 +461,15 @@ export default function MembershipExperienceScreen() {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => null);
     logEvent('membership_experience_completed', {
       screen: 'MembershipExperienceScreen',
+      extra: {
+        source: launchSource,
+        origin: launchOrigin,
+      },
     });
+    if (launchSource === 'auth') {
+      navigation.navigate('SignIn', { viewPlansPrompt: true });
+      return;
+    }
     navigation.goBack();
   };
 
@@ -610,7 +630,7 @@ export default function MembershipExperienceScreen() {
         </View>
 
         <View
-          pointerEvents="box-none"
+          pointerEvents={isResultScene ? 'none' : 'box-none'}
           style={[
             styles.tapZoneLayer,
             {
@@ -749,6 +769,12 @@ const createStyles = (theme: AppTheme) =>
       textAlign: 'center',
       marginBottom: theme.spacing.sm,
     },
+    sceneTitleCompact: {
+      fontSize: 34,
+      lineHeight: 40,
+      letterSpacing: -0.9,
+      maxWidth: 340,
+    },
     sceneSubtitle: {
       marginTop: 0,
       fontSize: theme.typography.body.size,
@@ -758,6 +784,9 @@ const createStyles = (theme: AppTheme) =>
       textAlign: 'center',
       paddingHorizontal: theme.spacing.md,
       marginBottom: theme.spacing.xl,
+    },
+    sceneSubtitleMockup: {
+      marginBottom: theme.spacing.xxl,
     },
     mockupWrap: {
       width: '100%',
