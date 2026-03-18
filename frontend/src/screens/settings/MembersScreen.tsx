@@ -32,6 +32,7 @@ import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme, ThemeMode } from '../../theme/tokens';
+import { buildInviteShareMessage, resolveInviteCode } from '../../utils/invites';
 
 import * as Clipboard from 'expo-clipboard';
 
@@ -52,11 +53,10 @@ type Invite = {
   role: MemberRole;
   status: string;
   short_code?: string | null;
+  claim_token?: string | null;
   invited_by?: string | null;
 };
 
-const APP_STORE_FALLBACK_URL = 'https://apps.apple.com/app/id6759526773';
-const INVITE_LINK_BASE_URL = 'https://verityprotect.com/invite';
 const ROLE_DISPLAY_NAMES: Record<MemberRole, string> = {
   editor: 'Family',
   admin: 'Caretaker',
@@ -102,18 +102,6 @@ function resolveDisplayName(member: Member) {
 function formatStatus(status: string) {
   if (!status) return '';
   return `${status.charAt(0).toUpperCase()}${status.slice(1)}`;
-}
-
-function formatInviteCode(value: string) {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return '';
-  }
-  const cleaned = trimmed.replace(/[^A-Z0-9]/gi, '').toUpperCase();
-  if (cleaned.length !== 8) {
-    return trimmed;
-  }
-  return `${cleaned.slice(0, 4)}-${cleaned.slice(4)}`;
 }
 
 export default function MembersScreen() {
@@ -350,18 +338,6 @@ export default function MembersScreen() {
     }, [activeProfile?.id, fetchMembers, fetchInvites])
   );
 
-  const resolveInviteToken = (invite: Invite) => (invite.short_code ?? invite.id ?? '').trim();
-  const resolveInviteCode = (invite: Invite) => formatInviteCode(invite.short_code ?? invite.id ?? '');
-  const buildInviteLink = (invite: Invite) => {
-    const token = invite.short_code ? resolveInviteCode(invite) : resolveInviteToken(invite);
-    return `${INVITE_LINK_BASE_URL}/${encodeURIComponent(token)}`;
-  };
-  const buildInviteMessage = (invite: Invite) => {
-    const code = resolveInviteCode(invite);
-    return `You're invited to join my Verity Protect Circle.\n\nOpen this invite:\n${buildInviteLink(
-      invite
-    )}\n\nIf the app isn't installed, install it here:\n${APP_STORE_FALLBACK_URL}\n\nIf the invite doesn't open automatically, enter this code in the app:\n${code}`;
-  };
   const buildSmsUrl = (message: string) => {
     const encoded = encodeURIComponent(message);
     const separator = Platform.OS === 'ios' ? '&' : '?';
@@ -369,7 +345,7 @@ export default function MembersScreen() {
   };
 
   const shareInvite = async (invite: Invite) => {
-    const message = buildInviteMessage(invite);
+    const message = buildInviteShareMessage(invite);
     try {
       await Share.share({ title: 'Verity Protect invite', message });
     } catch (err) {
@@ -447,7 +423,7 @@ export default function MembersScreen() {
   );
 
   const shareViaSMS = async (invite: Invite) => {
-    const message = buildInviteMessage(invite);
+    const message = buildInviteShareMessage(invite);
     try {
       await Linking.openURL(buildSmsUrl(message));
     } catch (err) {

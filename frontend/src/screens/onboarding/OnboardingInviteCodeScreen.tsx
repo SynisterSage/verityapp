@@ -9,7 +9,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useNavigation, useRoute } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { authorizedFetch } from '../../services/backend';
@@ -27,6 +27,7 @@ const CODE_LENGTH = 8;
 
 export default function OnboardingInviteCodeScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'OnboardingInviteCode'>>();
+  const route = useRoute<RouteProp<RootStackParamList, 'OnboardingInviteCode'>>();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const styles = useMemo(() => createInviteCodeStyles(theme), [theme]);
@@ -70,6 +71,14 @@ export default function OnboardingInviteCodeScreen() {
   const handleCodeChange = (text: string) => {
     setCode(sanitizeCode(text));
   };
+
+  useEffect(() => {
+    const initialCode = route.params?.initialCode;
+    if (!initialCode || code.length > 0) {
+      return;
+    }
+    setCode(sanitizeCode(initialCode));
+  }, [code.length, route.params?.initialCode]);
 
   const acceptCode = async () => {
     if (!areNamesEntered) {

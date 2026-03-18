@@ -43,6 +43,7 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { authorizedFetch } from './src/services/backend';
 import { supabase } from './src/services/supabase';
 import { getPublicEnv } from './src/services/publicConfig';
+import { resolveInviteClaimToken } from './src/services/inviteClaims';
 import SignInScreen from './src/screens/auth/SignInScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
 import ConfirmEmailScreen from './src/screens/auth/ConfirmEmailScreen';
@@ -158,7 +159,8 @@ const ACTIVITY_PUSH_SOUND = 'activity-notification.wav';
 const SUPPORT_PUSH_CHANNEL_ID = 'support-updates';
 const SUPPORT_PUSH_SOUND = 'support-notification.wav';
 const CALL_DETAIL_ALERT_TYPES = new Set<string>(['fraud', 'safe', 'call_review']);
-const PENDING_INVITE_ID_KEY = 'app:pending-invite-id';
+const PENDING_INVITE_CLAIM_KEY = 'app:pending-invite-claim';
+const LEGACY_PENDING_INVITE_ID_KEY = 'app:pending-invite-id';
 const TRIAL_REMINDER_MODAL_LAST_SHOWN_AT_KEY = 'trial:reminder:last-shown-at';
 
 function normalizeInviteIdentifier(value: string | null | undefined) {
@@ -733,7 +735,12 @@ function SettingsStackNavigator() {
   );
 }
 
-function parseInviteIdFromUrl(url: string) {
+type InviteClaimPayload = {
+  inviteCode?: string;
+  inviteToken?: string;
+};
+
+function parseInviteClaimFromUrl(url: string): InviteClaimPayload | null {
   const parsed = Linking.parse(url);
   const combinedPath = [parsed.hostname, parsed.path].filter(Boolean).join('/');
   const segments = combinedPath
@@ -744,29 +751,52 @@ function parseInviteIdFromUrl(url: string) {
   const inviteIndex = normalizedSegments.findIndex(
     (segment) => segment === 'invite' || segment === 'invites'
   );
-  if (inviteIndex >= 0 && segments.length > inviteIndex + 1) {
-    return normalizeInviteIdentifier(segments[inviteIndex + 1]);
+  const hasInviteSegment = inviteIndex >= 0;
+  const pathInviteCode =
+    hasInviteSegment && segments.length > inviteIndex + 1
+      ? normalizeInviteIdentifier(segments[inviteIndex + 1])
+      : null;
+
+  const queryInviteToken = parsed.queryParams?.t ?? parsed.queryParams?.token;
+  const inviteToken =
+    typeof queryInviteToken === 'string'
+      ? queryInviteToken.trim()
+      : Array.isArray(queryInviteToken)
+      ? queryInviteToken[0]?.trim()
+      : '';
+
+  const queryInviteCode =
+    parsed.queryParams?.code ?? parsed.queryParams?.inviteId ?? parsed.queryParams?.invite_id;
+  const inviteCode =
+    typeof queryInviteCode === 'string'
+      ? normalizeInviteIdentifier(queryInviteCode)
+      : Array.isArray(queryInviteCode)
+      ? normalizeInviteIdentifier(queryInviteCode[0] ?? '')
+      : null;
+
+  if (!hasInviteSegment && !inviteCode && !inviteToken) {
+    return null;
   }
-  const queryInviteId = parsed.queryParams?.inviteId ?? parsed.queryParams?.invite_id;
-  if (typeof queryInviteId === 'string' && queryInviteId.trim().length > 0) {
-    return normalizeInviteIdentifier(queryInviteId);
+
+  if (!pathInviteCode && !inviteCode && !inviteToken) {
+    return null;
   }
-  if (Array.isArray(queryInviteId) && queryInviteId[0]?.trim()) {
-    return normalizeInviteIdentifier(queryInviteId[0]);
-  }
-  return null;
+
+  return {
+    inviteCode: pathInviteCode ?? inviteCode ?? undefined,
+    inviteToken: inviteToken || undefined,
+  };
 }
 
 function InviteLinkHandler() {
+  const { onboardingComplete } = useProfile();
   const { session } = useAuth();
-  const { profiles, refreshProfiles, setActiveProfile } = useProfile();
-  const pendingInviteRef = useRef<string | null>(null);
-  const isAcceptingInviteRef = useRef(false);
-  const acceptedProfileIdRef = useRef<string | null>(null);
+  const pendingInviteRef = useRef<InviteClaimPayload | null>(null);
+  const isResolvingInviteRef = useRef(false);
 
-  const persistPendingInvite = useCallback(async (inviteId: string) => {
+  const persistPendingInvite = useCallback(async (payload: InviteClaimPayload) => {
     try {
-      await AsyncStorage.setItem(PENDING_INVITE_ID_KEY, inviteId);
+      await AsyncStorage.setItem(PENDING_INVITE_CLAIM_KEY, JSON.stringify(payload));
     } catch {
       // Best effort persistence.
     }
@@ -774,74 +804,121 @@ function InviteLinkHandler() {
 
   const clearPendingInvite = useCallback(async () => {
     try {
-      await AsyncStorage.removeItem(PENDING_INVITE_ID_KEY);
+      await Promise.all([
+        AsyncStorage.removeItem(PENDING_INVITE_CLAIM_KEY),
+        AsyncStorage.removeItem(LEGACY_PENDING_INVITE_ID_KEY),
+      ]);
     } catch {
       // Best effort cleanup.
     }
   }, []);
 
-  const activateAcceptedProfile = useCallback(
-    (profileId?: string) => {
-      const targetProfileId = profileId ?? acceptedProfileIdRef.current;
-      if (!targetProfileId) {
-        return;
+  const routeToInviteAuthPrompt = useCallback(() => {
+    if (!rootNavigationRef.current?.isReady()) {
+      return;
+    }
+    rootNavigationRef.current.navigate('SignIn', {
+      inviteClaimPrompt: true,
+    });
+  }, []);
+
+  const openInviteEntry = useCallback(
+    (inviteCode: string) => {
+      if (!rootNavigationRef.current?.isReady()) {
+        return false;
       }
-      const acceptedProfile = profiles.find((profile) => profile.id === targetProfileId);
-      if (acceptedProfile) {
-        setActiveProfile(acceptedProfile);
-        acceptedProfileIdRef.current = null;
+
+      if (onboardingComplete) {
+        rootNavigationRef.current.navigate('AppTabs', {
+          screen: 'SettingsTab',
+          params: {
+            screen: 'EnterInviteCode',
+            params: {
+              initialCode: inviteCode,
+            },
+          },
+        });
+        return true;
       }
+
+      rootNavigationRef.current.navigate('OnboardingInviteCode', {
+        initialCode: inviteCode,
+        source: 'deeplink',
+      });
+      return true;
     },
-    [profiles, setActiveProfile]
+    [onboardingComplete]
   );
 
-  const acceptInvite = useCallback(
-    async (inviteId: string) => {
-      if (isAcceptingInviteRef.current) {
-        return;
+  const resolveInviteCode = useCallback(
+    async (payload: InviteClaimPayload) => {
+      const normalizedCode = normalizeInviteIdentifier(payload.inviteCode);
+      if (normalizedCode) {
+        return normalizedCode;
       }
-      const normalizedInviteId = normalizeInviteIdentifier(inviteId) ?? inviteId.trim();
-      if (!normalizedInviteId) {
-        return;
+
+      const token = payload.inviteToken?.trim();
+      if (!token) {
+        return null;
       }
-      isAcceptingInviteRef.current = true;
-      try {
-        const response = await authorizedFetch(`/profiles/invites/${normalizedInviteId}/accept`, {
-          method: 'POST',
-        });
-        const acceptedProfileId =
-          typeof response?.member?.profile_id === 'string'
-            ? response.member.profile_id
-            : undefined;
-        acceptedProfileIdRef.current = acceptedProfileId ?? null;
+
+      const resolved = await resolveInviteClaimToken({ token });
+      return normalizeInviteIdentifier(resolved.code);
+    },
+    []
+  );
+
+  const processInviteClaim = useCallback(async () => {
+    if (isResolvingInviteRef.current) {
+      return;
+    }
+    if (!session || !pendingInviteRef.current) {
+      return;
+    }
+
+    isResolvingInviteRef.current = true;
+    try {
+      const inviteCode = await resolveInviteCode(pendingInviteRef.current);
+      if (!inviteCode) {
         pendingInviteRef.current = null;
         await clearPendingInvite();
-        await refreshProfiles();
-        activateAcceptedProfile(acceptedProfileId);
-        Alert.alert('Invite accepted', 'You now have access to the shared profile.');
-      } catch (err) {
-        console.error('Failed to accept invite', err);
-      } finally {
-        isAcceptingInviteRef.current = false;
+        Alert.alert('Link unavailable', 'This invite link is invalid or expired.');
+        return;
       }
-    },
-    [activateAcceptedProfile, clearPendingInvite, refreshProfiles]
-  );
+
+      const opened = openInviteEntry(inviteCode);
+      if (!opened) {
+        return;
+      }
+
+      pendingInviteRef.current = null;
+      await clearPendingInvite();
+    } catch {
+      pendingInviteRef.current = null;
+      await clearPendingInvite();
+      Alert.alert('Link unavailable', 'This invite link is invalid or expired.');
+    } finally {
+      isResolvingInviteRef.current = false;
+    }
+  }, [clearPendingInvite, openInviteEntry, resolveInviteCode, session]);
 
   const handleUrl = useCallback(
     async (url: string) => {
-      const inviteId = parseInviteIdFromUrl(url);
-      if (!inviteId) {
+      const payload = parseInviteClaimFromUrl(url);
+      if (!payload) {
         return;
       }
+
+      pendingInviteRef.current = payload;
+      await persistPendingInvite(payload);
+
       if (!session) {
-        pendingInviteRef.current = inviteId;
-        await persistPendingInvite(inviteId);
+        routeToInviteAuthPrompt();
         return;
       }
-      await acceptInvite(inviteId);
+      await processInviteClaim();
     },
-    [acceptInvite, persistPendingInvite, session]
+    [persistPendingInvite, processInviteClaim, routeToInviteAuthPrompt, session]
   );
 
   useEffect(() => {
@@ -858,27 +935,71 @@ function InviteLinkHandler() {
     let isMounted = true;
     const hydratePendingInvite = async () => {
       try {
-        const storedInviteId = await AsyncStorage.getItem(PENDING_INVITE_ID_KEY);
-        if (!isMounted || !storedInviteId?.trim()) {
+        const stored = await AsyncStorage.getItem(PENDING_INVITE_CLAIM_KEY);
+        let rawStored = stored;
+        if (!rawStored?.trim()) {
+          rawStored = await AsyncStorage.getItem(LEGACY_PENDING_INVITE_ID_KEY);
+        }
+
+        if (!isMounted || !rawStored?.trim()) {
           return;
         }
-        pendingInviteRef.current = storedInviteId.trim();
+
+        const parsed = JSON.parse(rawStored) as InviteClaimPayload | string | null;
+        if (parsed && typeof parsed === 'object') {
+          pendingInviteRef.current = {
+            inviteCode: normalizeInviteIdentifier((parsed as InviteClaimPayload).inviteCode),
+            inviteToken:
+              typeof (parsed as InviteClaimPayload).inviteToken === 'string'
+                ? (parsed as InviteClaimPayload).inviteToken?.trim() || undefined
+                : undefined,
+          };
+          return;
+        }
+
+        if (typeof parsed === 'string' && parsed.trim()) {
+          pendingInviteRef.current = {
+            inviteCode: normalizeInviteIdentifier(parsed),
+          };
+          return;
+        }
+
+        if (rawStored.trim()) {
+          pendingInviteRef.current = {
+            inviteCode: normalizeInviteIdentifier(rawStored.trim()),
+          };
+        }
       } catch {
-        // Best effort hydration.
+        // Backward compatibility for older stored plain invite IDs.
+        try {
+          const legacyValue = await AsyncStorage.getItem(LEGACY_PENDING_INVITE_ID_KEY);
+          if (legacyValue?.trim()) {
+            pendingInviteRef.current = {
+              inviteCode: normalizeInviteIdentifier(legacyValue.trim()),
+            };
+          }
+        } catch {
+          // Best effort hydration.
+        }
       }
-      if (session && pendingInviteRef.current) {
-        await acceptInvite(pendingInviteRef.current);
+      if (!session && pendingInviteRef.current) {
+        routeToInviteAuthPrompt();
+        return;
       }
+      await processInviteClaim();
     };
-    hydratePendingInvite();
+    void hydratePendingInvite();
     return () => {
       isMounted = false;
     };
-  }, [acceptInvite, session]);
+  }, [processInviteClaim, routeToInviteAuthPrompt, session]);
 
   useEffect(() => {
-    activateAcceptedProfile();
-  }, [activateAcceptedProfile]);
+    if (!session) {
+      return;
+    }
+    void processInviteClaim();
+  }, [processInviteClaim, session]);
 
   return null;
 }

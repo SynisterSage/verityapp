@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import rateLimit from 'express-rate-limit';
 
 import PATHS from '@src/common/constants/PATHS';
 import ProfilesController from '@src/controllers/ProfilesController';
@@ -17,6 +18,7 @@ import {
   updateContactsPermissionSchema,
   inviteMemberSchema,
   acceptInviteSchema,
+  resolveInviteClaimTokenSchema,
   changeMemberRoleSchema,
   registerDeviceTokenSchema,
   createClientTokenSchema,
@@ -27,6 +29,23 @@ import {
 } from '@src/middleware/validationSchemas';
 
 const router = Router();
+
+const inviteResolveLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 45,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many invite link checks. Please wait a minute and try again.',
+  },
+});
+
+router.get(
+  PATHS.Profiles.InviteResolveToken,
+  inviteResolveLimiter,
+  validateRequest(resolveInviteClaimTokenSchema),
+  ProfileMembersController.resolveInviteClaimToken
+);
 
 router.get(PATHS.Profiles.Get, ProfilesController.listProfiles);
 router.get(PATHS.Profiles.Update, ProfilesController.getProfile);

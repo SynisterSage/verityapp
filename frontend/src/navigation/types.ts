@@ -6,12 +6,14 @@ export type RootStackParamList = {
     | {
         facilityClaimPrompt?: boolean;
         facilitySlug?: string;
+        inviteClaimPrompt?: boolean;
       }
     | undefined;
   SignUp:
     | {
         facilityClaimPrompt?: boolean;
         facilitySlug?: string;
+        inviteClaimPrompt?: boolean;
       }
     | undefined;
   ConfirmEmail: { email?: string; confirmed?: boolean };
@@ -37,7 +39,12 @@ export type RootStackParamList = {
   OnboardingAlerts: { source?: 'onboarding' | 'nudge' } | undefined;
   OnboardingCallForwarding: { source?: 'onboarding' | 'nudge' } | undefined;
   OnboardingTestCall: { source?: 'onboarding' | 'nudge' } | undefined;
-  OnboardingInviteCode: undefined;
+  OnboardingInviteCode:
+    | {
+        initialCode?: string;
+        source?: 'manual' | 'deeplink';
+      }
+    | undefined;
   OnboardingSuccess: undefined;
   PermissionPriming: undefined;
   AppTabs: NavigatorScreenParams<TabParamList> | undefined;
@@ -86,7 +93,11 @@ export type SettingsStackParamList = {
   Blocklist: undefined;
   DataPrivacy: undefined;
   Automation: undefined;
-  EnterInviteCode: undefined;
+  EnterInviteCode:
+    | {
+        initialCode?: string;
+      }
+    | undefined;
   Members: { highlightInviteEntry?: boolean } | undefined;
   SupportInfo: undefined;
   HowItWorks: undefined;

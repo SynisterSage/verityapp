@@ -78,6 +78,7 @@ export default function SignUpScreen({
     useState<EmailAvailabilityState>('idle');
   const isFacilityClaimPromptVisible = Boolean(route?.params?.facilityClaimPrompt);
   const facilityNameFromPrompt = formatFacilityNameFromSlug(route?.params?.facilitySlug);
+  const isInviteClaimPromptVisible = Boolean(route?.params?.inviteClaimPrompt);
 
   useEffect(() => {
     let active = true;
@@ -402,6 +403,30 @@ export default function SignUpScreen({
           </View>
         ) : null}
 
+        {isInviteClaimPromptVisible ? (
+          <View
+            style={[
+              styles.facilityClaimPrompt,
+              {
+                borderColor: withOpacity(theme.colors.accent, 0.42),
+                backgroundColor: withOpacity(theme.colors.accent, 0.1),
+              },
+            ]}
+          >
+            <View style={[styles.facilityClaimIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.2) }]}>
+              <Ionicons name="people-outline" size={14} color={theme.colors.accent} />
+            </View>
+            <View style={styles.facilityClaimTextWrap}>
+              <Text style={[styles.facilityClaimTitle, { color: theme.colors.text }]}>
+                Sign up required to join this circle
+              </Text>
+              <Text style={[styles.facilityClaimBody, { color: theme.colors.textMuted }]}>
+                Create your account and we'll prefill your invite code automatically.
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
         <View style={styles.fields}>
           <View style={styles.fieldWrapper}>
             <Text style={[styles.fieldLabel, { color: theme.colors.textDim }]}>Email</Text>
@@ -709,10 +734,11 @@ export default function SignUpScreen({
         onHelperPress={() =>
           navigation.navigate(
             'SignIn',
-            isFacilityClaimPromptVisible
+            isFacilityClaimPromptVisible || isInviteClaimPromptVisible
               ? {
-                  facilityClaimPrompt: true,
+                  facilityClaimPrompt: isFacilityClaimPromptVisible,
                   facilitySlug: route?.params?.facilitySlug,
+                  inviteClaimPrompt: isInviteClaimPromptVisible,
                 }
               : undefined
           )

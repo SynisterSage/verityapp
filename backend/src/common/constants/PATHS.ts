@@ -41,6 +41,7 @@ const PATHS = {
   },
   Profiles: {
     _: '/profiles',
+    InviteResolveToken: '/invites/resolve-token',
     Get: '/',
     Create: '/',
     Update: '/:profileId',

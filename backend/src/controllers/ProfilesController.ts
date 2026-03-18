@@ -6,6 +6,7 @@ import { CURRENT_PEPPER_VERSION, hashPasscode, verifyCurrentPasscode, verifyLega
 import supabaseAdmin from '@src/services/supabase';
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import { generateUniqueShortCode } from '@src/common/helpers/invite';
+import { createInviteClaimToken } from '@src/services/inviteClaims';
 import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
 import {
   getAuthenticatedUserId,
@@ -22,6 +23,23 @@ import { hasActiveSubscription } from '@src/services/subscriptionAccess';
 
 const INVITE_ROLES = ['admin', 'editor'] as const;
 type MemberRole = (typeof INVITE_ROLES)[number];
+
+function attachInviteClaimToken<T extends { id: string; short_code?: string | null }>(invite: T) {
+  try {
+    const token = createInviteClaimToken({
+      inviteId: invite.id,
+      inviteCode: invite.short_code ?? null,
+    });
+    return { ...invite, claim_token: token };
+  } catch (error) {
+    logger.warn(
+      `[invite-claims] unable to create invite claim token: ${
+        error instanceof Error ? error.message : 'unknown error'
+      }`
+    );
+    return { ...invite };
+  }
+}
 
 const SETUP_TICKET_ID = 'setup-help';
 const SETUP_TICKET_SUBJECT = 'Onboarding support';
@@ -1325,7 +1343,9 @@ async function inviteMember(req: Request, res: Response) {
     logger.err(alertError);
   }
 
-  return res.status(HTTP_STATUS_CODES.Ok).json({ invite: data, status: 'pending' });
+  return res
+    .status(HTTP_STATUS_CODES.Ok)
+    .json({ invite: attachInviteClaimToken(data), status: 'pending' });
 }
 
 async function listInvites(req: Request, res: Response) {
@@ -1370,7 +1390,9 @@ async function listInvites(req: Request, res: Response) {
     );
   }
 
-  return res.status(HTTP_STATUS_CODES.Ok).json({ invites: invitesWithCode });
+  return res
+    .status(HTTP_STATUS_CODES.Ok)
+    .json({ invites: invitesWithCode.map((invite) => attachInviteClaimToken(invite)) });
 }
 
 async function revokeInvite(req: Request, res: Response) {

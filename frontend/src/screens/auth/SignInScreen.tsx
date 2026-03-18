@@ -57,6 +57,7 @@ export default function SignInScreen({
   const insets = useSafeAreaInsets();
   const isFacilityClaimPromptVisible = Boolean(route?.params?.facilityClaimPrompt);
   const facilityNameFromPrompt = formatFacilityNameFromSlug(route?.params?.facilitySlug);
+  const isInviteClaimPromptVisible = Boolean(route?.params?.inviteClaimPrompt);
 
   useEffect(() => {
     let mounted = true;
@@ -204,6 +205,30 @@ export default function SignInScreen({
                 {facilityNameFromPrompt
                   ? `Continue signing in to claim ${facilityNameFromPrompt}'s partner offer.`
                   : 'Continue signing in to claim your facility partner offer.'}
+              </Text>
+            </View>
+          </View>
+        ) : null}
+
+        {isInviteClaimPromptVisible ? (
+          <View
+            style={[
+              styles.facilityClaimPrompt,
+              {
+                borderColor: withOpacity(theme.colors.accent, 0.42),
+                backgroundColor: withOpacity(theme.colors.accent, 0.1),
+              },
+            ]}
+          >
+            <View style={[styles.facilityClaimIcon, { backgroundColor: withOpacity(theme.colors.accent, 0.2) }]}>
+              <Ionicons name="people-outline" size={14} color={theme.colors.accent} />
+            </View>
+            <View style={styles.facilityClaimTextWrap}>
+              <Text style={[styles.facilityClaimTitle, { color: theme.colors.text }]}>
+                Sign in required to join this circle
+              </Text>
+              <Text style={[styles.facilityClaimBody, { color: theme.colors.textMuted }]}>
+                Continue signing in and we'll prefill your invite code automatically.
               </Text>
             </View>
           </View>
@@ -399,10 +424,11 @@ export default function SignInScreen({
         onHelperPress={() =>
           navigation.navigate(
             'SignUp',
-            isFacilityClaimPromptVisible
+            isFacilityClaimPromptVisible || isInviteClaimPromptVisible
               ? {
-                  facilityClaimPrompt: true,
+                  facilityClaimPrompt: isFacilityClaimPromptVisible,
                   facilitySlug: route?.params?.facilitySlug,
+                  inviteClaimPrompt: isInviteClaimPromptVisible,
                 }
               : undefined
           )

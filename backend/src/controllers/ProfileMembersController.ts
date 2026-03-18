@@ -4,7 +4,8 @@ import logger from 'jet-logger';
 
 import HTTP_STATUS_CODES from '@src/common/constants/HTTP_STATUS_CODES';
 import supabaseAdmin from '@src/services/supabase';
-import { formatShortCode } from '@src/common/helpers/invite';
+import { formatShortCode, generateUniqueShortCode } from '@src/common/helpers/invite';
+import { createInviteClaimToken, parseInviteClaimToken } from '@src/services/inviteClaims';
 import {
   getAuthenticatedUserId,
   logProfileAccessDenied,
@@ -76,6 +77,160 @@ function normalizeShortCode(input: string) {
     return null;
   }
   return formatShortCode(cleaned);
+}
+
+async function ensureInviteShortCode(invite: { id: string; short_code?: string | null }) {
+  const existing = normalizeShortCode(invite.short_code ?? '');
+  if (existing) {
+    return existing;
+  }
+
+  const generated = (await generateUniqueShortCode()) ?? formatShortCode(invite.id.slice(0, 8));
+  const normalized = normalizeShortCode(generated);
+  if (!normalized) {
+    return null;
+  }
+
+  const { error } = await supabaseAdmin
+    .from('profile_invites')
+    .update({ short_code: normalized })
+    .eq('id', invite.id);
+
+  if (error) {
+    logger.err(error);
+    return null;
+  }
+
+  return normalized;
+}
+
+async function resolvePendingInviteByIdentifier(args: { inviteId?: string; shortCode?: string | null }) {
+  const inviteId = args.inviteId?.trim();
+  const normalizedShortCode = normalizeShortCode(args.shortCode ?? '');
+
+  if (inviteId) {
+    const { data, error } = await supabaseAdmin
+      .from('profile_invites')
+      .select('id, profile_id, role, status, short_code')
+      .eq('id', inviteId)
+      .eq('status', 'pending')
+      .maybeSingle();
+    if (error) {
+      throw error;
+    }
+    if (data) {
+      return data;
+    }
+  }
+
+  if (normalizedShortCode) {
+    const { data, error } = await supabaseAdmin
+      .from('profile_invites')
+      .select('id, profile_id, role, status, short_code')
+      .eq('short_code', normalizedShortCode)
+      .eq('status', 'pending')
+      .maybeSingle();
+    if (error) {
+      throw error;
+    }
+    if (data) {
+      return data;
+    }
+  }
+
+  return null;
+}
+
+async function resolveInviteClaimToken(req: Request, res: Response) {
+  const query = ((req as any).validatedBody ?? req.query ?? {}) as {
+    t?: string;
+    token?: string;
+    code?: string;
+    inviteId?: string;
+    invite_id?: string;
+  };
+
+  const tokenValue = (query.t ?? query.token ?? '').trim();
+  const codeValue = normalizeShortCode(query.code ?? '');
+  const inviteIdValue = (query.inviteId ?? query.invite_id ?? '').trim();
+
+  try {
+    let resolvedInvite:
+      | {
+          id: string;
+          profile_id: string;
+          role: string;
+          status: string;
+          short_code: string | null;
+        }
+      | null = null;
+
+    if (tokenValue) {
+      const parsedToken = parseInviteClaimToken(tokenValue);
+      if (!parsedToken) {
+        return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Invite link is invalid or expired' });
+      }
+
+      resolvedInvite = await resolvePendingInviteByIdentifier({
+        inviteId: parsedToken.inviteId,
+        shortCode: parsedToken.inviteCode,
+      });
+      if (!resolvedInvite) {
+        return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Invite link is invalid or expired' });
+      }
+
+      if (parsedToken.inviteCode) {
+        const resolvedCode = normalizeShortCode(resolvedInvite.short_code ?? '');
+        if (!resolvedCode || resolvedCode !== parsedToken.inviteCode) {
+          return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Invite link is invalid or expired' });
+        }
+      }
+    } else {
+      resolvedInvite = await resolvePendingInviteByIdentifier({
+        inviteId: inviteIdValue || undefined,
+        shortCode: codeValue,
+      });
+      if (!resolvedInvite) {
+        return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Invite link is invalid or expired' });
+      }
+    }
+
+    const shortCode = await ensureInviteShortCode(resolvedInvite);
+    if (!shortCode) {
+      return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to resolve invite link' });
+    }
+
+    const hydratedInvite = {
+      ...resolvedInvite,
+      short_code: shortCode,
+    };
+    let refreshedToken: string | undefined;
+    try {
+      refreshedToken = createInviteClaimToken({
+        inviteId: hydratedInvite.id,
+        inviteCode: hydratedInvite.short_code,
+      });
+    } catch (error) {
+      logger.warn(
+        `[invite-claims] unable to create invite claim token: ${
+          error instanceof Error ? error.message : 'unknown error'
+        }`
+      );
+    }
+
+    return res.status(HTTP_STATUS_CODES.Ok).json({
+      eligible: true,
+      token: refreshedToken,
+      code: shortCode,
+      invite: {
+        id: hydratedInvite.id,
+        role: hydratedInvite.role,
+      },
+    });
+  } catch (error) {
+    logger.err(error as Error);
+    return res.status(HTTP_STATUS_CODES.InternalServerError).json({ error: 'Failed to resolve invite link' });
+  }
 }
 
 async function listMembers(req: Request, res: Response) {
@@ -536,4 +691,5 @@ export default {
   removeMember,
   changeMemberRole,
   acceptInvite,
+  resolveInviteClaimToken,
 };

@@ -124,6 +124,22 @@ export const acceptInviteSchema = z.object({
   lastName: z.string().optional(),
 });
 
+export const resolveInviteClaimTokenSchema = z
+  .object({
+    t: z.string().min(8).max(2048).optional(),
+    token: z.string().min(8).max(2048).optional(),
+    code: z.string().min(4).max(64).optional(),
+    inviteId: z.string().min(4).max(128).optional(),
+    invite_id: z.string().min(4).max(128).optional(),
+  })
+  .strict()
+  .refine(
+    (value) => Boolean(value.t || value.token || value.code || value.inviteId || value.invite_id),
+    {
+      message: 'Token or invite code is required',
+    }
+  );
+
 export const changeMemberRoleSchema = z.object({
   member_id: z.string().uuid('Invalid member ID'),
   role: z.enum(['editor', 'admin']),
