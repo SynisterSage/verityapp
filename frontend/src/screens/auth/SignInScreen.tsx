@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -171,7 +172,12 @@ export default function SignInScreen({
       ]}
       edges={['bottom']}
     >
-      <View style={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View>
           <Text style={[styles.title, { color: theme.colors.text, fontFamily: theme.typography.fontFamily }]}>
             Welcome Back
@@ -291,13 +297,6 @@ export default function SignInScreen({
             <Text style={[styles.membershipNoteBody, { color: theme.colors.textMuted }]}>
               Come back anytime.
             </Text>
-            <TouchableOpacity
-              onPress={() => {
-                void Linking.openURL('mailto:support@verityprotect.com').catch(() => null);
-              }}
-              style={styles.membershipNoteLinkWrap}
-            >
-            </TouchableOpacity>
           </View>
         ) : null}
 
@@ -417,7 +416,7 @@ export default function SignInScreen({
           </View>
         ) : null}
         </View>
-      </View>
+      </ScrollView>
 
       <ActionFooter
         primaryLabel={isSubmitting ? 'Signing In…' : 'Sign In'}
@@ -486,8 +485,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 0,
   },
-  content: {
+  scroll: {
     flex: 1,
+  },
+  content: {
+    flexGrow: 1,
+    minHeight: '100%',
     justifyContent: 'flex-start',
     paddingHorizontal: 24,
   },
@@ -567,14 +570,6 @@ const styles = StyleSheet.create({
   membershipNoteBody: {
     fontSize: 13,
     lineHeight: 20,
-  },
-  membershipNoteLinkWrap: {
-    alignSelf: 'flex-start',
-    paddingVertical: 2,
-  },
-  membershipNoteLink: {
-    fontSize: 13,
-    fontWeight: '700',
   },
   fieldWrapper: {
     marginBottom: 14,
