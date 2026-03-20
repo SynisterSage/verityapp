@@ -17,7 +17,8 @@
     "dev-support": "ts-node ./scripts/dev-support.ts",
     "sync-twilio-numbers": "ts-node ./scripts/syncTwilioNumbers.ts",
     "facility:upsert": "ts-node ./scripts/upsertFacilityOffer.ts",
-    "facility:link": "ts-node ./scripts/generateFacilityClaimLink.ts"
+    "facility:link": "ts-node ./scripts/generateFacilityClaimLink.ts",
+    "app-version:upsert": "ts-node ./scripts/upsertAppVersion.ts"
   },
   "engines": {
     "node": ">=16.0.0"

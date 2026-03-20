@@ -12,6 +12,9 @@ const TRIAL_PUSH_CHANNEL_ID = 'activity-alerts';
 const CIRCLE_ALERT_TYPES = new Set<string>([
   'circle_invite',
   'pin_change',
+  'pin_reset_request',
+  'pin_reset_approved',
+  'pin_reset_denied',
   'safe_phrase_added',
   'trusted_contact_added',
   'blocked_caller_added',
@@ -56,6 +59,18 @@ type TrialReminderPushPayload = {
   title: string;
   body: string;
   nudgeKey: string;
+  data?: Record<string, string>;
+};
+
+type AppUpdatePushPayload = {
+  title: string;
+  body: string;
+  data?: Record<string, string>;
+};
+
+type PinResetPushPayload = {
+  title: string;
+  body: string;
   data?: Record<string, string>;
 };
 
@@ -445,4 +460,119 @@ export async function notifyUserForTrialReminder(userId: string, payload: TrialR
   }));
 
   await deactivateInvalidTokens(dedupedRecipients, messages);
+}
+
+export async function notifyAllDevicesForAppUpdate(payload: AppUpdatePushPayload) {
+  const { data: tokenRows, error } = await supabaseAdmin
+    .from('profile_device_tokens')
+    .select('id, expo_push_token')
+    .eq('is_active', true);
+
+  if (error) {
+    logger.err(
+      `[push-notify] failed loading app update tokens message=${error.message}`
+    );
+    return;
+  }
+
+  const dedupedRecipients = dedupeTokens(
+    (tokenRows ?? [])
+      .filter((row) => typeof row.expo_push_token === 'string' && row.expo_push_token.trim().length > 0)
+      .map((row) => ({ id: row.id, expo_push_token: row.expo_push_token }))
+  );
+
+  if (dedupedRecipients.length === 0) {
+    return;
+  }
+
+  const messages: ExpoPushMessage[] = dedupedRecipients.map((recipient) => ({
+    to: recipient.expo_push_token,
+    title: payload.title,
+    body: payload.body,
+    sound: ACTIVITY_PUSH_SOUND,
+    channelId: ACTIVITY_PUSH_CHANNEL_ID,
+    data: normalizePushData(payload.data),
+  }));
+
+  await deactivateInvalidTokens(dedupedRecipients, messages);
+}
+
+export async function notifyUsersForPinReset(
+  profileId: string,
+  userIds: string[],
+  payload: PinResetPushPayload
+) {
+  const normalizedUserIds = Array.from(new Set(userIds.filter(Boolean)));
+  if (normalizedUserIds.length === 0) {
+    return;
+  }
+
+  const { data: profileRow } = await supabaseAdmin
+    .from('profiles')
+    .select('enable_push_alerts')
+    .eq('id', profileId)
+    .maybeSingle();
+  const defaultPushEnabled = profileRow?.enable_push_alerts !== false;
+
+  const { data: memberRows } = await supabaseAdmin
+    .from('profile_members')
+    .select('user_id, notification_preferences')
+    .eq('profile_id', profileId)
+    .in('user_id', normalizedUserIds);
+
+  const prefsByUser = new Map<string, Record<string, unknown> | null>();
+  (memberRows ?? []).forEach((row) => {
+    if (row.user_id) {
+      prefsByUser.set(row.user_id, row.notification_preferences as Record<string, unknown> | null);
+    }
+  });
+
+  const { data: tokenRows, error } = await supabaseAdmin
+    .from('profile_device_tokens')
+    .select('id, user_id, expo_push_token')
+    .in('user_id', normalizedUserIds)
+    .eq('is_active', true);
+
+  if (error) {
+    logger.err(
+      `[push-notify] failed loading pin reset tokens profile=${profileId} message=${error.message}`
+    );
+    return;
+  }
+
+  const seenTokens = new Set<string>();
+  const dedupedRecipients = (tokenRows ?? [])
+    .filter((row) => typeof row.expo_push_token === 'string' && row.expo_push_token.trim().length > 0)
+    .map((row) => ({ id: row.id, expo_push_token: row.expo_push_token, user_id: row.user_id }))
+    .filter((row) => {
+      if (!row.expo_push_token || seenTokens.has(row.expo_push_token)) {
+        return false;
+      }
+      seenTokens.add(row.expo_push_token);
+      return true;
+    });
+
+  const filtered = dedupedRecipients.filter((recipient) => {
+    const prefs = recipient.user_id ? prefsByUser.get(recipient.user_id) ?? null : null;
+    const globalPref = readBooleanPref(prefs, 'enable_push_alerts');
+    const globalEnabled = globalPref === null ? defaultPushEnabled : globalPref;
+    const circlePref = readBooleanPref(prefs, 'enable_push_circle_activity');
+    const circleEnabled = circlePref === null ? true : circlePref;
+    return globalEnabled && circleEnabled;
+  });
+
+  if (filtered.length === 0) {
+    return;
+  }
+
+  const messages: ExpoPushMessage[] = filtered.map((recipient) => ({
+    to: recipient.expo_push_token,
+    title: payload.title,
+    body: payload.body,
+    sound: ACTIVITY_PUSH_SOUND,
+    channelId: ACTIVITY_PUSH_CHANNEL_ID,
+    data: normalizePushData(payload.data),
+  }));
+
+  await deactivateInvalidTokens(filtered, messages);
 }

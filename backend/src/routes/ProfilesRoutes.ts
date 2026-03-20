@@ -7,6 +7,7 @@ import ProfileMembersController from '@src/controllers/ProfileMembersController'
 import ProfileDeviceTokensController from '@src/controllers/ProfileDeviceTokensController';
 import TwilioClientController from '@src/controllers/TwilioClientController';
 import ProfessionalLookupController from '@src/controllers/ProfessionalLookupController';
+import PinResetRequestsController from '@src/controllers/PinResetRequestsController';
 import { validateRequest } from '@src/middleware/validateRequest';
 import {
   createProfileSchema,
@@ -26,6 +27,8 @@ import {
   recordClientCallLifecycleSchema,
   updateVoIPTokenSchema,
   sensitiveActionPasscodeSchema,
+  createPinResetRequestSchema,
+  pinResetActionSchema,
 } from '@src/middleware/validationSchemas';
 
 const router = Router();
@@ -95,5 +98,26 @@ router.get('/:profileId/twilio-client/active-call', (req, res) =>
 router.post(PATHS.Profiles.DeviceTokens, validateRequest(registerDeviceTokenSchema), ProfileDeviceTokensController.registerDeviceToken);
 router.put('/:profileId/voip-token', validateRequest(updateVoIPTokenSchema), ProfilesController.updateVoIPToken);
 router.get(PATHS.Profiles.ProfessionalLookup, ProfessionalLookupController.search);
+router.get(PATHS.Profiles.PinResetRequests, PinResetRequestsController.listRequests);
+router.post(
+  PATHS.Profiles.PinResetRequests,
+  validateRequest(createPinResetRequestSchema),
+  PinResetRequestsController.createRequest
+);
+router.post(
+  PATHS.Profiles.PinResetRequestApprove,
+  validateRequest(pinResetActionSchema),
+  PinResetRequestsController.approveRequest
+);
+router.post(
+  PATHS.Profiles.PinResetRequestDeny,
+  validateRequest(pinResetActionSchema),
+  PinResetRequestsController.denyRequest
+);
+router.post(
+  PATHS.Profiles.PinResetRequestComplete,
+  validateRequest(pinResetActionSchema),
+  PinResetRequestsController.completeRequest
+);
 
 export default router;

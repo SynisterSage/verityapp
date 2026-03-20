@@ -99,6 +99,7 @@ export const updateAlertPrefsSchema = z.object({
   enable_push_circle_activity: z.boolean().optional(),
   enable_push_support_replies: z.boolean().optional(),
   enable_email_weekly_reports: z.boolean().optional(),
+  enable_email_pin_reset_requests: z.boolean().optional(),
   alert_threshold_score: z.number().min(0).max(100).optional(),
   auto_mark_enabled: z.boolean().optional(),
   auto_mark_fraud_threshold: z.number().min(0).max(100).optional(),
@@ -118,6 +119,12 @@ export const inviteMemberSchema = z.object({
   email: z.string().email('Invalid email format').optional(),
   role: z.enum(['editor', 'admin']).optional(),
 });
+
+export const createPinResetRequestSchema = z.object({
+  message: z.string().max(280).optional(),
+}).strict();
+
+export const pinResetActionSchema = z.object({}).strict();
 
 export const acceptInviteSchema = z.object({
   firstName: z.string().optional(),

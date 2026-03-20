@@ -18,6 +18,9 @@ const RATE_LIMIT_BYPASS_ALERT_TYPES = new Set<string>(['trusted', 'fraud', 'call
 const CIRCLE_ALERT_TYPES = new Set<string>([
   'circle_invite',
   'pin_change',
+  'pin_reset_request',
+  'pin_reset_approved',
+  'pin_reset_denied',
   'safe_phrase_added',
   'trusted_contact_added',
   'blocked_caller_added',

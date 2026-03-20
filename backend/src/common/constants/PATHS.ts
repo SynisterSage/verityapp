@@ -61,6 +61,10 @@ const PATHS = {
     DeviceTokens: '/:profileId/device-tokens',
     ProfessionalLookup: '/:profileId/professional-lookup',
     Support: '/:profileId/support',
+    PinResetRequests: '/:profileId/pin-reset-requests',
+    PinResetRequestApprove: '/:profileId/pin-reset-requests/:requestId/approve',
+    PinResetRequestDeny: '/:profileId/pin-reset-requests/:requestId/deny',
+    PinResetRequestComplete: '/:profileId/pin-reset-requests/:requestId/complete',
   },
 } as const;
 

@@ -162,6 +162,7 @@ function applyNotificationPreferences(
       | 'enable_push_circle_activity'
       | 'enable_push_support_replies'
       | 'enable_email_weekly_reports'
+      | 'enable_email_pin_reset_requests'
       | 'auto_mark_enabled'
       | 'auto_mark_fraud_threshold'
       | 'auto_mark_safe_threshold'
@@ -177,6 +178,7 @@ function applyNotificationPreferences(
     { key: 'enable_push_circle_activity', type: 'boolean' },
     { key: 'enable_push_support_replies', type: 'boolean' },
     { key: 'enable_email_weekly_reports', type: 'boolean' },
+    { key: 'enable_email_pin_reset_requests', type: 'boolean' },
     { key: 'auto_mark_enabled', type: 'boolean' },
     { key: 'auto_mark_fraud_threshold', type: 'number' },
     { key: 'auto_mark_safe_threshold', type: 'number' },
@@ -368,6 +370,18 @@ async function setPasscode(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
+  const { data: existingProfile, error: existingProfileError } = await supabaseAdmin
+    .from('profiles')
+    .select('pin_hash, pin_updated_at')
+    .eq('id', profileId)
+    .maybeSingle();
+
+  if (existingProfileError) {
+    logger.err(existingProfileError);
+  }
+
+  const hadPin = Boolean(existingProfile?.pin_hash || existingProfile?.pin_updated_at);
+
   const hashed = await hashPasscode(pin);
   const { error } = await supabaseAdmin
     .from('profiles')
@@ -387,26 +401,28 @@ async function setPasscode(req: Request, res: Response) {
   }
 
   try {
-    const { data: memberRow } = await supabaseAdmin
-      .from('profile_members')
-      .select('display_name')
-      .eq('profile_id', profileId)
-      .eq('user_id', userId)
-      .maybeSingle();
-    const actorLabel =
-      memberRow?.display_name ??
-      (isCaretaker ? 'Circle owner' : 'Circle member');
-    const payload = {
-      actor_user_id: userId,
-      actor_role: isCaretaker ? 'caretaker' : 'member',
-      actor_label: actorLabel,
-      message: 'Updated the Safety PIN',
-    };
-    await recordCircleAlert({
-      profileId,
-      alertType: 'pin_change',
-      payload,
-    });
+    if (hadPin) {
+      const { data: memberRow } = await supabaseAdmin
+        .from('profile_members')
+        .select('display_name')
+        .eq('profile_id', profileId)
+        .eq('user_id', userId)
+        .maybeSingle();
+      const actorLabel =
+        memberRow?.display_name ??
+        (isCaretaker ? 'Circle owner' : 'Circle member');
+      const payload = {
+        actor_user_id: userId,
+        actor_role: isCaretaker ? 'caretaker' : 'member',
+        actor_label: actorLabel,
+        message: 'Updated the Safety PIN',
+      };
+      await recordCircleAlert({
+        profileId,
+        alertType: 'pin_change',
+        payload,
+      });
+    }
   } catch (alertError) {
     logger.err(alertError);
   }
@@ -600,6 +616,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
     enable_push_circle_activity,
     enable_push_support_replies,
     enable_email_weekly_reports,
+    enable_email_pin_reset_requests,
     auto_mark_enabled,
     auto_mark_fraud_threshold,
     auto_mark_safe_threshold,
@@ -646,6 +663,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
           enable_push_circle_activity: true,
           enable_push_support_replies: true,
           enable_email_weekly_reports: true,
+          enable_email_pin_reset_requests: false,
           alert_threshold_score: 50,
           auto_mark_enabled: false,
           auto_mark_fraud_threshold: 80,
@@ -697,6 +715,9 @@ async function updateAlertPrefs(req: Request, res: Response) {
   }
   if (typeof enable_email_weekly_reports === 'boolean') {
     updatedPrefs.enable_email_weekly_reports = enable_email_weekly_reports;
+  }
+  if (typeof enable_email_pin_reset_requests === 'boolean') {
+    updatedPrefs.enable_email_pin_reset_requests = enable_email_pin_reset_requests;
   }
   if (typeof auto_mark_enabled === 'boolean') {
     updatedPrefs.auto_mark_enabled = auto_mark_enabled;
@@ -809,6 +830,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
     enable_push_circle_activity: updatedPrefs.enable_push_circle_activity,
     enable_push_support_replies: updatedPrefs.enable_push_support_replies,
     enable_email_weekly_reports: updatedPrefs.enable_email_weekly_reports,
+    enable_email_pin_reset_requests: updatedPrefs.enable_email_pin_reset_requests,
     auto_mark_enabled: updatedPrefs.auto_mark_enabled,
     auto_mark_fraud_threshold: updatedPrefs.auto_mark_fraud_threshold,
     auto_mark_safe_threshold: updatedPrefs.auto_mark_safe_threshold,
