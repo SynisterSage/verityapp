@@ -54,7 +54,7 @@ const POLICY_SECTIONS = [
       'Notifications (Required): Delivers real-time fraud alerts and circle activity updates. App works without notifications, but real-time delivery requires this permission.',
       'Contacts (Optional): Used to populate your trusted contact list and display caller names. You grant access only to specific contacts you add. You can revoke anytime in Settings.',
       'Phone (Optional): Used during onboarding to pre-fill your phone number and display your Verity Number.',
-      'Photos/Camera/Library (Not Used): Currently not used for any functionality. You can safely deny this permission.',
+      'Photos/Camera/Library (Optional - New in 1.1.0): Used to upload profile pictures for your account and circle members. Photos are stored securely and shared only with authorized circle members. You can delete pictures anytime.',
     ],
   },
   {

@@ -99,10 +99,10 @@ The Verity Protect app requests the following device permissions:
 - Used during onboarding to pre-fill your phone number and display your Verity Number
 - Does not grant access to call history or cellular data
 
----
-
-**NOT USED:**
-- Photos/Camera/Library: Currently not used for any functionality in the app. If requested during onboarding, it is for future reserved features. You can deny this permission.
+**Photos/Camera/Library (Optional - New in 1.1.0):**
+- Used to upload profile pictures for your account and circle members
+- Photos are stored securely and shared only with authorized circle members
+- You can delete pictures anytime through Settings → Profile
 
 ---
 
