@@ -9,6 +9,16 @@ Verity Protect ("we," "our," or "us") operates the Verity Protect mobile applica
 
 By using our Service, you consent to the data practices described in this policy. If you do not agree with this policy, please do not access or use our Service.
 
+## IMPORTANT: Not an Emergency Service
+
+**Verity Protect is NOT a 911 emergency service.** If you are experiencing an emergency:
+- **Always use your phone's native emergency dialer (911 in the US)**
+- Do not rely on Verity Protect for emergency communications
+- Verity is designed to screen and filter non-emergency calls only
+- For life-threatening situations or medical emergencies, call 911 immediately
+
+Verity Protect is not monitored by emergency responders and cannot be used as a substitute for traditional emergency services.
+
 ## 1. Information We Collect
 
 ### 1.1 Information You Provide Directly

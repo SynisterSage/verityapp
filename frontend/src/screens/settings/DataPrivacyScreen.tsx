@@ -15,6 +15,7 @@ import {
 import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
+import * as ImagePickerLib from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -237,6 +238,8 @@ export default function DataPrivacyScreen() {
   const [notifGranted, setNotifGranted] = useState<boolean | null>(null);
   const [locationGranted, setLocationGranted] = useState<boolean | null>(null);
   const [micGranted, setMicGranted] = useState<boolean | null>(null);
+  const [cameraGranted, setCameraGranted] = useState<boolean | null>(null);
+  const [photoLibraryGranted, setPhotoLibraryGranted] = useState<boolean | null>(null);
 
   useEffect(() => {
     Notifications.getPermissionsAsync().then(({ status }) => {
@@ -248,6 +251,18 @@ export default function DataPrivacyScreen() {
     Audio.getPermissionsAsync().then(({ status }) => {
       setMicGranted(status === 'granted' ? true : status === 'undetermined' ? null : false);
     }).catch(() => setMicGranted(false));
+  }, []);
+
+  useEffect(() => {
+    ImagePickerLib.getCameraPermissionsAsync().then(({ status }) => {
+      setCameraGranted(status === 'granted' ? true : status === 'undetermined' ? null : false);
+    }).catch(() => setCameraGranted(false));
+  }, []);
+
+  useEffect(() => {
+    ImagePickerLib.getMediaLibraryPermissionsAsync().then(({ status }) => {
+      setPhotoLibraryGranted(status === 'granted' ? true : status === 'undetermined' ? null : false);
+    }).catch(() => setPhotoLibraryGranted(false));
   }, []);
 
   useEffect(() => {
@@ -530,6 +545,22 @@ export default function DataPrivacyScreen() {
               label="Microphone"
               description="Used to screen and connect incoming calls"
               granted={micGranted}
+              styles={styles}
+              theme={theme}
+            />
+            <OsPermissionRow
+              icon="camera-outline"
+              label="Camera"
+              description="Required to take profile pictures"
+              granted={cameraGranted}
+              styles={styles}
+              theme={theme}
+            />
+            <OsPermissionRow
+              icon="image-outline"
+              label="Photo Library"
+              description="Required to select profile pictures"
+              granted={photoLibraryGranted}
               styles={styles}
               theme={theme}
             />

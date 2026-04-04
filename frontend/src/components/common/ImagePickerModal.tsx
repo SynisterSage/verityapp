@@ -9,6 +9,7 @@ import {
   Text,
   ActivityIndicator,
   Image,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,18 +43,6 @@ export default function ImagePickerModal({
   const styles = useCallback(() => createImagePickerStyles(theme), [theme])();
   const [selectedImage, setSelectedImage] = useState<ImageData | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-
-  const requestPermissions = async () => {
-    const cameraStatus = await ImagePickerLib.requestCameraPermissionsAsync();
-    const galleryStatus = await ImagePickerLib.requestMediaLibraryPermissionsAsync();
-
-    return {
-      camera: cameraStatus.status === 'granted',
-      gallery: galleryStatus.status === 'granted',
-    };
-  };
-
-
 
   const processImage = async (result: ImagePickerLib.ImagePickerResult) => {
     if (result.canceled) {
@@ -108,17 +97,35 @@ export default function ImagePickerModal({
 
   const handleTakePhoto = async () => {
     try {
-      const permissions = await requestPermissions();
-      if (!permissions.camera) {
+      setIsProcessing(true);
+      
+      // Request camera permission explicitly first
+      const { status: cameraStatus } = await ImagePickerLib.requestCameraPermissionsAsync();
+      
+      if (cameraStatus !== 'granted') {
+        setIsProcessing(false);
         Alert.alert(
-          'Camera Permission Denied',
-          'Please enable camera access in Settings to take photos.'
+          'Camera Permission Required',
+          'Camera access is needed to take a photo. Please enable it in Settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                if (Platform.OS === 'ios') {
+                  Linking.openURL('app-settings:');
+                } else {
+                  Linking.openURL('app-settings:com.verityprotect');
+                }
+              },
+            },
+          ]
         );
         return;
       }
 
       const result = await ImagePickerLib.launchCameraAsync({
-        mediaTypes: ImagePickerLib.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -127,23 +134,46 @@ export default function ImagePickerModal({
 
       await processImage(result);
     } catch (error) {
-      Alert.alert('Error', `Camera error: ${error}`);
+      setIsProcessing(false);
+      Alert.alert(
+        'Camera Error',
+        'Unable to access camera. Please check your permissions and try again.'
+      );
+      console.error('Camera error:', error);
     }
   };
 
   const handleSelectFromLibrary = async () => {
     try {
-      const permissions = await requestPermissions();
-      if (!permissions.gallery) {
+      setIsProcessing(true);
+      
+      // Request media library permission explicitly first
+      const { status: libraryStatus } = await ImagePickerLib.requestMediaLibraryPermissionsAsync();
+      
+      if (libraryStatus !== 'granted') {
+        setIsProcessing(false);
         Alert.alert(
-          'Photo Library Permission Denied',
-          'Please enable photo library access in Settings.'
+          'Photo Library Permission Required',
+          'Photo library access is needed to select a photo. Please enable it in Settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Open Settings',
+              onPress: () => {
+                if (Platform.OS === 'ios') {
+                  Linking.openURL('app-settings:');
+                } else {
+                  Linking.openURL('app-settings:com.verityprotect');
+                }
+              },
+            },
+          ]
         );
         return;
       }
 
       const result = await ImagePickerLib.launchImageLibraryAsync({
-        mediaTypes: ImagePickerLib.MediaTypeOptions.Images,
+        mediaTypes: ['images'],
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,
@@ -152,7 +182,12 @@ export default function ImagePickerModal({
 
       await processImage(result);
     } catch (error) {
-      Alert.alert('Error', `Gallery error: ${error}`);
+      setIsProcessing(false);
+      Alert.alert(
+        'Library Error',
+        'Unable to access photo library. Please check your permissions and try again.'
+      );
+      console.error('Library error:', error);
     }
   };
 

@@ -331,6 +331,14 @@ home: [
         </Text>
       </Pressable>
 
+      {/* Emergency Service Disclaimer */}
+      <View style={[styles.disclaimerCard, { backgroundColor: withOpacity(theme.colors.warning, 0.1) }]}>
+        <Ionicons name="warning-outline" size={16} color={theme.colors.warning} style={styles.disclaimerIcon} />
+        <Text style={[styles.disclaimerText, { color: theme.colors.text }]}>
+          Verity is not a 911 service. For emergencies, use your phone's native emergency dialer.
+        </Text>
+      </View>
+
         <View style={{ height: 32 }} />
       </ScrollView>
 
@@ -535,5 +543,23 @@ const createCallForwardingStyles = (theme: AppTheme) =>
       borderWidth: 1,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    disclaimerCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      borderRadius: 12,
+      padding: 12,
+      gap: 10,
+      borderWidth: 1,
+      borderColor: withOpacity(theme.colors.warning, 0.3),
+    },
+    disclaimerIcon: {
+      marginTop: 2,
+    },
+    disclaimerText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '500',
     },
   });

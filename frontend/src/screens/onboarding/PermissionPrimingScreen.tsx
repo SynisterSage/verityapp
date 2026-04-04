@@ -14,6 +14,7 @@ import * as Notifications from 'expo-notifications';
 import * as Location from 'expo-location';
 import { Audio } from 'expo-av';
 import { CommonActions, useNavigation } from '@react-navigation/native';
+import * as ImagePickerLib from 'expo-image-picker';
 
 import { useTheme } from '../../context/ThemeContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
@@ -56,6 +57,18 @@ const PERMISSIONS: PermRow[] = [
     title: 'Contacts',
     reason: "We'll ask when you add your first trusted contact.",
     isInfoOnly: true,
+  },
+  {
+    key: 'camera',
+    icon: 'camera-outline',
+    title: 'Camera',
+    reason: 'Used to capture your profile picture.',
+  },
+  {
+    key: 'photoLibrary',
+    icon: 'image-outline',
+    title: 'Photo Library',
+    reason: 'Used to select your profile picture.',
   },
 ];
 
@@ -239,6 +252,8 @@ export default function PermissionPrimingScreen() {
     notifications: 'idle',
     location: 'idle',
     contacts: 'idle',
+    camera: 'idle',
+    photoLibrary: 'idle',
   });
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -319,6 +334,32 @@ export default function PermissionPrimingScreen() {
       else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } catch {
       setPermState('location', 'denied');
+    }
+
+    setActiveKey(null);
+
+    // 4. Camera
+    setActiveKey('camera');
+    try {
+      const { status } = await ImagePickerLib.requestCameraPermissionsAsync();
+      const granted = status === 'granted';
+      setPermState('camera', granted ? 'granted' : 'denied');
+      if (granted) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } catch {
+      setPermState('camera', 'denied');
+    }
+
+    // 5. Photo Library
+    setActiveKey('photoLibrary');
+    try {
+      const { status } = await ImagePickerLib.requestMediaLibraryPermissionsAsync();
+      const granted = status === 'granted';
+      setPermState('photoLibrary', granted ? 'granted' : 'denied');
+      if (granted) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      else Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } catch {
+      setPermState('photoLibrary', 'denied');
     }
 
     setActiveKey(null);

@@ -59,6 +59,12 @@
 	<string>Verity Protect uses your location to find nearby care professionals for your trusted list.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Verity Protect uses your microphone to screen and record incoming calls for fraud detection.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Verity Protect uses your camera to capture your profile picture.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Verity Protect uses your photo library to select and upload your profile picture.</string>
+	<key>NSPhotoLibraryAddOnlyUsageDescription</key>
+	<string>Verity Protect uses your photo library to save and share exported data.</string>
 	<key>NSSupportsLiveActivities</key>
 	<true/>
 	<key>NSVoIPUsageDescription</key>
