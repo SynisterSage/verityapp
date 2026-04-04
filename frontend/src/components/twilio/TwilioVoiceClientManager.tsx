@@ -11,6 +11,7 @@ import {
   TwilioClientCallLifecycleState,
 } from '../../services/twilioClient';
 import { authorizedFetch } from '../../services/backend';
+import { logEvent } from '../../services/sentry';
 import { dismissActiveCall, navigateToActiveCall } from '../../navigation/rootNavigator';
 import {
   getPlaceholderCallUUID,
@@ -121,6 +122,7 @@ function parseTrustedMapEntryName(value: unknown) {
 export default function TwilioVoiceClientManager() {
   const {
     activeProfile,
+    canManageProfile,
     isTwilioClientReady,
     twilioClientToken,
     twilioClientIdentity,
@@ -155,6 +157,18 @@ export default function TwilioVoiceClientManager() {
   const INIT_MIN_INTERVAL_MS = 15_000;
   const MANUAL_HANGUP_ACTIVITY_END_DELAY_MS = 1800;
 
+  /**
+   * Builds the payload for iOS Live Activity (lock screen call widget).
+   * 
+   * CRITICAL: Permission gating prevents unauthorized users (family, caretakers)
+   * from seeing live call activities. Only the profile owner/manager can access.
+   * 
+   * Returns null if:
+   * 1. User lacks canManageProfile permission (not owner/manager)
+   * 2. activeProfile is missing or invalid
+   * 
+   * This prevents cross-profile data leakage and respects role-based access control.
+   */
   const buildLiveActivityPayload = (args: {
     callSid: string;
     status: string;
@@ -162,6 +176,24 @@ export default function TwilioVoiceClientManager() {
     callerName?: string | null;
     connectedAtEpochSeconds?: number | null;
   }) => {
+    // Permission gate: only owner/manager can see live activities
+    if (!canManageProfile) {
+      logEvent('LIVE_ACTIVITY_PERMISSION_DENIED', {
+        callSid: args.callSid,
+        status: args.status,
+      });
+      return null;
+    }
+
+    // Validate profile ownership
+    if (!activeProfile?.id) {
+      logEvent('LIVE_ACTIVITY_INVALID_PROFILE', {
+        callSid: args.callSid,
+        hasProfile: !!activeProfile,
+      });
+      return null;
+    }
+
     livePayloadArgsByCallSidRef.current.set(args.callSid, { ...args });
     const cached = getIncomingCallMetadata(args.callSid);
     const rawNumber = trimToNull(args.fromNumber ?? cached?.fromNumber ?? null);
@@ -244,12 +276,15 @@ export default function TwilioVoiceClientManager() {
         if (activeCallSid) {
           const args = livePayloadArgsByCallSidRef.current.get(activeCallSid);
           if (args) {
-            updateLiveCallActivity(buildLiveActivityPayload(args)).catch((err) => {
-              console.warn('[twilio-voice] failed refreshing live activity after trusted lookup', {
-                callSid: activeCallSid,
-                message: err instanceof Error ? err.message : String(err),
+            const payload = buildLiveActivityPayload(args);
+            if (payload) {
+              updateLiveCallActivity(payload).catch((err) => {
+                logEvent('LIVE_ACTIVITY_UPDATE_ERROR', {
+                  callSid: activeCallSid,
+                  message: err instanceof Error ? err.message : String(err),
+                });
               });
-            });
+            }
           }
         }
       }
@@ -268,6 +303,8 @@ export default function TwilioVoiceClientManager() {
     if (targetCallSid) {
       const pendingEndTimer = pendingLiveActivityEndTimerByCallSidRef.current.get(targetCallSid);
       if (pendingEndTimer) {
+        clearTimeout(pendingEndTimer);
+        pendingLiveActivityEndTimerByCallSidRef.current.delete(targetCallSid);
         const shouldDismiss = currentActiveCallSid === targetCallSid;
         if (shouldDismiss) {
           activeCallSidRef.current = null;
@@ -277,19 +314,34 @@ export default function TwilioVoiceClientManager() {
       }
       connectedAtByCallSidRef.current.delete(targetCallSid);
       clearIncomingCallMetadata(targetCallSid);
+      
+      const basePayload = buildLiveActivityPayload({
+        callSid: targetCallSid,
+        status: 'Ended',
+        connectedAtEpochSeconds: null,
+      });
+      
+      // Skip activity end if permission denied
+      if (!basePayload) {
+        livePayloadArgsByCallSidRef.current.delete(targetCallSid);
+        const shouldDismiss = currentActiveCallSid === targetCallSid;
+        if (shouldDismiss) {
+          activeCallSidRef.current = null;
+          dismissActiveCall();
+        }
+        return;
+      }
+      
       const endPayload = {
-        ...buildLiveActivityPayload({
-          callSid: targetCallSid,
-          status: 'Ended',
-          connectedAtEpochSeconds: null,
-        }),
+        ...basePayload,
         callSid: targetCallSid,
       };
+      
       const shouldShowEndedPreview = consumeManualHangupIntent(targetCallSid);
       const finalizeLiveActivity = () => {
         endLiveCallActivity(endPayload)
           .catch((err) => {
-            console.warn('[twilio-voice] failed ending live activity', {
+            logEvent('LIVE_ACTIVITY_END_ERROR', {
               callSid: targetCallSid,
               message: err instanceof Error ? err.message : String(err),
             });
@@ -300,7 +352,7 @@ export default function TwilioVoiceClientManager() {
       };
       if (shouldShowEndedPreview) {
         updateLiveCallActivity(endPayload).catch((err) => {
-          console.warn('[twilio-voice] failed updating ended preview live activity', {
+          logEvent('LIVE_ACTIVITY_END_PREVIEW_ERROR', {
             callSid: targetCallSid,
             message: err instanceof Error ? err.message : String(err),
           });
@@ -483,12 +535,14 @@ export default function TwilioVoiceClientManager() {
             connectedAtByCallSidRef.current.get(session.call_sid) ??
             null,
         });
-        startLiveCallActivity(livePayload).catch((err) => {
-          console.warn('[twilio-voice] failed hydrating live activity', {
-            callSid: session.call_sid,
-            message: err instanceof Error ? err.message : String(err),
+        if (livePayload) {
+          startLiveCallActivity(livePayload).catch((err) => {
+            logEvent('LIVE_ACTIVITY_START_ERROR', {
+              callSid: session.call_sid,
+              message: err instanceof Error ? err.message : String(err),
+            });
           });
-        });
+        }
         navigateToActiveCall({
           callSid: session.call_sid,
           fromNumber: session.from_number,
@@ -647,20 +701,21 @@ export default function TwilioVoiceClientManager() {
       // Report lifecycle but DON'T navigate yet - let CallKit handle the incoming call UI
       // We'll navigate when user accepts and call starts connecting
       reportLifecycle('ringing', data);
-      startLiveCallActivity(
-        buildLiveActivityPayload({
-          callSid: parsed.callSid,
-          status: 'Ringing',
-          fromNumber: parsed.fromNumber,
-          callerName: parsed.callerName,
-          connectedAtEpochSeconds: null,
-        })
-      ).catch((err) => {
-        console.warn('[twilio-voice] failed starting live activity', {
-          callSid: parsed.callSid,
-          message: err instanceof Error ? err.message : String(err),
-        });
+      const ringingPayload = buildLiveActivityPayload({
+        callSid: parsed.callSid,
+        status: 'Ringing',
+        fromNumber: parsed.fromNumber,
+        callerName: parsed.callerName,
+        connectedAtEpochSeconds: null,
       });
+      if (ringingPayload) {
+        startLiveCallActivity(ringingPayload).catch((err) => {
+          logEvent('LIVE_ACTIVITY_START_ERROR', {
+            callSid: parsed.callSid,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
       console.info('[twilio-voice] Incoming call reported, waiting for user to accept via CallKit');
 
       // If user already answered the placeholder CallKit call, immediately accept
@@ -721,20 +776,21 @@ export default function TwilioVoiceClientManager() {
       }
 
       reportLifecycle('connecting', data);
-      updateLiveCallActivity(
-        buildLiveActivityPayload({
-          callSid,
-          status: 'Connecting',
-          fromNumber: parsed.fromNumber,
-          callerName: parsed.callerName,
-          connectedAtEpochSeconds: null,
-        })
-      ).catch((err) => {
-        console.warn('[twilio-voice] failed updating live activity', {
-          callSid,
-          message: err instanceof Error ? err.message : String(err),
-        });
+      const connectingPayload = buildLiveActivityPayload({
+        callSid,
+        status: 'Connecting',
+        fromNumber: parsed.fromNumber,
+        callerName: parsed.callerName,
+        connectedAtEpochSeconds: null,
       });
+      if (connectingPayload) {
+        updateLiveCallActivity(connectingPayload).catch((err) => {
+          logEvent('LIVE_ACTIVITY_UPDATE_ERROR', {
+            callSid,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
       // Don't navigate yet - wait for full connection before showing active call screen
       // This prevents showing controls before audio is established
       console.info('[twilio-voice] Call connecting, waiting for full connection before navigation');
@@ -753,20 +809,21 @@ export default function TwilioVoiceClientManager() {
       const connectedAtEpochSeconds = Math.floor(Date.now() / 1000);
       connectedAtByCallSidRef.current.set(callSid, connectedAtEpochSeconds);
       reportLifecycle('connected', data);
-      updateLiveCallActivity(
-        buildLiveActivityPayload({
-          callSid,
-          status: 'Connected',
-          fromNumber: parsed.fromNumber,
-          callerName: parsed.callerName,
-          connectedAtEpochSeconds,
-        })
-      ).catch((err) => {
-        console.warn('[twilio-voice] failed updating live activity', {
-          callSid,
-          message: err instanceof Error ? err.message : String(err),
-        });
+      const connectedPayload = buildLiveActivityPayload({
+        callSid,
+        status: 'Connected',
+        fromNumber: parsed.fromNumber,
+        callerName: parsed.callerName,
+        connectedAtEpochSeconds,
       });
+      if (connectedPayload) {
+        updateLiveCallActivity(connectedPayload).catch((err) => {
+          logEvent('LIVE_ACTIVITY_UPDATE_ERROR', {
+            callSid,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
       navigateToActiveCall({
         callSid,
         fromNumber: parsed.fromNumber,
@@ -788,20 +845,21 @@ export default function TwilioVoiceClientManager() {
       const connectedAtEpochSeconds =
         connectedAtByCallSidRef.current.get(callSid) ?? null;
       reportLifecycle('reconnecting', data, activeCallSidRef.current);
-      updateLiveCallActivity(
-        buildLiveActivityPayload({
-          callSid,
-          status: 'Reconnecting',
-          fromNumber: parsed.fromNumber,
-          callerName: parsed.callerName,
-          connectedAtEpochSeconds,
-        })
-      ).catch((err) => {
-        console.warn('[twilio-voice] failed updating live activity', {
-          callSid,
-          message: err instanceof Error ? err.message : String(err),
-        });
+      const reconnectingPayload = buildLiveActivityPayload({
+        callSid,
+        status: 'Reconnecting',
+        fromNumber: parsed.fromNumber,
+        callerName: parsed.callerName,
+        connectedAtEpochSeconds,
       });
+      if (reconnectingPayload) {
+        updateLiveCallActivity(reconnectingPayload).catch((err) => {
+          logEvent('LIVE_ACTIVITY_UPDATE_ERROR', {
+            callSid,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
       navigateToActiveCall({
         callSid,
         fromNumber: parsed.fromNumber,
@@ -837,20 +895,21 @@ export default function TwilioVoiceClientManager() {
       if (!callSid) {
         return;
       }
-      updateLiveCallActivity(
-        buildLiveActivityPayload({
-          callSid,
-          status: 'Ringing',
-          fromNumber: parsed.fromNumber,
-          callerName: parsed.callerName,
-          connectedAtEpochSeconds: null,
-        })
-      ).catch((err) => {
-        console.warn('[twilio-voice] failed updating live activity', {
-          callSid,
-          message: err instanceof Error ? err.message : String(err),
-        });
+      const ringingPayloadUpdate = buildLiveActivityPayload({
+        callSid,
+        status: 'Ringing',
+        fromNumber: parsed.fromNumber,
+        callerName: parsed.callerName,
+        connectedAtEpochSeconds: null,
       });
+      if (ringingPayloadUpdate) {
+        updateLiveCallActivity(ringingPayloadUpdate).catch((err) => {
+          logEvent('LIVE_ACTIVITY_UPDATE_ERROR', {
+            callSid,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        });
+      }
     };
 
     registerEvent('deviceReady', handleDeviceReady);

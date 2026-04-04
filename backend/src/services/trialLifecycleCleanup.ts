@@ -146,6 +146,20 @@ export async function runTrialLifecycleCleanup(
       }
       reclaimedProfiles += 1;
       if (!dryRun) {
+        // Track as orphaned DID (for call validation)
+        const { error: orphanError } = await supabaseAdmin
+          .from('orphaned_dids')
+          .insert({
+            phone_number: profile.twilio_virtual_number,
+            original_profile_id: profile.id,
+            reclaim_reason: 'trial_expired',
+            reclaimed_at: nowIso,
+            expires_at: new Date(Date.now() + 30 * DAY_MS).toISOString(), // Keep for 30 days
+          });
+        if (orphanError) {
+          logger.warn(`[trial] failed to track orphaned DID for profile=${profile.id}: ${orphanError.message}`);
+        }
+        
         const released = await releaseNumberFromProfileWithOptions(profile.id, { markForRestore: true });
         if (!released) {
           logger.warn(`[trial] failed to reclaim number for profile=${profile.id}`);
@@ -155,6 +169,18 @@ export async function runTrialLifecycleCleanup(
 
     reclaimedUsers += 1;
     if (!dryRun) {
+      // Mark all profiles for this user as having active subscription = false
+      const { error: profileUpdateError } = await supabaseAdmin
+        .from('profiles')
+        .update({
+          has_active_subscription: false,
+          forwarding_number_cleared_at: nowIso,
+        })
+        .eq('caretaker_id', row.user_id);
+      if (profileUpdateError) {
+        logger.warn(`[trial] failed to update profile subscription status for user=${row.user_id}: ${profileUpdateError.message}`);
+      }
+      
       const { error: updateError } = await supabaseAdmin
         .from('user_subscriptions')
         .update({

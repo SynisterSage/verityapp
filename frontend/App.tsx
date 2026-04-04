@@ -15,10 +15,12 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import {
   Alert,
   AppState,
+  Animated,
   ActivityIndicator,
   Modal,
   Platform,
   Pressable,
+  Easing,
   StyleSheet,
   Text,
   TextInput,
@@ -44,6 +46,11 @@ import { authorizedFetch } from './src/services/backend';
 import { supabase } from './src/services/supabase';
 import { getPublicEnv } from './src/services/publicConfig';
 import { resolveInviteClaimToken, wasInviteClaimRecentlyAccepted } from './src/services/inviteClaims';
+import {
+  fetchAppVersionPolicy,
+  evaluateAppUpdateStatus,
+  type AppUpdateStatus,
+} from './src/services/appVersion';
 import SignInScreen from './src/screens/auth/SignInScreen';
 import SignUpScreen from './src/screens/auth/SignUpScreen';
 import ConfirmEmailScreen from './src/screens/auth/ConfirmEmailScreen';
@@ -71,6 +78,7 @@ import MembersScreen from './src/screens/settings/MembersScreen';
 import SupportInfoScreen from './src/screens/settings/SupportInfoScreen';
 import HowItWorksScreen from './src/screens/settings/HowItWorksScreen';
 import WhatsNewScreen from './src/screens/settings/WhatsNewScreen';
+import FullCoverageScreen from './src/screens/onboarding/FullCoverageScreen';
 import CircleActivityDetailScreen from './src/screens/dashboard/CircleActivityDetailScreen';
 import DoctorLookupScreen from './src/screens/settings/DoctorLookupScreen';
 import SupportScreen from './src/screens/support/SupportScreen';
@@ -148,6 +156,19 @@ const CALL_DETAIL_ALERT_TYPES = new Set<string>(['fraud', 'safe', 'call_review']
 const PENDING_INVITE_CLAIM_KEY = 'app:pending-invite-claim';
 const LEGACY_PENDING_INVITE_ID_KEY = 'app:pending-invite-id';
 const TRIAL_REMINDER_MODAL_LAST_SHOWN_AT_KEY = 'trial:reminder:last-shown-at';
+const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+
+function resolveAppStoreUrl(status: AppUpdateStatus | null): string | null {
+  if (!status) {
+    return null;
+  }
+  const envUrl =
+    Platform.OS === 'ios'
+      ? getPublicEnv('EXPO_PUBLIC_APP_STORE_URL')
+      : getPublicEnv('EXPO_PUBLIC_PLAY_STORE_URL');
+  const normalizedEnvUrl = envUrl.trim().length > 0 ? envUrl.trim() : null;
+  return status.storeUrl ?? normalizedEnvUrl ?? null;
+}
 
 function normalizeInviteIdentifier(value: string | null | undefined) {
   const trimmed = typeof value === 'string' ? value.trim() : '';
@@ -716,6 +737,7 @@ function SettingsStackNavigator() {
       <SettingsStack.Screen name="Members" component={MembersScreen} />
       <SettingsStack.Screen name="SupportInfo" component={SupportInfoScreen} />
       <SettingsStack.Screen name="HowItWorks" component={HowItWorksScreen} />
+      <SettingsStack.Screen name="FullCoverage" component={FullCoverageScreen} />
       <SettingsStack.Screen name="SafetyIntelligence" component={DoctorLookupScreen} />
     </SettingsStack.Navigator>
   );
@@ -725,6 +747,44 @@ type InviteClaimPayload = {
   inviteCode?: string;
   inviteToken?: string;
 };
+
+type EmailConfirmationPayload = {
+  email: string;
+  confirmed: true;
+};
+
+function parseEmailConfirmationFromUrl(url: string): EmailConfirmationPayload | null {
+  const parsed = Linking.parse(url);
+  
+  // Check if this is an auth callback URL
+  const combinedPath = [parsed.hostname, parsed.path].filter(Boolean).join('/').toLowerCase();
+  const isAuthCallback = combinedPath.includes('auth/callback') || 
+                         combinedPath.endsWith('auth') ||
+                         url.includes('verityprotect://auth');
+  
+  if (!isAuthCallback) {
+    return null;
+  }
+  
+  // Supabase sends token and email in query params for email confirmation
+  const token = parsed.queryParams?.token;
+  const email = parsed.queryParams?.email;
+  const type = parsed.queryParams?.type;
+  
+  // Check if this is an email confirmation callback
+  if (token && email && (type === 'email_change' || type === 'verify' || !type)) {
+    // This is an email confirmation deep link
+    const emailStr = Array.isArray(email) ? email[0] : email;
+    if (typeof emailStr === 'string' && emailStr.includes('@')) {
+      return {
+        email: emailStr.toLowerCase(),
+        confirmed: true,
+      };
+    }
+  }
+  
+  return null;
+}
 
 function parseInviteClaimFromUrl(url: string): InviteClaimPayload | null {
   const parsed = Linking.parse(url);
@@ -743,7 +803,14 @@ function parseInviteClaimFromUrl(url: string): InviteClaimPayload | null {
       ? normalizeInviteIdentifier(segments[inviteIndex + 1])
       : undefined;
 
-  const queryInviteToken = parsed.queryParams?.t ?? parsed.queryParams?.token;
+  const explicitInviteToken = parsed.queryParams?.inviteToken ?? parsed.queryParams?.invite_token;
+  const explicitInviteCode =
+    parsed.queryParams?.inviteCode ?? parsed.queryParams?.invite_code ?? parsed.queryParams?.inviteId ?? parsed.queryParams?.invite_id;
+  const hasInviteContext = hasInviteSegment || Boolean(explicitInviteToken) || Boolean(explicitInviteCode);
+
+  const queryInviteToken = hasInviteContext
+    ? explicitInviteToken ?? parsed.queryParams?.t ?? parsed.queryParams?.token
+    : explicitInviteToken;
   const inviteToken =
     typeof queryInviteToken === 'string'
       ? queryInviteToken.trim()
@@ -751,8 +818,9 @@ function parseInviteClaimFromUrl(url: string): InviteClaimPayload | null {
       ? queryInviteToken[0]?.trim()
       : '';
 
-  const queryInviteCode =
-    parsed.queryParams?.code ?? parsed.queryParams?.inviteId ?? parsed.queryParams?.invite_id;
+  const queryInviteCode = hasInviteContext
+    ? parsed.queryParams?.code ?? explicitInviteCode
+    : explicitInviteCode;
   const inviteCode =
     typeof queryInviteCode === 'string'
       ? normalizeInviteIdentifier(queryInviteCode)
@@ -760,7 +828,7 @@ function parseInviteClaimFromUrl(url: string): InviteClaimPayload | null {
       ? normalizeInviteIdentifier(queryInviteCode[0] ?? '')
       : undefined;
 
-  if (!hasInviteSegment && !inviteCode && !inviteToken) {
+  if (!hasInviteContext && !inviteCode && !inviteToken && !pathInviteCode) {
     return null;
   }
 
@@ -915,6 +983,40 @@ function InviteLinkHandler() {
 
   const handleUrl = useCallback(
     async (url: string) => {
+      // Check for email confirmation deep link (from Supabase callback)
+      const emailConfirmation = parseEmailConfirmationFromUrl(url);
+      if (emailConfirmation) {
+        if (!rootNavigationRef.current?.isReady()) {
+          return;
+        }
+        rootNavigationRef.current.navigate('ConfirmEmail', {
+          email: emailConfirmation.email,
+          confirmed: emailConfirmation.confirmed,
+        });
+        return;
+      }
+
+      // Check for full-coverage deep link
+      if (url.includes('full-coverage') || url.includes('fullcoverage') || url.includes('full_coverage')) {
+        const parsed = Linking.parse(url);
+        const combinedPath = [parsed.hostname, parsed.path].filter(Boolean).join('/').toLowerCase();
+        if (combinedPath.includes('full-coverage') || combinedPath.includes('fullcoverage') || combinedPath.includes('full_coverage')) {
+          if (session) {
+            // Authenticated user: show Account settings with full coverage context
+            rootNavigationRef.navigate('AppTabs', {
+              screen: 'SettingsTab',
+              params: { screen: 'Account', params: { fromFullCoverageSetup: true } },
+            });
+          } else {
+            // Unauthenticated user: route to sign in with full coverage flag
+            rootNavigationRef.navigate('SignIn', {
+              fromFullCoverageSetup: true,
+            });
+          }
+          return;
+        }
+      }
+
       const payload = parseInviteClaimFromUrl(url);
       if (!payload) {
         return;
@@ -1576,6 +1678,234 @@ function SessionExpiredModal({ visible, theme, mode, onDismiss }: SessionExpired
   );
 }
 
+type AppUpdateModalProps = {
+  visible: boolean;
+  theme: AppTheme;
+  mode: string;
+  status: AppUpdateStatus;
+  storeUrl: string | null;
+  onUpdate: () => void;
+  onDismiss?: () => void;
+};
+
+function AppUpdateModal({
+  visible,
+  theme,
+  mode,
+  status,
+  storeUrl,
+  onUpdate,
+  onDismiss,
+}: AppUpdateModalProps) {
+  const isDark = mode === 'dark';
+  const styles = useMemo(() => createAppUpdateModalStyles(theme, isDark), [isDark, theme]);
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslateY = useRef(new Animated.Value(10)).current;
+  const cardScale = useRef(new Animated.Value(0.98)).current;
+  const enforceRequiredUpdate = status.isRequired && Boolean(storeUrl);
+  const title = enforceRequiredUpdate ? 'Update required' : 'Update available';
+  const defaultMessage = enforceRequiredUpdate
+    ? 'Please update to continue using Verity Protect.'
+    : 'A new version is ready. Update for the latest fixes and improvements.';
+  const message = status.updateMessage ?? defaultMessage;
+  const versionLine = status.latestVersion
+    ? `Current ${status.currentVersion} • Latest ${status.latestVersion}`
+    : `Current ${status.currentVersion}`;
+
+  const handleUpdate = useCallback(() => {
+    if (!storeUrl) {
+      Alert.alert('Update unavailable', 'Update link not configured yet.');
+      return;
+    }
+    void Linking.openURL(storeUrl);
+    onUpdate();
+  }, [onUpdate, storeUrl]);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    backdropOpacity.setValue(0);
+    cardOpacity.setValue(0);
+    cardTranslateY.setValue(10);
+    cardScale.setValue(0.98);
+    Animated.parallel([
+      Animated.timing(backdropOpacity, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardOpacity, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardTranslateY, {
+        toValue: 0,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(cardScale, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [backdropOpacity, cardOpacity, cardScale, cardTranslateY, visible]);
+
+  if (!visible) {
+    return null;
+  }
+
+  return (
+    <Modal visible transparent animationType="none" statusBarTranslucent>
+      <View style={styles.overlay}>
+        <Animated.View style={[styles.backdrop, { opacity: backdropOpacity }]} />
+        <Animated.View
+          style={[
+            styles.card,
+            {
+              opacity: cardOpacity,
+              transform: [{ translateY: cardTranslateY }, { scale: cardScale }],
+            },
+          ]}
+        >
+          <View style={styles.iconWrap}>
+            <Ionicons name="sparkles" size={26} color={theme.colors.accent} />
+          </View>
+
+          <View style={styles.copyWrap}>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.message}>{message}</Text>
+            <Text style={styles.versionText}>{versionLine}</Text>
+          </View>
+
+          <View style={styles.buttonRow}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.primaryButton,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={handleUpdate}
+            >
+              <Text style={styles.primaryButtonText}>Update now</Text>
+            </Pressable>
+            {!enforceRequiredUpdate && onDismiss ? (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.secondaryButton,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={onDismiss}
+              >
+                <Text style={styles.secondaryButtonText}>Continue for now</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+}
+
+const createAppUpdateModalStyles = (theme: AppTheme, isDark: boolean) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: theme.spacing.xl,
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: theme.colors.overlay,
+    },
+    card: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.radii.lg,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+      padding: theme.spacing.xl,
+      gap: theme.spacing.md,
+      alignItems: 'center',
+      width: '100%',
+      maxWidth: 380,
+      alignSelf: 'center',
+      shadowColor: theme.shadows.md.shadowColor,
+      shadowOpacity: isDark ? 0.35 : theme.shadows.md.shadowOpacity,
+      shadowRadius: theme.shadows.md.shadowRadius,
+      shadowOffset: theme.shadows.md.shadowOffset,
+      elevation: theme.shadows.md.elevation,
+    },
+    iconWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: theme.radii.md,
+      backgroundColor: withOpacity(theme.colors.accent, 0.12),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    copyWrap: {
+      gap: theme.spacing.xs,
+      alignItems: 'center',
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: theme.colors.text,
+      textAlign: 'center',
+    },
+    message: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.colors.textMuted,
+      textAlign: 'center',
+    },
+    versionText: {
+      fontSize: 12,
+      color: theme.colors.textDim,
+      textAlign: 'center',
+    },
+    buttonRow: {
+      width: '100%',
+      gap: theme.spacing.sm,
+    },
+    primaryButton: {
+      height: theme.components.button.height,
+      borderRadius: theme.components.button.radius,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.accent,
+    },
+    primaryButtonText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.colors.surface,
+    },
+    secondaryButton: {
+      height: Math.max(48, theme.components.button.height - 8),
+      borderRadius: theme.radii.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.surfaceAlt,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+    },
+    secondaryButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    buttonPressed: {
+      opacity: 0.85,
+      transform: [{ scale: 0.99 }],
+    },
+  });
+
 function NavigationHost() {
   const { mode, theme } = useTheme();
   const { session, isLoading, sessionExpired, clearSessionExpired } = useAuth();
@@ -1614,6 +1944,11 @@ function NavigationHost() {
   const notificationRetryCountRef = useRef<Record<string, number>>({});
   const [showTrialReminder, setShowTrialReminder] = useState(false);
   const [trialReminderDaysLeft, setTrialReminderDaysLeft] = useState(0);
+  const [appUpdateStatus, setAppUpdateStatus] = useState<AppUpdateStatus | null>(null);
+  const [showAppUpdateModal, setShowAppUpdateModal] = useState(false);
+  const updateDismissedVersionRef = useRef<string | null>(null);
+  const updateCheckInFlightRef = useRef(false);
+  const lastUpdateCheckAtRef = useRef(0);
   const trialReminderStorageKey = useMemo(() => {
     const userId = session?.user?.id?.trim();
     if (!userId) {
@@ -2055,6 +2390,84 @@ function NavigationHost() {
     return () => subscription.remove();
   }, [consumePendingSiriRoute]);
 
+  const checkForAppUpdate = useCallback(
+    async (reason: 'launch' | 'resume') => {
+      if (updateCheckInFlightRef.current) {
+        return;
+      }
+      const now = Date.now();
+      if (now - lastUpdateCheckAtRef.current < UPDATE_CHECK_INTERVAL_MS) {
+        return;
+      }
+      updateCheckInFlightRef.current = true;
+      lastUpdateCheckAtRef.current = now;
+      try {
+        const policy = await fetchAppVersionPolicy();
+        const status = evaluateAppUpdateStatus(policy);
+        if (!status) {
+          setAppUpdateStatus(null);
+          setShowAppUpdateModal(false);
+          return;
+        }
+        const hasStoreUrl = Boolean(resolveAppStoreUrl(status));
+        const enforceRequiredUpdate = status.isRequired && hasStoreUrl;
+        setAppUpdateStatus(status);
+        if (enforceRequiredUpdate) {
+          setShowAppUpdateModal(true);
+          updateDismissedVersionRef.current = null;
+          logEvent('app_update_prompt_shown', {
+            screen: 'App',
+            extra: {
+              reason,
+              required: true,
+              currentVersion: status.currentVersion,
+              latestVersion: status.latestVersion,
+            },
+          });
+          return;
+        }
+        if (status.isRequired && !hasStoreUrl) {
+          logEvent('app_update_required_link_missing', {
+            screen: 'App',
+            level: 'warning',
+            extra: {
+              currentVersion: status.currentVersion,
+              latestVersion: status.latestVersion,
+              minSupportedVersion: status.minSupportedVersion,
+            },
+          });
+        }
+        const promptVersionKey = status.latestVersion ?? status.currentVersion;
+        if (updateDismissedVersionRef.current === promptVersionKey) {
+          return;
+        }
+        setShowAppUpdateModal(true);
+        logEvent('app_update_prompt_shown', {
+          screen: 'App',
+          extra: {
+            reason,
+            required: enforceRequiredUpdate,
+            currentVersion: status.currentVersion,
+            latestVersion: status.latestVersion,
+          },
+        });
+      } finally {
+        updateCheckInFlightRef.current = false;
+      }
+    },
+    []
+  );
+
+  useEffect(() => {
+    void checkForAppUpdate('launch');
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        void checkForAppUpdate('resume');
+      }
+    });
+    return () => subscription.remove();
+  }, [checkForAppUpdate]);
+
   useEffect(() => {
     Notifications.getLastNotificationResponseAsync()
       .then((response) => {
@@ -2099,6 +2512,37 @@ function NavigationHost() {
   useEffect(() => {
     void resolvePendingNotification();
   }, [session, resolvePendingNotification]);
+
+  const resolvedStoreUrl = useMemo(() => resolveAppStoreUrl(appUpdateStatus), [appUpdateStatus]);
+
+  const handleUpdateDismiss = useCallback(() => {
+    if (!appUpdateStatus) {
+      return;
+    }
+    const promptVersionKey = appUpdateStatus.latestVersion ?? appUpdateStatus.currentVersion;
+    updateDismissedVersionRef.current = promptVersionKey;
+    setShowAppUpdateModal(false);
+    logEvent('app_update_prompt_dismissed', {
+      screen: 'App',
+      extra: {
+        currentVersion: appUpdateStatus.currentVersion,
+        latestVersion: appUpdateStatus.latestVersion,
+      },
+    });
+  }, [appUpdateStatus]);
+
+  const handleUpdateAction = useCallback(() => {
+    if (!appUpdateStatus) {
+      return;
+    }
+    logEvent('app_update_prompt_action', {
+      screen: 'App',
+      extra: {
+        currentVersion: appUpdateStatus.currentVersion,
+        latestVersion: appUpdateStatus.latestVersion,
+      },
+    });
+  }, [appUpdateStatus]);
 
   const navTheme = useMemo(() => {
     const baseTheme = mode === 'dark' ? DarkTheme : DefaultTheme;
@@ -2188,6 +2632,17 @@ function NavigationHost() {
         onManage={handleTrialReminderManage}
         onLater={dismissTrialReminder}
       />
+      {appUpdateStatus ? (
+        <AppUpdateModal
+          visible={showAppUpdateModal}
+          theme={theme}
+          mode={mode}
+          status={appUpdateStatus}
+          storeUrl={resolvedStoreUrl}
+          onUpdate={handleUpdateAction}
+          onDismiss={appUpdateStatus.isRequired && resolvedStoreUrl ? undefined : handleUpdateDismiss}
+        />
+      ) : null}
     </View>
   );
 }

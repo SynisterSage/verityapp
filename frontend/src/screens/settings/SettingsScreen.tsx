@@ -1,5 +1,14 @@
-import { ScrollView, StyleSheet, Switch, Text, View, Pressable, ActivityIndicator } from 'react-native';
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+  Pressable,
+  ActivityIndicator,
+  TextInput,
+  Animated,
+} from 'react-native';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -22,6 +31,15 @@ type SettingsRowItem = {
   destructive?: boolean;
 };
 
+type SettingsSearchItem = {
+  label: string;
+  subtitle?: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  route: keyof SettingsStackParamList;
+  section: 'Account' | 'Safety intelligence' | 'General' | 'Privacy';
+  keywords?: string[];
+};
+
 export default function SettingsScreen({
   navigation,
   route,
@@ -34,7 +52,10 @@ export default function SettingsScreen({
   const { canManageProfile } = useProfile();
   const { theme, mode, setMode, isUsingSystemTheme } = useTheme();
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { unreadAgentCount } = useSupportContext();
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const clearAnim = useRef(new Animated.Value(0)).current;
 
   const accountRows: SettingsRowItem[] = useMemo(() => {
     const rows: SettingsRowItem[] = [];
@@ -227,6 +248,189 @@ export default function SettingsScreen({
   );
   const signOutHandler = createRowHandler(signOutRow);
 
+  const searchIndex = useMemo<SettingsSearchItem[]>(() => {
+    const rows: SettingsSearchItem[] = [
+      {
+        label: 'Account',
+        subtitle: 'Profile & safety options',
+        icon: 'person-outline',
+        route: 'Account',
+        section: 'Account',
+        keywords: ['profile', 'phone', 'email', 'name', 'plan'],
+      },
+      {
+        label: 'Notifications',
+        subtitle: 'Alerts & daily reports',
+        icon: 'notifications-outline',
+        route: 'Notifications',
+        section: 'Account',
+        keywords: [
+          'alerts',
+          'push',
+          'email',
+          'weekly report',
+          'pin reset emails',
+          'support replies',
+          'circle activity',
+          'trusted activity',
+          'call screening',
+        ],
+      },
+      {
+        label: 'Membership & Billing',
+        subtitle: 'Plan, restore, and App Store billing',
+        icon: 'card-outline',
+        route: 'MembershipBilling',
+        section: 'Account',
+        keywords: ['plan', 'billing', 'restore', 'subscription', 'membership'],
+      },
+      {
+        label: 'Safe Phrases',
+        subtitle: 'Approved conversation topics',
+        icon: 'chatbubble-ellipses-outline',
+        route: 'SafePhrases',
+        section: 'Safety intelligence',
+        keywords: ['safe phrase', 'phrases', 'conversation'],
+      },
+      {
+        label: 'Doctor Lookup',
+        subtitle: 'Recognize care team numbers',
+        icon: 'medkit-outline',
+        route: 'SafetyIntelligence',
+        section: 'Safety intelligence',
+        keywords: ['doctor', 'care team', 'medical'],
+      },
+      {
+        label: 'Trusted Contacts',
+        subtitle: 'Bypass the screening PIN',
+        icon: 'people-outline',
+        route: 'TrustedContacts',
+        section: 'Safety intelligence',
+        keywords: ['trusted', 'contacts', 'pin'],
+      },
+      {
+        label: 'Blocked Numbers',
+        subtitle: 'Automatic spam rejection',
+        icon: 'ban-outline',
+        route: 'Blocklist',
+        section: 'Safety intelligence',
+        keywords: ['block', 'blocked', 'spam'],
+      },
+      {
+        label: 'Theme',
+        subtitle: 'Light / Dark appearance',
+        icon: 'moon-outline',
+        route: 'Settings',
+        section: 'General',
+        keywords: ['theme', 'dark mode', 'light mode', 'appearance'],
+      },
+      {
+        label: 'Use iPhone Theme',
+        subtitle: 'Automatically follow your phone appearance',
+        icon: 'phone-portrait-outline',
+        route: 'Settings',
+        section: 'General',
+        keywords: ['system theme', 'automatic', 'iphone'],
+      },
+      {
+        label: 'How It Works',
+        subtitle: 'Guides and docs for Verity Protect',
+        icon: 'book-outline',
+        route: 'HowItWorks',
+        section: 'General',
+        keywords: ['guide', 'docs', 'help'],
+      },
+      {
+        label: 'Support',
+        subtitle: 'Contact the Verity Protect team',
+        icon: 'help-circle-outline',
+        route: 'SupportInfo',
+        section: 'General',
+        keywords: ['support', 'help', 'contact'],
+      },
+      {
+        label: 'Data & Privacy',
+        subtitle: 'Your information, protected',
+        icon: 'lock-closed-outline',
+        route: 'DataPrivacy',
+        section: 'Privacy',
+        keywords: ['privacy', 'data', 'export', 'delete'],
+      },
+    ];
+
+    if (canManageProfile) {
+      rows.splice(1, 0, {
+        label: 'My Circle',
+        subtitle: 'Family caretakers & guests',
+        icon: 'people-outline',
+        route: 'Members',
+        section: 'Account',
+        keywords: ['caretaker', 'family', 'invite', 'member', 'guest'],
+      });
+      rows.push({
+        label: 'Security',
+        subtitle: 'Sign-in & safety PIN',
+        icon: 'shield-checkmark-outline',
+        route: 'Security',
+        section: 'Account',
+        keywords: ['password', 'pin', 'passcode', 'reset', 'sign-in', 'face id', 'touch id'],
+      });
+      rows.push({
+        label: 'Automation',
+        subtitle: 'Verity smart screening rules',
+        icon: 'flash-outline',
+        route: 'Automation',
+        section: 'Safety intelligence',
+        keywords: ['automation', 'rules', 'screening'],
+      });
+    }
+
+    return rows;
+  }, [canManageProfile]);
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const searchResults = useMemo(() => {
+    if (!normalizedQuery) return [];
+    const tokens = normalizedQuery.split(/\s+/).filter(Boolean);
+    return searchIndex.filter((item) => {
+      const haystack = [
+        item.label,
+        item.subtitle,
+        ...(item.keywords ?? []),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return tokens.every((token) => haystack.includes(token));
+    });
+  }, [normalizedQuery, searchIndex]);
+
+  useEffect(() => {
+    Animated.timing(clearAnim, {
+      toValue: searchQuery ? 1 : 0,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  }, [clearAnim, searchQuery]);
+
+  const searchResultRows = useMemo<SettingsRowItem[]>(
+    () =>
+      searchResults.map((item) => ({
+        label: item.label,
+        subtitle: item.subtitle ? `${item.section} · ${item.subtitle}` : item.section,
+        icon: item.icon,
+        onPress:
+          item.route === 'Settings'
+            ? item.label === 'Theme'
+              ? toggleThemeMode
+              : item.label === 'Use iPhone Theme'
+                ? () => setMode('system')
+                : undefined
+            : () => navigation.navigate(item.route),
+      })),
+    [navigation, searchResults, setMode, toggleThemeMode]
+  );
+
   const renderSection = (section: { title: string; rows: SettingsRowItem[] }) => (
     <View key={section.title} style={styles.section}>
       <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>{section.title}</Text>
@@ -265,73 +469,175 @@ export default function SettingsScreen({
           unreadCount: unreadAgentCount,
         }}
       />
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: bottomGap + 100 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {sections.map(renderSection)}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>General</Text>
-          <View
+      <View style={styles.bodyWrap}>
+        <Animated.ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: bottomGap + 100 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          scrollEventThrottle={16}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+            useNativeDriver: true,
+          })}
+        >
+          <Animated.View
             style={[
-              styles.card,
+              styles.searchWrap,
               { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+              {
+                opacity: scrollY.interpolate({
+                  inputRange: [0, 40],
+                  outputRange: [1, 0],
+                  extrapolate: 'clamp',
+                }),
+                transform: [
+                  {
+                    translateY: scrollY.interpolate({
+                      inputRange: [0, 40],
+                      outputRange: [0, -8],
+                      extrapolate: 'clamp',
+                    }),
+                  },
+                ],
+              },
             ]}
           >
-            <SettingRow
-              item={appearanceRow}
-              onPress={createRowHandler(appearanceRow)}
-              rightElement={
-                <Switch
-                  value={isDarkMode}
-                  onValueChange={toggleThemeMode}
-                  thumbColor={theme.colors.surface}
-                  trackColor={{
-                    false: withOpacity(theme.colors.textMuted, 0.4),
-                    true: theme.colors.accent,
-                  }}
-                  ios_backgroundColor={withOpacity(theme.colors.textMuted, 0.35)}
-                  accessibilityLabel="Toggle dark mode override"
-                  style={styles.themeSwitch}
-                />
-              }
+            <Ionicons name="search-outline" size={18} color={theme.colors.textMuted} />
+            <TextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search settings"
+              placeholderTextColor={withOpacity(theme.colors.textMuted, 0.7)}
+              style={[styles.searchInput, { color: theme.colors.text }]}
+              returnKeyType="search"
+              clearButtonMode="never"
+              multiline={false}
             />
-            {!isUsingSystemTheme ? (
-              <SettingRow
-                item={systemThemeRow}
-                onPress={createRowHandler(systemThemeRow)}
-              />
+            {searchQuery ? (
+              <Animated.View
+                style={{
+                  opacity: clearAnim,
+                  transform: [
+                    {
+                      scale: clearAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.8, 1],
+                      }),
+                    },
+                  ],
+                }}
+              >
+                <Pressable
+                  onPress={() => setSearchQuery('')}
+                  style={({ pressed }) => [
+                    styles.searchClear,
+                    pressed && { opacity: 0.6, transform: [{ scale: 0.92 }] },
+                  ]}
+                  hitSlop={8}
+                >
+                  <Ionicons name="close-circle" size={18} color={theme.colors.textMuted} />
+                </Pressable>
+              </Animated.View>
             ) : null}
-            <SettingRow
-              item={howItWorksRow}
-              onPress={createRowHandler(howItWorksRow)}
-            />
-            <SettingRow
-              item={supportRow}
-              onPress={createRowHandler(supportRow)}
-              isLast
-            />
-          </View>
-        </View>
-        {renderSection(privacySection)}
-        <View style={styles.section}>
-          <View style={[styles.card, styles.signOutCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
-            <SettingRow item={signOutRow} isLast onPress={signOutHandler} isWorking={isSigningOut} />
-          </View>
-        </View>
-        <View style={styles.footer}>
-          <Text style={[styles.footerText, { color: withOpacity(theme.colors.text, 0.4) }]}>Verity Protect</Text>
-          <Pressable onPress={() => navigation.navigate('WhatsNew' as any)}>
-            <Text style={[styles.footerVersion, { color: theme.colors.accent }]}>
-              Version {Constants.expoConfig?.version ?? '1.0.0'}
-            </Text>
-          </Pressable>
-        </View>
-      </ScrollView>
+          </Animated.View>
+          {normalizedQuery ? (
+            <>
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>Results</Text>
+                <View
+                  style={[
+                    styles.card,
+                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+                  ]}
+                >
+                  {searchResultRows.length === 0 ? (
+                    <View style={styles.emptyState}>
+                      <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>No matches</Text>
+                      <Text style={[styles.emptySubtitle, { color: theme.colors.textMuted }]}>
+                        Try searching for “PIN”, “notifications”, or “billing”.
+                      </Text>
+                    </View>
+                  ) : (
+                    searchResultRows.map((row, index) => (
+                      <View key={`${row.label}-${index}`} style={styles.rowWrapper}>
+                        <SettingRow
+                          item={row}
+                          isLast={index === searchResultRows.length - 1}
+                          onPress={createRowHandler(row)}
+                        />
+                      </View>
+                    ))
+                  )}
+                </View>
+              </View>
+            </>
+          ) : (
+            <>
+              {sections.map(renderSection)}
+              <View style={styles.section}>
+                <Text style={[styles.sectionTitle, { color: theme.colors.textMuted }]}>General</Text>
+                <View
+                  style={[
+                    styles.card,
+                    { backgroundColor: theme.colors.surface, borderColor: theme.colors.border },
+                  ]}
+                >
+                  <SettingRow
+                    item={appearanceRow}
+                    onPress={createRowHandler(appearanceRow)}
+                    rightElement={
+                      <Switch
+                        value={isDarkMode}
+                        onValueChange={toggleThemeMode}
+                        thumbColor={theme.colors.surface}
+                        trackColor={{
+                          false: withOpacity(theme.colors.textMuted, 0.4),
+                          true: theme.colors.accent,
+                        }}
+                        ios_backgroundColor={withOpacity(theme.colors.textMuted, 0.35)}
+                        accessibilityLabel="Toggle dark mode override"
+                        style={styles.themeSwitch}
+                      />
+                    }
+                  />
+                  {!isUsingSystemTheme ? (
+                    <SettingRow
+                      item={systemThemeRow}
+                      onPress={createRowHandler(systemThemeRow)}
+                    />
+                  ) : null}
+                  <SettingRow
+                    item={howItWorksRow}
+                    onPress={createRowHandler(howItWorksRow)}
+                  />
+                  <SettingRow
+                    item={supportRow}
+                    onPress={createRowHandler(supportRow)}
+                    isLast
+                  />
+                </View>
+              </View>
+              {renderSection(privacySection)}
+              <View style={styles.section}>
+                <View style={[styles.card, styles.signOutCard, { backgroundColor: theme.colors.surface, borderColor: theme.colors.border }]}>
+                  <SettingRow item={signOutRow} isLast onPress={signOutHandler} isWorking={isSigningOut} />
+                </View>
+              </View>
+              <View style={styles.footerInScroll}>
+                <Text style={[styles.footerText, { color: withOpacity(theme.colors.text, 0.4) }]}>Verity Protect</Text>
+                <Pressable onPress={() => navigation.navigate('WhatsNew' as any)}>
+                  <Text style={[styles.footerVersion, { color: theme.colors.accent }]}>
+                    Version {Constants.expoConfig?.version ?? '1.0.0'}
+                  </Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+        </Animated.ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
@@ -406,10 +712,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   content: {
-    paddingTop: 24,
+    paddingTop: 12,
   },
   scrollView: {
     flex: 1,
+  },
+  bodyWrap: {
+    flex: 1,
+    position: 'relative',
   },
   section: {
     marginTop: 6,
@@ -421,6 +731,32 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     marginBottom: 12,
     textTransform: 'uppercase',
+  },
+  searchWrap: {
+    marginTop: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    height: 44,
+    marginBottom: 18,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    height: 44,
+    paddingVertical: 0,
+    lineHeight: 18,
+    textAlignVertical: 'center',
+  },
+  searchClear: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   card: {
     borderRadius: 28,
@@ -491,6 +827,25 @@ const styles = StyleSheet.create({
     gap: 2,
     paddingBottom: 8,
   },
+  footerSticky: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 5,
+    alignItems: 'center',
+    gap: 2,
+    paddingTop: 8,
+    paddingBottom: 6,
+    paddingHorizontal: 24,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  footerInScroll: {
+    marginTop: 12,
+    alignItems: 'center',
+    gap: 2,
+    paddingBottom: 8,
+  },
   footerText: {
     textAlign: 'center',
     letterSpacing: 0.3,
@@ -501,5 +856,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 11,
     letterSpacing: 0.2,
+  },
+  emptyState: {
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    gap: 6,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    textAlign: 'center',
   },
 });

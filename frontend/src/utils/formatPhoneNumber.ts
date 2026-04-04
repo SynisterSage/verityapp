@@ -4,6 +4,14 @@ export function formatPhoneNumber(raw?: string | null, fallback = 'Recent Call')
   }
 
   const digits = raw.replace(/\D/g, '');
+  
+  // Handle 7-digit landlines (local format without area code)
+  if (digits.length === 7) {
+    const prefix = digits.slice(0, 3);
+    const line = digits.slice(3, 7);
+    return `${prefix}-${line}`;
+  }
+  
   if (digits.length < 10) {
     return fallback;
   }

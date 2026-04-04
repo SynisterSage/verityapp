@@ -47,6 +47,12 @@ function toCircleActivityItem(
       ? 'Shared an invite link.'
       : alert.alert_type === 'pin_change'
       ? 'Updated the Safety PIN.'
+      : alert.alert_type === 'pin_reset_request'
+      ? 'Requested a Safety PIN reset.'
+      : alert.alert_type === 'pin_reset_approved'
+      ? 'Approved a Safety PIN reset.'
+      : alert.alert_type === 'pin_reset_denied'
+      ? 'Denied a Safety PIN reset.'
       : alert.alert_type === 'safe_phrase_added'
       ? `Added safe word "${alert.payload?.phrase ?? 'a phrase'}".`
       : alert.alert_type === 'trusted_contact_added'

@@ -139,12 +139,17 @@ export default function PasscodeScreen({ navigation }: { navigation: any }) {
         text: 'All other callers must enter your Safety PIN.',
       },
       {
+        icon: 'create-outline',
+        color: theme.colors.warning,
+        text: 'Write this PIN down or save it somewhere safe (a screenshot works too).',
+      },
+      {
         icon: 'ban-outline',
         color: theme.colors.danger,
         text: 'Blocked numbers and callers not in Trusted Contacts are stopped before your phone rings.',
       },
     ],
-    [theme.colors.accent, theme.colors.danger, theme.colors.success]
+    [theme.colors.accent, theme.colors.danger, theme.colors.success, theme.colors.warning]
   );
 
   const handleContinue = async () => {

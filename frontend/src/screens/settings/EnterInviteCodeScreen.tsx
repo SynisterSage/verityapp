@@ -116,13 +116,14 @@ export default function EnterInviteCodeScreen() {
         }),
       });
       await markInviteClaimAccepted(codeValue);
-      await refreshProfiles();
+      const refreshedProfiles = await refreshProfiles();
       
       // Find and switch to the newly joined profile
       // It should be one that the user is a member of but not the caretaker
-      if (profiles && profiles.length > 0) {
+      const updatedProfiles = refreshedProfiles ?? profiles;
+      if (updatedProfiles && updatedProfiles.length > 0) {
         // Look for a profile that's not the currently active one
-        const joinedProfile = profiles.find((p) => p.id !== activeProfile?.id && p.id);
+        const joinedProfile = updatedProfiles.find((p) => p.id !== activeProfile?.id && p.id);
         if (joinedProfile) {
           setActiveProfile(joinedProfile);
         }

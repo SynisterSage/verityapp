@@ -24,6 +24,15 @@ export function getCircleTrayCopy(alert: AlertRow, fallbackDisplay?: string): Ci
         case 'pin_change':
           detail = alert.payload?.message ?? 'Updated the Safety PIN.';
           break;
+        case 'pin_reset_request':
+          detail = alert.payload?.message ?? 'Requested a Safety PIN reset.';
+          break;
+        case 'pin_reset_approved':
+          detail = alert.payload?.message ?? 'Approved a Safety PIN reset.';
+          break;
+        case 'pin_reset_denied':
+          detail = alert.payload?.message ?? 'Denied a Safety PIN reset.';
+          break;
         case 'circle_invite':
         detail =
           alert.payload?.message ??

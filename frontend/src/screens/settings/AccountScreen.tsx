@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   ActivityIndicator,
+  Animated,
+  Easing,
   Keyboard,
   KeyboardAvoidingView,
   Linking,
@@ -17,14 +19,16 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../../context/ThemeContext';
 import type { AppTheme } from '../../theme/tokens';
 
 import SettingsHeader from '../../components/common/SettingsHeader';
 import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
+import MultiEndpointInfoModal from '../../components/common/MultiEndpointInfoModal';
 import VerityNumberInfoModal from '../../components/common/VerityNumberInfoModal';
-import RecipientPhoneInfoModal from '../../components/common/RecipientPhoneInfoModal';
+import AvatarEditor from '../../components/account/AvatarEditor';
 import { deleteProfile } from '../../services/profile';
 import { authorizedFetch } from '../../services/backend';
 import { useAuth } from '../../context/AuthContext';
@@ -102,6 +106,7 @@ export default function AccountScreen() {
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [fallbackPhoneDigits, setFallbackPhoneDigits] = useState('');
+  const [landlinePhoneDigits, setLandlinePhoneDigits] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [pinAction, setPinAction] = useState<PinAction>(null);
@@ -113,11 +118,75 @@ export default function AccountScreen() {
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [pendingDeletePin, setPendingDeletePin] = useState('');
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
+  const [showMultiEndpointInfoModal, setShowMultiEndpointInfoModal] = useState(false);
   const [showVerityNumberInfoModal, setShowVerityNumberInfoModal] = useState(false);
-  const [showRecipientPhoneInfoModal, setShowRecipientPhoneInfoModal] = useState(false);
   const [numberCopied, setNumberCopied] = useState(false);
+  const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const lastPhoneKey = useRef<string | null>(null);
   const lastFallbackPhoneKey = useRef<string | null>(null);
+
+  const route = useRoute();
+  const landlinePulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Load current user's avatar
+  useEffect(() => {
+    if (session?.user?.user_metadata?.avatar_url) {
+      setUserAvatarUrl(session.user.user_metadata.avatar_url);
+    }
+  }, [session?.user?.user_metadata?.avatar_url]);
+
+  // Trigger pulse animation if coming from full coverage setup
+  useEffect(() => {
+    let mounted = true;
+    const triggerAnimation = async () => {
+      const fromFullCoverage = (route.params as any)?.fromFullCoverageSetup;
+      
+      // Also check for stored flag from signup flow
+      let triggerFromStorage = false;
+      if (!fromFullCoverage) {
+        try {
+          const storedFlag = await AsyncStorage.getItem('fullCoverageSetupAnimation');
+          triggerFromStorage = storedFlag === '1';
+          if (triggerFromStorage) {
+            await AsyncStorage.removeItem('fullCoverageSetupAnimation');
+          }
+        } catch {
+          // no-op
+        }
+      }
+
+      if ((fromFullCoverage || triggerFromStorage) && mounted) {
+        landlinePulseAnim.setValue(1);
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(landlinePulseAnim, {
+              toValue: 1.05,
+              duration: 600,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(landlinePulseAnim, {
+              toValue: 1,
+              duration: 600,
+              easing: Easing.inOut(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ])
+        ).start();
+        // Stop animation after 12 seconds (2 full pulses = ~2.4s, so 5 cycles = ~12s)
+        const timer = setTimeout(() => {
+          if (mounted) {
+            landlinePulseAnim.setValue(1);
+          }
+        }, 12000);
+        return () => clearTimeout(timer);
+      }
+    };
+    void triggerAnimation();
+    return () => {
+      mounted = false;
+    };
+  }, [route.params, landlinePulseAnim]);
 
   // Only reinitialize form fields when the profile ID changes (i.e., user switches
   // profiles). Using activeProfile directly would reset inputs on every background
@@ -131,13 +200,89 @@ export default function AccountScreen() {
     setLastName(activeProfile.last_name ?? '');
     setPhoneDigits(normalizePhoneDigits(activeProfile.phone_number ?? ''));
     setFallbackPhoneDigits(normalizePhoneDigits(activeProfile.fallback_phone_number ?? ''));
+    setLandlinePhoneDigits('');
+    
+    // Load existing mobile and landline endpoints from backend
+    fetchEndpoints(activeProfile.id);
   }, [activeProfile]);
+
+  // Validate subscription status and clear stale forwarding settings if trial expired
+  useEffect(() => {
+    let mounted = true;
+    const validateSubscription = async () => {
+      if (!activeProfile) return;
+      
+      // Check if subscription is inactive (trial expired without renewal)
+      if (activeProfile && !activeProfile.has_active_subscription) {
+        // Clear old forwarding settings from async storage
+        try {
+          await AsyncStorage.removeItem('twilio_forwarding_number');
+          await AsyncStorage.removeItem('twilio_forwarding_enabled');
+        } catch {
+          // no-op
+        }
+        
+        // Show alert first time only (per session)
+        const alreadyShown = await AsyncStorage.getItem('forwarding_expired_alert_shown_' + activeProfile.id);
+        if (!alreadyShown && mounted) {
+          Alert.alert(
+            'Call Forwarding Disabled',
+            'Your trial or subscription has ended. Call forwarding has been disabled for security. To re-enable, please visit the Subscription page and renew your membership.',
+            [
+              {
+                text: 'Go to Subscription',
+                onPress: async () => {
+                  try {
+                    await AsyncStorage.setItem('forwarding_expired_alert_shown_' + activeProfile.id, '1');
+                  } catch {
+                    // no-op
+                  }
+                  // Navigate to subscription screen if available
+                  // For now, just dismiss
+                },
+              },
+              { 
+                text: 'Dismiss', 
+                onPress: async () => {
+                  try {
+                    await AsyncStorage.setItem('forwarding_expired_alert_shown_' + activeProfile.id, '1');
+                  } catch {
+                    // no-op
+                  }
+                },
+              },
+            ]
+          );
+        }
+      }
+    };
+    
+    validateSubscription();
+    return () => {
+      mounted = false;
+    };
+  }, [activeProfile?.has_active_subscription, activeProfile?.id]);
 
   useEffect(() => {
     if (!numberCopied) return;
     const t = setTimeout(() => setNumberCopied(false), 2000);
     return () => clearTimeout(t);
   }, [numberCopied]);
+
+  const fetchEndpoints = useCallback(async (profileId: string) => {
+    try {
+      const data = await authorizedFetch(`/profiles/${profileId}/endpoints`);
+      if (data?.endpoints && Array.isArray(data.endpoints)) {
+        const landlineEndpoint = data.endpoints.find((e: any) => e.endpoint_type === 'landline');
+        
+        if (landlineEndpoint?.phone_number) {
+          setLandlinePhoneDigits(normalizePhoneDigits(landlineEndpoint.phone_number));
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch endpoints:', err);
+    }
+  }, []);
 
   const isReadOnly = !canManageProfile;
   const safetyActions = useMemo(
@@ -242,6 +387,35 @@ export default function AccountScreen() {
       });
       if (data?.profile) {
         setActiveProfile(data.profile);
+        
+        
+        // Update landline endpoint if changed
+        if (landlinePhoneDigits) {
+          try {
+            // First try to get existing endpoints to check if landline exists
+            const endpoints = await authorizedFetch(`/profiles/${activeProfile.id}/endpoints`);
+            const landlineEndpoint = endpoints?.endpoints?.find((e: any) => e.endpoint_type === 'landline');
+            
+            if (landlineEndpoint) {
+              // Update existing landline endpoint
+              await authorizedFetch(`/profiles/${activeProfile.id}/endpoints/${landlineEndpoint.id}`, {
+                method: 'PUT',
+                body: JSON.stringify({ phone_number: `+1${landlinePhoneDigits}` }),
+              });
+            } else {
+              // Create new landline endpoint
+              await authorizedFetch(`/profiles/${activeProfile.id}/endpoints`, {
+                method: 'POST',
+                body: JSON.stringify({
+                  endpoint_type: 'landline',
+                  phone_number: `+1${landlinePhoneDigits}`,
+                }),
+              });
+            }
+          } catch (err) {
+            console.warn('Failed to update/create landline endpoint:', err);
+          }
+        }
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to update profile.');
@@ -353,6 +527,18 @@ export default function AccountScreen() {
           ]}
           showsVerticalScrollIndicator={false}
         >
+          {/* Avatar Editor */}
+          <View style={styles.avatarSection}>
+            <AvatarEditor
+              userId={session?.user?.id || ''}
+              currentAvatarUrl={userAvatarUrl}
+              userName={`${firstName || 'User'} ${lastName || ''}`}
+              onAvatarUpdated={setUserAvatarUrl}
+              size="large"
+              editable={true}
+            />
+          </View>
+
           <Text style={styles.sectionLabel}>Profile basics</Text>
           <View style={styles.card}>
             <Text style={styles.inputLabel}>First name</Text>
@@ -374,10 +560,10 @@ export default function AccountScreen() {
               editable={!isReadOnly}
             />
             <View style={styles.inputLabelRow}>
-              <Text style={styles.inputLabel}>Recipient phone</Text>
+              <Text style={styles.inputLabel}>Mobile phone</Text>
               <Pressable
                 style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
-                onPress={() => setShowRecipientPhoneInfoModal(true)}
+                onPress={() => setShowMultiEndpointInfoModal(true)}
                 hitSlop={8}
               >
                 <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
@@ -419,6 +605,33 @@ export default function AccountScreen() {
                 editable={!isReadOnly}
               />
             </View>
+            <View style={styles.inputLabelRow}>
+              <Animated.View style={[styles.labelWithBadge, { transform: [{ scale: landlinePulseAnim }] }]}>
+                <Text style={styles.inputLabel}>Landline (optional)</Text>
+                <Animated.View style={[styles.newBadge, { opacity: landlinePulseAnim }]}>
+                  <Text style={styles.newBadgeText}>New</Text>
+                </Animated.View>
+              </Animated.View>
+              <Pressable
+                style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
+                onPress={() => setShowMultiEndpointInfoModal(true)}
+                hitSlop={8}
+              >
+                <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
+              </Pressable>
+            </View>
+            <Animated.View style={[styles.inputWithPrefix, isReadOnly && styles.inputDisabled, { borderColor: landlinePulseAnim.interpolate({ inputRange: [1, 1.05], outputRange: [theme.colors.border, theme.colors.accent] }) }]}>
+              <Text style={styles.prefixText}>+1</Text>
+              <TextInput
+                style={styles.inputPrefixed}
+                value={landlinePhoneDigits ? formatPhoneNumber(landlinePhoneDigits) : ''}
+                onChangeText={(v) => setLandlinePhoneDigits(normalizePhoneDigits(v))}
+                placeholder="(000) 000-0000"
+                placeholderTextColor={theme.colors.textDim}
+                keyboardType="phone-pad"
+                editable={!isReadOnly}
+              />
+            </Animated.View>
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput
               style={[styles.input, styles.inputDisabled]}
@@ -683,6 +896,12 @@ export default function AccountScreen() {
           theme={theme}
           mode={mode}
         />
+        <MultiEndpointInfoModal
+          visible={showMultiEndpointInfoModal}
+          onClose={() => setShowMultiEndpointInfoModal(false)}
+          theme={theme}
+          mode={mode}
+        />
         <VerityNumberInfoModal
           visible={showVerityNumberInfoModal}
           onClose={() => setShowVerityNumberInfoModal(false)}
@@ -690,12 +909,7 @@ export default function AccountScreen() {
           mode={mode}
           context="settings"
         />
-        <RecipientPhoneInfoModal
-          visible={showRecipientPhoneInfoModal}
-          onClose={() => setShowRecipientPhoneInfoModal(false)}
-          theme={theme}
-          mode={mode}
-        />
+
       </SafeAreaView>
     </KeyboardAvoidingView>
   );
@@ -714,6 +928,10 @@ const createAccountStyles = (theme: AppTheme) =>
     body: {
       paddingHorizontal: 24,
       gap: 20,
+    },
+    avatarSection: {
+      paddingVertical: 8,
+      alignItems: 'center',
     },
     profileForm: {
       gap: 18,
@@ -812,6 +1030,23 @@ const createAccountStyles = (theme: AppTheme) =>
     },
     labelHelpButtonPressed: {
       opacity: 0.72,
+    },
+    labelWithBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    newBadge: {
+      backgroundColor: theme.colors.accent,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    newBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#FFFFFF',
+      letterSpacing: 0.5,
     },
     input: {
       height: 60,

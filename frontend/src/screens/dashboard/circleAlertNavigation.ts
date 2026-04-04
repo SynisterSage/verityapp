@@ -20,6 +20,9 @@ export function getCircleAlertDestination(
       return () => navigate('SettingsTab', { screen: 'Automation' });
 
     case 'pin_change':
+    case 'pin_reset_request':
+    case 'pin_reset_approved':
+    case 'pin_reset_denied':
     case 'security_password':
       return () => navigate('SettingsTab', { screen: 'Security' });
 

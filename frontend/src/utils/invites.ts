@@ -1,5 +1,7 @@
 const DEFAULT_INVITE_LINK_BASE_URL = 'https://verityprotect.com/invite';
 const DEFAULT_APP_STORE_FALLBACK_URL = 'https://apps.apple.com/app/id6759526773';
+const DEFAULT_PLAY_STORE_FALLBACK_URL =
+  'https://play.google.com/store/apps/details?id=com.anonymous.frontend';
 
 type InviteLike = {
   id?: string | null;
@@ -42,13 +44,20 @@ export function buildInviteShareMessage(
   invite: InviteLike,
   options?: {
     appStoreUrl?: string;
+    playStoreUrl?: string;
     inviteBaseUrl?: string;
   }
 ) {
   const appStoreUrl = options?.appStoreUrl ?? DEFAULT_APP_STORE_FALLBACK_URL;
+  const playStoreUrl = options?.playStoreUrl ?? DEFAULT_PLAY_STORE_FALLBACK_URL;
   const code = resolveInviteCode(invite);
   const link = buildInviteLink(invite, options?.inviteBaseUrl);
+  const storeLines = [
+    appStoreUrl ? `iOS: ${appStoreUrl}` : null,
+    playStoreUrl ? `Android: ${playStoreUrl}` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
 
-  return `You're invited to join my Verity Protect Circle.\n\nOpen this invite:\n${link}\n\nIf the app isn't installed, install it here:\n${appStoreUrl}\n\nIf the invite doesn't open automatically, enter this code in the app:\n${code}`;
+  return `You're invited to join my Verity Protect Circle.\n\nOpen this invite:\n${link}\n\nIf the app isn't installed, install it here:\n${storeLines}\n\nIf the invite doesn't open automatically, enter this code in the app:\n${code}`;
 }
-

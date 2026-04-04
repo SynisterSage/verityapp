@@ -1283,7 +1283,8 @@ async function inviteMember(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Forbidden).json({ error: 'Forbidden' });
   }
 
-  const allowedRoles: MemberRole[] = [...INVITE_ROLES];
+  const isCaretaker = await userIsCaretaker(userId, profileId);
+  const allowedRoles: MemberRole[] = isCaretaker ? [...INVITE_ROLES] : ['editor'];
   if (role && !allowedRoles.includes(role as MemberRole)) {
     return res
       .status(HTTP_STATUS_CODES.Forbidden)

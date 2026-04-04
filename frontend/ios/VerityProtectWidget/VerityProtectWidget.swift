@@ -413,7 +413,15 @@ struct VerityProtectAlertsWidget: Widget {
     }
     .configurationDisplayName("Verity Alerts")
     .description("Quick view of needs-attention and history alert counts.")
-    .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular])
+    .supportedFamilies(VerityProtectAlertsWidget.supportedFamilies())
+  }
+  
+  private static func supportedFamilies() -> [WidgetFamily] {
+    var families: [WidgetFamily] = [.systemSmall, .systemMedium, .systemLarge]
+    if #available(iOSApplicationExtension 16.0, *) {
+      families.append(.accessoryRectangular)
+    }
+    return families
   }
 }
 
@@ -426,7 +434,15 @@ struct VerityProtectHistoryWidget: Widget {
     }
     .configurationDisplayName("Verity History")
     .description("History-focused snapshot with current needs-attention count.")
-    .supportedFamilies([.systemSmall, .systemMedium, .systemLarge, .accessoryRectangular])
+    .supportedFamilies(VerityProtectHistoryWidget.supportedFamilies())
+  }
+  
+  private static func supportedFamilies() -> [WidgetFamily] {
+    var families: [WidgetFamily] = [.systemSmall, .systemMedium, .systemLarge]
+    if #available(iOSApplicationExtension 16.0, *) {
+      families.append(.accessoryRectangular)
+    }
+    return families
   }
 }
 

@@ -584,6 +584,9 @@ async function acceptInvite(req: Request, res: Response) {
       .maybeSingle();
     return data ?? null;
   };
+  const isEmailLike = (value: string) => value.includes('@');
+  const isSmsInviteEmail = (value?: string | null) =>
+    Boolean(value && value.toLowerCase().endsWith('@verityprotect.sms'));
 
   let invite = await fetchInvite('id', inviteId);
   if (!invite) {
@@ -595,7 +598,9 @@ async function acceptInvite(req: Request, res: Response) {
     }
   }
   if (!invite) {
-    invite = await fetchInvite('email', inviteId);
+    if (isEmailLike(inviteId)) {
+      invite = await fetchInvite('email', inviteId.toLowerCase());
+    }
   }
 
   if (!invite || invite.status !== 'pending') {
@@ -609,6 +614,15 @@ async function acceptInvite(req: Request, res: Response) {
     .join(' ')
     .trim();
   const { data: userRow } = await supabaseAdmin.auth.admin.getUserById(userId);
+  const userEmail = userRow?.user?.email?.trim().toLowerCase() ?? null;
+  const inviteEmail = invite.email?.trim().toLowerCase() ?? null;
+  if (inviteEmail && !isSmsInviteEmail(inviteEmail)) {
+    if (!userEmail || inviteEmail !== userEmail) {
+      return res
+        .status(HTTP_STATUS_CODES.Forbidden)
+        .json({ error: 'Invite does not match the authenticated account' });
+    }
+  }
   const displayName = buildDisplayName({
     fallbackName: requestedName || null,
     email: userRow?.user?.email ?? null,

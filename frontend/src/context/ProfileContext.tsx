@@ -60,6 +60,7 @@ export type Profile = {
   enable_push_circle_activity?: boolean | null;
   enable_push_support_replies?: boolean | null;
   enable_email_weekly_reports?: boolean | null;
+  enable_email_pin_reset_requests?: boolean | null;
   auto_mark_enabled?: boolean | null;
   auto_mark_fraud_threshold?: number | null;
   auto_mark_safe_threshold?: number | null;
@@ -75,6 +76,7 @@ export type Profile = {
   city?: string | null;
   state?: string | null;
   zip_code?: string | null;
+  has_active_subscription?: boolean | null;
 };
 
 export type ProfileMembership = {
@@ -99,7 +101,7 @@ type ProfileContextValue = {
   authInvalid: boolean;
   passcodeDraft: string;
   redirectToSettings: boolean;
-  refreshProfiles: (options?: { silent?: boolean }) => Promise<void>;
+  refreshProfiles: (options?: { silent?: boolean }) => Promise<Profile[] | null>;
   setActiveProfile: (profile: Profile | null) => void;
   setOnboardingComplete: (value: boolean) => void;
   setPasscodeDraft: (value: string) => void;
@@ -174,7 +176,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setAuthInvalid(false);
       setIsLoading(false);
       setResolvedSessionKey(targetSessionKey);
-      return;
+      return [];
     }
     try {
       const data = await authorizedFetch('/profiles');
@@ -188,6 +190,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
       setActiveProfile(selectedProfile);
       setOnboardingComplete(Boolean(selectedProfile?.has_passcode));
       setAuthInvalid(false);
+      return list;
     } catch (err) {
       const message = err instanceof Error ? err.message.toLowerCase() : '';
       if (message.includes('401') || message.includes('unauthorized')) {
@@ -201,6 +204,7 @@ export function ProfileProvider({ children }: { children: React.ReactNode }) {
         // Keep the current profile snapshot on transient failures to avoid UI flicker.
         console.warn('Failed to refresh profiles; keeping previous profile state', err);
       }
+      return null;
     } finally {
       setIsLoading(false);
       setResolvedSessionKey(targetSessionKey);

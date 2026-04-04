@@ -17,7 +17,9 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { StackNavigationProp } from '@react-navigation/stack';
+import * as LocalAuthentication from 'expo-local-authentication';
 import SettingsHeader from '../../components/common/SettingsHeader';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
@@ -32,6 +34,14 @@ import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
 import { logError, logEvent } from '../../services/sentry';
 import { navigateToSupportPortal } from '../../navigation/rootNavigator';
+import type { SettingsStackParamList } from '../../navigation/types';
+import {
+  approvePinResetRequest,
+  createPinResetRequest,
+  denyPinResetRequest,
+  listPinResetRequests,
+  type PinResetRequest,
+} from '../../services/pinReset';
 
 type ModalAction = 'password' | 'pin' | null;
 
@@ -54,6 +64,7 @@ export default function SecurityScreen() {
   const { activeProfile, canManageProfile, setActiveProfile } = useProfile();
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createSecurityStyles(theme), [theme]);
+  const navigation = useNavigation<StackNavigationProp<SettingsStackParamList>>();
   const placeholderColor = useMemo(
     () => withOpacity(theme.colors.textMuted, 0.65),
     [theme.colors.textMuted]
@@ -75,6 +86,11 @@ export default function SecurityScreen() {
   const [isPinVerifying, setIsPinVerifying] = useState(false);
   const [isChangingPin, setIsChangingPin] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [pinResetRequests, setPinResetRequests] = useState<PinResetRequest[]>([]);
+  const [pinResetLoading, setPinResetLoading] = useState(false);
+  const [pinResetError, setPinResetError] = useState('');
+  const [activePinResetRequest, setActivePinResetRequest] = useState<PinResetRequest | null>(null);
+  const [pinResetProcessing, setPinResetProcessing] = useState(false);
   const successAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -322,6 +338,131 @@ export default function SecurityScreen() {
     navigateToSupportPortal();
   };
 
+  const fetchPinResetRequests = useCallback(async () => {
+    if (!activeProfile?.id) {
+      return;
+    }
+    setPinResetLoading(true);
+    setPinResetError('');
+    try {
+      const data = await listPinResetRequests(activeProfile.id);
+      setPinResetRequests(data?.requests ?? []);
+    } catch (err: any) {
+      setPinResetError(err?.message || 'Failed to load PIN reset requests.');
+    } finally {
+      setPinResetLoading(false);
+    }
+  }, [activeProfile?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPinResetRequests();
+    }, [fetchPinResetRequests])
+  );
+
+  const runBiometricGate = async () => {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    if (!hasHardware) {
+      Alert.alert('Biometrics unavailable', 'Face ID or Touch ID is not available on this device.');
+      return false;
+    }
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Confirm to approve PIN reset',
+      fallbackLabel: 'Use device passcode',
+      disableDeviceFallback: false,
+    });
+    if (!result.success) {
+      Alert.alert('Verification failed', 'Face ID/Touch ID was not successful.');
+      return false;
+    }
+    return true;
+  };
+
+  const handleRequestPinReset = async () => {
+    if (!activeProfile?.id) return;
+    Alert.alert(
+      'Request PIN reset',
+      'This will notify the owner or a caretaker to set a new Safety PIN.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Send request',
+          onPress: async () => {
+            setPinResetProcessing(true);
+            try {
+              await createPinResetRequest(activeProfile.id);
+              await fetchPinResetRequests();
+              Alert.alert('Sent', 'We notified your caretakers.');
+            } catch (err: any) {
+              Alert.alert('Unable to send', err?.message || 'Try again shortly.');
+            } finally {
+              setPinResetProcessing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleApprovePinReset = async (request: PinResetRequest) => {
+    if (!activeProfile?.id) return;
+    const ok = await runBiometricGate();
+    if (!ok) return;
+    setPinResetProcessing(true);
+    try {
+      await approvePinResetRequest(activeProfile.id, request.id);
+      setActivePinResetRequest(null);
+      await fetchPinResetRequests();
+      navigation.navigate('ChangePasscode', {
+        pinResetRequestId: request.id,
+        requesterName: request.requester_name ?? undefined,
+      });
+    } catch (err: any) {
+      Alert.alert('Unable to approve', err?.message || 'Try again.');
+    } finally {
+      setPinResetProcessing(false);
+    }
+  };
+
+  const handleDenyPinReset = async (request: PinResetRequest) => {
+    if (!activeProfile?.id) return;
+    setPinResetProcessing(true);
+    try {
+      await denyPinResetRequest(activeProfile.id, request.id);
+      setActivePinResetRequest(null);
+      await fetchPinResetRequests();
+    } catch (err: any) {
+      Alert.alert('Unable to deny', err?.message || 'Try again.');
+    } finally {
+      setPinResetProcessing(false);
+    }
+  };
+
+  const pendingPinResetRequests = useMemo(
+    () => pinResetRequests.filter((request) => request.status === 'pending'),
+    [pinResetRequests]
+  );
+
+  const latestApprovedPinResetRequest = useMemo(
+    () => pinResetRequests.find((request) => request.status === 'approved') ?? null,
+    [pinResetRequests]
+  );
+
+  const handleContinueApprovedPinReset = useCallback(() => {
+    if (!activeProfile?.id || !latestApprovedPinResetRequest) {
+      return;
+    }
+    navigation.navigate('ChangePasscode', {
+      pinResetRequestId: latestApprovedPinResetRequest.id,
+      requesterName: latestApprovedPinResetRequest.requester_name ?? undefined,
+    });
+  }, [activeProfile?.id, latestApprovedPinResetRequest, navigation]);
+
+  const latestRequesterStatus = useMemo(() => {
+    if (canManageProfile) return null;
+    return pinResetRequests[0] ?? null;
+  }, [canManageProfile, pinResetRequests]);
+
   return (
     <SafeAreaView style={styles.screen} edges={[]}>
       <SettingsHeader title="Sign-in Safety" subtitle="Manage how you access Verity" />
@@ -465,6 +606,79 @@ export default function SecurityScreen() {
         )}
         <Text style={styles.lastUpdateText}>Last updated {formatDateTime(lastPinUpdate)}</Text>
       </View>
+
+      {canManageProfile ? (
+        <View style={[styles.card, styles.pinResetCard]}>
+          <Text style={styles.cardLabel}>PIN reset requests</Text>
+          <Text style={styles.cardHelper}>
+            Approve requests from family members who can’t access the PIN.
+          </Text>
+          {pinResetLoading ? (
+            <View style={styles.pinResetLoadingRow}>
+              <ActivityIndicator size="small" color={theme.colors.textMuted} />
+              <Text style={styles.cardHelper}>Loading requests…</Text>
+            </View>
+          ) : pendingPinResetRequests.length === 0 && latestApprovedPinResetRequest ? (
+            <>
+              <Text style={styles.cardHelper}>
+                Approved for {latestApprovedPinResetRequest.requester_name ?? 'a circle member'}.
+                Set and share the new PIN to finish this reset.
+              </Text>
+              <TouchableOpacity
+                style={styles.secondaryButton}
+                onPress={handleContinueApprovedPinReset}
+                disabled={pinResetProcessing}
+              >
+                <Text style={styles.secondaryText}>
+                  {pinResetProcessing ? 'Processing…' : 'Set new PIN now'}
+                </Text>
+                <Ionicons name="lock-closed-outline" size={18} color={theme.colors.text} />
+              </TouchableOpacity>
+            </>
+          ) : pendingPinResetRequests.length === 0 ? (
+            <Text style={styles.cardHelper}>No pending requests right now.</Text>
+          ) : (
+            <Pressable
+              style={({ pressed }) => [
+                styles.pinResetRequestRow,
+                pressed && styles.pressablePressed,
+              ]}
+              onPress={() => setActivePinResetRequest(pendingPinResetRequests[0])}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pinResetRequester}>
+                  {pendingPinResetRequests[0].requester_name ?? 'Circle member'}
+                </Text>
+                <Text style={styles.pinResetMeta}>Requested a PIN reset</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
+            </Pressable>
+          )}
+          {pinResetError ? <Text style={styles.errorText}>{pinResetError}</Text> : null}
+        </View>
+      ) : (
+        <View style={[styles.card, styles.pinResetCard]}>
+          <Text style={styles.cardLabel}>Forgot your PIN?</Text>
+          <Text style={styles.cardHelper}>
+            Ask the owner or a caretaker to reset it for you.
+          </Text>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleRequestPinReset}
+            disabled={pinResetProcessing}
+          >
+            <Text style={styles.secondaryText}>
+              {pinResetProcessing ? 'Sending request…' : 'Request PIN reset'}
+            </Text>
+            <Ionicons name="paper-plane-outline" size={18} color={theme.colors.text} />
+          </TouchableOpacity>
+          {latestRequesterStatus ? (
+            <Text style={styles.cardHelper}>
+              Status: {latestRequesterStatus.status.replace('_', ' ')}
+            </Text>
+          ) : null}
+        </View>
+      )}
     </ScrollView>
 
       {isEmailProvider ? (
@@ -589,6 +803,48 @@ export default function SecurityScreen() {
           </View>
         </Modal>
       ) : null}
+
+      {activePinResetRequest ? (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setActivePinResetRequest(null)}>
+          <View style={styles.modalOverlay}>
+            <Pressable style={styles.modalBackdrop} onPress={() => setActivePinResetRequest(null)}>
+              <BlurView intensity={65} tint={mode === 'dark' ? 'dark' : 'light'} style={styles.modalBlur} />
+            </Pressable>
+            <View style={styles.pinResetModal}>
+              <Text style={styles.pinTitle}>PIN reset request</Text>
+              <Text style={styles.pinSubtitle}>
+                {activePinResetRequest.requester_name ?? 'A circle member'} needs a new Safety PIN.
+              </Text>
+              <View style={styles.pinResetModalActions}>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.secondaryButton,
+                    pressed && styles.pressablePressed,
+                    pinResetProcessing && styles.secondaryButtonDisabled,
+                  ]}
+                  onPress={() => handleDenyPinReset(activePinResetRequest)}
+                  disabled={pinResetProcessing}
+                >
+                  <Text style={styles.secondaryText}>Deny</Text>
+                </Pressable>
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.primaryButton,
+                    pressed && styles.pressablePressed,
+                    pinResetProcessing && styles.primaryDisabled,
+                  ]}
+                  onPress={() => handleApprovePinReset(activePinResetRequest)}
+                  disabled={pinResetProcessing}
+                >
+                  <Text style={styles.primaryButtonText}>
+                    {pinResetProcessing ? 'Approving…' : 'Approve & set new PIN'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -600,22 +856,57 @@ const createSecurityStyles = (theme: AppTheme) =>
       backgroundColor: theme.colors.bg,
     },
     content: {
-      paddingHorizontal: 24,
-      paddingTop: 4,
-      gap: 20,
+      paddingHorizontal: theme.spacing.xl,
+      paddingTop: theme.spacing.xs,
+      gap: theme.spacing.lg,
     },
     card: {
       backgroundColor: theme.colors.surface,
-      borderRadius: 32,
-      borderWidth: 1,
+      borderRadius: theme.radii.lg,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      padding: 24,
-      gap: 16,
-      elevation: 18,
+      padding: theme.spacing.xl,
+      gap: theme.spacing.md,
     },
     pinCard: {
       gap: 10,
       paddingBottom: 18,
+    },
+    pinResetCard: {
+      gap: 12,
+    },
+    pinResetLoadingRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    pinResetRequestRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: theme.spacing.sm,
+      paddingHorizontal: theme.spacing.sm,
+      gap: theme.spacing.sm,
+      borderRadius: theme.radii.sm,
+      backgroundColor: theme.colors.surfaceAlt,
+    },
+    pinResetRequester: {
+      color: theme.colors.text,
+      fontWeight: '600',
+    },
+    pinResetMeta: {
+      color: theme.colors.textMuted,
+      fontSize: 12,
+    },
+    pinResetModal: {
+      backgroundColor: theme.colors.surface,
+      borderRadius: theme.radii.md,
+      padding: theme.spacing.lg,
+      gap: theme.spacing.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.border,
+    },
+    pinResetModalActions: {
+      gap: 10,
     },
     cardLabel: {
       fontSize: 18,
@@ -642,12 +933,12 @@ const createSecurityStyles = (theme: AppTheme) =>
       marginBottom: 6,
     },
     input: {
-      height: 60,
-      borderRadius: 16,
-      borderWidth: 1,
+      height: theme.components.input.height,
+      borderRadius: theme.radii.sm,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surfaceAlt,
-      paddingHorizontal: 16,
+      paddingHorizontal: theme.components.input.paddingHorizontal,
       color: theme.colors.text,
       fontSize: 16,
     },
@@ -655,16 +946,34 @@ const createSecurityStyles = (theme: AppTheme) =>
       opacity: 0.6,
     },
     secondaryButton: {
-      marginTop: 12,
-      height: 60,
-      borderRadius: 24,
-      borderWidth: 1,
+      marginTop: theme.spacing.sm,
+      height: theme.components.button.height,
+      borderRadius: theme.components.button.radius,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surfaceAlt,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 20,
+      paddingHorizontal: theme.components.button.paddingHorizontal,
+    },
+    primaryButton: {
+      marginTop: theme.spacing.sm,
+      height: theme.components.button.height,
+      borderRadius: theme.components.button.radius,
+      backgroundColor: theme.colors.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: theme.components.button.paddingHorizontal,
+    },
+    primaryButtonText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.colors.surface,
+      textAlign: 'center',
+    },
+    primaryDisabled: {
+      opacity: 0.6,
     },
     secondaryButtonDisabled: {
       opacity: 0.55,
@@ -675,7 +984,7 @@ const createSecurityStyles = (theme: AppTheme) =>
     secondaryText: {
       fontSize: 16,
       fontWeight: '600',
-      color: theme.colors.textMuted,
+      color: theme.colors.text,
     },
     googleBadge: {
       width: 64,
@@ -698,7 +1007,7 @@ const createSecurityStyles = (theme: AppTheme) =>
       marginBottom: 16,
     },
     footerLabel: {
-      marginTop: 8,
+      marginTop: theme.spacing.sm,
       fontSize: 13,
       color: withOpacity(theme.colors.text, 0.65),
       textAlign: 'center',
@@ -719,10 +1028,10 @@ const createSecurityStyles = (theme: AppTheme) =>
     },
     modalOverlay: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: withOpacity(theme.colors.text, 0.45),
+      backgroundColor: theme.colors.overlay,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 32,
+      paddingHorizontal: theme.spacing.xl,
     },
     modalBackdrop: {
       ...StyleSheet.absoluteFillObject,
@@ -732,13 +1041,13 @@ const createSecurityStyles = (theme: AppTheme) =>
     },
     pinModal: {
       backgroundColor: theme.colors.surface,
-      borderRadius: 24,
-      borderWidth: 1,
+      borderRadius: theme.radii.md,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      padding: 24,
+      padding: theme.spacing.xl,
       width: '100%',
       maxWidth: 360,
-      gap: 12,
+      gap: theme.spacing.sm,
     },
     pinTitle: {
       color: theme.colors.text,
@@ -750,10 +1059,10 @@ const createSecurityStyles = (theme: AppTheme) =>
       fontSize: 14,
     },
     pinInput: {
-      borderWidth: 1,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      borderRadius: 16,
-      padding: 14,
+      borderRadius: theme.radii.sm,
+      padding: theme.spacing.sm,
       fontSize: 18,
       letterSpacing: 3,
       color: theme.colors.text,
@@ -771,10 +1080,10 @@ const createSecurityStyles = (theme: AppTheme) =>
     },
     modalButton: {
       flex: 1,
-      borderRadius: 16,
-      borderWidth: 1,
+      borderRadius: theme.radii.sm,
+      borderWidth: StyleSheet.hairlineWidth,
       borderColor: theme.colors.border,
-      paddingVertical: 12,
+      paddingVertical: theme.spacing.sm,
       alignItems: 'center',
       backgroundColor: theme.colors.surface,
     },
@@ -793,11 +1102,11 @@ const createSecurityStyles = (theme: AppTheme) =>
       color: theme.colors.surface,
     },
     successBanner: {
-      paddingVertical: 6,
-      paddingHorizontal: 14,
+      paddingVertical: theme.spacing.xs,
+      paddingHorizontal: theme.spacing.sm,
       backgroundColor: withOpacity(theme.colors.success, 0.12),
-      borderRadius: 16,
-      marginBottom: 8,
+      borderRadius: theme.radii.sm,
+      marginBottom: theme.spacing.sm,
     },
     pinSuccessBadge: {
       alignSelf: 'flex-start',
@@ -813,6 +1122,10 @@ const createSecurityStyles = (theme: AppTheme) =>
     lastUpdateText: {
       fontSize: 12,
       color: theme.colors.textMuted,
-      marginTop: 6,
+      marginTop: theme.spacing.xs,
+    },
+    pressablePressed: {
+      opacity: 0.86,
+      transform: [{ scale: 0.99 }],
     },
   });

@@ -497,6 +497,36 @@ async function callIncoming(req: Request, res: Response) {
   const fromNumber = payload.From ?? '';
   const callSid = payload.CallSid;
   const profile = await getProfileByToNumber(toNumber);
+  
+  // CRITICAL: Validate subscription is active
+  if (profile && !profile.has_active_subscription) {
+    logger.info(
+      `[twilio-incoming] Call to inactive profile profileId=${profile.id} toNumber=${toNumber} callSid=${callSid}`
+    );
+    appendVoicemail(
+      twimlResponse,
+      callbackUrl,
+      'This account is inactive. Please check your subscription status.'
+    );
+    return res.type('text/xml').send(twimlResponse.toString());
+  }
+  
+  // Check if number is orphaned (trial expired, number reclaimed)
+  if (!profile && toNumber) {
+    const orphaned = await isOrphanedDid(toNumber);
+    if (orphaned) {
+      logger.info(
+        `[twilio-incoming] Call to orphaned DID (trial expired) toNumber=${toNumber} callSid=${callSid}`
+      );
+      appendVoicemail(
+        twimlResponse,
+        callbackUrl,
+        'This number is no longer active. If you believe this is an error, please contact support.'
+      );
+      return res.type('text/xml').send(twimlResponse.toString());
+    }
+  }
+  
   if (profile) {
     const trustedCaller = await getTrustedCaller(profile.id, fromNumber);
     if (trustedCaller) {
@@ -645,7 +675,7 @@ async function getProfileByToNumber(to?: string | null) {
   const { data: profile, error } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, caretaker_id, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at'
+      'id, caretaker_id, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at, has_active_subscription'
     )
     .eq('twilio_virtual_number', to)
     .single();
@@ -653,6 +683,29 @@ async function getProfileByToNumber(to?: string | null) {
     return null;
   }
   return profile;
+}
+
+/**
+ * Check if a DID number is orphaned (reclaimed from expired trial).
+ * Used to validate subscription state on incoming calls.
+ */
+async function isOrphanedDid(number?: string | null) {
+  if (!number) {
+    return false;
+  }
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('orphaned_dids')
+      .select('id, original_profile_id, reclaim_reason')
+      .eq('phone_number', number)
+      .maybeSingle();
+    return !error && data !== null;
+  } catch (err) {
+    logger.warn(
+      `Failed checking orphaned DID status for number=${number} error=${String(err)}`
+    );
+    return false;
+  }
 }
 
 async function verifyPin(req: Request, res: Response) {

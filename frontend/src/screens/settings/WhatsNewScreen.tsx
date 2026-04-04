@@ -24,8 +24,21 @@ type Release = {
 
 const RELEASES: Release[] = [
   {
-    version: '1.0.3',
+    version: '1.1.0',
     label: 'Latest Release',
+    date: 'April 2026',
+    highlights: [
+      "Hey, it's Lex from Verity. 1.1.0 expands protection to your whole phone setup.",
+      'Landline support: one Verity number now protects both your mobile and landline. Calls route based on which line was dialed, and both show up in your activity.',
+      'PIN management: caretakers can request a PIN reset on behalf of an owner, who then approves or denies the request from a simple notification.',
+      'Profile pictures: add a profile photo to your account so family and caregivers see who they\'re helping at a glance.',
+      'Circle invites: fixed issues with invite delivery and acceptance so family joins smoothly.',
+      'Better landline workflow: set your landline in Account settings and Verity screens both lines from day one. — Lex & the Verity team',
+    ],
+  },
+  {
+    version: '1.0.3',
+    label: 'Previous Release',
     date: 'March 2026',
     highlights: [
       "Hey, it's Lex from Verity. Quick but important update following yesterday's 1.0.2 release.",
@@ -102,7 +115,11 @@ export default function WhatsNewScreen() {
         {RELEASES.map((release) => (
           <View key={release.version} style={styles.section}>
             <Pressable
-              style={({ pressed }) => [styles.sectionHeaderPressable, pressed && styles.sectionHeaderPressed]}
+              style={({ pressed }) => [
+                styles.sectionHeaderPressable,
+                styles.sectionHeaderBase,
+                pressed && styles.sectionHeaderPressed,
+              ]}
               onPress={() => {
                 LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
                 setExpandedByVersion((prev) => ({
@@ -205,7 +222,7 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
       letterSpacing: 0.1,
     },
     section: {
-      marginBottom: 28,
+      marginBottom: 16,
     },
     sectionHeaderRow: {
       flexDirection: 'row',
@@ -214,47 +231,58 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
       gap: 10,
     },
     sectionHeaderPressable: {
-      marginBottom: 14,
+      marginBottom: 8,
+    },
+    sectionHeaderBase: {
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: theme.colors.surface,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
     sectionHeaderPressed: {
-      opacity: 0.72,
+      opacity: 0.68,
     },
     sectionHeaderLeft: {
-      gap: 3,
+      gap: 2,
       flex: 1,
       minWidth: 0,
     },
     sectionHeaderRight: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      gap: 6,
     },
     sectionLabel: {
       color: theme.colors.textMuted,
-      fontSize: 10,
+      fontSize: 9,
       fontWeight: '700',
-      letterSpacing: 0.4,
+      letterSpacing: 0.5,
       textTransform: 'uppercase',
     },
     sectionVersion: {
       color: theme.colors.text,
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: '700',
-      letterSpacing: -0.3,
+      letterSpacing: -0.2,
     },
     sectionDate: {
       color: theme.colors.textMuted,
-      fontSize: 11,
+      fontSize: 10,
+      fontWeight: '500',
       letterSpacing: 0.1,
     },
     card: {
       backgroundColor: theme.colors.surface,
-      borderRadius: 32,
+      borderRadius: 24,
       paddingVertical: 8,
       paddingHorizontal: 24,
       borderWidth: 1,
-      borderColor: withOpacity(theme.colors.text, 0.08),
+      borderColor: theme.colors.border,
       overflow: 'hidden',
+      marginTop: 2,
+      elevation: 10,
     },
     bulletRow: {
       flexDirection: 'row',

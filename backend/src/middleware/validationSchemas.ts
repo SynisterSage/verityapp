@@ -278,6 +278,27 @@ export const appStoreNotificationSchema = z
   })
   .strict();
 
+// Multi-Endpoint Routing Schemas
+export const addProfileEndpointSchema = z.object({
+  endpoint_type: z.enum(['mobile', 'landline']).describe('endpoint_type must be "mobile" or "landline"'),
+  phone_number: z.string().min(10, 'Phone number is required').max(20, 'Invalid phone number format'),
+});
+
+export const updateProfileEndpointSchema = z.object({
+  phone_number: z.string().min(10, 'Phone number is required').max(20, 'Invalid phone number format').optional(),
+  is_active: z.boolean().optional(),
+});
+
+export const updateRoutingPreferencesSchema = z.object({
+  multi_endpoint_enabled: z.boolean().optional(),
+  use_ingress_aware_routing: z.boolean().optional(),
+  default_fallback_type: z.enum(['app', 'voicemail', 'first_available']).optional(),
+  simultaneous_ring_enabled: z.boolean().optional(),
+  ring_timeout_seconds: z.number().min(1).max(300).optional(),
+  no_answer_action: z.enum(['voicemail', 'fallback', 'hangup']).optional(),
+  voicemail_enabled: z.boolean().optional(),
+});
+
 // Type exports for use in controllers
 export type ResetPasswordRequest = z.infer<typeof resetPasswordSchema>;
 export type LegalAcceptanceRequest = z.infer<typeof legalAcceptanceSchema>;

@@ -27,6 +27,19 @@ export const SYSTEM_BASICS_CONTENT: ResourceSection[] = [
     ],
   },
   {
+    id: 'mobile-and-landline',
+    title: 'Use one Verity number on both mobile and landline',
+    body:
+      'Your single Verity number can protect both your mobile and landline. Calls are intelligently routed based on which line the caller used, so you get context-aware screening on all your phones.',
+    bullets: [
+      'Add your landline number in Settings → Account during or after setup.',
+      'Your Verity number screens calls to both lines through the same app.',
+      'Verity understands which line was called and routes accordingly.',
+      'Both lines appear in your Calls and Alerts so nothing is missed.',
+      'You can update or remove your landline anytime in Account settings.',
+    ],
+  },
+  {
     id: 'reliable-fallback-basics',
     title: 'Reliable fallback number (optional)',
     body:
@@ -329,8 +342,41 @@ export const FAQ_CONTENT: ResourceSection[] = [
       'Tap “Report a Problem” inside the store if you need a refund; mention the support ticket ID so we can link the conversation.',
       'Keep the ticket open and share the receipt you received from Apple/Google; we can help agents check the right profile.',
     ],
+  },  {
+    id: 'faq-landline',
+    title: 'Can I use Verity on my landline?',
+    body:
+      'Yes. Your single Verity number can protect both your mobile and landline. Add your landline in Settings → Account during or after setup.',
+    bullets: [
+      'You only need one Verity number for both lines.',
+      'Calls are routed based on which phone was called, so you get context in the app.',
+      'Both mobile and landline activity appears in your Calls and Alerts.',
+      'Remove or update your landline anytime in Account settings if you change carriers.',
+    ],
   },
-];
+  {
+    id: 'faq-pin-reset',
+    title: 'How do I request a PIN reset?',
+    body:
+      'If you forget your app PIN or need to change it, reach out to support or ask a caretaker to request a reset on your behalf.',
+    bullets: [
+      'A caretaker in your circle can submit a PIN reset request.',
+      'You will receive a notification to approve or deny the reset.',
+      'Once approved, a temporary reset link is sent and you can set a new PIN.',
+      'If you are the only one on your profile, contact support to verify your identity before resetting the PIN.',
+    ],
+  },
+  {
+    id: 'faq-emergency',
+    title: 'How do I make emergency calls?',
+    body:
+      'Emergency calls (911 or your country equivalent) bypass Verity and go directly to emergency services.',
+    bullets: [
+      'Dialing 911 or the local emergency number always reaches emergency services without screening.',
+      'Verity does not intercept emergency calls, but logs them for your record.',
+      'Enable backup numbers for trusted contacts so they can reach you if your phone loses signal.',
+    ],
+  },];
 
 export const BILLING_CONTENT: ResourceSection[] = [
   {
@@ -344,17 +390,6 @@ export const BILLING_CONTENT: ResourceSection[] = [
       'Open the App Store or Play Store app, tap your profile, and go to Subscriptions to see active charges.',
       'Receipts are emailed from the store; save them for your records or share them with support.',
       'Need a refund? Use the store’s “Report a Problem” feature and mention the Verity Protect ticket so we can support the request.',
-    ],
-  },
-  {
-    id: 'billing-why-membership',
-    title: 'Why membership is required',
-    body:
-      'Membership covers the live infrastructure that keeps call protection running in real time, including routing, recording, and monitoring systems.',
-    bullets: [
-      'Phone infrastructure: forwarded-line call routing, carrier connectivity, and uptime monitoring.',
-      'Call recording and storage: secure capture, retention, and access to transcripts/history for review.',
-      'Active fraud monitoring: real-time risk checks, alert delivery, and family visibility across devices.',
     ],
   },
   {

@@ -88,6 +88,36 @@ function getEventMeta(alertType: string, accentColor: string, colors: {
         whatItMeans:
           'The safety PIN is used to verify identity when someone calls your line. Changing it means any caller who knew the old PIN will need the new one to get through.',
       };
+    case 'pin_reset_request':
+      return {
+        icon: 'help-circle-outline',
+        iconColor: colors.warning,
+        eventLabel: 'PIN reset requested',
+        whoLabel: (p, actor) => actor,
+        whatHappened: (p, actor) => `${actor} requested a safety PIN reset.`,
+        whatItMeans:
+          'Caretakers can approve the request and set a new PIN. The old PIN is not retrievable.',
+      };
+    case 'pin_reset_approved':
+      return {
+        icon: 'checkmark-circle-outline',
+        iconColor: colors.success,
+        eventLabel: 'PIN reset approved',
+        whoLabel: (p, actor) => actor,
+        whatHappened: (p, actor) => `${actor} approved a safety PIN reset.`,
+        whatItMeans:
+          'A caretaker approved a reset. A new PIN should be set and shared with the requester.',
+      };
+    case 'pin_reset_denied':
+      return {
+        icon: 'close-circle-outline',
+        iconColor: colors.danger,
+        eventLabel: 'PIN reset denied',
+        whoLabel: (p, actor) => actor,
+        whatHappened: (p, actor) => `${actor} denied a safety PIN reset.`,
+        whatItMeans:
+          'The request was declined. The requester may need to contact a caretaker directly.',
+      };
     case 'security_password':
       return {
         icon: 'lock-closed-outline',

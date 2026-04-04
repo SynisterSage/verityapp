@@ -8,6 +8,8 @@ import {
   Pressable,
   ActivityIndicator,
   Modal,
+  Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,12 +18,14 @@ import * as Haptics from 'expo-haptics';
 import { authorizedFetch } from '../../services/backend';
 import { useProfile } from '../../context/ProfileContext';
 import { useSubscription } from '../../context/SubscriptionContext';
+import { useAuth } from '../../context/AuthContext';
 import OnboardingHeader from '../../components/onboarding/OnboardingHeader';
 import ActionFooter from '../../components/onboarding/ActionFooter';
 import HowItWorksCard from '../../components/onboarding/HowItWorksCard';
 import ReliableFallbackInfoModal from '../../components/common/ReliableFallbackInfoModal';
+import MultiEndpointInfoModal from '../../components/common/MultiEndpointInfoModal';
 import VerityNumberInfoModal from '../../components/common/VerityNumberInfoModal';
-import RecipientPhoneInfoModal from '../../components/common/RecipientPhoneInfoModal';
+import ImagePickerModal from '../../components/common/ImagePickerModal';
 import { useTheme } from '../../context/ThemeContext';
 import { withOpacity } from '../../utils/color';
 import type { AppTheme } from '../../theme/tokens';
@@ -68,12 +72,17 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const insets = useSafeAreaInsets();
   const { activeProfile, setActiveProfile, setOnboardingComplete } = useProfile();
   const { refreshStatus, status } = useSubscription();
+  const { session } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phoneDigits, setPhoneDigits] = useState('');
   const [fallbackPhoneDigits, setFallbackPhoneDigits] = useState('');
+  const [landlinePhoneDigits, setLandlinePhoneDigits] = useState('');
   const [assignedNumber, setAssignedNumber] = useState(activeProfile?.twilio_virtual_number || '');
   const [isAssigningNumber, setIsAssigningNumber] = useState(false);
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [selectedAvatarUri, setSelectedAvatarUri] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
   const lastNameRef = useRef<TextInput | null>(null);
   const phoneRef = useRef<TextInput | null>(null);
@@ -81,14 +90,15 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCallFlowModal, setShowCallFlowModal] = useState(false);
   const [showFallbackInfoModal, setShowFallbackInfoModal] = useState(false);
+  const [showMultiEndpointInfoModal, setShowMultiEndpointInfoModal] = useState(false);
   const [showVerityNumberInfoModal, setShowVerityNumberInfoModal] = useState(false);
-  const [showRecipientPhoneInfoModal, setShowRecipientPhoneInfoModal] = useState(false);
   const { theme, mode } = useTheme();
   const styles = useMemo(() => createProfileStyles(theme, mode), [theme, mode]);
   const placeholderColor = withOpacity(theme.colors.textMuted, 0.7);
 
   const formattedPhone = useMemo(() => formatPhone(phoneDigits), [phoneDigits]);
   const formattedFallbackPhone = useMemo(() => formatPhone(fallbackPhoneDigits), [fallbackPhoneDigits]);
+  const formattedLandlinePhone = useMemo(() => formatPhone(landlinePhoneDigits), [landlinePhoneDigits]);
   const isProfileInfoComplete = Boolean(firstName.trim() && lastName.trim() && phoneDigits.length === 10);
   const isFormValid = Boolean(assignedNumber); // Continue only enabled after number assigned
   const primaryDisabled = !isFormValid || isSubmitting;
@@ -173,6 +183,21 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         if (refreshedProfile) {
           setActiveProfile(refreshedProfile as any);
         }
+        
+        // Create landline endpoint if provided
+        if (landlinePhoneDigits) {
+          try {
+            await authorizedFetch(`/profiles/${profileId}/endpoints`, {
+              method: 'POST',
+              body: JSON.stringify({
+                endpoint_type: 'landline',
+                phone_number: `+1${landlinePhoneDigits}`,
+              }),
+            });
+          } catch (err) {
+            console.warn('Failed to create landline endpoint:', err);
+          }
+        }
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => null);
       } else {
         throw new Error('No phone number returned');
@@ -209,6 +234,43 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => null);
     } finally {
       setIsAssigningNumber(false);
+    }
+  };
+
+  const handleAvatarSelected = async (imageData: {
+    base64: string;
+    uri: string;
+    width: number;
+    height: number;
+    mimeType: string;
+  }) => {
+    try {
+      setIsUploadingAvatar(true);
+      const userId = session?.user?.id;
+      
+      if (!userId) {
+        Alert.alert('Error', 'User ID not found. Please try again.');
+        return;
+      }
+
+      const response = await authorizedFetch(`/users/${userId}/avatar`, {
+        method: 'POST',
+        body: JSON.stringify({
+          imageData: imageData.base64,
+          mimeType: imageData.mimeType,
+        }),
+      });
+
+      if (response.avatar_url) {
+        setSelectedAvatarUri(imageData.uri);
+        setShowAvatarPicker(false);
+      } else {
+        Alert.alert('Error', 'Failed to upload profile picture');
+      }
+    } catch (error) {
+      Alert.alert('Error', `Failed to upload avatar: ${error}`);
+    } finally {
+      setIsUploadingAvatar(false);
     }
   };
 
@@ -282,10 +344,10 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         </View>
 
         <View style={styles.inputLabelRow}>
-          <Text style={styles.inputLabel}>Recipient phone</Text>
+          <Text style={styles.inputLabel}>Mobile phone</Text>
           <Pressable
             style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
-            onPress={() => setShowRecipientPhoneInfoModal(true)}
+            onPress={() => setShowMultiEndpointInfoModal(true)}
             hitSlop={8}
           >
             <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
@@ -331,6 +393,57 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           />
         </View>
         <Text style={styles.fallbackHint}>Optional. Used only if in-app calling is unavailable.</Text>
+
+        <View style={styles.inputLabelRow}>
+          <View style={styles.labelWithBadge}>
+            <Text style={styles.inputLabel}>Landline (optional)</Text>
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>New</Text>
+            </View>
+          </View>
+          <Pressable
+            style={({ pressed }) => [styles.labelHelpButton, pressed && styles.labelHelpButtonPressed]}
+            onPress={() => setShowMultiEndpointInfoModal(true)}
+            hitSlop={8}
+          >
+            <Ionicons name="help-circle-outline" size={16} color={theme.colors.textMuted} />
+          </Pressable>
+        </View>
+        <View style={styles.inputContainer}>
+          <Ionicons name="call-outline" size={18} color={withOpacity(theme.colors.text, 0.45)} />
+          <Text style={styles.prefix}>+1</Text>
+          <TextInput
+            style={[styles.input, styles.phoneInput]}
+            placeholder="(000) 000-0000"
+            placeholderTextColor={placeholderColor}
+            keyboardType="phone-pad"
+            value={formattedLandlinePhone}
+            onChangeText={(value) => setLandlinePhoneDigits(value.replace(/\D/g, '').slice(0, 10))}
+            returnKeyType="done"
+          />
+        </View>
+        <Text style={styles.fallbackHint}>For calls from your home or office phone</Text>
+
+        {/* Optional Avatar Section */}
+        <View style={styles.avatarSection}>
+          <Text style={styles.inputLabel}>Profile picture (optional)</Text>
+          <View style={styles.avatarWrapper}>
+            <View style={styles.avatarPreviewContainer}>
+              {selectedAvatarUri ? (
+                <Image
+                  source={{ uri: selectedAvatarUri }}
+                  style={styles.avatarPreview}
+                />
+              ) : null}
+            </View>
+            <Pressable
+              style={styles.avatarChangeButton}
+              onPress={() => setShowAvatarPicker(true)}
+            >
+              <Ionicons name="camera" size={20} color="#FFFFFF" />
+            </Pressable>
+          </View>
+        </View>
 
         <View style={styles.inputLabelRow}>
           <Text style={styles.inputLabel}>Verity number</Text>
@@ -496,6 +609,12 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           theme={theme}
           mode={mode}
         />
+        <MultiEndpointInfoModal
+          visible={showMultiEndpointInfoModal}
+          onClose={() => setShowMultiEndpointInfoModal(false)}
+          theme={theme}
+          mode={mode}
+        />
         <VerityNumberInfoModal
           visible={showVerityNumberInfoModal}
           onClose={() => setShowVerityNumberInfoModal(false)}
@@ -503,12 +622,13 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           mode={mode}
           context="onboarding"
         />
-        <RecipientPhoneInfoModal
-          visible={showRecipientPhoneInfoModal}
-          onClose={() => setShowRecipientPhoneInfoModal(false)}
-          theme={theme}
-          mode={mode}
+        <ImagePickerModal
+          visible={showAvatarPicker}
+          onImageSelected={handleAvatarSelected}
+          onCancel={() => setShowAvatarPicker(false)}
+          isLoading={isUploadingAvatar}
         />
+
       </SafeAreaView>
     </View>
   );
@@ -582,6 +702,23 @@ const createProfileStyles = (theme: AppTheme, mode?: string) =>
     labelHelpButtonPressed: {
       opacity: 0.72,
     },
+    labelWithBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    newBadge: {
+      backgroundColor: theme.colors.accent,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+    },
+    newBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: '#FFFFFF',
+      letterSpacing: 0.5,
+    },
     inputContainer: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -604,6 +741,48 @@ const createProfileStyles = (theme: AppTheme, mode?: string) =>
     prefix: {
       color: theme.colors.textMuted,
       fontWeight: '600',
+    },
+    avatarSection: {
+      marginTop: 16,
+      marginBottom: 8,
+    },
+    avatarWrapper: {
+      position: 'relative',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 8,
+    },
+    avatarPreviewContainer: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.surfaceAlt,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    avatarPreview: {
+      width: 120,
+      height: 120,
+      borderRadius: 60,
+    },
+    avatarChangeButton: {
+      position: 'absolute',
+      bottom: -4,
+      right: -4,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.colors.accent,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 3,
+      borderColor: '#FFFFFF',
+      shadowColor: '#000',
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 8,
     },
     assignButton: {
       flexDirection: 'row',

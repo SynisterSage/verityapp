@@ -60,6 +60,7 @@ export default function SignInScreen({
   const facilityNameFromPrompt = formatFacilityNameFromSlug(route?.params?.facilitySlug);
   const isInviteClaimPromptVisible = Boolean(route?.params?.inviteClaimPrompt);
   const isViewPlansPromptVisible = Boolean(route?.params?.viewPlansPrompt);
+  const isFromFullCoverageSetup = Boolean(route?.params?.fromFullCoverageSetup);
 
   useEffect(() => {
     let mounted = true;
@@ -103,6 +104,13 @@ export default function SignInScreen({
       });
     } else {
       logEvent('login_success', { screen: 'SignIn' });
+      if (isFromFullCoverageSetup) {
+        try {
+          await AsyncStorage.setItem('fullCoverageSetupAnimation', '1');
+        } catch {
+          // no-op
+        }
+      }
     }
     setIsSubmitting(false);
   };
@@ -140,6 +148,13 @@ export default function SignInScreen({
   const handleGoogleSignIn = async () => {
     logEvent('login_google_attempt', { screen: 'SignIn' });
     await signInWithGoogle();
+    if (isFromFullCoverageSetup) {
+      try {
+        await AsyncStorage.setItem('fullCoverageSetupAnimation', '1');
+      } catch {
+        // no-op
+      }
+    }
   };
 
   const handleAppleSignIn = async () => {
@@ -153,6 +168,12 @@ export default function SignInScreen({
         screen: 'SignIn',
         extra: { reason: message },
       });
+    } else if (isFromFullCoverageSetup) {
+      try {
+        await AsyncStorage.setItem('fullCoverageSetupAnimation', '1');
+      } catch {
+        // no-op
+      }
     }
   };
 

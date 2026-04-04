@@ -1928,8 +1928,7 @@ export default function MembershipScreen() {
           >
             <Text style={styles.exitModalTitle}>Leave for now?</Text>
             <Text style={styles.exitModalBody}>
-              You will be signed out and returned to login. Verity membership covers secure call routing,
-              screening, recordings, and fraud monitoring infrastructure.
+              You will be signed out and returned to login.
             </Text>
             <View style={styles.exitModalActions}>
               <Pressable

@@ -74,7 +74,8 @@ function isLegacyAlertPrefsError(err: unknown) {
     (message.includes('enable_push_trusted_activity') ||
       message.includes('enable_push_circle_activity') ||
       message.includes('enable_push_support_replies') ||
-      message.includes('enable_email_weekly_reports'))
+      message.includes('enable_email_weekly_reports') ||
+      message.includes('enable_email_pin_reset_requests'))
   );
 }
 
@@ -82,7 +83,8 @@ type PreferenceKey =
   | 'trusted_activity'
   | 'circle_activity'
   | 'support_replies'
-  | 'weekly_email';
+  | 'weekly_email'
+  | 'pin_reset_email';
 
 type PreferenceItem = {
   key: PreferenceKey;
@@ -111,6 +113,9 @@ export default function NotificationsScreen() {
   const [weeklyEmailReports, setWeeklyEmailReports] = useState(
     activeProfile?.enable_email_weekly_reports ?? true
   );
+  const [pinResetEmails, setPinResetEmails] = useState(
+    activeProfile?.enable_email_pin_reset_requests ?? false
+  );
   const [screeningChoice, setScreeningChoice] = useState<ScreeningChoiceKey>(() =>
     getScreeningChoiceFromThreshold(activeProfile?.alert_threshold_score ?? 60)
   );
@@ -131,6 +136,7 @@ export default function NotificationsScreen() {
     setPushCircleActivity(activeProfile.enable_push_circle_activity ?? true);
     setPushSupportReplies(activeProfile.enable_push_support_replies ?? true);
     setWeeklyEmailReports(activeProfile.enable_email_weekly_reports ?? true);
+    setPinResetEmails(activeProfile.enable_email_pin_reset_requests ?? false);
   }, [activeProfile]);
 
   const selectedScreeningLabel = useMemo(
@@ -180,8 +186,15 @@ export default function NotificationsScreen() {
         icon: 'mail-outline',
         active: weeklyEmailReports,
       },
+      {
+        key: 'pin_reset_email',
+        title: 'PIN reset emails',
+        description: 'Email caretakers when someone requests a PIN reset',
+        icon: 'mail-unread-outline',
+        active: pinResetEmails,
+      },
     ],
-    [weeklyEmailReports]
+    [pinResetEmails, weeklyEmailReports]
   );
 
   const handleToggle = useCallback((key: PreferenceKey) => {
@@ -197,7 +210,11 @@ export default function NotificationsScreen() {
       setPushSupportReplies((prev) => !prev);
       return;
     }
-    setWeeklyEmailReports((prev) => !prev);
+    if (key === 'weekly_email') {
+      setWeeklyEmailReports((prev) => !prev);
+      return;
+    }
+    setPinResetEmails((prev) => !prev);
   }, []);
 
   const hasChanges = useMemo(() => {
@@ -212,9 +229,16 @@ export default function NotificationsScreen() {
       pushSupportReplies !== (activeProfile.enable_push_support_replies ?? true);
     const emailChanged =
       weeklyEmailReports !== (activeProfile.enable_email_weekly_reports ?? true);
+    const pinResetEmailChanged =
+      pinResetEmails !== (activeProfile.enable_email_pin_reset_requests ?? false);
 
     return canManageProfile
-      ? thresholdChanged || trustedChanged || circleChanged || supportRepliesChanged || emailChanged
+      ? thresholdChanged ||
+          trustedChanged ||
+          circleChanged ||
+          supportRepliesChanged ||
+          emailChanged ||
+          pinResetEmailChanged
       : thresholdChanged || trustedChanged || circleChanged || supportRepliesChanged;
   }, [
     activeProfile,
@@ -223,6 +247,7 @@ export default function NotificationsScreen() {
     pushSupportReplies,
     pushTrustedActivity,
     threshold,
+    pinResetEmails,
     weeklyEmailReports,
   ]);
 
@@ -244,6 +269,7 @@ export default function NotificationsScreen() {
 
       if (canManageProfile) {
         body.enable_email_weekly_reports = weeklyEmailReports;
+        body.enable_email_pin_reset_requests = pinResetEmails;
       }
 
       const legacyBody: Record<string, number | boolean> = {
@@ -288,6 +314,9 @@ export default function NotificationsScreen() {
         enable_email_weekly_reports: canManageProfile
           ? weeklyEmailReports
           : activeProfile.enable_email_weekly_reports,
+        enable_email_pin_reset_requests: canManageProfile
+          ? pinResetEmails
+          : activeProfile.enable_email_pin_reset_requests,
         enable_email_alerts: canManageProfile
           ? weeklyEmailReports
           : (data?.profile ?? activeProfile).enable_email_alerts,
@@ -303,6 +332,7 @@ export default function NotificationsScreen() {
           pushCircleActivity,
           pushSupportReplies,
           weeklyEmailReports: canManageProfile ? weeklyEmailReports : undefined,
+          pinResetEmails: canManageProfile ? pinResetEmails : undefined,
         },
       });
     } catch (err: any) {
@@ -418,7 +448,7 @@ export default function NotificationsScreen() {
 
         {canManageProfile ? (
           <View style={styles.notificationsSection}>
-            <Text style={styles.sectionTitle}>Email Summary</Text>
+            <Text style={styles.sectionTitle}>Email Updates</Text>
             {emailItems.map((item) => (
               <PreferenceToggleRow
                 key={item.key}

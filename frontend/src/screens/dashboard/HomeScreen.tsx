@@ -1149,7 +1149,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                   { opacity: setupNudgeOpacity },
                 ]}
               >
-                <Text style={styles.sectionLabel}>Complete your setup</Text>
+                <Text style={[styles.sectionLabel, { marginBottom: 6 }]}>Complete your setup</Text>
                 <View style={styles.setupNudgeCard}>
                   <View style={styles.setupNudgeAccent} />
                   <View style={styles.setupNudgeBody}>
@@ -1592,66 +1592,66 @@ const createStyles = (theme: AppTheme) =>
     setupNudgeCard: {
       borderRadius: 20,
       borderWidth: StyleSheet.hairlineWidth,
-      borderColor: withOpacity(theme.colors.text, 0.12),
+      borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
       overflow: 'hidden',
       flexDirection: 'row',
     },
     setupNudgeAccent: {
-      width: 3,
-      backgroundColor: withOpacity(theme.colors.accent, 0.95),
+      width: 2,
+      backgroundColor: theme.colors.accent,
     },
     setupNudgeBody: {
       flex: 1,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      gap: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      gap: 6,
     },
     setupNudgeTopRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
-      gap: 8,
+      gap: 6,
     },
     setupNudgeDismiss: {
-      width: 24,
-      height: 24,
+      width: 22,
+      height: 22,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: 12,
-      marginTop: -2,
+      borderRadius: 11,
+      marginTop: 0,
     },
     setupNudgeDismissPressed: {
-      backgroundColor: withOpacity(theme.colors.textMuted, 0.16),
+      backgroundColor: withOpacity(theme.colors.textMuted, 0.12),
     },
     setupNudgeTitle: {
       color: theme.colors.text,
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: '700',
-      lineHeight: 25,
-      letterSpacing: -0.25,
+      lineHeight: 23,
+      letterSpacing: -0.2,
       flex: 1,
     },
     setupNudgeDescription: {
       color: theme.colors.textMuted,
-      fontSize: 15,
-      lineHeight: 21,
+      fontSize: 14,
+      lineHeight: 20,
     },
     setupNudgeCta: {
-      marginTop: 2,
+      marginTop: 0,
       width: '100%',
-      borderRadius: 14,
+      borderRadius: 12,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 12,
+      paddingVertical: 10,
       backgroundColor: theme.colors.accent,
     },
     setupNudgeCtaPressed: {
-      opacity: 0.88,
+      opacity: 0.85,
     },
     setupNudgeCtaText: {
-      color: theme.colors.surface,
-      fontSize: 16,
+      color: '#ffffff',
+      fontSize: 15,
       fontWeight: '700',
     },
     statsGrid: {

@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -44,7 +45,11 @@ type Member = {
   role: MemberRole;
   is_caretaker?: boolean;
   display_name?: string | null;
-  user?: { email?: string; user_metadata?: { full_name?: string } } | null;
+  user?: {
+    email?: string;
+    user_metadata?: { full_name?: string };
+    avatar_url?: string | null;
+  } | null;
 };
 
 type Invite = {
@@ -643,9 +648,16 @@ export default function MembersScreen() {
                     <View style={styles.memberCard}>
                       <View style={styles.memberRow}>
                         <View style={[styles.memberAvatar, { backgroundColor: avatarColor }]}>
-                          <Text style={styles.memberAvatarText}>
-                            {safeName.charAt(0).toUpperCase()}
-                          </Text>
+                          {member.user?.avatar_url ? (
+                            <Image
+                              source={{ uri: member.user.avatar_url }}
+                              style={styles.memberAvatarImage}
+                            />
+                          ) : (
+                            <Text style={styles.memberAvatarText}>
+                              {safeName.charAt(0).toUpperCase()}
+                            </Text>
+                          )}
                         </View>
                         <View style={styles.memberContent}>
                           <View style={styles.memberNameRow}>
@@ -1022,6 +1034,11 @@ const createMembersStyles = (theme: AppTheme, mode: ThemeMode) => {
     memberAvatarText: {
       color: '#fff',
       fontWeight: '600',
+    },
+    memberAvatarImage: {
+      width: 38,
+      height: 38,
+      borderRadius: 20,
     },
     memberContent: {
       flex: 1,

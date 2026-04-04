@@ -187,7 +187,7 @@ async function listRequests(req: Request, res: Response) {
     .order('created_at', { ascending: false });
 
   if (isCaretaker || isAdmin) {
-    query.eq('status', 'pending');
+    query.in('status', ['pending', 'approved']).limit(10);
   } else {
     query.eq('requester_user_id', userId).limit(5);
   }

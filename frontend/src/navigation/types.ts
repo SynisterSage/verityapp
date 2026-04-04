@@ -8,6 +8,7 @@ export type RootStackParamList = {
         facilitySlug?: string;
         inviteClaimPrompt?: boolean;
         viewPlansPrompt?: boolean;
+        fromFullCoverageSetup?: boolean;
       }
     | undefined;
   SignUp:
@@ -89,11 +90,16 @@ export type CallsStackParamList = {
 
 export type SettingsStackParamList = {
   Settings: { initialScreen?: 'Blocklist' } | undefined;
-  Account: undefined;
+  Account: { fromFullCoverageSetup?: boolean } | undefined;
   MembershipBilling: undefined;
   Notifications: undefined;
   Security: undefined;
-  ChangePasscode: undefined;
+  ChangePasscode:
+    | {
+        pinResetRequestId?: string;
+        requesterName?: string;
+      }
+    | undefined;
   SafePhrases: undefined;
   TrustedContacts: undefined;
   Blocklist: undefined;
@@ -107,6 +113,7 @@ export type SettingsStackParamList = {
   Members: { highlightInviteEntry?: boolean } | undefined;
   SupportInfo: undefined;
   HowItWorks: undefined;
+  FullCoverage: undefined;
   WhatsNew: undefined;
   SafetyIntelligence: undefined;
 };

@@ -31,6 +31,13 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="verityprotect"/>
       </intent-filter>
+      <intent-filter android:autoVerify="true">
+        <action android:name="android.intent.action.VIEW"/>
+        <category android:name="android.intent.category.DEFAULT"/>
+        <category android:name="android.intent.category.BROWSABLE"/>
+        <data android:scheme="https" android:host="verityprotect.com" android:pathPrefix="/invite"/>
+        <data android:scheme="https" android:host="www.verityprotect.com" android:pathPrefix="/invite"/>
+      </intent-filter>
     </activity>
   </application>
 </manifest>
