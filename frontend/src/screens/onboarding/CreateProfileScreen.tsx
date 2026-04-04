@@ -311,6 +311,27 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
         </Text>
       </View>
 
+      {/* Optional Avatar Section */}
+      <View style={styles.avatarSection}>
+        <Text style={styles.inputLabel}>Profile picture (optional)</Text>
+        <View style={styles.avatarWrapper}>
+          <View style={styles.avatarPreviewContainer}>
+            {selectedAvatarUri ? (
+              <Image
+                source={{ uri: selectedAvatarUri }}
+                style={styles.avatarPreview}
+              />
+            ) : null}
+          </View>
+          <Pressable
+            style={styles.avatarChangeButton}
+            onPress={() => setShowAvatarPicker(true)}
+          >
+            <Ionicons name="camera" size={20} color="#FFFFFF" />
+          </Pressable>
+        </View>
+      </View>
+
       <View style={styles.inputGroup}>
         <Text style={styles.inputLabel}>First name</Text>
         <View style={styles.inputContainer}>
@@ -423,27 +444,6 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           />
         </View>
         <Text style={styles.fallbackHint}>For calls from your home or office phone</Text>
-
-        {/* Optional Avatar Section */}
-        <View style={styles.avatarSection}>
-          <Text style={styles.inputLabel}>Profile picture (optional)</Text>
-          <View style={styles.avatarWrapper}>
-            <View style={styles.avatarPreviewContainer}>
-              {selectedAvatarUri ? (
-                <Image
-                  source={{ uri: selectedAvatarUri }}
-                  style={styles.avatarPreview}
-                />
-              ) : null}
-            </View>
-            <Pressable
-              style={styles.avatarChangeButton}
-              onPress={() => setShowAvatarPicker(true)}
-            >
-              <Ionicons name="camera" size={20} color="#FFFFFF" />
-            </Pressable>
-          </View>
-        </View>
 
         <View style={styles.inputLabelRow}>
           <Text style={styles.inputLabel}>Verity number</Text>
