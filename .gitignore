@@ -10,3 +10,5 @@
 *.p12
 *.cer
 *.p8
+# Documentation (scratch work, not versioned)
+docs/

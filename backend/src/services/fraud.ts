@@ -756,6 +756,16 @@ const REPORTING_MARKERS = [
   'the email told me to',
 ];
 
+const LEGITIMATE_CONTEXT_PATTERNS = [
+  /i\s+(was|am)\s+(just\s+)?(joking|kidding|messing|pranking|testing|playing)/i,
+  /that.{0,15}(not|never)\s+(a|was)\s+(scam|fraud|real|true)/i,
+  /i\s+(think|believe|say)\s+it\s+(is|was)\s+(a\s+)?(scam|fraud|phishing|fake)/i,
+  /(my|the|a)\s+(doctor|bank|lawyer|friend|accountant|support|rep|agent)\s+(said|called|told|informed|advised)/i,
+  /(this|that|the call).{0,20}(not|never)\s+(a\s+)?(real|actual|true|legitimate|official)/i,
+  /i.{0,20}(was|just)\s+(joking|messing around|testing you)/i,
+  /they.{0,20}(claimed|said|told|wanted).{0,20}(scam|fraud|steal|rob|trick)/i,
+];
+
 const EMAIL_PHISHING_TERMS = [
   'verify your email',
   'click the link',
@@ -1600,10 +1610,6 @@ const ACCOUNT_ACCESS_TERMS = [
   'online banking',
   'bank login',
   'account login',
-  'credit card',
-  'debit card',
-  'credit cards',
-  'debit cards',
   'card number',
   'debit card number',
   'credit card number',
@@ -3222,15 +3228,35 @@ function countRepetitionHits(text: string, terms: string[]) {
 }
 
 function isNegated(text: string, index: number) {
-  const windowStart = Math.max(0, index - 40);
-  const window = text.slice(windowStart, index);
-  return NEGATION_MARKERS.some((marker) => window.includes(marker));
+  // PHASE 2: Expand negation detection window from 80→150 characters
+  // This catches longer negative constructions like "would be a scam" over more intervening words
+  const windowStart = Math.max(0, index - 150);
+  const window = text.slice(windowStart, index).toLowerCase();
+  
+  // Check for explicit negation markers
+  if (NEGATION_MARKERS.some((marker) => window.includes(marker))) {
+    return true;
+  }
+  
+  // Check for conditional negations like "would be", "that's a"
+  // Example: "that would be a scam" should mark "scam" as negated
+  if (window.match(/would be a|that's a|that is a|it would be/i)) {
+    return true;
+  }
+  
+  return false;
 }
 
 function isReported(text: string, index: number) {
   const windowStart = Math.max(0, index - 60);
   const window = text.slice(windowStart, index).toLowerCase();
   return REPORTING_MARKERS.some((marker) => window.includes(marker));
+}
+
+function detectLegitimateContext(text: string): boolean {
+  // Check if the transcript contains legitimate contextual markers
+  // that indicate the caller is describing a scam they got, joking, or testing
+  return LEGITIMATE_CONTEXT_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function findMatches(text: string, keywords: FraudKeyword[]) {
@@ -3367,9 +3393,9 @@ function heuristicBoosts(text: string, safePhraseMatches: string[] = []) {
   if (codeRequestHits >= 1) boost += 14;
   if (text.includes('charity') || text.includes('donation')) boost += 20;
   if (explicitScamHits >= 1) boost += 28;
-  if (paymentRequestHits >= 1) boost += 18;
-  if (hardBlockHits >= 1) boost += 30;
-  if (threatHits >= 1) boost += 12;
+  if (paymentRequestHits >= 1) boost += 12;
+  if (hardBlockHits >= 1) boost += 8;
+  if (threatHits >= 1) boost += 10;
   if (accountAccessHits >= 1) boost += 10;
   if (moneyAmountHits >= 1) boost += 10;
   if (taxScamHits >= 1) boost += 30;
@@ -3378,8 +3404,8 @@ function heuristicBoosts(text: string, safePhraseMatches: string[] = []) {
   if (bankFraudHits >= 2) boost += 10;
   if (authorityHits >= 1) boost += 14;
   if (remoteAccessHits >= 1) boost += 18;
-  if (giftCardHits >= 1) boost += 20;
-  if (grandchildHits >= 1) boost += 28;
+  if (giftCardHits >= 1) boost += 3;
+  if (grandchildHits >= 1) boost += 22;
   if (grandchildHits >= 1 && giftCardHits >= 1) boost += 18;
   if (sweepstakesHits >= 1) boost += 22;
   if (sweepstakesHits >= 1 && paymentRequestHits >= 1) boost += 16;
@@ -3556,6 +3582,72 @@ export function hashCallerNumber(number?: string | null) {
 
 export function analyzeTranscript(transcript: string, metadata: FraudMetadata = {}) {
   const normalized = normalizeText(transcript);
+
+  // PHASE 1.1: Early exit for legitimate context (e.g., "I was joking", "it was a scam they called about")
+  if (detectLegitimateContext(normalized)) {
+    return {
+      score: 0,
+      riskLevel: 'low',
+      matchedKeywords: [],
+      notes: {
+        callbackHits: 0,
+        giftCardHits: 0,
+        linkHits: 0,
+        grandchildHits: 0,
+        sweepstakesHits: 0,
+        romanceHits: 0,
+        jobLoanHits: 0,
+        emailHits: 0,
+        medicalScamHits: 0,
+        utilityHits: 0,
+        charityHits: 0,
+        familyEmergencyHits: 0,
+        governmentImpersonationHits: 0,
+        matchCount: 0,
+        weightSum: 0,
+        comboBoost: 0,
+        negatedMatches: [],
+        urgencyHits: 0,
+        secrecyHits: 0,
+        impersonationHits: 0,
+        paymentAppHits: 0,
+        codeRequestHits: 0,
+        explicitScamHits: 0,
+        paymentRequestHits: 0,
+        hardBlockHits: 0,
+        threatHits: 0,
+        accountAccessHits: 0,
+        moneyAmountHits: 0,
+        taxScamHits: 0,
+        bankFraudHits: 0,
+        piiHarvestHits: 0,
+        criticalKeywordHits: 0,
+        safePhraseMatches: ['__legitimate_context__'],
+        safePhraseDampening: 0,
+        repeatCallerBoost: 0,
+        callerCountry: metadata.callerCountry ?? null,
+        callerRegion: metadata.callerRegion ?? null,
+        highRiskCountryBoost: 0,
+        timeOfDayBoost: 0,
+        durationBoost: 0,
+        repeatCallCount: 0,
+        detectedLocale: null,
+        localeBoost: 0,
+        regionMismatchBoost: 0,
+        commandSensitiveHits: 0,
+        actionBoost: 0,
+        techSupportHits: 0,
+        investmentHits: 0,
+        medicalHits: 0,
+        deviceHits: 0,
+        travelPromoHits: 0,
+        remoteAccessHits: 0,
+        voiceSyntheticScore: null,
+        voiceBoost: 0,
+      },
+    };
+  }
+
   const callerCountry = metadata.callerCountry ?? null;
   const callerRegion = metadata.callerRegion ?? null;
   const isHighRiskCountry = metadata.isHighRiskCountry ?? false;
@@ -3575,7 +3667,10 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   const safePhraseMatches = (metadata.safePhraseMatches ?? []).filter(Boolean);
   const heuristic = heuristicBoosts(normalized, safePhraseMatches);
   const actionBoost = heuristic.actionBoost;
-  const safePhraseDampening = safePhraseMatches.length > 0 ? Math.min(40, safePhraseMatches.length * 12) : 0;
+  // PHASE 1.3: Increase safe phrase dampening multiplier from 12→30
+  // 1 phrase = 30, 2 phrases = 60, 3 phrases = 90 (capped at 80)
+  // This prevents aggressive floors from overriding legitimate context signals
+  const safePhraseDampening = safePhraseMatches.length > 0 ? Math.min(80, safePhraseMatches.length * 30) : 0;
 
   if (!normalized) {
     return {
@@ -3650,6 +3745,15 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   score *= multiplier;
   let boost = comboBoost(normalized) + heuristic.boost;
   boost = Math.max(0, boost - safePhraseDampening);
+  
+  // Apply negation dampening if there are negated matches
+  // PHASE 2: More aggressive negation dampening - if 2+ terms are negated, suppress score heavily
+  const negationDampening = negated.length >= 2 
+    ? Math.min(80, 50 + negated.length * 15) // 2 negated = 80, 3 negated = 95 (capped at 80)
+    : negated.length > 0 
+    ? Math.min(50, negated.length * 20) // 1 negated = 20
+    : 0;
+  
   score +=
     boost +
     highRiskCountryBoost +
@@ -3658,7 +3762,8 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
     localeBoost +
     regionMismatchBoost +
     heuristic.actionBoost +
-    voiceBoost;
+    voiceBoost -
+    negationDampening;
 
   const criticalKeywordHits = matches.filter((kw) => CRITICAL_KEYWORDS.has(kw.phrase)).length;
   const taxKeywordHits = matches.filter((kw) => TAX_SCAM_TERMS.includes(kw.phrase)).length;
@@ -3667,6 +3772,10 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
   const bankKeywordHits = matches.filter((kw) => BANK_FRAUD_TERMS.includes(kw.phrase)).length;
   const bankHardTerms = new Set(['fraud alert', 'bank fraud', 'account compromised', 'unauthorized transaction', 'unauthorized charge', 'suspicious activity', 'suspicious transaction']);
   const bankHardHits = matches.filter((kw) => bankHardTerms.has(kw.phrase)).length;
+  
+  // PHASE 1.3: Safe phrase override - if 2+ safe phrases, skip aggressive floors entirely
+  // Example: \"My doctor said I might need payment\" has doctor = safe phrase, dampens score significantly
+  const shouldSkipAggressiveFloors = safePhraseMatches.length >= 2;
   const techSupportHits = heuristic.techSupportHits;
   const piiHarvestHits = heuristic.piiHarvestHits;
   const strongHardBlockSignal =
@@ -3685,74 +3794,126 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
       heuristic.paymentRequestHits >= 1 ||
       heuristic.accountAccessHits >= 1);
 
-  if (heuristic.explicitScamHits >= 1) {
+  // PHASE 1.2: Revert aggressive floor forcing - require 2+ signals for high scores (>85)
+  // Single-signal floors caused false positives (e.g., "Zelle" alone → 95)
+  // Now: "Zelle" + "pay now" + "urgent" = critical (3 signals required for score >= 90)
+
+  // PHASE 2: Don't apply explicit scam floor if main scam keyword is negated
+  // Example: "No I don't want gift cards, that would be a scam" → negated speech shouldn't force 90
+  // Check if "scam" itself is in the negated list before applying the floor
+  const scamNegated = negated.some(neg => neg.toLowerCase().includes('scam'));
+  if (heuristic.explicitScamHits >= 1 && !scamNegated) {
     score = Math.max(score, 90);
   }
-  if (heuristic.hardBlockHits >= 1) {
-    score = Math.max(score, strongHardBlockSignal ? 95 : 82);
-  }
-  // Override patterns: tax + payment
-  if (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment'))) {
-    score = Math.max(score, 96);
-  }
-  if (taxKeywordHits >= 1) {
-    score = Math.max(score, 90);
-  }
-  if (taxHardHits >= 1) {
-    score = Math.max(score, 100);
-  }
-  if (bankKeywordHits >= 1) {
-    score = Math.max(score, 85);
-  }
-  if (bankHardHits >= 1) {
+  if (strongHardBlockSignal && !shouldSkipAggressiveFloors) {
+    // Hard block + 1+ payment/code/threat/explicit/impersonation = critical
     score = Math.max(score, 95);
-  }
-  if (bankKeywordHits >= 1 && (heuristic.impersonationHits >= 1 || heuristic.accountAccessHits >= 1)) {
-    score = Math.max(score, 95);
-  }
-  if (criticalKeywordHits >= 1) {
-    score = Math.max(score, 75);
-  }
-  if (criticalKeywordHits >= 2) {
+  } else if (heuristic.hardBlockHits >= 1 && (heuristic.urgencyHits >= 1 || heuristic.threatHits >= 1) && !shouldSkipAggressiveFloors) {
+    // Hard block + urgency/threat = high (redundancy required)
     score = Math.max(score, 85);
-  }
-  if (matches.length >= 1) {
+  } else if (heuristic.hardBlockHits >= 1 && !shouldSkipAggressiveFloors) {
+    // Single hard block hit (e.g., "gift card" alone) = very low, requires human review
     score = Math.max(score, 35);
   }
-  if (matches.length >= 2) {
-    score = Math.max(score, 50);
+
+  // Override patterns: tax + payment (strong signal combo)
+  if (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment')) && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 96);
   }
-  if (matches.length >= 3) {
-    score = Math.max(score, 65);
-  }
-  if (heuristic.jobLoanHits >= 1) {
-    score = Math.max(score, 85);
-  }
-  if (heuristic.sweepstakesHits >= 1) {
-    score = Math.max(score, 70);
-  }
-  if (heuristic.governmentImpersonationHits >= 1) {
-    score = Math.max(score, 85);
-  }
-  if (heuristic.threatHits >= 1) {
-    score = Math.max(score, 70);
-  }
-  if (heuristic.threatHits >= 2) {
-    score = Math.max(score, 90);
-  }
-  if (heuristic.travelPromoHits >= 1) {
-    score = Math.max(score, 70);
-  }
-  if (heuristic.investmentHits >= 1) {
-    score = Math.max(score, 70);
-  }
-  if (heuristic.paymentRequestHits >= 1 || heuristic.codeRequestHits >= 1) {
-    score = Math.max(score, 70);
-  }
-  if (heuristic.threatHits >= 1 && heuristic.accountAccessHits >= 1) {
+  // Tax with 2+ keywords = high
+  if (taxKeywordHits >= 2 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 88);
+  } else if (taxKeywordHits >= 1 && heuristic.urgencyHits >= 1 && !shouldSkipAggressiveFloors) {
+    // Tax + urgency = high
     score = Math.max(score, 80);
   }
-  if (normalized.includes('donation') || normalized.includes('charity')) {
+
+  if (taxHardHits >= 1 && !shouldSkipAggressiveFloors) {
+    // "Back taxes", "tax lien", "tax warrant" = critical
+    score = Math.max(score, 100);
+  }
+  if (bankHardHits >= 1 && !shouldSkipAggressiveFloors) {
+    // "Account compromised", "unauthorized transaction" = critical only with 2+ signals
+    if (heuristic.impersonationHits >= 1 || heuristic.accountAccessHits >= 1 || heuristic.paymentRequestHits >= 1) {
+      score = Math.max(score, 95);
+    } else {
+      score = Math.max(score, 75);
+    }
+  }
+  if (bankKeywordHits >= 1 && (heuristic.impersonationHits >= 1 || heuristic.accountAccessHits >= 1) && !shouldSkipAggressiveFloors) {
+    // Bank keyword + impersonation/access request = critical
+    score = Math.max(score, 95);
+  } else if (bankKeywordHits >= 2 && !shouldSkipAggressiveFloors) {
+    // 2+ bank keywords = high
+    score = Math.max(score, 80);
+  } else if (bankKeywordHits >= 1 && heuristic.paymentRequestHits >= 1 && !shouldSkipAggressiveFloors) {
+    // Bank + payment request = high
+    score = Math.max(score, 75);
+  }
+
+  if (criticalKeywordHits >= 2 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 85);
+  } else if (criticalKeywordHits >= 1 && heuristic.paymentRequestHits >= 1 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 75);
+  }
+
+  // Match count heuristics
+  if (matches.length >= 1) {
+    score = Math.max(score, 20);
+  }
+  if (matches.length >= 2) {
+    score = Math.max(score, 40);
+  }
+  if (matches.length >= 3) {
+    score = Math.max(score, 55);
+  }
+  if (matches.length >= 5 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 75);
+  }
+
+  // Scenario-specific floors (require additional signal for high scores)
+  if (heuristic.jobLoanHits >= 1 && heuristic.paymentAppHits >= 1 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 85);
+  } else if (heuristic.jobLoanHits >= 2 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 80);
+  }
+  if (heuristic.sweepstakesHits >= 1 && heuristic.paymentRequestHits >= 1 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 80);
+  } else if (heuristic.sweepstakesHits >= 1 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 65);
+  }
+  if (heuristic.governmentImpersonationHits >= 2 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 90);
+  } else if (heuristic.governmentImpersonationHits >= 1 && heuristic.paymentRequestHits >= 1 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 85);
+  } else if (heuristic.governmentImpersonationHits >= 1 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 70);
+  }
+  if (heuristic.threatHits >= 2 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 90);
+  } else if (heuristic.threatHits >= 1 && heuristic.accountAccessHits >= 1) {
+    score = Math.max(score, 80);
+  } else if (heuristic.threatHits >= 1 && heuristic.paymentRequestHits >= 1) {
+    score = Math.max(score, 75);
+  } else if (heuristic.threatHits >= 1) {
+    score = Math.max(score, 60);
+  }
+  if (heuristic.travelPromoHits >= 1 && heuristic.paymentRequestHits >= 1 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 75);
+  } else if (heuristic.travelPromoHits >= 1 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 60);
+  }
+  if (heuristic.investmentHits >= 1 && (heuristic.paymentAppHits >= 1 || heuristic.urgencyHits >= 1) && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 80);
+  } else if (heuristic.investmentHits >= 1) {
+    score = Math.max(score, 65);
+  }
+  if (heuristic.paymentRequestHits >= 1 && heuristic.codeRequestHits >= 1 && !shouldSkipAggressiveFloors) {
+    score = Math.max(score, 85);
+  } else if (heuristic.paymentRequestHits >= 1 || heuristic.codeRequestHits >= 1) {
+    score = Math.max(score, 70);
+  }
+  if ((normalized.includes('donation') || normalized.includes('charity')) && !shouldSkipAggressiveFloors) {
     score = Math.max(score, 60);
   }
   if (strongTechSupportSignal) {
@@ -3775,7 +3936,50 @@ export function analyzeTranscript(transcript: string, metadata: FraudMetadata = 
     (taxKeywordHits >= 1 && (heuristic.paymentRequestHits >= 1 || matches.some((kw) => kw.phrase === 'payment')));
   const techSupportOverride = strongTechSupportSignal || techSupportHits >= 3;
 
-  const finalScore = Math.min(100, Math.round(score));
+  // Cap score if single signal without multi-signal confirmation
+  // Unless there's explicit scam intent or tech support (which are always strong)
+  if (!strongTechSupportSignal && heuristic.explicitScamHits === 0 && matches.length === 1) {
+    score = Math.min(score, 70);
+  }
+  
+  // PHASE 2: Cap score for account/verification keywords unless strong fraud indicators exist
+  // "Verify account" + "credit card" without payment request = mild (cap at 65)
+  // "Verify account" + "unauthorized" + "suspicious" = stronger (allow up to 80-85)
+  // Override hardBlockOverride if it's ONLY due to hardBlockHits without payment request
+  const hardBlockOnlyNoPayment = heuristic.hardBlockHits >= 1 && heuristic.paymentRequestHits === 0;
+  
+  const hasStrongBankingSignals = heuristic.bankFraudHits >= 2; // Multiple banking fraud hits = stronger signal
+  const hasPaymentOrThreat = heuristic.paymentRequestHits >= 1 || heuristic.threatHits >= 1;
+  
+  // Apply cap: mild fraud only when no strong banking signals
+  if (heuristic.accountAccessHits >= 1 && !hasStrongBankingSignals) {
+    // Account access keywords alone without multiple banking signals cap at 65 (mild/medium)
+    score = Math.min(score, 65);
+  } else if (heuristic.accountAccessHits >= 1 && hasStrongBankingSignals && heuristic.paymentRequestHits === 0) {
+    // Multiple banking signals but no payment request = allow up to 80
+    score = Math.min(score, 80);
+  }
+
+  // PHASE 1.3: Apply aggressive safe phrase final dampening
+  // When 2+ safe phrases present, heavily suppress final score to prevent over-aggressive score inflation
+  // Example: "My granddaughter from police station needs bail, I'll send gift card"
+  //          has 2 safe phrases producing score of 237, but legitimate context should keep it under 60
+  // Strategy: Use multiplicative dampening (keep only a small fraction of score)
+  let finalScore = score;
+  if (safePhraseMatches.length >= 2) {
+    // 2 safe phrases: multiply score by 0.2 (keep 20%), 3+ phrases: multiply by 0.15
+    const reductionFactor = safePhraseMatches.length >= 3 ? 0.15 : 0.2;
+    finalScore = score * reductionFactor;
+  }
+  
+  // PHASE 2: Apply heavy dampening when 3+ keywords are negated
+  //  This handles cases like "I don't want gift cards and I will never ask for money, that would be a scam"
+  // where the person explicitly rejects the scam scenario
+  if (negated.length >= 3) {
+    finalScore = Math.max(15, finalScore * 0.3); // multiply by 0.3 when 3+ keywords negated
+  }
+  
+  finalScore = Math.min(100, Math.round(finalScore));
   return {
     score: finalScore,
     riskLevel: scoreToRiskLevel(finalScore),

@@ -11,7 +11,8 @@ const NODE_ENV = (process.env.NODE_ENV ?? 'development');
 
 // Configure "dotenv"
 const envPath = path.join(__dirname, `./config/.env.${NODE_ENV}`);
-const result2 = fs.existsSync(envPath) ? dotenv.config({ path: envPath }) : null;
+const rootEnvPath = path.join(__dirname, '.env');
+const result2 = fs.existsSync(envPath) ? dotenv.config({ path: envPath }) : (fs.existsSync(rootEnvPath) ? dotenv.config({ path: rootEnvPath }) : null);
 if (result2?.error) {
   throw result2.error;
 }

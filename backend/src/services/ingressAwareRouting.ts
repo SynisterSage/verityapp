@@ -9,6 +9,12 @@
 
 import logger from 'jet-logger';
 import supabaseAdmin from '@src/services/supabase';
+import { logRoutingException, maskPhone, shortId } from '@src/utils/secureLogging';
+import {
+  normalizeE164Cached,
+  phonesMatch,
+  isValidPhone,
+} from '@src/utils/phoneNormalization';
 
 export interface IngressDetectionResult {
   ingressType: 'mobile' | 'landline' | 'app' | 'unknown';
@@ -40,32 +46,13 @@ export interface RoutingContext {
  * Normalize phone number to E.164 format for comparison
  */
 export function normalizeE164(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  
-  // Remove non-digits
-  let cleaned = phone.replace(/\D/g, '');
-  
-  // Handle US numbers (10 digits -> +1XXXXXXXXXX)
-  if (cleaned.length === 10) {
-    return `+1${cleaned}`;
-  }
-  
-  // Already has country code or is international
-  if (cleaned.length > 10) {
-    return `+${cleaned}`;
-  }
-  
-  return null;
+  return normalizeE164Cached(phone);
 }
 
 /**
  * Compare two phone numbers after normalization
  */
-export function phonesMatch(phone1: string | null, phone2: string | null): boolean {
-  const norm1 = normalizeE164(phone1);
-  const norm2 = normalizeE164(phone2);
-  return norm1 !== null && norm1 === norm2;
-}
+export { phonesMatch } from '@src/utils/phoneNormalization';
 
 /**
  * Detect which endpoint (mobile/landline) the call originated from
@@ -243,13 +230,13 @@ export async function checkLoopGuards(
 
     const details: Record<string, unknown> = {
       callSid,
-      profileId,
-      destination: destinationEndpoint?.replace(/\d(?=\d{4})/g, '*'),  // mask for logs
+      profileId: shortId(profileId),
+      destination: maskPhone(destinationEndpoint),
     };
 
     // Guard 1: Never dial back to ingress number
     if (destinationEndpoint && phonesMatch(fromNumber, destinationEndpoint)) {
-      logger.warn(`[loop-guard] BLOCKED: destination matches ingress number (from=${fromNumber})`);
+      logger.warn(`[loop-guard] BLOCKED: destination matches ingress number (from=${maskPhone(fromNumber)})`);
       return {
         allowed: false,
         reason: 'blocked_ingress',
@@ -260,7 +247,7 @@ export async function checkLoopGuards(
 
     // Guard 2: Never dial the Verity virtual number
     if (destinationEndpoint && phonesMatch(toNumber, destinationEndpoint)) {
-      logger.warn(`[loop-guard] BLOCKED: destination matches Verity number (to=${toNumber})`);
+      logger.warn(`[loop-guard] BLOCKED: destination matches Verity number (to=${maskPhone(toNumber)})`);
       return {
         allowed: false,
         reason: 'blocked_ingress',
@@ -279,23 +266,23 @@ export async function checkLoopGuards(
 
     const hopLimit = routingPrefs?.hop_limit_threshold || 5;
     
-    // Count how many times this call has been dialed in recent call history
-    // For now, we'll do a simple check - in production, you might track hop count in the call trace
-    const { data: recentCalls } = await supabaseAdmin
-      .from('calls')
+    // Count how many times this call SID appears in call_routing_traces
+    // This detects if the same incoming call is being routed through multiple legs
+    const { data: callTraces } = await supabaseAdmin
+      .from('call_routing_traces')
       .select('id')
       .eq('profile_id', profileId)
-      .eq('twilio_call_sid', callSid)
-      .limit(1);
+      .eq('call_sid', callSid);
 
-    // If same CallSid appears multiple times, we're looping
-    if (recentCalls && recentCalls.length > 1) {
-      logger.warn(`[loop-guard] BLOCKED: Call SID appears multiple times (hop detected)`);
+    // If hop count exceeds threshold, block the routing
+    const hopCount = callTraces?.length ?? 0;
+    if (hopCount >= hopLimit) {
+      logger.warn(`[loop-guard] BLOCKED: Hop limit exceeded (${hopCount} >= ${hopLimit})`);
       return {
         allowed: false,
         reason: 'blocked_hop',
-        hopCount: recentCalls.length,
-        details: { ...details, reason: 'hop_limit_exceeded', hop_count: recentCalls.length },
+        hopCount,
+        details: { ...details, reason: 'hop_limit_exceeded', hop_count: hopCount, limit: hopLimit },
       };
     }
 
@@ -315,8 +302,10 @@ export async function checkLoopGuards(
         (trace: any) => `${trace.ingress_from_number}:${trace.last_attempted_leg}` === callSignature
       );
 
-      if (recentMatches.length > 2) {
-        logger.warn(`[loop-guard] BLOCKED: Duplicate call signature detected ${recentMatches.length} times`);
+      // Use hop limit as threshold (if a caller tries same destination >= hop_limit times, block)
+      const duplicateThreshold = hopLimit;
+      if (recentMatches.length >= duplicateThreshold) {
+        logger.warn(`[loop-guard] BLOCKED: Duplicate call signature detected ${recentMatches.length} times (threshold: ${duplicateThreshold})`);
         return {
           allowed: false,
           reason: 'blocked_duplicate',
@@ -325,18 +314,19 @@ export async function checkLoopGuards(
             ...details,
             reason: 'duplicate_detection',
             recent_matches: recentMatches.length,
+            threshold: duplicateThreshold,
           },
         };
       }
     }
 
     // All checks passed
-    logger.info(`[loop-guard] ALLOWED: Call passed all loop guards`);
+    logger.info(`[loop-guard] ALLOWED: Call passed all loop guards (hopCount=${hopCount} threshold=${hopLimit})`);
     return {
       allowed: true,
       reason: 'allowed',
-      hopCount: recentCalls?.length || 1,
-      details: { ...details, passed_all_checks: true },
+      hopCount: hopCount + 1,  // Next hop number if routing proceeds
+      details: { ...details, passed_all_checks: true, hop_limit: hopLimit },
     };
   } catch (err) {
     logger.err(`[loop-guard] Exception: ${(err as Error).message}`);
@@ -416,6 +406,7 @@ export async function resolveIngressAwareEndpoint(
  */
 export async function logRoutingTrace(
   callId: string | null | undefined,
+  callSid: string | undefined,
   profileId: string,
   ingressResult: IngressDetectionResult,
   loopGuardResult: LoopGuardCheckResult,
@@ -428,6 +419,7 @@ export async function logRoutingTrace(
       .from('call_routing_traces')
       .insert({
         call_id: callId || null,
+        call_sid: callSid || null,
         profile_id: profileId,
         ingress_detected: ingressResult.ingressType,
         ingress_confidence: ingressResult.ingressConfidence,

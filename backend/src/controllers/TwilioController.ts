@@ -17,6 +17,14 @@ import { getPinLockState, recordPinAttempt } from '@src/services/pinAttempts';
 import { dispatchAlertPush } from '@src/services/alertPushDispatcher';
 import { notifyProfileForAlert } from '@src/services/pushNotifications';
 import { sendVoIPPushToProfile } from '@src/services/voipPush';
+import {
+  selectRoutingPath,
+  resolveIngressAwareBridgeTarget,
+  appendIngressAwareBridgeTwiml,
+  maskPhoneNumber,
+} from '@src/services/multiEndpointRouting';
+import { logBridgeAttempt, logRoutingException, shortId } from '@src/utils/secureLogging';
+import { detectMedicalOffice, MedicalDetectionResult } from '@src/utils/medicalOfficeDetector';
 
 const DEFAULT_GREETING = 'Hello, you have reached Verity Protect. This call is being recorded for safety purposes.';
 const PUBLIC_API_URL = process.env.PUBLIC_API_URL?.replace(/\/+$/, '');
@@ -392,8 +400,55 @@ async function bridgeToProfile(
     fallback_phone_number?: string | null;
     twilio_client_identity?: string | null;
     twilio_client_last_seen_at?: string | null;
+    multi_endpoint_enabled?: boolean;
   }
 ) {
+  // Try ingress-aware PTSN routing first (if enabled)
+  const routingPath = await selectRoutingPath(profile);
+  if (routingPath === 'ingress_aware') {
+    const ingressResult = await resolveIngressAwareBridgeTarget(
+      profile,
+      {
+        callSid,
+        toNumber,
+        fromNumber,
+        forwardedFrom: undefined,
+      }
+    );
+
+    if (ingressResult?.destination && ingressResult?.ingressResult?.ingressType) {
+      // Only dial PSTN numbers through ingress-aware routing
+      // App endpoints should fall through to legacy VoIP handling
+      if (ingressResult.ingressResult.ingressType !== 'app') {
+        // This is a PSTN endpoint (mobile/landline), dial it
+        logBridgeAttempt(
+          callSid,
+          'pstn',
+          ingressResult.destination
+        );
+        logger.info(
+          `[bridge] Using ingress-aware routing mode=${ingressResult.routingMode} destination=${maskPhoneNumber(ingressResult.destination)} endpoint_type=${ingressResult.ingressResult.ingressType}`
+        );
+        appendIngressAwareBridgeTwiml(
+          twimlResponse,
+          dialStatusUrl,
+          callerId,
+          ingressResult.destination,
+          profile.fallback_phone_number || null,
+          ingressResult.ingressResult?.ingressType
+        );
+        return `pstn=${maskPhoneNumber(ingressResult.destination)} (${ingressResult.ingressResult?.ingressType})`;
+      }
+      // If it's an app endpoint, fall through to legacy VoIP handling below
+    } else if (ingressResult?.routingMode === 'failed_safe') {
+      // Routing failed safely, continue with legacy logic
+      logger.info(
+        `[bridge] Ingress-aware routing failed safe, falling back to legacy for profile=${shortId(profile.id)}`
+      );
+    }
+  }
+
+  // Legacy routing logic (VoIP + fallback number)
   const fallbackNumber = getExplicitFallbackNumber(profile.fallback_phone_number);
   const loopTarget = numbersLikelyMatch(profile.phone_number, toNumber);
 
@@ -418,6 +473,12 @@ async function bridgeToProfile(
       const dialTimeoutSeconds = resolveClientDialTimeoutSeconds(
         voipPushSent,
         profile.twilio_client_last_seen_at
+      );
+      logBridgeAttempt(
+        callSid,
+        'voip',
+        undefined,
+        clientIdentity
       );
       logger.info(
         `[bridge] loop-avoidance client dial profile=${profile.id} voipPushSent=${voipPushSent} pauseSeconds=${pauseDuration} timeoutSeconds=${dialTimeoutSeconds} lastSeenAt=${profile.twilio_client_last_seen_at ?? 'n/a'}`
@@ -457,6 +518,12 @@ async function bridgeToProfile(
       voipPushSent,
       profile.twilio_client_last_seen_at
     );
+    logBridgeAttempt(
+      callSid,
+      'voip',
+      undefined,
+      clientIdentity
+    );
     logger.info(
       `[bridge] client dial profile=${profile.id} voipPushSent=${voipPushSent} pauseSeconds=${pauseDuration} timeoutSeconds=${dialTimeoutSeconds} lastSeenAt=${profile.twilio_client_last_seen_at ?? 'n/a'}`
     );
@@ -474,6 +541,11 @@ async function bridgeToProfile(
     return `client=${clientIdentity}`;
   }
   if (fallbackNumber) {
+    logBridgeAttempt(
+      callSid,
+      'fallback',
+      fallbackNumber
+    );
     appendNumberBridge(twimlResponse, dialStatusUrl, callerId, fallbackNumber);
     return `number=${fallbackNumber}`;
   }
@@ -675,7 +747,7 @@ async function getProfileByToNumber(to?: string | null) {
   const { data: profile, error } = await supabaseAdmin
     .from('profiles')
     .select(
-      'id, caretaker_id, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at, has_active_subscription'
+      'id, caretaker_id, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at, has_active_subscription, multi_endpoint_enabled'
     )
     .eq('twilio_virtual_number', to)
     .single();
@@ -1207,6 +1279,24 @@ async function recordingReady(req: Request, res: Response) {
       typeof fraudScore === 'number' &&
       (fraudScore >= fraudThreshold || autoAlertRequired || overrideAlertRequired);
 
+    // Detect if this is a medical office call (CNAM keyword matching)
+    let medicalDetection: MedicalDetectionResult | null = null;
+    try {
+      if (resolvedFrom && profile.id) {
+        // Try to get caller name from Twilio (if available via CNAM lookup)
+        // For now, we just have the phone number, so pass null for CNAM
+        medicalDetection = detectMedicalOffice(null);
+        
+        if (medicalDetection.isMedical) {
+          logger.info(
+            `Medical office detected profileId=${shortId(profile.id)} phone=${maskPhoneNumber(resolvedFrom)} confidence=${medicalDetection.confidence} category=${medicalDetection.category}`
+          );
+        }
+      }
+    } catch (error) {
+      logger.warn(`Medical office detection failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+
     await supabaseAdmin
       .from('calls')
       .update({
@@ -1232,6 +1322,22 @@ async function recordingReady(req: Request, res: Response) {
       .eq('id', callRow.id);
 
     if (shouldCreateFraudAlert) {
+      const alertPayload: Record<string, any> = {
+        score: fraudScore,
+        riskLevel: fraudRiskLevel,
+        keywords: fraudKeywords,
+        callerHash,
+      };
+
+      // Add medical office detection to alert payload
+      if (medicalDetection?.isMedical) {
+        alertPayload.medical = {
+          detected: true,
+          confidence: medicalDetection.confidence,
+          category: medicalDetection.category,
+        };
+      }
+
       await supabaseAdmin
         .from('alerts')
         .upsert(
@@ -1241,12 +1347,7 @@ async function recordingReady(req: Request, res: Response) {
             call_id: callRow.id,
             alert_type: 'fraud',
             status: 'pending',
-            payload: {
-              score: fraudScore,
-              riskLevel: fraudRiskLevel,
-              keywords: fraudKeywords,
-              callerHash,
-            },
+            payload: alertPayload,
           },
           { onConflict: 'call_id,alert_type', ignoreDuplicates: true }
         );
@@ -1263,6 +1364,10 @@ async function recordingReady(req: Request, res: Response) {
         const pushData: Record<string, string> = { type: 'fraud' };
         if (fraudRiskLevel) {
           pushData.riskLevel = fraudRiskLevel;
+        }
+        if (medicalDetection?.isMedical) {
+          pushData.medical = 'true';
+          pushData.medicalCategory = medicalDetection.category || '';
         }
         await dispatchAlertPush({
           id: latestAlert.id,

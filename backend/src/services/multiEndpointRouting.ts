@@ -25,6 +25,14 @@ import {
   phonesMatch,
   normalizeE164,
 } from '@src/services/ingressAwareRouting';
+import {
+  logIngressDetected,
+  logLoopGuardCheck,
+  logEndpointResolved,
+  logRoutingDecision,
+  maskPhone,
+  shortId,
+} from '@src/utils/secureLogging';
 
 // Re-export for convenience
 export { normalizeE164 } from '@src/services/ingressAwareRouting';
@@ -85,17 +93,31 @@ export async function resolveIngressAwareBridgeTarget(
 
     // Step 1: Detect call ingress (mobile/landline/etc)
     const ingressResult = await detectCallIngress(ctx);
-    logger.info(
-      `[multi-endpoint] Ingress detected: type=${ingressResult.ingressType} confidence=${ingressResult.ingressConfidence}`
+    logIngressDetected(
+      callSid || 'unknown',
+      ingressResult.ingressType,
+      ingressResult.ingressConfidence,
+      ingressResult.ingressFromNumber,
+      ingressResult.details?.method as string || 'unknown'
     );
 
-    // Step 2: Run loop guards
-    // Start with a guess about the destination (resolve endpoint if possible)
-    const candidateDestination = await resolveIngressAwareEndpoint(profile.id, ingressResult);
-    const loopGuardResult = await checkLoopGuards(ctx, candidateDestination, ingressResult);
-
-    logger.info(
-      `[multi-endpoint] Loop guard: allowed=${loopGuardResult.allowed} reason=${loopGuardResult.reason}`
+    // Step 2: Resolve endpoint (do this ONCE and reuse for both loop guard + routing)
+    const candidateEndpoint = await resolveIngressAwareEndpoint(profile.id, ingressResult);
+    logEndpointResolved(
+      callSid || 'unknown',
+      ingressResult.ingressType,
+      candidateEndpoint,
+      Boolean(candidateEndpoint)
+    );
+    
+    // Step 3: Run loop guards with the resolved endpoint
+    const loopGuardResult = await checkLoopGuards(ctx, candidateEndpoint, ingressResult);
+    logLoopGuardCheck(
+      callSid || 'unknown',
+      loopGuardResult.allowed,
+      loopGuardResult.reason,
+      loopGuardResult.hopCount,
+      candidateEndpoint
     );
 
     // If loop guard blocks, fail safe to legacy
@@ -103,6 +125,7 @@ export async function resolveIngressAwareBridgeTarget(
       logger.warn(`[multi-endpoint] Loop guard blocked routing, failing safe to legacy`);
       await logRoutingTrace(
         undefined,
+        ctx.callSid,
         profile.id,
         ingressResult,
         loopGuardResult,
@@ -118,13 +141,12 @@ export async function resolveIngressAwareBridgeTarget(
       };
     }
 
-    // Step 3: Resolve endpoint to dial
-    const endpointNumber = await resolveIngressAwareEndpoint(profile.id, ingressResult);
-
-    if (!endpointNumber) {
+    // Step 4: Use the resolved endpoint (no need to call again)
+    if (!candidateEndpoint) {
       logger.info(`[multi-endpoint] No endpoint resolved, failing safe to legacy`);
       await logRoutingTrace(
         undefined,
+        ctx.callSid,
         profile.id,
         ingressResult,
         loopGuardResult,
@@ -140,9 +162,15 @@ export async function resolveIngressAwareBridgeTarget(
       };
     }
 
-    logger.info(`[multi-endpoint] Routing to endpoint: ${endpointNumber} (${ingressResult.ingressType})`);
+    logRoutingDecision(
+      callSid || 'unknown',
+      'ingress_aware',
+      candidateEndpoint,
+      ingressResult.ingressType
+    );
     await logRoutingTrace(
       undefined,
+      ctx.callSid,
       profile.id,
       ingressResult,
       loopGuardResult,
@@ -152,7 +180,7 @@ export async function resolveIngressAwareBridgeTarget(
     );
 
     return {
-      destination: endpointNumber,
+      destination: candidateEndpoint,
       routingMode: 'ingress_aware',
       ingressResult,
       loopGuardResult,

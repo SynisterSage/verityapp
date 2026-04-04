@@ -48,6 +48,16 @@ const POLICY_SECTIONS = [
       'Verity Protect helps you and your circle monitor calls for potential fraud. We collect only what we need to provide the service and keep it strictly secure. We never sell your data or use it for advertising.',
   },
   {
+    title: 'Device permissions',
+    bullets: [
+      'Microphone (Required): Used only to transmit audio during live call screening. We do not record your microphone input.',
+      'Notifications (Required): Delivers real-time fraud alerts and circle activity updates. App works without notifications, but real-time delivery requires this permission.',
+      'Contacts (Optional): Used to populate your trusted contact list and display caller names. You grant access only to specific contacts you add. You can revoke anytime in Settings.',
+      'Phone (Optional): Used during onboarding to pre-fill your phone number and display your Verity Number.',
+      'Photos/Camera/Library (Not Used): Currently not used for any functionality. You can safely deny this permission.',
+    ],
+  },
+  {
     title: 'What we collect',
     bullets: [
       'Account metadata (name, email, phone number, relationships).',

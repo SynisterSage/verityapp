@@ -1,7 +1,7 @@
 # Privacy Policy
 
 **Effective Date:** February 6, 2026  
-**Last Updated:** February 20, 2026
+**Last Updated:** April 4, 2026
 
 ## Introduction
 
@@ -74,6 +74,37 @@ Verity Protect is not monitored by emergency responders and cannot be used as a 
 
 **Authentication Services:**
 - If you sign in with Google or other OAuth providers, we receive basic profile information (name, email, profile photo)
+
+## 1.5 Device Permissions (iOS App)
+
+The Verity Protect app requests the following device permissions:
+
+**Microphone (Required):**
+- Used to transmit audio during live call screening through Verity's VoIP bridge
+- Only active when you are on a bridged call routed through Verity Protect
+- We do not record microphone input; you control your own audio transmission
+
+**Contacts (Optional):**
+- Used to populate your trusted contact list and display caller names
+- You grant access to specific contacts you add to your account
+- We do not access your entire contact list without explicit permission
+- You can revoke access anytime through Settings → Data & Privacy
+
+**Notifications (Required for app functionality):**
+- Used to deliver real-time fraud alerts, suspicious call warnings, and circle activity updates
+- App works without notifications enabled, but real-time delivery requires this permission
+- You can control notification types through app settings
+
+**Phone (Optional):**
+- Used during onboarding to pre-fill your phone number and display your Verity Number
+- Does not grant access to call history or cellular data
+
+---
+
+**NOT USED:**
+- Photos/Camera/Library: Currently not used for any functionality in the app. If requested during onboarding, it is for future reserved features. You can deny this permission.
+
+---
 
 ## 2. How We Use Your Information
 

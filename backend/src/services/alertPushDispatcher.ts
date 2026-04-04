@@ -78,6 +78,21 @@ function buildPushContent(alert: AlertLike) {
         : null;
     const riskLevel = normalizeAlertType(payload.riskLevel);
     const isCritical = riskLevel === 'critical' || (typeof score === 'number' && score >= 85);
+    
+    // Check if medical office detected
+    const medical = (payload.medical as Record<string, unknown> | undefined);
+    if (medical && medical.detected === true) {
+      const medicalCategory = coerceString(medical.category);
+      const medicalTitle = medicalCategory ? `${medicalCategory} Calling` : 'Medical Office Calling';
+      return {
+        title: medicalTitle,
+        body: normalizePushSentence(
+          payload.message,
+          `🏥 A ${medicalCategory || 'medical office'} is calling. Tap to verify with Doctor Lookup.`
+        ),
+      };
+    }
+
     return {
       title: isCritical ? 'Critical Call Alert' : 'Call Risk Alert',
       body: normalizePushSentence(

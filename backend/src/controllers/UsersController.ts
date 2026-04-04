@@ -93,21 +93,22 @@ const UsersController = {
         });
       }
 
-      // Get current user to find avatar URL
-      const { data: user, error: fetchError } = await supabaseAdmin
-        .from('users')
+      // Get current user's profile to find avatar URL
+      const { data: profiles, error: fetchError } = await supabaseAdmin
+        .from('profiles')
         .select('avatar_url')
-        .eq('id', userId)
-        .single();
+        .eq('caretaker_id', userId)
+        .order('created_at', { ascending: true })
+        .limit(1);
 
-      if (fetchError || !user) {
+      if (fetchError || !profiles || profiles.length === 0) {
         return res.status(HTTP_STATUS_CODES.NotFound).json({
-          error: 'User not found',
+          error: 'Profile not found',
         });
       }
 
       // Delete avatar
-      await deleteUserAvatar(userId, user.avatar_url);
+      await deleteUserAvatar(userId, profiles[0].avatar_url);
 
       return res.status(HTTP_STATUS_CODES.Ok).json({
         success: true,

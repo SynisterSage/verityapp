@@ -48,9 +48,9 @@ export async function uploadUserAvatar(
 
     // Update users table with the new avatar URL
     const { error: updateError } = await supabaseAdmin
-      .from('users')
+      .from('profiles')
       .update({ avatar_url: publicUrlData.publicUrl })
-      .eq('id', userId);
+      .eq('caretaker_id', userId);
 
     if (updateError) {
       logger.err(`Failed to update user avatar_url: ${updateError.message}`);
@@ -88,11 +88,11 @@ export async function deleteUserAvatar(userId: string, avatarUrl?: string): Prom
       }
     }
 
-    // Clear the avatar_url from the users table
+    // Clear the avatar_url from the profiles table
     const { error: updateError } = await supabaseAdmin
-      .from('users')
+      .from('profiles')
       .update({ avatar_url: null })
-      .eq('id', userId);
+      .eq('caretaker_id', userId);
 
     if (updateError) {
       logger.err(`Failed to clear avatar_url for user ${userId}: ${updateError.message}`);
