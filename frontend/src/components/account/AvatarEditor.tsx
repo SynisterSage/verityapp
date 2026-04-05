@@ -7,11 +7,13 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '../../context/ThemeContext';
 import { authorizedFetch } from '../../services/backend';
+import { createClient } from '../../services/supabase';
 import ImagePickerModal from '../common/ImagePickerModal';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
@@ -33,8 +35,9 @@ export default function AvatarEditor({
   size = 'medium',
   editable = true,
 }: AvatarEditorProps) {
+  const colorScheme = useColorScheme();
   const { theme } = useTheme();
-  const styles = useMemo(() => createAvatarEditorStyles(theme, size), [theme, size]);
+  const styles = useMemo(() => createAvatarEditorStyles(theme, size, colorScheme), [theme, size, colorScheme]);
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -68,6 +71,19 @@ export default function AvatarEditor({
       if (response.avatar_url) {
         onAvatarUpdated?.(response.avatar_url);
         setShowImagePicker(false);
+        
+        // Persist avatar URL to Supabase user metadata
+        try {
+          const supabase = createClient();
+          console.log('🔄 Updating user metadata with avatar_url:', response.avatar_url);
+          const updateResult = await supabase.auth.updateUser({
+            data: { avatar_url: response.avatar_url }
+          });
+          console.log('✅ User metadata updated:', updateResult);
+        } catch (err) {
+          console.error('❌ Failed to update user metadata with avatar_url:', err);
+        }
+        
         Alert.alert('Success', 'Profile picture updated');
       } else {
         Alert.alert('Error', 'Failed to update profile picture');
@@ -97,6 +113,17 @@ export default function AvatarEditor({
               method: 'DELETE',
             });
             onAvatarUpdated?.(null);
+            
+            // Persist deletion to Supabase user metadata
+            try {
+              const supabase = createClient();
+              await supabase.auth.updateUser({
+                data: { avatar_url: null }
+              });
+            } catch (err) {
+              console.warn('Failed to clear avatar_url from user metadata:', err);
+            }
+            
             Alert.alert('Success', 'Profile picture deleted');
           } catch (error) {
             Alert.alert('Error', `Failed to delete avatar: ${error}`);
@@ -142,7 +169,7 @@ export default function AvatarEditor({
               style={styles.editButton}
               onPress={() => setShowImagePicker(true)}
             >
-              <Ionicons name="camera" size={18} color={theme.colors.text} />
+              <Ionicons name="camera" size={18} color={theme.colors.accent} />
             </Pressable>
           )}
         </View>
@@ -154,12 +181,14 @@ export default function AvatarEditor({
         onImageSelected={handleImageSelected}
         onCancel={() => setShowImagePicker(false)}
         isLoading={isUploading}
+        hasExistingImage={!!currentAvatarUrl}
+        onRemoveImage={handleDeleteAvatar}
       />
     </>
   );
 }
 
-function createAvatarEditorStyles(theme: AppTheme, size: 'small' | 'medium' | 'large') {
+function createAvatarEditorStyles(theme: AppTheme, size: 'small' | 'medium' | 'large', colorScheme: 'light' | 'dark' | null | undefined) {
   const sizeMap = { small: 64, medium: 128, large: 180 };
   const avatarSize = sizeMap[size];
   const editButtonSize = size === 'small' ? 28 : size === 'medium' ? 36 : 44;
@@ -212,11 +241,11 @@ function createAvatarEditorStyles(theme: AppTheme, size: 'small' | 'medium' | 'l
       width: editButtonSize,
       height: editButtonSize,
       borderRadius: editButtonSize / 2,
-      backgroundColor: theme.colors.accent,
+      backgroundColor: colorScheme === 'dark' ? theme.colors.surface : '#FFFFFF',
       justifyContent: 'center',
       alignItems: 'center',
       borderWidth: 3,
-      borderColor: '#FFFFFF',
+      borderColor: colorScheme === 'dark' ? theme.colors.bg : '#FFFFFF',
       shadowColor: '#000',
       shadowOpacity: 0.25,
       shadowRadius: 4,

@@ -283,7 +283,7 @@ async function listMembers(req: Request, res: Response) {
 
   const { data: users } = await supabaseAdmin
     .from('auth.users')
-    .select('id, email, user_metadata')
+    .select('id, email, user_metadata, avatar_url')
     .in('id', Array.from(userIds));
 
   const userMap = new Map((users ?? []).map((user) => [user.id, user]));
@@ -328,6 +328,8 @@ async function listMembers(req: Request, res: Response) {
     const formatted = resolveName(userId, entry);
     return {
       id: entry.id,
+      email: entry.email,
+      avatar_url: entry.avatar_url ?? null,
       user_metadata: {
         ...(entry.user_metadata ?? {}),
         full_name: formatted ?? entry.user_metadata?.full_name,

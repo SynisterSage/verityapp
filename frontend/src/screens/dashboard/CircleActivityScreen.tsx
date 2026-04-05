@@ -34,7 +34,8 @@ import { useProfile } from '../../context/ProfileContext';
 
 function toCircleActivityItem(
   alert: AlertRow,
-  memberNames: Record<string, string> = {}
+  memberNames: Record<string, string> = {},
+  memberAvatars: Record<string, string | null> = {}
 ): CircleActivityItem {
   const actorId = alert.payload?.actor_user_id as string | undefined;
   const actorLabel =
@@ -81,6 +82,7 @@ function toCircleActivityItem(
     description,
     timestamp: formatAlertTime(alert.created_at),
     alertRow: alert,
+    actorAvatarUrl: actorId ? memberAvatars[actorId] : null,
   };
 }
 
@@ -133,11 +135,16 @@ export default function CircleActivityScreen() {
         const members = (membersData?.members ?? []) as Array<{
           user_id?: string;
           display_name?: string;
+          user?: { avatar_url?: string | null };
         }>;
         const memberNames: Record<string, string> = {};
+        const memberAvatars: Record<string, string | null> = {};
         members.forEach((member) => {
           if (member.user_id && member.display_name) {
             memberNames[member.user_id] = member.display_name;
+          }
+          if (member.user_id && member.user?.avatar_url) {
+            memberAvatars[member.user_id] = member.user.avatar_url;
           }
         });
 
@@ -148,7 +155,7 @@ export default function CircleActivityScreen() {
               (parseAlertTimestamp(b.created_at)?.getTime() ?? 0) -
               (parseAlertTimestamp(a.created_at)?.getTime() ?? 0)
           )
-          .map((alert) => toCircleActivityItem(alert, memberNames));
+          .map((alert) => toCircleActivityItem(alert, memberNames, memberAvatars));
         if (!cancelled) {
           setActivityList(mapped);
         }
@@ -178,13 +185,17 @@ export default function CircleActivityScreen() {
         authorizedFetch(`/profiles/${activeProfile.id}/members`),
       ]);
       const alerts = (alertsData?.alerts ?? []) as AlertRow[];
-      const members = (membersData?.members ?? []) as Array<{ user_id?: string; display_name?: string }>;
+      const members = (membersData?.members ?? []) as Array<{ user_id?: string; display_name?: string; user?: { avatar_url?: string | null } }>;
       const memberNames: Record<string, string> = {};
-      members.forEach((m) => { if (m.user_id && m.display_name) memberNames[m.user_id] = m.display_name; });
+      const memberAvatars: Record<string, string | null> = {};
+      members.forEach((m) => {
+        if (m.user_id && m.display_name) memberNames[m.user_id] = m.display_name;
+        if (m.user_id && m.user?.avatar_url) memberAvatars[m.user_id] = m.user.avatar_url;
+      });
       const mapped = alerts
         .filter((a) => CIRCLE_ALERT_TYPES.has(a.alert_type ?? ''))
         .sort((a, b) => (parseAlertTimestamp(b.created_at)?.getTime() ?? 0) - (parseAlertTimestamp(a.created_at)?.getTime() ?? 0))
-        .map((a) => toCircleActivityItem(a, memberNames));
+        .map((a) => toCircleActivityItem(a, memberNames, memberAvatars));
       setActivityList(mapped);
     } catch {
       // silently fail on pull-to-refresh

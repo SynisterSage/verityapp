@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,6 +15,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useTheme } from '../../context/ThemeContext';
 import { supabase } from '../../services/supabase';
+import { authorizedFetch } from '../../services/backend';
+import { useProfile } from '../../context/ProfileContext';
 import { withOpacity } from '../../utils/color';
 import type { RootStackParamList } from '../../navigation/types';
 
@@ -235,17 +238,39 @@ export default function CircleActivityDetailScreen({ route }: Props) {
 
   const [alert, setAlert] = useState<AlertRow | null>(null);
   const [loading, setLoading] = useState(true);
+  const [memberAvatarMap, setMemberAvatarMap] = useState<Record<string, string | null>>({});
+  const { activeProfile } = useProfile();
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('alerts')
-      .select('id, created_at, alert_type, payload')
-      .eq('id', alertId)
-      .maybeSingle();
-    setAlert(data ?? null);
-    setLoading(false);
-  }, [alertId]);
+    try {
+      const { data } = await supabase
+        .from('alerts')
+        .select('id, created_at, alert_type, payload')
+        .eq('id', alertId)
+        .maybeSingle();
+      setAlert(data ?? null);
+
+      // Fetch members to get avatar URLs
+      if (activeProfile?.id) {
+        try {
+          const membersData = await authorizedFetch(`/profiles/${activeProfile.id}/members`);
+          const avatarMap: Record<string, string | null> = {};
+          const members = (membersData?.members ?? []) as Array<{ user_id?: string; user?: { avatar_url?: string | null } }>;
+          members.forEach((member) => {
+            if (member.user_id && member.user?.avatar_url) {
+              avatarMap[member.user_id] = member.user.avatar_url;
+            }
+          });
+          setMemberAvatarMap(avatarMap);
+        } catch {
+          setMemberAvatarMap({});
+        }
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [alertId, activeProfile?.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -277,6 +302,8 @@ export default function CircleActivityDetailScreen({ route }: Props) {
   });
 
   const heroName = meta.whoLabel(payload, actor);
+  const actorUserId = (payload.actor_user_id as string | undefined) ?? null;
+  const actorAvatarUrl = actorUserId ? memberAvatarMap[actorUserId] : null;
   const heroDate = alert
     ? new Date(alert.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
     : '';
@@ -302,6 +329,12 @@ export default function CircleActivityDetailScreen({ route }: Props) {
       >
         {/* Hero */}
         <View style={styles.heroBlock}>
+          {actorAvatarUrl && (
+            <Image
+              source={{ uri: actorAvatarUrl }}
+              style={styles.heroAvatar}
+            />
+          )}
           <Text style={styles.heroName}>{heroName}</Text>
           {heroMeta ? (
             <View style={styles.heroMeta}>
@@ -474,11 +507,19 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
     heroBlock: {
       paddingTop: 12,
       paddingBottom: 18,
+      alignItems: 'center',
+    },
+    heroAvatar: {
+      width: 100,
+      height: 100,
+      borderRadius: 50,
+      marginBottom: 12,
     },
     heroName: {
       color: theme.colors.text,
       fontSize: 26,
       fontWeight: '600',
+      textAlign: 'center',
     },
     heroMeta: {
       flexDirection: 'row',

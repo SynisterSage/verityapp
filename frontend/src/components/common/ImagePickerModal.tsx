@@ -30,6 +30,8 @@ type ImagePickerModalProps = {
   visible: boolean;
   onImageSelected: (imageData: ImageData) => void;
   onCancel: () => void;
+  onRemoveImage?: () => void;
+  hasExistingImage?: boolean;
   isLoading?: boolean;
 };
 
@@ -37,6 +39,8 @@ export default function ImagePickerModal({
   visible,
   onImageSelected,
   onCancel,
+  onRemoveImage,
+  hasExistingImage = false,
   isLoading = false,
 }: ImagePickerModalProps) {
   const { theme } = useTheme();
@@ -263,6 +267,24 @@ export default function ImagePickerModal({
                     </Text>
                   </View>
                 </Pressable>
+
+                {hasExistingImage && onRemoveImage && (
+                  <Pressable
+                    style={[styles.button, styles.destructiveButton]}
+                    onPress={onRemoveImage}
+                    disabled={isProcessing || isLoading}
+                  >
+                    <Ionicons
+                      name="trash"
+                      size={24}
+                      color="#ef4444"
+                      style={styles.buttonIcon}
+                    />
+                    <Text style={[styles.buttonTitle, styles.destructiveButtonText]}>
+                      Remove Profile Picture
+                    </Text>
+                  </Pressable>
+                )}
               </View>
 
               {/* Info */}
@@ -281,6 +303,24 @@ export default function ImagePickerModal({
 
               {/* Buttons */}
               <View style={styles.previewButtonContainer}>
+                <Pressable
+                  style={[styles.button, styles.destructiveButton]}
+                  onPress={() => {
+                    setSelectedImage(null);
+                  }}
+                  disabled={isLoading}
+                >
+                  <Ionicons
+                    name="trash"
+                    size={24}
+                    color="#ef4444"
+                    style={styles.buttonIcon}
+                  />
+                  <Text style={[styles.buttonTitle, styles.destructiveButtonText]}>
+                    Remove
+                  </Text>
+                </Pressable>
+
                 <Pressable
                   style={[styles.button, styles.secondaryButton]}
                   onPress={() => setSelectedImage(null)}
@@ -314,13 +354,15 @@ export default function ImagePickerModal({
             </>
           )}
 
-          {isProcessing && (
+          {(isProcessing || isLoading) && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator
                 size="large"
                 color={theme.colors.accent}
               />
-              <Text style={styles.loadingText}>Processing image...</Text>
+              <Text style={styles.loadingText}>
+                {isProcessing ? 'Processing image...' : 'Uploading profile picture...'}
+              </Text>
             </View>
           )}
         </View>
@@ -390,6 +432,11 @@ function createImagePickerStyles(theme: AppTheme) {
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
+    destructiveButton: {
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+      borderWidth: 1,
+      borderColor: '#ef4444',
+    },
     buttonIcon: {
       marginRight: 4,
     },
@@ -405,6 +452,9 @@ function createImagePickerStyles(theme: AppTheme) {
     },
     secondaryButtonText: {
       color: theme.colors.text,
+    },
+    destructiveButtonText: {
+      color: '#ef4444',
     },
     buttonSubtitle: {
       fontSize: 13,

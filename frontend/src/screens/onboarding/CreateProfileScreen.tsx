@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
 import { authorizedFetch } from '../../services/backend';
+import { supabase } from '../../services/supabase';
 import { useProfile } from '../../context/ProfileContext';
 import { useSubscription } from '../../context/SubscriptionContext';
 import { useAuth } from '../../context/AuthContext';
@@ -84,6 +85,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [selectedAvatarUri, setSelectedAvatarUri] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
+  const lastFallbackPhoneKey = useRef<string | null>(null);
+  const lastLandlinePhoneKey = useRef<string | null>(null);
   const lastNameRef = useRef<TextInput | null>(null);
   const phoneRef = useRef<TextInput | null>(null);
   const [error, setError] = useState('');
@@ -99,6 +102,13 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const formattedPhone = useMemo(() => formatPhone(phoneDigits), [phoneDigits]);
   const formattedFallbackPhone = useMemo(() => formatPhone(fallbackPhoneDigits), [fallbackPhoneDigits]);
   const formattedLandlinePhone = useMemo(() => formatPhone(landlinePhoneDigits), [landlinePhoneDigits]);
+  
+  const getInitials = useMemo(() => {
+    const first = firstName.trim()[0]?.toUpperCase() || '';
+    const last = lastName.trim()[0]?.toUpperCase() || '';
+    return (first + last).slice(0, 2);
+  }, [firstName, lastName]);
+  
   const isProfileInfoComplete = Boolean(firstName.trim() && lastName.trim() && phoneDigits.length === 10);
   const isFormValid = Boolean(assignedNumber); // Continue only enabled after number assigned
   const primaryDisabled = !isFormValid || isSubmitting;
@@ -128,6 +138,34 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
 
   const handlePhoneKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
     lastPhoneKey.current = nativeEvent.key;
+  };
+
+  const handleFallbackPhoneChange = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 10);
+    if (lastFallbackPhoneKey.current === 'Backspace' && digits.length === fallbackPhoneDigits.length) {
+      setFallbackPhoneDigits((prev) => prev.slice(0, -1));
+    } else {
+      setFallbackPhoneDigits(digits);
+    }
+    lastFallbackPhoneKey.current = null;
+  };
+
+  const handleFallbackPhoneKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
+    lastFallbackPhoneKey.current = nativeEvent.key;
+  };
+
+  const handleLandlinePhoneChange = (value: string) => {
+    const digits = value.replace(/\D/g, '').slice(0, 10);
+    if (lastLandlinePhoneKey.current === 'Backspace' && digits.length === landlinePhoneDigits.length) {
+      setLandlinePhoneDigits((prev) => prev.slice(0, -1));
+    } else {
+      setLandlinePhoneDigits(digits);
+    }
+    lastLandlinePhoneKey.current = null;
+  };
+
+  const handleLandlinePhoneKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
+    lastLandlinePhoneKey.current = nativeEvent.key;
   };
 
   const handleAssignNumber = async () => {
@@ -262,7 +300,7 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
       });
 
       if (response.avatar_url) {
-        setSelectedAvatarUri(imageData.uri);
+        setSelectedAvatarUri(response.avatar_url);
         setShowAvatarPicker(false);
       } else {
         Alert.alert('Error', 'Failed to upload profile picture');
@@ -321,8 +359,16 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
                 source={{ uri: selectedAvatarUri }}
                 style={styles.avatarPreview}
               />
+            ) : getInitials ? (
+              <Text style={styles.initialsText}>{getInitials}</Text>
             ) : null}
+            {isUploadingAvatar && (
+              <View style={styles.avatarLoadingOverlay}>
+                <ActivityIndicator size="large" color={theme.colors.accent} />
+              </View>
+            )}
           </View>
+          {/* Edit button overlaid at bottom right */}
           <Pressable
             style={styles.avatarChangeButton}
             onPress={() => setShowAvatarPicker(true)}
@@ -409,7 +455,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
             placeholderTextColor={placeholderColor}
             keyboardType="phone-pad"
             value={formattedFallbackPhone}
-            onChangeText={(value) => setFallbackPhoneDigits(value.replace(/\D/g, '').slice(0, 10))}
+            onChangeText={handleFallbackPhoneChange}
+            onKeyPress={handleFallbackPhoneKeyPress}
             returnKeyType="done"
           />
         </View>
@@ -439,7 +486,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
             placeholderTextColor={placeholderColor}
             keyboardType="phone-pad"
             value={formattedLandlinePhone}
-            onChangeText={(value) => setLandlinePhoneDigits(value.replace(/\D/g, '').slice(0, 10))}
+            onChangeText={handleLandlinePhoneChange}
+            onKeyPress={handleLandlinePhoneKeyPress}
             returnKeyType="done"
           />
         </View>
@@ -627,6 +675,8 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           onImageSelected={handleAvatarSelected}
           onCancel={() => setShowAvatarPicker(false)}
           isLoading={isUploadingAvatar}
+          hasExistingImage={!!selectedAvatarUri}
+          onRemoveImage={() => setSelectedAvatarUri(null)}
         />
 
       </SafeAreaView>
@@ -748,9 +798,10 @@ const createProfileStyles = (theme: AppTheme, mode?: string) =>
     },
     avatarWrapper: {
       position: 'relative',
-      alignItems: 'center',
-      justifyContent: 'center',
+      width: 120,
+      height: 120,
       marginTop: 8,
+      alignSelf: 'center',
     },
     avatarPreviewContainer: {
       width: 120,
@@ -765,6 +816,22 @@ const createProfileStyles = (theme: AppTheme, mode?: string) =>
       width: 120,
       height: 120,
       borderRadius: 60,
+    },
+    initialsText: {
+      fontSize: 48,
+      fontWeight: '600',
+      color: theme.colors.accent,
+    },
+    avatarLoadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      borderRadius: 60,
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     avatarChangeButton: {
       position: 'absolute',

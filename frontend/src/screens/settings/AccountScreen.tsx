@@ -31,6 +31,7 @@ import VerityNumberInfoModal from '../../components/common/VerityNumberInfoModal
 import AvatarEditor from '../../components/account/AvatarEditor';
 import { deleteProfile } from '../../services/profile';
 import { authorizedFetch } from '../../services/backend';
+import { supabase } from '../../services/supabase';
 import { useAuth } from '../../context/AuthContext';
 import { useProfile } from '../../context/ProfileContext';
 import * as Clipboard from 'expo-clipboard';
@@ -107,6 +108,7 @@ export default function AccountScreen() {
   const [phoneDigits, setPhoneDigits] = useState('');
   const [fallbackPhoneDigits, setFallbackPhoneDigits] = useState('');
   const [landlinePhoneDigits, setLandlinePhoneDigits] = useState('');
+  const [existingLandlinePhoneDigits, setExistingLandlinePhoneDigits] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [pinAction, setPinAction] = useState<PinAction>(null);
@@ -124,6 +126,7 @@ export default function AccountScreen() {
   const [userAvatarUrl, setUserAvatarUrl] = useState<string | null>(null);
   const lastPhoneKey = useRef<string | null>(null);
   const lastFallbackPhoneKey = useRef<string | null>(null);
+  const lastLandlinePhoneKey = useRef<string | null>(null);
 
   const route = useRoute();
   const landlinePulseAnim = useRef(new Animated.Value(1)).current;
@@ -134,6 +137,23 @@ export default function AccountScreen() {
       setUserAvatarUrl(session.user.user_metadata.avatar_url);
     }
   }, [session?.user?.user_metadata?.avatar_url]);
+
+  // Refresh user metadata when screen is focused to ensure we have latest avatar
+  useFocusEffect(
+    useCallback(() => {
+      const refreshUserAvatarUrl = async () => {
+        try {
+          const { data } = await supabase.auth.getUser();
+          if (data?.user?.user_metadata?.avatar_url) {
+            setUserAvatarUrl(data.user.user_metadata.avatar_url);
+          }
+        } catch (err) {
+          console.warn('Failed to refresh user avatar URL', err);
+        }
+      };
+      refreshUserAvatarUrl();
+    }, [])
+  );
 
   // Trigger pulse animation if coming from full coverage setup
   useEffect(() => {
@@ -276,7 +296,12 @@ export default function AccountScreen() {
         const landlineEndpoint = data.endpoints.find((e: any) => e.endpoint_type === 'landline');
         
         if (landlineEndpoint?.phone_number) {
-          setLandlinePhoneDigits(normalizePhoneDigits(landlineEndpoint.phone_number));
+          const normalizedLandline = normalizePhoneDigits(landlineEndpoint.phone_number);
+          setLandlinePhoneDigits(normalizedLandline);
+          setExistingLandlinePhoneDigits(normalizedLandline);
+        } else {
+          setLandlinePhoneDigits('');
+          setExistingLandlinePhoneDigits('');
         }
       }
     } catch (err) {
@@ -297,9 +322,10 @@ export default function AccountScreen() {
       firstName.trim() !== (activeProfile.first_name ?? '') ||
       lastName.trim() !== (activeProfile.last_name ?? '') ||
       phoneDigits !== existingPhoneDigits ||
-      fallbackPhoneDigits !== normalizePhoneDigits(activeProfile.fallback_phone_number ?? '')
+      fallbackPhoneDigits !== normalizePhoneDigits(activeProfile.fallback_phone_number ?? '') ||
+      landlinePhoneDigits !== existingLandlinePhoneDigits
     );
-  }, [activeProfile, firstName, lastName, phoneDigits, fallbackPhoneDigits]);
+  }, [activeProfile, firstName, lastName, phoneDigits, fallbackPhoneDigits, landlinePhoneDigits, existingLandlinePhoneDigits]);
 
   const formattedPhone = useMemo(
     () => (phoneDigits ? formatPhoneNumber(phoneDigits) : ''),
@@ -336,6 +362,20 @@ export default function AccountScreen() {
 
   const handleFallbackPhoneKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
     lastFallbackPhoneKey.current = nativeEvent.key;
+  };
+
+  const handleLandlinePhoneChange = (value: string) => {
+    const digits = normalizePhoneDigits(value);
+    if (lastLandlinePhoneKey.current === 'Backspace' && digits.length === landlinePhoneDigits.length) {
+      setLandlinePhoneDigits((prev) => prev.slice(0, -1));
+    } else {
+      setLandlinePhoneDigits(digits);
+    }
+    lastLandlinePhoneKey.current = null;
+  };
+
+  const handleLandlinePhoneKeyPress = ({ nativeEvent }: { nativeEvent: { key: string } }) => {
+    lastLandlinePhoneKey.current = nativeEvent.key;
   };
 
   const profileId = activeProfile?.id;
@@ -625,7 +665,8 @@ export default function AccountScreen() {
               <TextInput
                 style={styles.inputPrefixed}
                 value={landlinePhoneDigits ? formatPhoneNumber(landlinePhoneDigits) : ''}
-                onChangeText={(v) => setLandlinePhoneDigits(normalizePhoneDigits(v))}
+                onChangeText={handleLandlinePhoneChange}
+                onKeyPress={handleLandlinePhoneKeyPress}
                 placeholder="(000) 000-0000"
                 placeholderTextColor={theme.colors.textDim}
                 keyboardType="phone-pad"

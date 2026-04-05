@@ -6,4 +6,5 @@ export type CircleActivityItem = {
   description: string;
   timestamp: string;
   alertRow: AlertRow;
+  actorAvatarUrl?: string | null;
 };
