@@ -131,28 +131,26 @@ export default function AccountScreen() {
   const route = useRoute();
   const landlinePulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Load current user's avatar
-  useEffect(() => {
-    if (session?.user?.user_metadata?.avatar_url) {
-      setUserAvatarUrl(session.user.user_metadata.avatar_url);
-    }
-  }, [session?.user?.user_metadata?.avatar_url]);
-
-  // Refresh user metadata when screen is focused to ensure we have latest avatar
+  // Refresh avatar URL from profile when screen is focused
   useFocusEffect(
     useCallback(() => {
       const refreshUserAvatarUrl = async () => {
+        if (!activeProfile?.id) return;
         try {
-          const { data } = await supabase.auth.getUser();
-          if (data?.user?.user_metadata?.avatar_url) {
-            setUserAvatarUrl(data.user.user_metadata.avatar_url);
+          const members = await authorizedFetch(`/profiles/${activeProfile.id}/members`);
+          if (members?.members && members.members.length > 0) {
+            // Find caretaker entry (is_caretaker: true) to get avatar
+            const caretaker = members.members.find((m: any) => m.is_caretaker);
+            if (caretaker?.user?.avatar_url) {
+              setUserAvatarUrl(caretaker.user.avatar_url);
+            }
           }
         } catch (err) {
-          console.warn('Failed to refresh user avatar URL', err);
+          console.warn('Failed to refresh user avatar URL from profile', err);
         }
       };
       refreshUserAvatarUrl();
-    }, [])
+    }, [activeProfile?.id])
   );
 
   // Trigger pulse animation if coming from full coverage setup

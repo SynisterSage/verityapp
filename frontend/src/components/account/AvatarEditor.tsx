@@ -13,7 +13,6 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { useTheme } from '../../context/ThemeContext';
 import { authorizedFetch } from '../../services/backend';
-import { createClient } from '../../services/supabase';
 import ImagePickerModal from '../common/ImagePickerModal';
 import type { AppTheme } from '../../theme/tokens';
 import { withOpacity } from '../../utils/color';
@@ -71,19 +70,6 @@ export default function AvatarEditor({
       if (response.avatar_url) {
         onAvatarUpdated?.(response.avatar_url);
         setShowImagePicker(false);
-        
-        // Persist avatar URL to Supabase user metadata
-        try {
-          const supabase = createClient();
-          console.log('🔄 Updating user metadata with avatar_url:', response.avatar_url);
-          const updateResult = await supabase.auth.updateUser({
-            data: { avatar_url: response.avatar_url }
-          });
-          console.log('✅ User metadata updated:', updateResult);
-        } catch (err) {
-          console.error('❌ Failed to update user metadata with avatar_url:', err);
-        }
-        
         Alert.alert('Success', 'Profile picture updated');
       } else {
         Alert.alert('Error', 'Failed to update profile picture');
@@ -113,17 +99,6 @@ export default function AvatarEditor({
               method: 'DELETE',
             });
             onAvatarUpdated?.(null);
-            
-            // Persist deletion to Supabase user metadata
-            try {
-              const supabase = createClient();
-              await supabase.auth.updateUser({
-                data: { avatar_url: null }
-              });
-            } catch (err) {
-              console.warn('Failed to clear avatar_url from user metadata:', err);
-            }
-            
             Alert.alert('Success', 'Profile picture deleted');
           } catch (error) {
             Alert.alert('Error', `Failed to delete avatar: ${error}`);

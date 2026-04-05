@@ -56,9 +56,9 @@ function buildDisplayName({
   email,
   metadata,
 }: {
-  fallbackName?: string | null;
-  email?: string | null;
-  metadata?: { full_name?: string; first_name?: string; last_name?: string } | null;
+  fallbackName?: string | null,
+  email?: string | null,
+  metadata?: { full_name?: string, first_name?: string, last_name?: string } | null,
 }) {
   const metaFullName = metadata?.full_name;
   const firstLast = [metadata?.first_name, metadata?.last_name]
@@ -79,7 +79,7 @@ function normalizeShortCode(input: string) {
   return formatShortCode(cleaned);
 }
 
-async function ensureInviteShortCode(invite: { id: string; short_code?: string | null }) {
+async function ensureInviteShortCode(invite: { id: string, short_code?: string | null }) {
   const existing = normalizeShortCode(invite.short_code ?? '');
   if (existing) {
     return existing;
@@ -104,7 +104,7 @@ async function ensureInviteShortCode(invite: { id: string; short_code?: string |
   return normalized;
 }
 
-async function resolvePendingInviteByIdentifier(args: { inviteId?: string; shortCode?: string | null }) {
+async function resolvePendingInviteByIdentifier(args: { inviteId?: string, shortCode?: string | null }) {
   const inviteId = args.inviteId?.trim();
   const normalizedShortCode = normalizeShortCode(args.shortCode ?? '');
 
@@ -143,11 +143,11 @@ async function resolvePendingInviteByIdentifier(args: { inviteId?: string; short
 
 async function resolveInviteClaimToken(req: Request, res: Response) {
   const query = ((req as any).validatedBody ?? req.query ?? {}) as {
-    t?: string;
-    token?: string;
-    code?: string;
-    inviteId?: string;
-    invite_id?: string;
+    t?: string,
+    token?: string,
+    code?: string,
+    inviteId?: string,
+    invite_id?: string,
   };
 
   const tokenValue = (query.t ?? query.token ?? '').trim();
@@ -157,11 +157,11 @@ async function resolveInviteClaimToken(req: Request, res: Response) {
   try {
     let resolvedInvite:
       | {
-          id: string;
-          profile_id: string;
-          role: string;
-          status: string;
-          short_code: string | null;
+          id: string,
+          profile_id: string,
+          role: string,
+          status: string,
+          short_code: string | null,
         }
       | null = null;
 
@@ -214,7 +214,7 @@ async function resolveInviteClaimToken(req: Request, res: Response) {
       logger.warn(
         `[invite-claims] unable to create invite claim token: ${
           error instanceof Error ? error.message : 'unknown error'
-        }`
+        }`,
       );
     }
 
@@ -252,7 +252,7 @@ async function listMembers(req: Request, res: Response) {
 
   const { data: profile } = await supabaseAdmin
     .from('profiles')
-    .select('id, caretaker_id')
+    .select('id, caretaker_id, avatar_url')
     .eq('id', profileId)
     .single();
 
@@ -274,7 +274,7 @@ async function listMembers(req: Request, res: Response) {
     }
   });
   const filteredMembers = Array.from(uniqueMembersMap.values()).filter(
-    (member) => member.user_id !== profile.caretaker_id
+    (member) => member.user_id !== profile.caretaker_id,
   );
 
   const userIds = new Set<string>();
@@ -283,7 +283,7 @@ async function listMembers(req: Request, res: Response) {
 
   const { data: users } = await supabaseAdmin
     .from('auth.users')
-    .select('id, email, user_metadata, avatar_url')
+    .select('id, email, user_metadata')
     .in('id', Array.from(userIds));
 
   const userMap = new Map((users ?? []).map((user) => [user.id, user]));
@@ -329,7 +329,7 @@ async function listMembers(req: Request, res: Response) {
     return {
       id: entry.id,
       email: entry.email,
-      avatar_url: entry.avatar_url ?? null,
+      avatar_url: entry.user_metadata?.avatar_url ?? null,
       user_metadata: {
         ...(entry.user_metadata ?? {}),
         full_name: formatted ?? entry.user_metadata?.full_name,
@@ -337,7 +337,7 @@ async function listMembers(req: Request, res: Response) {
     };
   };
 
-  const pendingNameUpdates: Array<{ id: string; name: string }> = [];
+  const pendingNameUpdates: { id: string, name: string }[] = [];
 
   const formattedMembers = [
     {
@@ -348,7 +348,10 @@ async function listMembers(req: Request, res: Response) {
       created_at: null,
       is_caretaker: true,
       display_name: resolveName(profile.caretaker_id, userMap.get(profile.caretaker_id)),
-      user: hydrateUser(profile.caretaker_id, userMap.get(profile.caretaker_id) ?? null),
+      user: {
+        ...hydrateUser(profile.caretaker_id, userMap.get(profile.caretaker_id) ?? null),
+        avatar_url: profile.avatar_url ?? null,
+      },
     },
     ...filteredMembers.map((member) => {
       const entry = userMap.get(member.user_id);
@@ -368,8 +371,8 @@ async function listMembers(req: Request, res: Response) {
   if (pendingNameUpdates.length > 0) {
     await Promise.all(
       pendingNameUpdates.map((update) =>
-        supabaseAdmin.from('profile_members').update({ display_name: update.name }).eq('id', update.id)
-      )
+        supabaseAdmin.from('profile_members').update({ display_name: update.name }).eq('id', update.id),
+      ),
     );
   }
 
@@ -382,7 +385,7 @@ async function changeMemberRole(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
   }
 
-  const { profileId, memberId } = req.params as { profileId: string; memberId: string };
+  const { profileId, memberId } = req.params as { profileId: string, memberId: string };
   const { role } = req.body as { role?: string };
   if (!profileId || !memberId) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profile or member id' });
@@ -473,7 +476,7 @@ async function removeMember(req: Request, res: Response) {
     return res.status(HTTP_STATUS_CODES.Unauthorized).json({ error: 'Unauthorized' });
   }
 
-  const { profileId, memberId } = req.params as { profileId: string; memberId: string };
+  const { profileId, memberId } = req.params as { profileId: string, memberId: string };
   if (!profileId || !memberId) {
     return res.status(HTTP_STATUS_CODES.BadRequest).json({ error: 'Missing profileId or memberId' });
   }
@@ -588,7 +591,7 @@ async function acceptInvite(req: Request, res: Response) {
   };
   const isEmailLike = (value: string) => value.includes('@');
   const isSmsInviteEmail = (value?: string | null) =>
-    Boolean(value && value.toLowerCase().endsWith('@verityprotect.sms'));
+    Boolean(value?.toLowerCase().endsWith('@verityprotect.sms'));
 
   let invite = await fetchInvite('id', inviteId);
   if (!invite) {
@@ -605,11 +608,11 @@ async function acceptInvite(req: Request, res: Response) {
     }
   }
 
-  if (!invite || invite.status !== 'pending') {
+  if (invite?.status !== 'pending') {
     return res.status(HTTP_STATUS_CODES.NotFound).json({ error: 'Invite not found or already handled' });
   }
 
-  const { firstName, lastName } = (req.body ?? {}) as { firstName?: string; lastName?: string };
+  const { firstName, lastName } = (req.body ?? {}) as { firstName?: string, lastName?: string };
   const requestedName = [firstName, lastName]
     .filter(Boolean)
     .map((segment) => segment?.trim())
@@ -649,7 +652,7 @@ async function acceptInvite(req: Request, res: Response) {
         display_name: displayName,
         caretaker_id: profileData?.caretaker_id,
       },
-      { onConflict: 'profile_id,user_id' }
+      { onConflict: 'profile_id,user_id' },
     )
     .select('id, profile_id, user_id, role, created_at, display_name')
     .maybeSingle();
