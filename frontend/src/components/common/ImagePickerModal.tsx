@@ -46,11 +46,11 @@ export default function ImagePickerModal({
 
   const processImage = async (result: ImagePickerLib.ImagePickerResult) => {
     if (result.canceled) {
+      setIsProcessing(false);
       return;
     }
 
     try {
-      setIsProcessing(true);
       const asset = result.assets[0];
 
       if (!asset.uri || !asset.width || !asset.height) {
