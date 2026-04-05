@@ -664,7 +664,7 @@ async function updateAlertPrefs(req: Request, res: Response) {
           enable_push_support_replies: true,
           enable_email_weekly_reports: true,
           enable_email_pin_reset_requests: false,
-          alert_threshold_score: 50,
+          alert_threshold_score: 60,
           auto_mark_enabled: false,
           auto_mark_fraud_threshold: 80,
           auto_mark_safe_threshold: 20,

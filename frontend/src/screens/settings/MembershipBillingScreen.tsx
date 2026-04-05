@@ -495,6 +495,8 @@ export default function MembershipBillingScreen() {
           )}
         </View>
 
+        <Text style={styles.securityNote}>Verity Protect never stores your payment card details.</Text>
+
         <Text style={styles.sectionLabel}>Circle access</Text>
         <View style={styles.card}>
           <Text style={styles.bodyText}>
@@ -547,7 +549,6 @@ export default function MembershipBillingScreen() {
           {!hasProductsLoaded && productsError ? (
             <Text style={styles.errorText}>{productsError}</Text>
           ) : null}
-          <Text style={styles.footnote}>Verity Protect never stores your payment card details.</Text>
           <View style={styles.legalLinksRow}>
             <Pressable
               onPress={() => {
@@ -597,26 +598,38 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
     },
     body: {
       paddingHorizontal: 24,
-      gap: 20,
+      gap: 24,
     },
     sectionLabel: {
       color: theme.colors.textMuted,
-      fontWeight: '600',
-      letterSpacing: 0.6,
+      fontWeight: '700',
+      letterSpacing: 0.8,
       fontSize: 12,
       textTransform: 'uppercase',
+      marginTop: 4,
+      marginBottom: 2,
     },
     card: {
       backgroundColor: theme.colors.surface,
-      borderRadius: 24,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      padding: 18,
-      gap: 12,
+      borderRadius: 28,
+      borderWidth: 0,
+      shadowColor: theme.colors.text,
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      shadowOffset: { width: 0, height: 4 },
+      elevation: 3,
+      padding: 20,
+      gap: 16,
     },
     trialCard: {
-      borderColor: withOpacity(theme.colors.accent, 0.35),
       backgroundColor: withOpacity(theme.colors.accent, 0.08),
+      borderWidth: 1.5,
+      borderColor: withOpacity(theme.colors.accent, 0.25),
+      shadowColor: theme.colors.accent,
+      shadowOpacity: 0.1,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 2,
     },
     trialHeader: {
       flexDirection: 'row',
@@ -641,9 +654,9 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
     },
     trialTitle: {
       color: theme.colors.text,
-      fontSize: 16,
-      fontWeight: '700',
-      letterSpacing: -0.2,
+      fontSize: 17,
+      fontWeight: '800',
+      letterSpacing: -0.3,
     },
     trialDetail: {
       color: theme.colors.textMuted,
@@ -666,17 +679,22 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
       marginTop: 4,
     },
     trialPrimaryButton: {
-      marginTop: 2,
-      minHeight: 44,
-      borderRadius: 13,
+      marginTop: 6,
+      minHeight: 48,
+      borderRadius: 14,
       backgroundColor: theme.colors.accent,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 7,
+      gap: 8,
+      shadowColor: theme.colors.accent,
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 4,
     },
     trialPrimaryButtonPressed: {
-      opacity: 0.86,
+      opacity: 0.88,
     },
     trialPrimaryButtonText: {
       color: '#fff',
@@ -690,9 +708,9 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
       gap: 14,
     },
     membershipIconWrap: {
-      width: 52,
-      height: 52,
-      borderRadius: 16,
+      width: 60,
+      height: 60,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -728,10 +746,10 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
       maxWidth: 210,
     },
     membershipPlanName: {
-      fontSize: 17,
-      fontWeight: '700',
+      fontSize: 18,
+      fontWeight: '800',
       color: theme.colors.text,
-      letterSpacing: -0.2,
+      letterSpacing: -0.3,
     },
     membershipStatusText: {
       fontSize: 13,
@@ -755,21 +773,21 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
       paddingVertical: 5,
     },
     statusPillActive: {
-      backgroundColor: withOpacity(theme.colors.success, 0.14),
+      backgroundColor: theme.colors.success,
     },
     statusPillInactive: {
-      backgroundColor: withOpacity(theme.colors.warning, 0.12),
+      backgroundColor: withOpacity(theme.colors.textMuted, 0.2),
     },
     statusPillText: {
       fontSize: 11,
       fontWeight: '800',
-      letterSpacing: 0.4,
+      letterSpacing: 0.5,
     },
     statusPillTextActive: {
-      color: theme.colors.success,
+      color: '#fff',
     },
     statusPillTextInactive: {
-      color: theme.colors.warning,
+      color: theme.colors.text,
     },
     // ── Meta rows ────────────────────────────────────────
     metaRow: {
@@ -806,15 +824,17 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
     actionRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      minHeight: 64,
-      gap: 14,
-      paddingVertical: 8,
+      minHeight: 68,
+      gap: 16,
+      paddingVertical: 10,
+      paddingHorizontal: 2,
     },
     actionRowPressed: {
-      opacity: 0.75,
+      opacity: 0.8,
+      backgroundColor: withOpacity(theme.colors.accent, 0.06),
     },
     actionRowDisabled: {
-      opacity: 0.55,
+      opacity: 0.48,
     },
     actionIconWrap: {
       width: 40,
@@ -831,8 +851,8 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
     actionTitle: {
       color: theme.colors.text,
       fontSize: 16,
-      fontWeight: '700',
-      letterSpacing: -0.2,
+      fontWeight: '800',
+      letterSpacing: -0.25,
     },
     actionDetail: {
       color: theme.colors.textMuted,
@@ -912,6 +932,13 @@ const createMembershipBillingStyles = (theme: AppTheme, mode?: string) =>
       fontSize: 12,
       lineHeight: 17,
       fontWeight: '500',
+    },
+    securityNote: {
+      color: withOpacity(theme.colors.textMuted, 0.82),
+      fontSize: 13,
+      lineHeight: 18,
+      fontWeight: '600',
+      marginVertical: 12,
     },
     legalLinksRow: {
       marginTop: 4,

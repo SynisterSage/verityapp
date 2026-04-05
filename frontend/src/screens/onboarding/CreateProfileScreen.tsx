@@ -83,6 +83,10 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   const [isAssigningNumber, setIsAssigningNumber] = useState(false);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [selectedAvatarUri, setSelectedAvatarUri] = useState<string | null>(null);
+  const [pendingAvatarBase64, setPendingAvatarBase64] = useState<{
+    base64: string;
+    mimeType: string;
+  } | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const lastPhoneKey = useRef<string | null>(null);
   const lastFallbackPhoneKey = useRef<string | null>(null);
@@ -222,6 +226,30 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           setActiveProfile(refreshedProfile as any);
         }
         
+        // NOW upload avatar AFTER profile is assigned
+        if (pendingAvatarBase64) {
+          try {
+            const userId = session?.user?.id;
+            if (userId) {
+              console.log('🔄 Saving avatar after profile created...');
+              const uploadResponse = await authorizedFetch(`/users/${userId}/avatar`, {
+                method: 'POST',
+                body: JSON.stringify({
+                  imageData: pendingAvatarBase64.base64,
+                  mimeType: pendingAvatarBase64.mimeType,
+                }),
+              });
+              if (uploadResponse?.avatar_url) {
+                setSelectedAvatarUri(uploadResponse.avatar_url);
+                setPendingAvatarBase64(null);
+                console.log('✅ Avatar saved:', uploadResponse.avatar_url);
+              }
+            }
+          } catch (avatarErr) {
+            console.warn('Failed to save avatar:', avatarErr);
+          }
+        }
+        
         // Create landline endpoint if provided
         if (landlinePhoneDigits) {
           try {
@@ -284,29 +312,16 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
   }) => {
     try {
       setIsUploadingAvatar(true);
-      const userId = session?.user?.id;
-      
-      if (!userId) {
-        Alert.alert('Error', 'User ID not found. Please try again.');
-        return;
-      }
-
-      const response = await authorizedFetch(`/users/${userId}/avatar`, {
-        method: 'POST',
-        body: JSON.stringify({
-          imageData: imageData.base64,
-          mimeType: imageData.mimeType,
-        }),
+      // Store the base64 data for later upload (after profile is created)
+      setPendingAvatarBase64({
+        base64: imageData.base64,
+        mimeType: imageData.mimeType,
       });
-
-      if (response.avatar_url) {
-        setSelectedAvatarUri(response.avatar_url);
-        setShowAvatarPicker(false);
-      } else {
-        Alert.alert('Error', 'Failed to upload profile picture');
-      }
+      // Use the URI for immediate display
+      setSelectedAvatarUri(imageData.uri);
+      setShowAvatarPicker(false);
     } catch (error) {
-      Alert.alert('Error', `Failed to upload avatar: ${error}`);
+      Alert.alert('Error', `Failed to prepare avatar: ${error}`);
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -676,7 +691,10 @@ export default function CreateProfileScreen({ navigation }: { navigation: any })
           onCancel={() => setShowAvatarPicker(false)}
           isLoading={isUploadingAvatar}
           hasExistingImage={!!selectedAvatarUri}
-          onRemoveImage={() => setSelectedAvatarUri(null)}
+          onRemoveImage={() => {
+            setSelectedAvatarUri(null);
+            setPendingAvatarBase64(null);
+          }}
         />
 
       </SafeAreaView>

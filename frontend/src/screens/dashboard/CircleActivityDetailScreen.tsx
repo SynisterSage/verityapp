@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   Image,
   ScrollView,
   StyleSheet,
@@ -239,6 +240,8 @@ export default function CircleActivityDetailScreen({ route }: Props) {
   const [alert, setAlert] = useState<AlertRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [memberAvatarMap, setMemberAvatarMap] = useState<Record<string, string | null>>({});
+  const [isAvatarImageLoading, setIsAvatarImageLoading] = useState(false);
+  const avatarShimmerAnim = useRef(new Animated.Value(0.6)).current;
   const { activeProfile } = useProfile();
 
   const load = useCallback(async () => {
@@ -273,6 +276,32 @@ export default function CircleActivityDetailScreen({ route }: Props) {
   }, [alertId, activeProfile?.id]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Shimmer animation for avatar loading state
+  useEffect(() => {
+    if (!isAvatarImageLoading) {
+      avatarShimmerAnim.setValue(0.6);
+      return;
+    }
+
+    const shimmerSequence = Animated.sequence([
+      Animated.timing(avatarShimmerAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(avatarShimmerAnim, {
+        toValue: 0.6,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    const shimmerLoop = Animated.loop(shimmerSequence);
+    shimmerLoop.start();
+
+    return () => shimmerLoop.stop();
+  }, [isAvatarImageLoading, avatarShimmerAnim]);
 
   const containerPaddingTop = Math.max(16, insets.top + 4);
   const contentPaddingBottom = Math.max(insets.bottom, 32);
@@ -330,10 +359,22 @@ export default function CircleActivityDetailScreen({ route }: Props) {
         {/* Hero */}
         <View style={styles.heroBlock}>
           {actorAvatarUrl && (
-            <Image
-              source={{ uri: actorAvatarUrl }}
-              style={styles.heroAvatar}
-            />
+            <>
+              <Image
+                source={{ uri: actorAvatarUrl }}
+                style={styles.heroAvatar}
+                onLoadStart={() => setIsAvatarImageLoading(true)}
+                onLoadEnd={() => setIsAvatarImageLoading(false)}
+              />
+              {isAvatarImageLoading && (
+                <Animated.View
+                  style={[
+                    styles.heroAvatarShimmer,
+                    { opacity: avatarShimmerAnim },
+                  ]}
+                />
+              )}
+            </>
           )}
           <Text style={styles.heroName}>{heroName}</Text>
           {heroMeta ? (
@@ -513,6 +554,17 @@ const makeStyles = (theme: ReturnType<typeof import('../../context/ThemeContext'
       width: 100,
       height: 100,
       borderRadius: 50,
+      marginBottom: 12,
+    },
+    heroAvatarShimmer: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      borderRadius: 50,
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      width: 100,
+      height: 100,
       marginBottom: 12,
     },
     heroName: {

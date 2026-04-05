@@ -134,6 +134,8 @@ export default function MembersScreen() {
   const memberTrayDragY = useRef(new Animated.Value(0)).current;
   const [selectedInvite, setSelectedInvite] = useState<Invite | null>(null);
   const shimmer = useRef(new Animated.Value(0.6)).current;
+  const [loadingAvatarIds, setLoadingAvatarIds] = useState<Set<string>>(new Set());
+  const memberShimmerAnim = useRef(new Animated.Value(0.6)).current;
   const actionAnim = useRef(new Animated.Value(0)).current;
   const actionTrayDragY = useRef(new Animated.Value(0)).current;
   const skeletonRows = useMemo(() => Array.from({ length: 3 }, (_, i) => `member-${i}`), []);
@@ -596,6 +598,32 @@ export default function MembersScreen() {
     return unsubscribe;
   }, [navigation, closeMemberTray]);
 
+  // Shimmer animation for loading member avatars
+  useEffect(() => {
+    if (loadingAvatarIds.size === 0) {
+      memberShimmerAnim.setValue(0.6);
+      return;
+    }
+
+    const shimmerSequence = Animated.sequence([
+      Animated.timing(memberShimmerAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(memberShimmerAnim, {
+        toValue: 0.6,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    const shimmerLoop = Animated.loop(shimmerSequence);
+    shimmerLoop.start();
+
+    return () => shimmerLoop.stop();
+  }, [loadingAvatarIds, memberShimmerAnim]);
+
   return (
     <View style={styles.outer}>
       <SafeAreaView style={styles.screen} edges={[]}>
@@ -649,10 +677,30 @@ export default function MembersScreen() {
                       <View style={styles.memberRow}>
                         <View style={[styles.memberAvatar, { backgroundColor: avatarColor }]}>
                           {member.user?.avatar_url ? (
-                            <Image
-                              source={{ uri: member.user.avatar_url }}
-                              style={styles.memberAvatarImage}
-                            />
+                            <>
+                              <Image
+                                source={{ uri: member.user.avatar_url }}
+                                style={styles.memberAvatarImage}
+                                onLoadStart={() => {
+                                  setLoadingAvatarIds(prev => new Set([...prev, member.user_id]));
+                                }}
+                                onLoadEnd={() => {
+                                  setLoadingAvatarIds(prev => {
+                                    const newSet = new Set(prev);
+                                    newSet.delete(member.user_id);
+                                    return newSet;
+                                  });
+                                }}
+                              />
+                              {loadingAvatarIds.has(member.user_id) && (
+                                <Animated.View
+                                  style={[
+                                    styles.memberAvatarShimmer,
+                                    { opacity: memberShimmerAnim },
+                                  ]}
+                                />
+                              )}
+                            </>
                           ) : (
                             <Text style={styles.memberAvatarText}>
                               {safeName.charAt(0).toUpperCase()}
@@ -1038,6 +1086,11 @@ const createMembersStyles = (theme: AppTheme, mode: ThemeMode) => {
     memberAvatarImage: {
       width: 38,
       height: 38,
+      borderRadius: 20,
+    },
+    memberAvatarShimmer: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
       borderRadius: 20,
     },
     memberContent: {

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   useColorScheme,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -40,6 +41,9 @@ export default function AvatarEditor({
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(false);
+  const [shouldShowShimmer, setShouldShowShimmer] = useState(false);
+  const shimmerAnim = useMemo(() => new Animated.Value(0.6), []);
 
   const getInitials = useCallback(() => {
     const names = userName.trim().split(/\s+/);
@@ -47,6 +51,46 @@ export default function AvatarEditor({
     if (names.length === 1) return names[0][0]?.toUpperCase() || '?';
     return (names[0][0] + names[names.length - 1][0]).toUpperCase();
   }, [userName]);
+
+  // Show shimmer when avatar URL is set (before image loads)
+  useEffect(() => {
+    if (currentAvatarUrl) {
+      setShouldShowShimmer(true);
+    }
+  }, [currentAvatarUrl]);
+
+  // Hide shimmer when image finishes loading
+  useEffect(() => {
+    if (!isImageLoading) {
+      setShouldShowShimmer(false);
+    }
+  }, [isImageLoading]);
+
+  // Shimmer animation loop
+  useEffect(() => {
+    if (!shouldShowShimmer) {
+      shimmerAnim.setValue(0.6);
+      return;
+    }
+
+    const shimmerSequence = Animated.sequence([
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.timing(shimmerAnim, {
+        toValue: 0.6,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+    ]);
+
+    const shimmerLoop = Animated.loop(shimmerSequence);
+    shimmerLoop.start();
+
+    return () => shimmerLoop.stop();
+  }, [shouldShowShimmer, shimmerAnim]);
 
   const handleImageSelected = async (imageData: {
     base64: string;
@@ -120,10 +164,23 @@ export default function AvatarEditor({
         <View style={styles.avatarWrapper}>
           <View style={[styles.avatarContainer, { width: avatarSize, height: avatarSize }]}>
             {currentAvatarUrl ? (
-              <Image
-                source={{ uri: currentAvatarUrl }}
-                style={styles.avatar}
-              />
+              <>
+                <Image
+                  source={{ uri: currentAvatarUrl }}
+                  style={styles.avatar}
+                  onLoadStart={() => setIsImageLoading(true)}
+                  onLoadEnd={() => setIsImageLoading(false)}
+                />
+                {/* Shimmer overlay while loading */}
+                {shouldShowShimmer && (
+                  <Animated.View
+                    style={[
+                      styles.shimmerOverlay,
+                      { opacity: shimmerAnim },
+                    ]}
+                  />
+                )}
+              </>
             ) : (
               <View style={styles.initialsContainer}>
                 <Text style={styles.initials}>{getInitials()}</Text>
@@ -208,6 +265,11 @@ function createAvatarEditorStyles(theme: AppTheme, size: 'small' | 'medium' | 'l
       backgroundColor: 'rgba(0, 0, 0, 0.4)',
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    shimmerOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+      borderRadius: avatarSize / 2,
     },
     editButton: {
       position: 'absolute',
