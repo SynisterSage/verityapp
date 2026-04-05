@@ -109,13 +109,26 @@ function buildPushContent(alert: AlertLike) {
     const callerNumber = coerceString(payload.callerNumber);
     const callerLabel = contactName || callerNumber;
     const bridged = payload.bridged === true;
+    const ingressType = coerceString(payload.ingressType).toLowerCase();
+    
+    // Build call descriptor based on ingress type
+    let callDescriptor = 'Incoming trusted call';
+    if (bridged) {
+      if (ingressType === 'landline') {
+        callDescriptor = 'Incoming trusted landline call';
+      } else if (ingressType === 'mobile') {
+        callDescriptor = 'Incoming trusted mobile call';
+      }
+      // 'app' or empty: use default 'Incoming trusted call'
+    }
+    
     return {
       title: 'Trusted Call Activity',
       body: normalizePushSentence(
         payload.message,
         callerLabel
           ? bridged
-            ? `Incoming trusted call from ${callerLabel}`
+            ? `${callDescriptor} from ${callerLabel}`
             : `Trusted caller activity from ${callerLabel}`
           : 'Trusted caller activity detected'
       ),

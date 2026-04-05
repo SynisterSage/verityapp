@@ -94,9 +94,11 @@ export default function ActiveCallScreen() {
   const [identityLookupResolved, setIdentityLookupResolved] = useState(false);
   const [showIdentityFallback, setShowIdentityFallback] = useState(false);
   const [audioRouteLabel, setAudioRouteLabel] = useState('iPhone');
+  const [showDndWarning, setShowDndWarning] = useState(false);
   const ringPulse = useRef(new Animated.Value(0)).current;
   const statusPulse = useRef(new Animated.Value(0)).current;
   const identitySkeletonPulse = useRef(new Animated.Value(0)).current;
+  const ringingStartTime = useRef<number | null>(null);
 
   const callSid = route.params?.callSid ?? '';
   const fromNumber = route.params?.fromNumber ?? '';
@@ -127,8 +129,29 @@ export default function ActiveCallScreen() {
     if (isConnected && !connectedAt) {
       console.log('[ActiveCallScreen] Call connected, starting timer');
       setConnectedAt(Date.now());
+      ringingStartTime.current = null; // Clear ringing start time
+      setShowDndWarning(false);
     }
   }, [status, connectedAt]);
+
+  // Show DND warning if call is ringing for too long without connecting
+  useEffect(() => {
+    const isRinging = status.toLowerCase() === 'ringing';
+    if (isRinging && !ringingStartTime.current) {
+      ringingStartTime.current = Date.now();
+    }
+
+    if (isRinging && ringingStartTime.current) {
+      const ringDuration = Date.now() - ringingStartTime.current;
+      // Show warning if ringing for 8+ seconds (typical timeout before call fails)
+      if (ringDuration > 8000) {
+        setShowDndWarning(true);
+      }
+    } else {
+      ringingStartTime.current = null;
+      setShowDndWarning(false);
+    }
+  }, [status]);
   const hasCallerIdentity = Boolean(trustedDisplayName || (identityLookupResolved && displayNumber));
   const showIdentitySkeleton = !hasCallerIdentity && !showIdentityFallback;
   const callerTitle =
@@ -427,6 +450,16 @@ export default function ActiveCallScreen() {
         <Text style={styles.audioRouteText}>Audio: {audioRouteLabel}</Text>
       </View>
 
+      {/* DND Warning Banner */}
+      {showDndWarning && (
+        <View style={[styles.dndWarning, { backgroundColor: withOpacity(theme.colors.warning, 0.15) }]}>
+          <Ionicons name="notifications-off" size={16} color={theme.colors.warning} />
+          <Text style={[styles.dndWarningText, { color: theme.colors.warning }]}>
+            Call is ringing but not connecting. Check if your phone is in Do Not Disturb mode.
+          </Text>
+        </View>
+      )}
+
       <View style={styles.middleBlock}>
         <View style={styles.avatarZone}>
           <Animated.View
@@ -560,6 +593,21 @@ const createStyles = (theme: AppTheme, mode: 'light' | 'dark') =>
       fontSize: 13,
       fontWeight: '500',
       marginTop: 8,
+    },
+    dndWarning: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 12,
+      marginTop: 16,
+    },
+    dndWarningText: {
+      flex: 1,
+      fontSize: 12,
+      fontWeight: '600',
+      lineHeight: 16,
     },
     middleBlock: {
       alignItems: 'center',

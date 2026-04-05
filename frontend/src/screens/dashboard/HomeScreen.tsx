@@ -5,6 +5,8 @@ import {
   AppStateStatus,
   Linking,
   Modal,
+  NativeModules,
+  Platform,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -197,6 +199,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [refreshing, setRefreshing] = useState(false);
   const [isAppActive, setIsAppActive] = useState(AppState.currentState === 'active');
   const [showNotifBanner, setShowNotifBanner] = useState(false);
+  const [isPhoneInDnd, setIsPhoneInDnd] = useState(false);
   const [setupNudgeState, setSetupNudgeState] = useState<SetupNudgeState>(emptySetupNudgeState);
   const [localDismissedNudges, setLocalDismissedNudges] = useState<SetupNudgeKey[]>([]);
   const [dismissingNudge, setDismissingNudge] = useState(false);
@@ -292,6 +295,35 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       Array.from(new Set([...setupNudgeState.dismissed_nudge_cards, ...localDismissedNudges])) as SetupNudgeKey[],
     [localDismissedNudges, setupNudgeState.dismissed_nudge_cards]
   );
+
+  // Check if phone is in Do Not Disturb mode (iOS only)
+  useEffect(() => {
+    if (Platform.OS !== 'ios') {
+      return;
+    }
+
+    const checkDndStatus = async () => {
+      try {
+        const VoIPPushModule = NativeModules.VoIPPushModule as
+          | { checkDoNotDisturb?: () => Promise<boolean> }
+          | undefined;
+
+        if (VoIPPushModule?.checkDoNotDisturb) {
+          const isDnd = await VoIPPushModule.checkDoNotDisturb();
+          setIsPhoneInDnd(isDnd);
+        }
+      } catch (err) {
+        console.warn('[DND Check] Failed to check DND status:', err);
+      }
+    };
+
+    // Check initially
+    checkDndStatus();
+
+    // Check every 10 seconds to stay current
+    const interval = setInterval(checkDndStatus, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const refreshSetupNudgeState = useCallback(async () => {
     if (!activeProfile?.id) {
@@ -1040,6 +1072,16 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         />
       </View>
 
+      {/* DND Warning Banner */}
+      {isPhoneInDnd && (
+        <View style={[styles.dndWarning, { borderColor: withOpacity(theme.colors.warning, 0.3) }]}>
+          <Ionicons name="notifications-off" size={14} color={theme.colors.warning} />
+          <Text style={[styles.dndWarningText, { color: theme.colors.warning }]}>
+            Do Not Disturb is on
+          </Text>
+        </View>
+      )}
+
       <View style={styles.scrollContainer}>
         <LinearGradient colors={topScrimColors} style={styles.topScrim} pointerEvents="none" />
         <ScrollView
@@ -1577,6 +1619,22 @@ const createStyles = (theme: AppTheme) =>
     },
     section: {
       marginTop: 20,
+    },
+    dndWarning: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+      marginTop: 10,
+      borderWidth: 1,
+      backgroundColor: 'transparent',
+    },
+    dndWarningText: {
+      fontSize: 11,
+      fontWeight: '500',
+      lineHeight: 14,
     },
     setupNudgeSection: {
       marginTop: 10,

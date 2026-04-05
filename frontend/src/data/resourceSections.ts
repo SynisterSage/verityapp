@@ -27,6 +27,22 @@ export const SYSTEM_BASICS_CONTENT: ResourceSection[] = [
     ],
   },
   {
+    id: 'enable-call-forwarding',
+    title: 'Enable call forwarding (important setup step)',
+    body:
+      'To protect your phone, you must enable call forwarding on your device. This tells your phone to send incoming calls to Verity for screening first. Without this step, Verity cannot screen your calls. You only need to do this once, and it takes just a few minutes.',
+    bullets: [
+      'You need to enable call forwarding on your mobile phone, landline, and any fallback number.',
+      'Each phone or line routes calls to your Verity number independently.',
+      'For mobile: Go to your phone Settings → Phone → Call Forwarding, turn it on, then enter your Verity number.',
+      'Tip: You can find your Verity number in your Account in Settings, or copy it from the setup screen you just completed.',
+      'For landline: Set up call forwarding through your landline provider (usually online on their account page or by phone).',
+      'If you set a fallback number: Enable call forwarding on that number too, so trusted calls reach you if your app is unavailable.',
+      'Once enabled, your calls go to Verity first, then Verity routes safe calls back to you automatically.',
+      'You can disable call forwarding anytime by going back into your phone settings.',
+    ],
+  },
+  {
     id: 'mobile-and-landline',
     title: 'Use one Verity number on both mobile and landline',
     body:

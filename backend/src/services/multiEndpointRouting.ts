@@ -251,7 +251,8 @@ export function appendIngressAwareBridgeTwiml(
   callerId: string,
   destinationNumber: string | null,
   fallbackNumber: string | null,
-  ingressType?: string
+  ingressType?: string,
+  actionUrl?: string
 ) {
   if (!destinationNumber) {
     // If no destination, use fallback or hang up
@@ -285,6 +286,8 @@ export function appendIngressAwareBridgeTwiml(
     callerId,
     timeout: 20,
     answerOnBridge: true,
+    action: actionUrl,
+    method: actionUrl ? 'POST' : undefined,
   });
 
   // Add number with enhanced logging

@@ -358,9 +358,9 @@ home: [
         }
         navigation.navigate('OnboardingTrustedContacts');
       }}
-      secondaryLabel={isNudgeFlow ? undefined : twilioNumber ? 'Do this later' : undefined}
+      secondaryLabel={isNudgeFlow ? 'Do this later' : undefined}
       onSecondaryPress={
-        isNudgeFlow ? undefined : twilioNumber ? () => navigation.navigate('OnboardingTrustedContacts') : undefined
+        isNudgeFlow ? () => navigation.navigate('OnboardingTrustedContacts') : undefined
       }
     />
   </SafeAreaView>

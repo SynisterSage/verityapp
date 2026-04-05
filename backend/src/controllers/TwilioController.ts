@@ -22,6 +22,7 @@ import {
   resolveIngressAwareBridgeTarget,
   appendIngressAwareBridgeTwiml,
   maskPhoneNumber,
+  normalizeE164,
 } from '@src/services/multiEndpointRouting';
 import { logBridgeAttempt, logRoutingException, shortId } from '@src/utils/secureLogging';
 import { detectMedicalOffice, MedicalDetectionResult } from '@src/utils/medicalOfficeDetector';
@@ -97,6 +98,18 @@ async function logTrustedBridgeActivity(args: {
   const { profileId, caretakerId, fromNumber, toNumber, bridgeTarget, trustedCaller, callSid } = args;
   const contactName = trustedCaller?.contact_name ?? null;
   const callerNumber = fromNumber ?? trustedCaller?.caller_number ?? null;
+  
+  // Extract ingress type from bridgeTarget string
+  // Format: "pstn=... (landline)" or "pstn=... (mobile)" or "client=..."
+  let ingressType: 'landline' | 'mobile' | 'app' | undefined;
+  if (bridgeTarget.includes('(landline)')) {
+    ingressType = 'landline';
+  } else if (bridgeTarget.includes('(mobile)')) {
+    ingressType = 'mobile';
+  } else if (bridgeTarget.includes('client=')) {
+    ingressType = 'app';
+  }
+  
   const payload = {
     callerNumber,
     contactName,
@@ -106,6 +119,7 @@ async function logTrustedBridgeActivity(args: {
     label: 'trusted',
     bridged: true,
     callSid: callSid ?? null,
+    ingressType,
   };
 
   const { data: alertRow, error } = await supabaseAdmin
@@ -435,7 +449,8 @@ async function bridgeToProfile(
           callerId,
           ingressResult.destination,
           profile.fallback_phone_number || null,
-          ingressResult.ingressResult?.ingressType
+          ingressResult.ingressResult?.ingressType,
+          bridgeFallbackUrl
         );
         return `pstn=${maskPhoneNumber(ingressResult.destination)} (${ingressResult.ingressResult?.ingressType})`;
       }
@@ -744,17 +759,50 @@ async function getProfileByToNumber(to?: string | null) {
   if (!to) {
     return null;
   }
+  
+  // Normalize incoming number to E.164 format to match stored values
+  const normalizedTo = normalizeE164(to);
+  if (!normalizedTo) {
+    return null;
+  }
+  
+  // First check if it matches an assigned VoIP number
   const { data: profile, error } = await supabaseAdmin
     .from('profiles')
     .select(
       'id, caretaker_id, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at, has_active_subscription, multi_endpoint_enabled'
     )
-    .eq('twilio_virtual_number', to)
+    .eq('twilio_virtual_number', normalizedTo)
     .single();
-  if (error || !profile) {
-    return null;
+  
+  if (!error && profile) {
+    return profile;
   }
-  return profile;
+  
+  // If not found in VoIP numbers, check if it matches an endpoint
+  const { data: endpoint, error: endpointError } = await supabaseAdmin
+    .from('profile_endpoints')
+    .select('profile_id, endpoint_type, phone_number_e164')
+    .eq('phone_number_e164', normalizedTo)
+    .eq('is_active', true)
+    .single();
+  
+  if (!endpointError && endpoint) {
+    // Found an endpoint - fetch the full profile
+    const { data: profileFromEndpoint, error: profileError } = await supabaseAdmin
+      .from('profiles')
+      .select(
+        'id, caretaker_id, phone_number, fallback_phone_number, twilio_virtual_number, pin_hash, pin_pepper_version, passcode_hash, twilio_client_identity, twilio_client_last_seen_at, has_active_subscription, multi_endpoint_enabled'
+      )
+      .eq('id', endpoint.profile_id)
+      .single();
+    
+    if (!profileError && profileFromEndpoint) {
+      return profileFromEndpoint;
+    }
+  }
+  
+  return null;
 }
 
 /**
