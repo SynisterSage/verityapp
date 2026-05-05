@@ -590,9 +590,8 @@ async function callIncoming(req: Request, res: Response) {
     logger.info(
       `[twilio-incoming] Call to inactive profile profileId=${profile.id} toNumber=${toNumber} callSid=${callSid}`
     );
-    appendVoicemail(
+    appendHangupMessage(
       twimlResponse,
-      callbackUrl,
       'This account is inactive. Please check your subscription status.'
     );
     return res.type('text/xml').send(twimlResponse.toString());
@@ -605,9 +604,8 @@ async function callIncoming(req: Request, res: Response) {
       logger.info(
         `[twilio-incoming] Call to orphaned DID (trial expired) toNumber=${toNumber} callSid=${callSid}`
       );
-      appendVoicemail(
+      appendHangupMessage(
         twimlResponse,
-        callbackUrl,
         'This number is no longer active. If you believe this is an error, please contact support.'
       );
       return res.type('text/xml').send(twimlResponse.toString());
@@ -785,7 +783,7 @@ async function getProfileByToNumber(to?: string | null) {
     .select('profile_id, endpoint_type, phone_number_e164')
     .eq('phone_number_e164', normalizedTo)
     .eq('is_active', true)
-    .single();
+    .maybeSingle();
   
   if (!endpointError && endpoint) {
     // Found an endpoint - fetch the full profile
@@ -813,16 +811,17 @@ async function isOrphanedDid(number?: string | null) {
   if (!number) {
     return false;
   }
+  const normalizedNumber = normalizeE164(number) ?? number;
   try {
     const { data, error } = await supabaseAdmin
       .from('orphaned_dids')
       .select('id, original_profile_id, reclaim_reason')
-      .eq('phone_number', number)
+      .eq('phone_number', normalizedNumber)
       .maybeSingle();
     return !error && data !== null;
   } catch (err) {
     logger.warn(
-      `Failed checking orphaned DID status for number=${number} error=${String(err)}`
+      `Failed checking orphaned DID status for number=${normalizedNumber} error=${String(err)}`
     );
     return false;
   }
@@ -1129,11 +1128,18 @@ async function recordingReady(req: Request, res: Response) {
       'id, caretaker_id, alert_threshold_score, enable_email_alerts, enable_sms_alerts, enable_push_alerts, auto_mark_enabled, auto_mark_fraud_threshold, auto_mark_safe_threshold, auto_trust_on_safe, auto_block_on_fraud'
     )
     .eq('twilio_virtual_number', resolvedTo)
-    .single();
+    .maybeSingle();
 
   if (profileError || !profile) {
-    logger.warn(
-      `No profile found for To=${resolvedTo} error=${profileError?.message ?? 'none'}`
+    const orphaned = await isOrphanedDid(resolvedTo);
+    if (orphaned) {
+      logger.info(
+        `Recording ready ignored for orphaned DID To=${resolvedTo} CallSid=${CallSid ?? 'n/a'}`
+      );
+      return res.status(204).end();
+    }
+    logger.info(
+      `Recording ready ignored for unassigned DID To=${resolvedTo} CallSid=${CallSid ?? 'n/a'} error=${profileError?.message ?? 'none'}`
     );
     return res.status(204).end();
   }

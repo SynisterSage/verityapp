@@ -114,33 +114,23 @@ export async function detectCallIngress(
     const normalizedFrom = normalizeE164(fromNumber);
 
     // Strategy 1: Check ForwardedFrom header (highest trust)
-    if (forwardedFrom) {
+    // Match ForwardedFrom against actual endpoint phone numbers
+    if (forwardedFrom && endpoints && endpoints.length > 0) {
       const normalizedForwarded = normalizeE164(forwardedFrom);
       
-      // Check if forwarded number matches mobile
-      if (profile.phone_number && phonesMatch(normalizedForwarded, profile.phone_number)) {
-        logger.info(`[ingress] High-confidence mobile detection via ForwardedFrom: ${forwardedFrom}`);
-        return {
-          ingressType: 'mobile',
-          ingressConfidence: 'high',
-          ingressFromNumber: fromNumber,
-          forwardedFromNumber: forwardedFrom,
-          aniConfidence: 'high',
-          details: { method: 'forwarded_from_header', endpoint_data: 'phone_number' },
-        };
-      }
-
-      // Check if forwarded number matches landline
-      if (profile.fallback_phone_number && phonesMatch(normalizedForwarded, profile.fallback_phone_number)) {
-        logger.info(`[ingress] High-confidence landline detection via ForwardedFrom: ${forwardedFrom}`);
-        return {
-          ingressType: 'landline',
-          ingressConfidence: 'high',
-          ingressFromNumber: fromNumber,
-          forwardedFromNumber: forwardedFrom,
-          aniConfidence: 'high',
-          details: { method: 'forwarded_from_header', endpoint_data: 'fallback_phone_number' },
-        };
+      for (const endpoint of endpoints) {
+        if (endpoint.phone_number_e164 && normalizeE164(endpoint.phone_number_e164) === normalizedForwarded) {
+          const endpointDesc = endpoint.endpoint_type === 'mobile' ? 'mobile' : 'landline';
+          logger.info(`[ingress] High-confidence ${endpointDesc} detection via ForwardedFrom: ${forwardedFrom}`);
+          return {
+            ingressType: endpoint.endpoint_type as 'mobile' | 'landline',
+            ingressConfidence: 'high',
+            ingressFromNumber: fromNumber,
+            forwardedFromNumber: forwardedFrom,
+            aniConfidence: 'high',
+            details: { method: 'forwarded_from_header', endpoint_type: endpoint.endpoint_type },
+          };
+        }
       }
     }
 
